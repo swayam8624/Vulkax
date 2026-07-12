@@ -1,0 +1,7 @@
+{
+  "technique": "ssbo",
+  "frames": 3,
+  "warmupFrames": 10,
+  "measurementGroup": "vulkan_windowed_measurements",
+  "path": "vulkan-windowed"
+}

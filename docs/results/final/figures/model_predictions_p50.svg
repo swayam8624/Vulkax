@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="420" viewBox="0 0 920 420">
+<rect width="100%" height="100%" fill="#101418"/>
+<text x="80" y="30" fill="#f4f7fb" font-family="Arial" font-size="20">model_predictions p50 Time or Modeled Cost (ms)</text>
+<line x1="80" y1="340" x2="896" y2="340" stroke="#6b7280"/>
+<line x1="80" y1="48" x2="80" y2="340" stroke="#6b7280"/>
+<rect x="86.0" y="48.0" width="392.0" height="292.0" fill="#4cc9f0"/>
+<text transform="translate(282.0,366) rotate(-35)" fill="#d1d5db" font-family="Arial" font-size="11" text-anchor="end">cpu-clustered</text>
+<text x="86.0" y="44.0" fill="#e5e7eb" font-family="Arial" font-size="11">0.465</text>
+<rect x="490.0" y="48.0" width="392.0" height="292.0" fill="#4cc9f0"/>
+<text transform="translate(686.0,366) rotate(-35)" fill="#d1d5db" font-family="Arial" font-size="11" text-anchor="end">fixed-cluster-cost-model</text>
+<text x="490.0" y="44.0" fill="#e5e7eb" font-family="Arial" font-size="11">0.465</text>
+</svg>

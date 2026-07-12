@@ -1,0 +1,21 @@
+{
+  "technique": "fixed-cluster-cost-model",
+  "frames": 3,
+  "activeClusters": 3456,
+  "averageLightsPerCluster": 6.40393,
+  "maximumLightsPerCluster": 100,
+  "lightListBytes": 19292,
+  "evaluatedLightSamples": 3054216,
+  "prunedLightSamples": 0,
+  "predictedErrorBound": 0,
+  "modeledScalarBoundDifference": 0,
+  "modeledMaxBoundDifference": 0,
+  "derivedScalarScore": 99,
+  "measurementGroup": "model_predictions",
+  "totalModeledCostMsP50": 0.464592,
+  "totalModeledCostMsP95": 0.464592,
+  "totalModeledCostMsP99": 0.464592,
+  "lightingModeledMsP50": 0.00339357,
+  "lightingModeledMsP95": 0.00339357,
+  "clusterChurn": 0
+}

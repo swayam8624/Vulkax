@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="420" viewBox="0 0 920 420">
+<rect width="100%" height="100%" fill="#101418"/>
+<text x="80" y="30" fill="#f4f7fb" font-family="Arial" font-size="20">vulkan_cpu_measurements p95 Time or Modeled Cost (ms)</text>
+<line x1="80" y1="340" x2="896" y2="340" stroke="#6b7280"/>
+<line x1="80" y1="48" x2="80" y2="340" stroke="#6b7280"/>
+<rect x="86.0" y="48.0" width="103.4" height="292.0" fill="#4cc9f0"/>
+<text transform="translate(137.7,366) rotate(-35)" fill="#d1d5db" font-family="Arial" font-size="11" text-anchor="end">adaptive-bounded</text>
+<text x="86.0" y="44.0" fill="#e5e7eb" font-family="Arial" font-size="11">25.9</text>
+<rect x="201.4" y="110.2" width="103.4" height="229.8" fill="#4cc9f0"/>
+<text transform="translate(253.1,366) rotate(-35)" fill="#d1d5db" font-family="Arial" font-size="11" text-anchor="end">adaptive-exact</text>
+<text x="201.4" y="104.2" fill="#e5e7eb" font-family="Arial" font-size="11">20.4</text>
+<rect x="316.9" y="244.5" width="103.4" height="95.5" fill="#4cc9f0"/>
+<text transform="translate(368.6,366) rotate(-35)" fill="#d1d5db" font-family="Arial" font-size="11" text-anchor="end">baseline</text>
+<text x="316.9" y="238.5" fill="#e5e7eb" font-family="Arial" font-size="11">8.48</text>
+<rect x="432.3" y="133.6" width="103.4" height="206.4" fill="#4cc9f0"/>
+<text transform="translate(484.0,366) rotate(-35)" fill="#d1d5db" font-family="Arial" font-size="11" text-anchor="end">beacon</text>
+<text x="432.3" y="127.6" fill="#e5e7eb" font-family="Arial" font-size="11">18.3</text>
+<rect x="547.7" y="52.4" width="103.4" height="287.6" fill="#4cc9f0"/>
+<text transform="translate(599.4,366) rotate(-35)" fill="#d1d5db" font-family="Arial" font-size="11" text-anchor="end">gpu-clustered</text>
+<text x="547.7" y="46.4" fill="#e5e7eb" font-family="Arial" font-size="11">25.5</text>
+<rect x="663.1" y="97.5" width="103.4" height="242.5" fill="#4cc9f0"/>
+<text transform="translate(714.9,366) rotate(-35)" fill="#d1d5db" font-family="Arial" font-size="11" text-anchor="end">instanced</text>
+<text x="663.1" y="91.5" fill="#e5e7eb" font-family="Arial" font-size="11">21.5</text>
+<rect x="778.6" y="127.8" width="103.4" height="212.2" fill="#4cc9f0"/>
+<text transform="translate(830.3,366) rotate(-35)" fill="#d1d5db" font-family="Arial" font-size="11" text-anchor="end">ssbo</text>
+<text x="778.6" y="121.8" fill="#e5e7eb" font-family="Arial" font-size="11">18.8</text>
+</svg>

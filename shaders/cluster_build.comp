@@ -1,0 +1,80 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct PointLight {
+  vec4 positionRadius;
+  vec4 colorIntensity;
+};
+
+struct ClusterHeader {
+  uint dataOffset;
+  uint storedCount;
+  uint totalCandidateCount;
+  uint flags;
+};
+
+const uint CLUSTER_OVERFLOW = 1u;
+
+layout(push_constant) uniform ClusterBuildConfig {
+  uint clusterCount;
+  uint lightCount;
+  uint maxLightsPerCluster;
+  uint lightIndexCapacity;
+  vec4 worldMin;
+  vec4 worldMax;
+  uvec4 gridSize;
+} config;
+
+layout(std430, set = 0, binding = 1) readonly buffer LightBuffer {
+  PointLight lights[];
+} lightBuffer;
+
+layout(std430, set = 0, binding = 4) buffer ClusterHeaders {
+  ClusterHeader headers[];
+} clusterHeaders;
+
+layout(std430, set = 0, binding = 5) buffer ClusterLightIndices {
+  uint indices[];
+} clusterLightIndices;
+
+bool sphereIntersectsAabb(vec3 center, float radius, vec3 boundsMin, vec3 boundsMax) {
+  vec3 closestPoint = clamp(center, boundsMin, boundsMax);
+  vec3 delta = center - closestPoint;
+  return dot(delta, delta) <= radius * radius;
+}
+
+void main() {
+  uint clusterId = gl_GlobalInvocationID.x;
+  if (clusterId >= config.clusterCount) {
+    return;
+  }
+
+  uint x = clusterId % config.gridSize.x;
+  uint y = (clusterId / config.gridSize.x) % config.gridSize.y;
+  uint z = clusterId / (config.gridSize.x * config.gridSize.y);
+
+  vec3 grid = vec3(config.gridSize.xyz);
+  vec3 extent = config.worldMax.xyz - config.worldMin.xyz;
+  vec3 clusterMin = config.worldMin.xyz + extent * (vec3(x, y, z) / grid);
+  vec3 clusterMax = config.worldMin.xyz + extent * (vec3(x + 1, y + 1, z + 1) / grid);
+
+  uint offset = clusterId * config.maxLightsPerCluster;
+  uint stored = 0;
+  uint candidates = 0;
+  for (uint lightIndex = 0; lightIndex < config.lightCount; ++lightIndex) {
+    PointLight light = lightBuffer.lights[lightIndex];
+    if (sphereIntersectsAabb(light.positionRadius.xyz, light.positionRadius.w, clusterMin, clusterMax)) {
+      if (stored < config.maxLightsPerCluster && offset + stored < config.lightIndexCapacity) {
+        clusterLightIndices.indices[offset + stored] = lightIndex;
+        stored += 1;
+      }
+      candidates += 1;
+    }
+  }
+
+  clusterHeaders.headers[clusterId].dataOffset = offset;
+  clusterHeaders.headers[clusterId].storedCount = stored;
+  clusterHeaders.headers[clusterId].totalCandidateCount = candidates;
+  clusterHeaders.headers[clusterId].flags = candidates > stored ? CLUSTER_OVERFLOW : 0u;
+}

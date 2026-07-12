@@ -1,0 +1,14 @@
+{
+  "technique": "fixed-cluster-cost-model",
+  "scene": "repeated",
+  "lightDistribution": "single-hotspot",
+  "objects": 20,
+  "lights": 100,
+  "frames": 3,
+  "warmupFrames": 10,
+  "seed": 1337,
+  "width": 800,
+  "height": 600,
+  "measurementGroup": "model_predictions",
+  "note": "Headless analytical model. These are model predictions, not Vulkan GPU timings or rendered image errors."
+}

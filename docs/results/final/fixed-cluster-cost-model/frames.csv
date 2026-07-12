@@ -1,0 +1,4 @@
+frame,activeClusters,activeLights,visibleObjects,avgLightsPerCluster,maxLightsPerCluster,lightListBytes,evaluatedLightSamples,prunedLightSamples,predictedErrorBound,modeledScalarBoundDifference,modeledMaxBoundDifference,derivedScalarScore,clusterBuildModeledMs,lightingModeledMs,totalModeledCostMs,splitCount,clusterChurn,measurementGroup,timingSource
+0,3456,100,20,6.40393,100,19292,3054216,0,0,0,0,99,0.461198,0.00339357,0.464592,0,0,model_predictions,modeled-headless
+1,3456,100,20,6.40393,100,19292,3054216,0,0,0,0,99,0.461198,0.00339357,0.464592,0,0,model_predictions,modeled-headless
+2,3456,100,20,6.40393,100,19292,3054216,0,0,0,0,99,0.461198,0.00339357,0.464592,0,0,model_predictions,modeled-headless

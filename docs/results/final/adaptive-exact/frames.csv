@@ -1,0 +1,4 @@
+frame,technique,cpuFrameMs,cpuClusterBuildMs,gpuClusterBuildMs,gpuLightingPassMs,gpuObjectPassMs,timingSource,activeLights,drawCalls,visibleObjects,activeClusters,maxLightsPerCluster,lightIndexCapacity,explicitClusters,bitsetClusters,overflowCount,evaluatedLightSamples,prunedLightSamples,predictedErrorBound,splitCount,mergeCount,clusterChurn,offscreenMse,offscreenPsnr,offscreenSsim,measurementGroup
+0,adaptive-exact,20.4112,0.432125,0,0,0,cpu-fallback,100,21,121,394,100,147456,281,113,0,10767,0,0,288,0,0.730964,0,99,1,vulkan_cpu_measurements
+1,adaptive-exact,20.2507,0.44525,0,0,0,cpu-fallback,100,21,121,394,100,147456,281,113,0,10763,0,0,288,0,0.730964,0,99,1,vulkan_cpu_measurements
+2,adaptive-exact,17.0438,0.410417,0,0,0,cpu-fallback,100,21,121,394,100,147456,281,113,0,10763,0,0,288,0,0.730964,0,99,1,vulkan_cpu_measurements
