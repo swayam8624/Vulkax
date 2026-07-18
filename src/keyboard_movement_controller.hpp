@@ -13,6 +13,7 @@ class KeyboardMovementController {
     int moveBackward = GLFW_KEY_S;
     int moveUp = GLFW_KEY_E;
     int moveDown = GLFW_KEY_Q;
+    int sprint = GLFW_KEY_LEFT_SHIFT;
     int lookLeft = GLFW_KEY_LEFT;
     int lookRight = GLFW_KEY_RIGHT;
     int lookUp = GLFW_KEY_UP;
@@ -23,6 +24,7 @@ class KeyboardMovementController {
 
   KeyMappings keys{};
   float moveSpeed{3.f};
+  float sprintMultiplier{4.f};
   float lookSpeed{1.5f};
 };
 }  // namespace lve

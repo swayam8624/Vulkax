@@ -383,6 +383,10 @@ void FirstApp::run() {
     viewerObject.transform.translation.z = -2.5f;
   }
   KeyboardMovementController cameraController{};
+  if (config.geoEnabled) {
+    cameraController.moveSpeed = 120.f;
+    cameraController.sprintMultiplier = 5.f;
+  }
 
   auto currentTime = std::chrono::high_resolution_clock::now();
   uint32_t submittedFrames = 0;

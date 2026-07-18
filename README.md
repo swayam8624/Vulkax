@@ -93,6 +93,10 @@ build/LveEngine --geo --geo-policy geo-beacon-bounded \
   --geo-budget-memory-mib 512 --geo-budget-upload-mibps 100
 ```
 
+Interactive controls use `W/A/S/D` for horizontal movement, `E/Q` for vertical movement, arrow
+keys for view rotation, and either Shift key for fast traversal. City mode uses metre-scale movement
+speeds appropriate for the full Connaught Place extent.
+
 Deterministic measured run:
 
 ```bash

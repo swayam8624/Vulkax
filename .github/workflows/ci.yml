@@ -7,8 +7,6 @@ on:
 jobs:
   linux-vulkan:
     runs-on: ubuntu-24.04
-    env:
-      VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
@@ -23,6 +21,15 @@ jobs:
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: Resolve Lavapipe driver
+        run: |
+          LVP_ICD="$(find /usr/share/vulkan/icd.d /etc/vulkan/icd.d \
+            -type f -name 'lvp_icd*.json' -print -quit 2>/dev/null)"
+          test -n "$LVP_ICD"
+          echo "VK_DRIVER_FILES=$LVP_ICD" >> "$GITHUB_ENV"
+          echo "Lavapipe manifest: $LVP_ICD"
+      - name: Verify Vulkan software device
+        run: vulkaninfo --summary
       - name: Vulkan software smoke test
         run: |
           xvfb-run -a build/LveEngine --geo --geo-policy fixed-lod1 \
