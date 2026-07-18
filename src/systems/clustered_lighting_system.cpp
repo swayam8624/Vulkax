@@ -137,40 +137,61 @@ void ClusteredLightingSystem::dispatch(
   vkCmdFillBuffer(commandBuffer, cursorBuffer, 0, VK_WHOLE_SIZE, 0);
   vkCmdFillBuffer(commandBuffer, blockSumBuffer, 0, VK_WHOLE_SIZE, 0);
 
-  auto barrier = [&](VkPipelineStageFlags source, VkPipelineStageFlags destination) {
+  auto barrier = [&](
+                     VkPipelineStageFlags source,
+                     VkAccessFlags sourceAccess,
+                     VkPipelineStageFlags destination) {
     VkMemoryBarrier memoryBarrier{};
     memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    memoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+    memoryBarrier.srcAccessMask = sourceAccess;
     memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
     vkCmdPipelineBarrier(
         commandBuffer, source, destination, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
   };
-  barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+  barrier(
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      VK_ACCESS_TRANSFER_WRITE_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelines[0]);
   vkCmdDispatch(commandBuffer, (push.lightCount + 63u) / 64u, 1, 1);
-  barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+  barrier(
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_ACCESS_SHADER_WRITE_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
   if (profiler != nullptr) profiler->writeTimestamp(commandBuffer, "cluster_count_end");
 
   uint32_t blockCount = (push.clusterCount + 255u) / 256u;
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelines[1]);
   vkCmdDispatch(commandBuffer, blockCount, 1, 1);
-  barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+  barrier(
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_ACCESS_SHADER_WRITE_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
   if (profiler != nullptr) profiler->writeTimestamp(commandBuffer, "cluster_local_scan_end");
 
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelines[2]);
   vkCmdDispatch(commandBuffer, 1, 1, 1);
-  barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+  barrier(
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_ACCESS_SHADER_WRITE_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
   if (profiler != nullptr) profiler->writeTimestamp(commandBuffer, "cluster_block_scan_end");
 
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelines[3]);
   vkCmdDispatch(commandBuffer, blockCount, 1, 1);
-  barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+  barrier(
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_ACCESS_SHADER_WRITE_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
   if (profiler != nullptr) profiler->writeTimestamp(commandBuffer, "cluster_offsets_end");
 
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelines[4]);
   vkCmdDispatch(commandBuffer, (push.lightCount + 63u) / 64u, 1, 1);
-  barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+  barrier(
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_ACCESS_SHADER_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
   if (profiler != nullptr) profiler->writeTimestamp(commandBuffer, "cluster_scatter_end");
 }
 

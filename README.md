@@ -157,6 +157,8 @@ bounds.
 - `src/beacon/offscreen_comparison.cpp`: exact captures and image metrics
 - `scripts/run_geobeacon_matrix.py`: resumable research matrix
 - `scripts/generate_beacon_figures.py`: raw-CSV figure regeneration
+- `scripts/android/`: Android Vulkan capability and benchmark harness
+- `.github/workflows/ci.yml`: Linux build, CTest, and Lavapipe smoke validation
 - `docs/paper/geobeacon_research.tex`: paper source
 - `docs/paper/geobeacon_research.pdf`: compiled paper
 

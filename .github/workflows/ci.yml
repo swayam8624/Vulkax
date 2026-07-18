@@ -1,0 +1,35 @@
+name: GeoBEACON CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux-vulkan:
+    runs-on: ubuntu-24.04
+    env:
+      VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ libglfw3-dev libglm-dev \
+            nlohmann-json3-dev libvulkan-dev vulkan-tools mesa-vulkan-drivers \
+            glslang-tools xvfb
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Vulkan software smoke test
+        run: |
+          xvfb-run -a build/LveEngine --geo --geo-policy fixed-lod1 \
+            --lights 10 --width 320 --height 180 --warmup-frames 1 --frames 1 \
+            --capture-reference false --output /tmp/geobeacon-ci --quiet
+      - name: Upload smoke measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: geobeacon-lavapipe-smoke
+          path: /tmp/geobeacon-ci
