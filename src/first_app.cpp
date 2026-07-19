@@ -9,6 +9,7 @@
 #include "beacon/adaptive_vulkan_builder.hpp"
 #include "geobeacon/geo_scene.hpp"
 #include "geobeacon/geo_camera_path.hpp"
+#include "geobeacon/geo_city_registry.hpp"
 #include "atlas/core/dataset.hpp"
 #include "atlas/navigation/replay_providers.hpp"
 #include "atlas/navigation/local_navigation.hpp"
@@ -233,6 +234,28 @@ vulkax::atlas::GeodeticPosition geodeticFromGeoWorld(
       frame.toEcef({world.x, world.z, 0.0}));
 }
 
+std::vector<DesktopCityOption> makeDesktopCityOptions(
+    const std::vector<geo::GeoCityDefinition>& cities,
+    const std::string& selectedId) {
+  std::vector<DesktopCityOption> options;
+  options.reserve(cities.size());
+  for (const auto& city : cities) {
+    const uint64_t mebibytes =
+        (city.installedBytes + 1024ull * 1024ull - 1) /
+        (1024ull * 1024ull);
+    options.push_back(
+        {
+            city.id,
+            city.displayName,
+            city.installed
+                ? std::to_string(mebibytes) + " MiB installed"
+                : "not installed",
+            city.id == selectedId,
+        });
+  }
+  return options;
+}
+
 glm::dquat rotationBetween(
     const glm::dvec3& from,
     const glm::dvec3& to) {
@@ -450,6 +473,17 @@ void FirstApp::run() {
   std::unique_ptr<geo::GeoScene> referenceGeoScene;
   std::unique_ptr<vulkax::atlas::LocalNavigationProvider> localNavigation;
   std::unique_ptr<DesktopMapControls> mapControls;
+  std::vector<geo::GeoCityDefinition> geoCities;
+  struct RetiredGeoCity {
+    uint64_t retireAfterFrame = 0;
+    std::unique_ptr<geo::GeoScene> scene;
+  };
+  struct RetiredRouteModel {
+    uint64_t retireAfterFrame = 0;
+    std::shared_ptr<LveModel> model;
+  };
+  std::vector<RetiredGeoCity> retiredGeoCities;
+  std::vector<RetiredRouteModel> retiredRouteModels;
   std::vector<vulkax::atlas::SearchResult> displayedSearchResults;
   std::optional<vulkax::atlas::RouteResult> activeLocalRoute;
   std::shared_ptr<LveModel> activeLocalRouteModel;
@@ -457,8 +491,8 @@ void FirstApp::run() {
   bool followingRoute = false;
   size_t followSegment = 0;
   float followSegmentProgress = 0.f;
+  geo::GeoBudgetConfig geoBudget{};
   if (config.geoEnabled) {
-    geo::GeoBudgetConfig geoBudget{};
     geoBudget.targetFrameMs = config.geoTargetFrameMs;
     geoBudget.gpuMemoryBudgetBytes = config.geoMemoryBudgetMiB * 1024ull * 1024ull;
     geoBudget.uploadBudgetMiBPerSecond = config.geoUploadBudgetMiBPerSecond;
@@ -480,6 +514,11 @@ void FirstApp::run() {
           true);
     }
     if (!config.benchmark) {
+      std::filesystem::path registryPath = config.geoCityRegistry;
+      if (registryPath.is_relative()) {
+        registryPath = std::filesystem::path{ENGINE_DIR} / registryPath;
+      }
+      geoCities = geo::loadGeoCityRegistry(registryPath);
       std::filesystem::path navigationPath = config.geoNavigationData;
       if (navigationPath.is_relative()) {
         navigationPath = std::filesystem::path{ENGINE_DIR} / navigationPath;
@@ -499,6 +538,9 @@ void FirstApp::run() {
       };
       displayedSearchResults =
           localNavigation->search(std::move(initialSearch)).get();
+      mapControls->setCities(
+          makeDesktopCityOptions(
+              geoCities, localNavigation->regionId()));
       mapControls->setSearchResults(displayedSearchResults);
       mapControls->setStatus(
           std::to_string(localNavigation->placeCount()) +
@@ -662,6 +704,22 @@ void FirstApp::run() {
     auto frameCpuStart = std::chrono::high_resolution_clock::now();
     double cpuClusterBuildMs = 0.0;
     glfwPollEvents();
+    retiredGeoCities.erase(
+        std::remove_if(
+            retiredGeoCities.begin(),
+            retiredGeoCities.end(),
+            [&](const RetiredGeoCity& city) {
+              return frameNumber >= city.retireAfterFrame;
+            }),
+        retiredGeoCities.end());
+    retiredRouteModels.erase(
+        std::remove_if(
+            retiredRouteModels.begin(),
+            retiredRouteModels.end(),
+            [&](const RetiredRouteModel& route) {
+              return frameNumber >= route.retireAfterFrame;
+            }),
+        retiredRouteModels.end());
 
     auto newTime = std::chrono::high_resolution_clock::now();
     float frameTime =
@@ -679,7 +737,84 @@ void FirstApp::run() {
     if (mapControls != nullptr && localNavigation != nullptr &&
         geoScene != nullptr) {
       while (auto action = mapControls->pollAction()) {
-        if (action->kind == DesktopMapActionKind::Search) {
+        if (action->kind == DesktopMapActionKind::SwitchCity) {
+          const auto city = std::find_if(
+              geoCities.begin(),
+              geoCities.end(),
+              [&](const geo::GeoCityDefinition& candidate) {
+                return candidate.id == action->cityId;
+              });
+          if (city == geoCities.end()) {
+            mapControls->setStatus("Selected city is not in the registry");
+            continue;
+          }
+          if (!city->installed) {
+            mapControls->setStatus(
+                city->displayName + " is not installed");
+            continue;
+          }
+          if (city->id == localNavigation->regionId()) {
+            mapControls->setStatus(city->displayName + " is already open");
+            continue;
+          }
+
+          mapControls->setStatus("Loading " + city->displayName + "...");
+          auto nextScene = std::make_unique<geo::GeoScene>(
+              lveDevice,
+              city->manifestPath,
+              config.geoPolicy,
+              config.geoCacheMode,
+              geoBudget);
+          auto nextNavigation =
+              std::make_unique<vulkax::atlas::LocalNavigationProvider>(
+                  city->navigationPath);
+          retiredGeoCities.push_back(
+              {
+                  frameNumber + LveSwapChain::MAX_FRAMES_IN_FLIGHT + 1,
+                  std::move(geoScene),
+              });
+          geoScene = std::move(nextScene);
+          localNavigation = std::move(nextNavigation);
+          config.geoManifest = city->manifestPath;
+          config.geoNavigationData = city->navigationPath;
+          activeLocalRoute.reset();
+          if (activeLocalRouteModel != nullptr) {
+            retiredRouteModels.push_back(
+                {
+                    frameNumber + LveSwapChain::MAX_FRAMES_IN_FLIGHT + 1,
+                    std::move(activeLocalRouteModel),
+                });
+          }
+          activeLocalRouteModel.reset();
+          activeRouteLocalPoints.clear();
+          followingRoute = false;
+          followSegment = 0;
+          followSegmentProgress = 0.f;
+          viewerObject.transform.translation = {0.f, -130.f, -720.f};
+          viewerObject.transform.rotation = {-0.18f, 0.f, 0.f};
+
+          vulkax::atlas::SearchRequest initialSearch{};
+          initialSearch.limit = 30;
+          initialSearch.focus = {
+              geoScene->manifest().geodeticOrigin.x,
+              geoScene->manifest().geodeticOrigin.y,
+              geoScene->manifest().geodeticOrigin.z,
+          };
+          displayedSearchResults =
+              localNavigation->search(std::move(initialSearch)).get();
+          mapControls->setMapName(localNavigation->displayName());
+          mapControls->setCities(
+              makeDesktopCityOptions(
+                  geoCities, localNavigation->regionId()));
+          mapControls->setSearchResults(displayedSearchResults);
+          mapControls->setRouteSummary(
+              "Choose a destination", 0.0, 0.0);
+          mapControls->setStatus(
+              std::to_string(localNavigation->placeCount()) +
+              " offline places · " +
+              std::to_string(localNavigation->nodeCount()) +
+              " road nodes");
+        } else if (action->kind == DesktopMapActionKind::Search) {
           vulkax::atlas::SearchRequest request{};
           request.query = action->query;
           request.limit = 30;
@@ -717,6 +852,13 @@ void FirstApp::run() {
             continue;
           }
           activeLocalRoute = std::move(routes.front());
+          if (activeLocalRouteModel != nullptr) {
+            retiredRouteModels.push_back(
+                {
+                    frameNumber + LveSwapChain::MAX_FRAMES_IN_FLIGHT + 1,
+                    std::move(activeLocalRouteModel),
+                });
+          }
           activeLocalRouteModel = buildLocalRouteModel(
               lveDevice,
               activeLocalRoute->shape,
@@ -751,6 +893,13 @@ void FirstApp::run() {
         } else if (
             action->kind == DesktopMapActionKind::ClearRoute) {
           activeLocalRoute.reset();
+          if (activeLocalRouteModel != nullptr) {
+            retiredRouteModels.push_back(
+                {
+                    frameNumber + LveSwapChain::MAX_FRAMES_IN_FLIGHT + 1,
+                    std::move(activeLocalRouteModel),
+                });
+          }
           activeLocalRouteModel.reset();
           activeRouteLocalPoints.clear();
           followingRoute = false;

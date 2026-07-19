@@ -37,7 +37,9 @@ scripts/vulkax_macos.sh london
 ```
 
 It uses the same native search, walking/driving/cycling routing, route ribbon, route-follow camera,
-semantic LODs, and bounded GeoBEACON lighting path as Connaught Place.
+semantic LODs, and bounded GeoBEACON lighting path as Connaught Place. Both installed cities are
+also available from the **Installed city** selector inside the application; switching replaces the
+active streamed scene, search index, route state, and camera without launching the globe.
 
 The local navigation database is generated deterministically from the checked OSM extract:
 

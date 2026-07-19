@@ -1,0 +1,17 @@
+{
+  "format": "Vulkax-city-registry-1",
+  "cities": [
+    {
+      "id": "connaught-place",
+      "displayName": "Connaught Place",
+      "manifest": "connaught_place/generated/geobeacon.json",
+      "navigation": "connaught_place/navigation.json"
+    },
+    {
+      "id": "central-london",
+      "displayName": "Central London",
+      "manifest": "central_london/generated/geobeacon.json",
+      "navigation": "central_london/navigation.json"
+    }
+  ]
+}

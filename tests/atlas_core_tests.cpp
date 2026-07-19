@@ -12,6 +12,7 @@
 #include "atlas/streaming/regional_pack.hpp"
 #include "atlas/streaming/globe_selector.hpp"
 #include "atlas/streaming/tile_source.hpp"
+#include "geobeacon/geo_city_registry.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -89,6 +90,16 @@ class FakeGatewayTransport final : public vulkax::atlas::HttpTransport {
 
 int main() {
   using namespace vulkax::atlas;
+
+  const auto checkedCities = lve::geo::loadGeoCityRegistry(
+      std::filesystem::path{ENGINE_DIR} / "data/cities.json");
+  assert(checkedCities.size() == 2);
+  assert(checkedCities[0].id == "connaught-place");
+  assert(checkedCities[0].installed);
+  assert(checkedCities[0].installedBytes > 1024 * 1024);
+  assert(checkedCities[1].id == "central-london");
+  assert(checkedCities[1].installed);
+  assert(checkedCities[1].installedBytes > checkedCities[0].installedBytes);
 
   const GeodeticPosition delhi{28.6139, 77.2090, 216.0};
   const std::vector<uint8_t> abc{'a', 'b', 'c'};

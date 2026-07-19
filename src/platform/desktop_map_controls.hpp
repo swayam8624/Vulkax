@@ -12,6 +12,7 @@ struct GLFWwindow;
 namespace lve {
 
 enum class DesktopMapActionKind {
+  SwitchCity,
   Search,
   Route,
   FollowRoute,
@@ -22,7 +23,15 @@ struct DesktopMapAction {
   DesktopMapActionKind kind = DesktopMapActionKind::Search;
   std::string query;
   std::string destinationId;
+  std::string cityId;
   vulkax::atlas::TravelMode mode = vulkax::atlas::TravelMode::Walking;
+};
+
+struct DesktopCityOption {
+  std::string id;
+  std::string displayName;
+  std::string status;
+  bool selected = false;
 };
 
 class DesktopMapControls {
@@ -37,6 +46,8 @@ class DesktopMapControls {
 
   bool available() const;
   std::optional<DesktopMapAction> pollAction();
+  void setMapName(const std::string& mapName);
+  void setCities(const std::vector<DesktopCityOption>& cities);
   void setSearchResults(
       const std::vector<vulkax::atlas::SearchResult>& results);
   void setStatus(const std::string& status);

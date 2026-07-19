@@ -167,6 +167,9 @@ BenchmarkConfig parseCommandLine(int argc, char** argv) {
     } else if (consumeValue(i, argc, argv, "--geo-navigation", value)) {
       config.geoNavigationData = value;
       config.geoEnabled = true;
+    } else if (consumeValue(i, argc, argv, "--geo-city-registry", value)) {
+      config.geoCityRegistry = value;
+      config.geoEnabled = true;
     } else if (consumeValue(i, argc, argv, "--atlas-manifest", value)) {
       config.atlasManifest = value;
       config.atlasEnabled = true;

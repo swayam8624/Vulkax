@@ -11,6 +11,8 @@ bool DesktopMapControls::available() const { return false; }
 std::optional<DesktopMapAction> DesktopMapControls::pollAction() {
   return std::nullopt;
 }
+void DesktopMapControls::setMapName(const std::string&) {}
+void DesktopMapControls::setCities(const std::vector<DesktopCityOption>&) {}
 void DesktopMapControls::setSearchResults(
     const std::vector<vulkax::atlas::SearchResult>&) {}
 void DesktopMapControls::setStatus(const std::string&) {}

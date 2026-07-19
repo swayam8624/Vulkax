@@ -72,6 +72,25 @@ class GeoBeaconToolsTests(unittest.TestCase):
                 self.assertGreater(indices, 0)
                 self.assertEqual(path.stat().st_size, representation["bytes"])
 
+    def test_checked_city_registry(self):
+        registry = json.loads((ROOT / "data/cities.json").read_text())
+        self.assertEqual(registry["format"], "Vulkax-city-registry-1")
+        self.assertEqual(
+            [city["id"] for city in registry["cities"]],
+            ["connaught-place", "central-london"],
+        )
+        for city in registry["cities"]:
+            manifest = json.loads(
+                (ROOT / "data" / city["manifest"]).read_text()
+            )
+            navigation = json.loads(
+                (ROOT / "data" / city["navigation"]).read_text()
+            )
+            self.assertEqual(manifest["datasetId"], city["id"])
+            self.assertEqual(manifest["displayName"], city["displayName"])
+            self.assertEqual(navigation["region"], city["id"])
+            self.assertEqual(navigation["displayName"], city["displayName"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -304,7 +304,11 @@ if (BUILD_TESTING)
   target_link_libraries(BeaconCoreTests PRIVATE glm::glm)
   add_test(NAME beacon_core COMMAND BeaconCoreTests)
 
-  add_executable(AtlasCoreTests tests/atlas_core_tests.cpp)
+  add_executable(
+    AtlasCoreTests
+    tests/atlas_core_tests.cpp
+    src/geobeacon/geo_city_registry.cpp
+  )
   target_compile_features(AtlasCoreTests PRIVATE cxx_std_20)
   target_compile_definitions(
     AtlasCoreTests PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/"

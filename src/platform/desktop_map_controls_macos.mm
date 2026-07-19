@@ -25,6 +25,8 @@ struct DesktopMapControls::Impl {
   std::mutex mutex;
   std::deque<DesktopMapAction> actions;
   NSVisualEffectView* panel = nil;
+  NSTextField* title = nil;
+  NSPopUpButton* cities = nil;
   NSSearchField* search = nil;
   NSPopUpButton* results = nil;
   NSPopUpButton* mode = nil;
@@ -62,6 +64,7 @@ NSTextField* label(NSString* text, NSFont* font) {
 
 @interface VulkaxMapControlTarget : NSObject
 @property(nonatomic, assign) void* owner;
+- (void)cityPressed:(id)sender;
 - (void)searchPressed:(id)sender;
 - (void)routePressed:(id)sender;
 - (void)followPressed:(id)sender;
@@ -71,6 +74,17 @@ NSTextField* label(NSString* text, NSFont* font) {
 @implementation VulkaxMapControlTarget
 - (lve::DesktopMapControls::Impl*)impl {
   return static_cast<lve::DesktopMapControls::Impl*>(self.owner);
+}
+
+- (void)cityPressed:(id)sender {
+  auto* state = [self impl];
+  NSMenuItem* selected = state->cities.selectedItem;
+  if (selected == nil || selected.representedObject == nil) return;
+  lve::DesktopMapAction action{};
+  action.kind = lve::DesktopMapActionKind::SwitchCity;
+  action.cityId =
+      [static_cast<NSString*>(selected.representedObject) UTF8String] ?: "";
+  state->enqueue(std::move(action));
 }
 
 - (void)searchPressed:(id)sender {
@@ -115,7 +129,7 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
   if (content == nil) return;
 
   impl->panel = [[NSVisualEffectView alloc]
-      initWithFrame:NSMakeRect(16.0, content.bounds.size.height - 330.0, 340.0, 314.0)];
+      initWithFrame:NSMakeRect(16.0, content.bounds.size.height - 376.0, 340.0, 360.0)];
   impl->panel.material = NSVisualEffectMaterialSidebar;
   impl->panel.blendingMode = NSVisualEffectBlendingModeWithinWindow;
   impl->panel.state = NSVisualEffectStateActive;
@@ -124,18 +138,31 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
   impl->panel.layer.masksToBounds = YES;
   impl->panel.autoresizingMask = NSViewMinYMargin | NSViewMaxXMargin;
 
-  NSStackView* stack = [[NSStackView alloc] initWithFrame:NSMakeRect(16, 14, 308, 286)];
+  NSStackView* stack = [[NSStackView alloc] initWithFrame:NSMakeRect(16, 14, 308, 332)];
   stack.orientation = NSUserInterfaceLayoutOrientationVertical;
   stack.alignment = NSLayoutAttributeLeading;
   stack.spacing = 10.0;
   stack.distribution = NSStackViewDistributionGravityAreas;
   stack.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
-  NSTextField* title =
+  impl->title =
       label(nsString(mapName), [NSFont systemFontOfSize:20 weight:NSFontWeightSemibold]);
   NSTextField* subtitle =
       label(@"Offline search and road navigation", [NSFont systemFontOfSize:12]);
   subtitle.textColor = NSColor.secondaryLabelColor;
+
+  impl->cities =
+      [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 230, 28) pullsDown:NO];
+  impl->cities.accessibilityLabel = @"Installed city";
+  NSButton* cityButton = [NSButton buttonWithTitle:@"Open"
+                                            target:nil
+                                            action:nil];
+  cityButton.bezelStyle = NSBezelStyleRounded;
+  cityButton.accessibilityLabel = @"Open selected city";
+  NSStackView* cityRow =
+      [NSStackView stackViewWithViews:@[impl->cities, cityButton]];
+  cityRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+  cityRow.spacing = 8.0;
 
   impl->search = [[NSSearchField alloc] initWithFrame:NSMakeRect(0, 0, 308, 28)];
   impl->search.placeholderString = @"Search places, roads, metro gates";
@@ -189,16 +216,19 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
   impl->status.textColor = NSColor.secondaryLabelColor;
 
   for (NSView* view in @[
-           title,
+           impl->title,
            subtitle,
+           cityRow,
            searchRow,
            impl->results,
            routeRow,
            impl->routeSummary,
            impl->status,
-       ]) {
+  ]) {
     [stack addArrangedSubview:view];
   }
+  [[cityRow.widthAnchor constraintEqualToConstant:308] setActive:YES];
+  [[impl->cities.widthAnchor constraintEqualToConstant:230] setActive:YES];
   [[searchRow.widthAnchor constraintEqualToConstant:308] setActive:YES];
   [[impl->search.widthAnchor constraintEqualToConstant:230] setActive:YES];
   [[impl->results.widthAnchor constraintEqualToConstant:308] setActive:YES];
@@ -209,6 +239,8 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
   VulkaxMapControlTarget* target = [[VulkaxMapControlTarget alloc] init];
   target.owner = impl.get();
   impl->target = target;
+  cityButton.target = target;
+  cityButton.action = @selector(cityPressed:);
   searchButton.target = target;
   searchButton.action = @selector(searchPressed:);
   impl->search.target = target;
@@ -239,6 +271,31 @@ std::optional<DesktopMapAction> DesktopMapControls::pollAction() {
   auto action = std::move(impl->actions.front());
   impl->actions.pop_front();
   return action;
+}
+
+void DesktopMapControls::setMapName(const std::string& mapName) {
+  impl->title.stringValue = nsString(mapName);
+  impl->search.accessibilityLabel =
+      [NSString stringWithFormat:@"Search %@", nsString(mapName)];
+}
+
+void DesktopMapControls::setCities(
+    const std::vector<DesktopCityOption>& cities) {
+  [impl->cities removeAllItems];
+  NSInteger selectedIndex = -1;
+  for (size_t index = 0; index < cities.size(); ++index) {
+    const auto& city = cities[index];
+    NSString* title = [NSString
+        stringWithFormat:@"%@ · %@",
+                         nsString(city.displayName),
+                         nsString(city.status)];
+    [impl->cities addItemWithTitle:title];
+    impl->cities.lastItem.representedObject = nsString(city.id);
+    if (city.selected) selectedIndex = static_cast<NSInteger>(index);
+  }
+  if (selectedIndex >= 0) {
+    [impl->cities selectItemAtIndex:selectedIndex];
+  }
 }
 
 void DesktopMapControls::setSearchResults(

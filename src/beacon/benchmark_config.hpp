@@ -91,6 +91,7 @@ struct BenchmarkConfig {
   std::filesystem::path geoManifest = "data/connaught_place/generated/geobeacon.json";
   std::filesystem::path geoNavigationData =
       "data/connaught_place/navigation.json";
+  std::filesystem::path geoCityRegistry = "data/cities.json";
   float geoTargetFrameMs = 16.67f;
   uint64_t geoMemoryBudgetMiB = 512;
   float geoUploadBudgetMiBPerSecond = 100.f;
