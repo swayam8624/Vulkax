@@ -1,5 +1,6 @@
 #include "lve_model.hpp"
 
+#include "runtime_paths.hpp"
 #include "lve_utils.hpp"
 
 // libs
@@ -13,10 +14,6 @@
 #include <cmath>
 #include <cstring>
 #include <unordered_map>
-
-#ifndef ENGINE_DIR
-#define ENGINE_DIR "../"
-#endif
 
 namespace std {
 template <>
@@ -41,7 +38,7 @@ LveModel::~LveModel() {}
 std::unique_ptr<LveModel> LveModel::createModelFromFile(
     LveDevice &device, const std::string &filepath) {
   Builder builder{};
-  builder.loadModel(ENGINE_DIR + filepath);
+  builder.loadModel(resolveRuntimeResource(filepath).string());
   return std::make_unique<LveModel>(device, builder);
 }
 

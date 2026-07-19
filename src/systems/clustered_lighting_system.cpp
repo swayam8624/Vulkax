@@ -1,12 +1,10 @@
 #include "systems/clustered_lighting_system.hpp"
 
+#include "runtime_paths.hpp"
+
 #include <cassert>
 #include <fstream>
 #include <stdexcept>
-
-#ifndef ENGINE_DIR
-#define ENGINE_DIR "../"
-#endif
 
 namespace lve {
 
@@ -28,10 +26,11 @@ ClusteredLightingSystem::~ClusteredLightingSystem() {
 }
 
 std::vector<char> ClusteredLightingSystem::readFile(const std::string& filepath) {
-  std::string enginePath = ENGINE_DIR + filepath;
-  std::ifstream file{enginePath, std::ios::ate | std::ios::binary};
+  const auto resourcePath = resolveRuntimeResource(filepath);
+  std::ifstream file{resourcePath, std::ios::ate | std::ios::binary};
   if (!file.is_open()) {
-    throw std::runtime_error("failed to open file: " + enginePath);
+    throw std::runtime_error(
+        "failed to open file: " + resourcePath.string());
   }
 
   size_t fileSize = static_cast<size_t>(file.tellg());

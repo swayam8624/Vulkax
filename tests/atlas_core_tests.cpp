@@ -97,9 +97,11 @@ int main() {
   assert(checkedCities[0].id == "connaught-place");
   assert(checkedCities[0].installed);
   assert(checkedCities[0].installedBytes > 1024 * 1024);
+  assert(close(checkedCities[0].centerWgs84.x, 28.63175, 1e-8));
   assert(checkedCities[1].id == "central-london");
   assert(checkedCities[1].installed);
   assert(checkedCities[1].installedBytes > checkedCities[0].installedBytes);
+  assert(close(checkedCities[1].centerWgs84.x, 51.5095, 1e-8));
 
   const GeodeticPosition delhi{28.6139, 77.2090, 216.0};
   const std::vector<uint8_t> abc{'a', 'b', 'c'};

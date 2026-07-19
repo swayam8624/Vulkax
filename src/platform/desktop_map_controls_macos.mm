@@ -28,8 +28,12 @@ struct DesktopMapControls::Impl {
   NSTextField* title = nil;
   NSPopUpButton* cities = nil;
   NSSearchField* search = nil;
+  NSButton* searchButton = nil;
   NSPopUpButton* results = nil;
   NSPopUpButton* mode = nil;
+  NSButton* routeButton = nil;
+  NSButton* followButton = nil;
+  NSButton* clearButton = nil;
   NSTextField* status = nil;
   NSTextField* routeSummary = nil;
   NSObject* target = nil;
@@ -64,6 +68,7 @@ NSTextField* label(NSString* text, NSFont* font) {
 
 @interface VulkaxMapControlTarget : NSObject
 @property(nonatomic, assign) void* owner;
+- (void)worldPressed:(id)sender;
 - (void)cityPressed:(id)sender;
 - (void)searchPressed:(id)sender;
 - (void)routePressed:(id)sender;
@@ -74,6 +79,12 @@ NSTextField* label(NSString* text, NSFont* font) {
 @implementation VulkaxMapControlTarget
 - (lve::DesktopMapControls::Impl*)impl {
   return static_cast<lve::DesktopMapControls::Impl*>(self.owner);
+}
+
+- (void)worldPressed:(id)sender {
+  lve::DesktopMapAction action{};
+  action.kind = lve::DesktopMapActionKind::ShowWorld;
+  [self impl]->enqueue(std::move(action));
 }
 
 - (void)cityPressed:(id)sender {
@@ -152,15 +163,20 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
   subtitle.textColor = NSColor.secondaryLabelColor;
 
   impl->cities =
-      [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 230, 28) pullsDown:NO];
+      [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 176, 28) pullsDown:NO];
   impl->cities.accessibilityLabel = @"Installed city";
   NSButton* cityButton = [NSButton buttonWithTitle:@"Open"
                                             target:nil
                                             action:nil];
   cityButton.bezelStyle = NSBezelStyleRounded;
   cityButton.accessibilityLabel = @"Open selected city";
+  NSButton* worldButton = [NSButton buttonWithTitle:@"World"
+                                             target:nil
+                                             action:nil];
+  worldButton.bezelStyle = NSBezelStyleRounded;
+  worldButton.accessibilityLabel = @"Show world overview";
   NSStackView* cityRow =
-      [NSStackView stackViewWithViews:@[impl->cities, cityButton]];
+      [NSStackView stackViewWithViews:@[impl->cities, cityButton, worldButton]];
   cityRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
   cityRow.spacing = 8.0;
 
@@ -169,11 +185,11 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
   impl->search.accessibilityLabel =
       [NSString stringWithFormat:@"Search %@", nsString(mapName)];
 
-  NSButton* searchButton = [NSButton buttonWithTitle:@"Search"
-                                              target:nil
-                                              action:nil];
-  searchButton.bezelStyle = NSBezelStyleRounded;
-  searchButton.accessibilityLabel = @"Search places";
+  impl->searchButton = [NSButton buttonWithTitle:@"Search"
+                                          target:nil
+                                          action:nil];
+  impl->searchButton.bezelStyle = NSBezelStyleRounded;
+  impl->searchButton.accessibilityLabel = @"Search places";
 
   impl->results =
       [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 308, 28) pullsDown:NO];
@@ -183,28 +199,34 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
   [impl->mode addItemsWithTitles:@[@"Walking", @"Driving", @"Cycling"]];
   impl->mode.accessibilityLabel = @"Travel mode";
 
-  NSButton* routeButton = [NSButton buttonWithTitle:@"Route"
-                                             target:nil
-                                             action:nil];
-  routeButton.bezelStyle = NSBezelStyleRounded;
-  routeButton.accessibilityLabel = @"Create route";
-  NSButton* followButton = [NSButton buttonWithTitle:@"Follow"
-                                              target:nil
-                                              action:nil];
-  followButton.bezelStyle = NSBezelStyleRounded;
-  followButton.accessibilityLabel = @"Follow current route";
-  NSButton* clearButton = [NSButton buttonWithTitle:@"Clear"
-                                             target:nil
-                                             action:nil];
-  clearButton.bezelStyle = NSBezelStyleRounded;
-  clearButton.accessibilityLabel = @"Clear current route";
+  impl->routeButton = [NSButton buttonWithTitle:@"Route"
+                                         target:nil
+                                         action:nil];
+  impl->routeButton.bezelStyle = NSBezelStyleRounded;
+  impl->routeButton.accessibilityLabel = @"Create route";
+  impl->followButton = [NSButton buttonWithTitle:@"Follow"
+                                          target:nil
+                                          action:nil];
+  impl->followButton.bezelStyle = NSBezelStyleRounded;
+  impl->followButton.accessibilityLabel = @"Follow current route";
+  impl->clearButton = [NSButton buttonWithTitle:@"Clear"
+                                         target:nil
+                                         action:nil];
+  impl->clearButton.bezelStyle = NSBezelStyleRounded;
+  impl->clearButton.accessibilityLabel = @"Clear current route";
 
   NSStackView* searchRow =
-      [NSStackView stackViewWithViews:@[impl->search, searchButton]];
+      [NSStackView stackViewWithViews:@[impl->search, impl->searchButton]];
   searchRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
   searchRow.spacing = 8.0;
   NSStackView* routeRow =
-      [NSStackView stackViewWithViews:@[impl->mode, routeButton, followButton, clearButton]];
+      [NSStackView
+          stackViewWithViews:@[
+            impl->mode,
+            impl->routeButton,
+            impl->followButton,
+            impl->clearButton,
+          ]];
   routeRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
   routeRow.spacing = 6.0;
 
@@ -228,7 +250,7 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
     [stack addArrangedSubview:view];
   }
   [[cityRow.widthAnchor constraintEqualToConstant:308] setActive:YES];
-  [[impl->cities.widthAnchor constraintEqualToConstant:230] setActive:YES];
+  [[impl->cities.widthAnchor constraintEqualToConstant:176] setActive:YES];
   [[searchRow.widthAnchor constraintEqualToConstant:308] setActive:YES];
   [[impl->search.widthAnchor constraintEqualToConstant:230] setActive:YES];
   [[impl->results.widthAnchor constraintEqualToConstant:308] setActive:YES];
@@ -241,16 +263,18 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
   impl->target = target;
   cityButton.target = target;
   cityButton.action = @selector(cityPressed:);
-  searchButton.target = target;
-  searchButton.action = @selector(searchPressed:);
+  worldButton.target = target;
+  worldButton.action = @selector(worldPressed:);
+  impl->searchButton.target = target;
+  impl->searchButton.action = @selector(searchPressed:);
   impl->search.target = target;
   impl->search.action = @selector(searchPressed:);
-  routeButton.target = target;
-  routeButton.action = @selector(routePressed:);
-  followButton.target = target;
-  followButton.action = @selector(followPressed:);
-  clearButton.target = target;
-  clearButton.action = @selector(clearPressed:);
+  impl->routeButton.target = target;
+  impl->routeButton.action = @selector(routePressed:);
+  impl->followButton.target = target;
+  impl->followButton.action = @selector(followPressed:);
+  impl->clearButton.target = target;
+  impl->clearButton.action = @selector(clearPressed:);
 
   [impl->panel addSubview:stack];
   [content addSubview:impl->panel positioned:NSWindowAbove relativeTo:nil];
@@ -300,6 +324,16 @@ void DesktopMapControls::setCities(
 
 void DesktopMapControls::setSearchQuery(const std::string& query) {
   impl->search.stringValue = nsString(query);
+}
+
+void DesktopMapControls::setNavigationEnabled(bool enabled) {
+  impl->search.enabled = enabled;
+  impl->searchButton.enabled = enabled;
+  impl->results.enabled = enabled;
+  impl->mode.enabled = enabled;
+  impl->routeButton.enabled = enabled;
+  impl->followButton.enabled = enabled;
+  impl->clearButton.enabled = enabled;
 }
 
 void DesktopMapControls::setSearchResults(

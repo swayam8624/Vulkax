@@ -5,11 +5,14 @@
 #include <string>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 namespace lve::geo {
 
 struct GeoCityDefinition {
   std::string id;
   std::string displayName;
+  glm::dvec3 centerWgs84{};
   std::filesystem::path manifestPath;
   std::filesystem::path navigationPath;
   bool installed = false;

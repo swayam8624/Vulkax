@@ -80,6 +80,7 @@ class GeoBeaconToolsTests(unittest.TestCase):
             ["connaught-place", "central-london"],
         )
         for city in registry["cities"]:
+            self.assertEqual(len(city["center"]), 3)
             manifest = json.loads(
                 (ROOT / "data" / city["manifest"]).read_text()
             )
@@ -90,6 +91,12 @@ class GeoBeaconToolsTests(unittest.TestCase):
             self.assertEqual(manifest["displayName"], city["displayName"])
             self.assertEqual(navigation["region"], city["id"])
             self.assertEqual(navigation["displayName"], city["displayName"])
+            self.assertAlmostEqual(
+                manifest["originWgs84"][0], city["center"][0], places=5
+            )
+            self.assertAlmostEqual(
+                manifest["originWgs84"][1], city["center"][1], places=5
+            )
 
 
 if __name__ == "__main__":

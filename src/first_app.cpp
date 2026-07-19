@@ -20,12 +20,14 @@
 #include "systems/point_light_system.hpp"
 #include "systems/simple_render_system.hpp"
 #include "platform/desktop_map_controls.hpp"
+#include "runtime_paths.hpp"
 
 // libs
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 // std
@@ -256,6 +258,78 @@ std::vector<DesktopCityOption> makeDesktopCityOptions(
   return options;
 }
 
+std::shared_ptr<LveModel> buildWorldGlobeModel(LveDevice& device) {
+  const auto globe = vulkax::atlas::buildWgs84Ellipsoid();
+  LveModel::Builder builder{};
+  builder.vertices.reserve(globe.vertices.size());
+  for (const auto& source : globe.vertices) {
+    builder.vertices.push_back(
+        {source.position, source.color, source.normal, source.uv});
+  }
+  builder.indices = globe.indices;
+  return std::make_shared<LveModel>(device, builder);
+}
+
+std::shared_ptr<LveModel> buildWorldCityMarkerModel(
+    LveDevice& device,
+    const std::vector<geo::GeoCityDefinition>& cities) {
+  LveModel::Builder builder{};
+  const auto appendTriangle =
+      [&](const glm::vec3& a,
+          const glm::vec3& b,
+          const glm::vec3& c,
+          const glm::vec3& color) {
+        const glm::vec3 normal = glm::normalize(glm::cross(b - a, c - a));
+        const uint32_t first =
+            static_cast<uint32_t>(builder.vertices.size());
+        builder.vertices.push_back({a, color, normal, {0.f, 0.f}});
+        builder.vertices.push_back({b, color, normal, {1.f, 0.f}});
+        builder.vertices.push_back({c, color, normal, {0.5f, 1.f}});
+        builder.indices.insert(
+            builder.indices.end(), {first, first + 1, first + 2});
+      };
+
+  constexpr float equatorialRadius = 10.f;
+  constexpr float polarRadius =
+      equatorialRadius *
+      static_cast<float>(
+          vulkax::atlas::Wgs84::semiMinorAxisMeters /
+          vulkax::atlas::Wgs84::semiMajorAxisMeters);
+  for (size_t index = 0; index < cities.size(); ++index) {
+    const double latitude = glm::radians(cities[index].centerWgs84.x);
+    const double longitude = glm::radians(cities[index].centerWgs84.y);
+    const glm::vec3 surface{
+        equatorialRadius * static_cast<float>(std::cos(latitude) * std::cos(longitude)),
+        polarRadius * static_cast<float>(std::sin(latitude)),
+        equatorialRadius * static_cast<float>(std::cos(latitude) * std::sin(longitude)),
+    };
+    const glm::vec3 outward = glm::normalize(surface);
+    const glm::vec3 reference =
+        std::abs(outward.y) > 0.9f ? glm::vec3{1.f, 0.f, 0.f}
+                                  : glm::vec3{0.f, 1.f, 0.f};
+    const glm::vec3 tangent = glm::normalize(glm::cross(reference, outward));
+    const glm::vec3 bitangent = glm::normalize(glm::cross(outward, tangent));
+    const glm::vec3 base = surface + outward * 0.08f;
+    const glm::vec3 tip = surface + outward * 0.72f;
+    const std::array<glm::vec3, 4> ring{
+        base + tangent * 0.22f,
+        base + bitangent * 0.22f,
+        base - tangent * 0.22f,
+        base - bitangent * 0.22f,
+    };
+    const glm::vec3 color =
+        index % 2 == 0 ? glm::vec3{1.f, 0.65f, 0.08f}
+                       : glm::vec3{0.05f, 0.95f, 0.78f};
+    for (size_t side = 0; side < ring.size(); ++side) {
+      appendTriangle(
+          tip, ring[side], ring[(side + 1) % ring.size()], color);
+    }
+    appendTriangle(ring[0], ring[2], ring[1], color);
+    appendTriangle(ring[0], ring[3], ring[2], color);
+  }
+  return std::make_shared<LveModel>(device, builder);
+}
+
 glm::dquat rotationBetween(
     const glm::dvec3& from,
     const glm::dvec3& to) {
@@ -474,6 +548,10 @@ void FirstApp::run() {
   std::unique_ptr<vulkax::atlas::LocalNavigationProvider> localNavigation;
   std::unique_ptr<DesktopMapControls> mapControls;
   std::vector<geo::GeoCityDefinition> geoCities;
+  std::shared_ptr<LveModel> worldGlobeModel;
+  std::shared_ptr<LveModel> worldCityMarkerModel;
+  glm::mat4 worldOverviewTransform{1.f};
+  bool worldOverview = false;
   struct RetiredGeoCity {
     uint64_t retireAfterFrame = 0;
     std::unique_ptr<geo::GeoScene> scene;
@@ -515,14 +593,22 @@ void FirstApp::run() {
     }
     if (!config.benchmark) {
       std::filesystem::path registryPath = config.geoCityRegistry;
-      if (registryPath.is_relative()) {
-        registryPath = std::filesystem::path{ENGINE_DIR} / registryPath;
-      }
+      registryPath = resolveRuntimeResource(registryPath);
       geoCities = geo::loadGeoCityRegistry(registryPath);
-      std::filesystem::path navigationPath = config.geoNavigationData;
-      if (navigationPath.is_relative()) {
-        navigationPath = std::filesystem::path{ENGINE_DIR} / navigationPath;
+      worldGlobeModel = buildWorldGlobeModel(lveDevice);
+      worldCityMarkerModel =
+          buildWorldCityMarkerModel(lveDevice, geoCities);
+      double meanLongitude = 0.0;
+      for (const auto& city : geoCities) {
+        meanLongitude += city.centerWgs84.y;
       }
+      meanLongitude /= static_cast<double>(geoCities.size());
+      worldOverviewTransform = glm::rotate(
+          glm::mat4{1.f},
+          glm::radians(static_cast<float>(meanLongitude + 90.0)),
+          glm::vec3{0.f, 1.f, 0.f});
+      std::filesystem::path navigationPath = config.geoNavigationData;
+      navigationPath = resolveRuntimeResource(navigationPath);
       localNavigation =
           std::make_unique<vulkax::atlas::LocalNavigationProvider>(
               navigationPath);
@@ -733,11 +819,51 @@ void FirstApp::run() {
     } else {
       cameraController.moveInPlaneXZ(lveWindow.getGLFWwindow(), frameTime, viewerObject);
     }
+    if (worldOverview) {
+      constexpr float minimumWorldCameraRadius = 12.5f;
+      const float radius = glm::length(viewerObject.transform.translation);
+      if (radius < minimumWorldCameraRadius) {
+        const glm::vec3 direction =
+            radius > 0.001f
+                ? viewerObject.transform.translation / radius
+                : glm::vec3{0.f, 0.f, -1.f};
+        viewerObject.transform.translation =
+            direction * minimumWorldCameraRadius;
+      }
+    }
 
     if (mapControls != nullptr && localNavigation != nullptr &&
         geoScene != nullptr) {
       while (auto action = mapControls->pollAction()) {
-        if (action->kind == DesktopMapActionKind::SwitchCity) {
+        if (action->kind == DesktopMapActionKind::ShowWorld) {
+          if (worldOverview) {
+            mapControls->setStatus("World overview is already open");
+            continue;
+          }
+          activeLocalRoute.reset();
+          if (activeLocalRouteModel != nullptr) {
+            retiredRouteModels.push_back(
+                {
+                    frameNumber + LveSwapChain::MAX_FRAMES_IN_FLIGHT + 1,
+                    std::move(activeLocalRouteModel),
+                });
+          }
+          activeRouteLocalPoints.clear();
+          followingRoute = false;
+          worldOverview = true;
+          viewerObject.transform.translation = {0.f, 0.f, -28.f};
+          viewerObject.transform.rotation = {0.f, 0.f, 0.f};
+          cameraController.moveSpeed = 8.f;
+          cameraController.sprintMultiplier = 8.f;
+          mapControls->setMapName("World Overview");
+          mapControls->setSearchQuery("");
+          mapControls->setNavigationEnabled(false);
+          mapControls->setRouteSummary(
+              "Select an installed city and choose Open", 0.0, 0.0);
+          mapControls->setStatus(
+              std::to_string(geoCities.size()) +
+              " installed cities · city data remains resident");
+        } else if (action->kind == DesktopMapActionKind::SwitchCity) {
           const auto city = std::find_if(
               geoCities.begin(),
               geoCities.end(),
@@ -753,30 +879,33 @@ void FirstApp::run() {
                 city->displayName + " is not installed");
             continue;
           }
-          if (city->id == localNavigation->regionId()) {
+          if (city->id == localNavigation->regionId() &&
+              !worldOverview) {
             mapControls->setStatus(city->displayName + " is already open");
             continue;
           }
 
-          mapControls->setStatus("Loading " + city->displayName + "...");
-          auto nextScene = std::make_unique<geo::GeoScene>(
-              lveDevice,
-              city->manifestPath,
-              config.geoPolicy,
-              config.geoCacheMode,
-              geoBudget);
-          auto nextNavigation =
-              std::make_unique<vulkax::atlas::LocalNavigationProvider>(
-                  city->navigationPath);
-          retiredGeoCities.push_back(
-              {
-                  frameNumber + LveSwapChain::MAX_FRAMES_IN_FLIGHT + 1,
-                  std::move(geoScene),
-              });
-          geoScene = std::move(nextScene);
-          localNavigation = std::move(nextNavigation);
-          config.geoManifest = city->manifestPath;
-          config.geoNavigationData = city->navigationPath;
+          if (city->id != localNavigation->regionId()) {
+            mapControls->setStatus("Loading " + city->displayName + "...");
+            auto nextScene = std::make_unique<geo::GeoScene>(
+                lveDevice,
+                city->manifestPath,
+                config.geoPolicy,
+                config.geoCacheMode,
+                geoBudget);
+            auto nextNavigation =
+                std::make_unique<vulkax::atlas::LocalNavigationProvider>(
+                    city->navigationPath);
+            retiredGeoCities.push_back(
+                {
+                    frameNumber + LveSwapChain::MAX_FRAMES_IN_FLIGHT + 1,
+                    std::move(geoScene),
+                });
+            geoScene = std::move(nextScene);
+            localNavigation = std::move(nextNavigation);
+            config.geoManifest = city->manifestPath;
+            config.geoNavigationData = city->navigationPath;
+          }
           activeLocalRoute.reset();
           if (activeLocalRouteModel != nullptr) {
             retiredRouteModels.push_back(
@@ -790,8 +919,11 @@ void FirstApp::run() {
           followingRoute = false;
           followSegment = 0;
           followSegmentProgress = 0.f;
+          worldOverview = false;
           viewerObject.transform.translation = {0.f, -130.f, -720.f};
           viewerObject.transform.rotation = {-0.18f, 0.f, 0.f};
+          cameraController.moveSpeed = 120.f;
+          cameraController.sprintMultiplier = 5.f;
 
           vulkax::atlas::SearchRequest initialSearch{};
           initialSearch.limit = 30;
@@ -803,6 +935,7 @@ void FirstApp::run() {
           displayedSearchResults =
               localNavigation->search(std::move(initialSearch)).get();
           mapControls->setMapName(localNavigation->displayName());
+          mapControls->setNavigationEnabled(true);
           mapControls->setCities(
               makeDesktopCityOptions(
                   geoCities, localNavigation->regionId()));
@@ -1006,7 +1139,14 @@ void FirstApp::run() {
           "(c) OpenStreetMap contributors";
       glfwSetWindowTitle(lveWindow.getGLFWwindow(), title.c_str());
     }
-    if (geoScene != nullptr) {
+    if (worldOverview && frameNumber % 30 == 0) {
+      glfwSetWindowTitle(
+          lveWindow.getGLFWwindow(),
+          "Vulkax World Overview | installed cities | "
+          "W/A/S/D + E/Q | Shift sprint | "
+          "(c) OpenStreetMap contributors");
+    }
+    if (geoScene != nullptr && !worldOverview) {
       geoScene->update(
           viewerObject.transform.translation,
           camera.getProjection() * camera.getView(),
@@ -1194,7 +1334,15 @@ void FirstApp::run() {
 
       // order here matters
       simpleRenderSystem.renderGameObjects(frameInfo);
-      if (geoScene != nullptr) {
+      if (worldOverview &&
+          worldGlobeModel != nullptr &&
+          worldCityMarkerModel != nullptr) {
+        simpleRenderSystem.begin(frameInfo);
+        simpleRenderSystem.renderModel(
+            frameInfo, *worldGlobeModel, worldOverviewTransform);
+        simpleRenderSystem.renderModel(
+            frameInfo, *worldCityMarkerModel, worldOverviewTransform);
+      } else if (geoScene != nullptr) {
         simpleRenderSystem.begin(frameInfo);
         for (const auto& item : geoScene->drawItems()) {
           simpleRenderSystem.renderModel(frameInfo, *item.model, item.transform);

@@ -12,6 +12,7 @@ struct GLFWwindow;
 namespace lve {
 
 enum class DesktopMapActionKind {
+  ShowWorld,
   SwitchCity,
   Search,
   Route,
@@ -49,6 +50,7 @@ class DesktopMapControls {
   void setMapName(const std::string& mapName);
   void setCities(const std::vector<DesktopCityOption>& cities);
   void setSearchQuery(const std::string& query);
+  void setNavigationEnabled(bool enabled);
   void setSearchResults(
       const std::vector<vulkax::atlas::SearchResult>& results);
   void setStatus(const std::string& status);

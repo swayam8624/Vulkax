@@ -49,6 +49,12 @@ std::vector<GeoCityDefinition> loadGeoCityRegistry(
     GeoCityDefinition city{};
     city.id = item.at("id").get<std::string>();
     city.displayName = item.at("displayName").get<std::string>();
+    const auto& center = item.at("center");
+    city.centerWgs84 = {
+        center.at(0).get<double>(),
+        center.at(1).get<double>(),
+        center.size() > 2 ? center.at(2).get<double>() : 0.0,
+    };
     city.manifestPath = base / item.at("manifest").get<std::string>();
     city.navigationPath = base / item.at("navigation").get<std::string>();
     city.installed =

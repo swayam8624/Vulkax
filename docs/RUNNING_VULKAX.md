@@ -74,6 +74,12 @@ London in the running application. The selector reports each checked city's inst
 Changing city retires old GPU resources after the in-flight frame window, clears the old route,
 loads the new local search graph, and resets the camera to the new city.
 
+Use **World** for the same-process WGS84 overview. Installed cities appear as geodetic markers and
+remain selectable in the panel. The active city stays resident while the overview is open; choose
+a city and press **Open** to return to its full streamed map. The overview is never the default.
+The generated `build/Vulkax.app` is self-contained: shaders, checked city geometry, navigation
+graphs, city registry, and ODbL notices are bundled under `Contents/Resources`.
+
 The incomplete globe experiment is deliberately separate:
 
 ```bash

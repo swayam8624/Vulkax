@@ -285,10 +285,46 @@ if (APPLE)
     COMMAND ${CMAKE_COMMAND} -E copy
             "${PROJECT_BINARY_DIR}/VulkaxAtlasInfo.plist"
             "${VULKAX_ATLAS_APP_DIR}/Contents/Info.plist"
-    COMMENT "Packaging the Vulkax Connaught Place macOS application"
+    COMMENT "Packaging the native Vulkax macOS application"
+  )
+  add_custom_target(
+    VulkaxAppResources ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/shaders"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/connaught_place"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/central_london"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${PROJECT_SOURCE_DIR}/shaders"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/shaders"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${PROJECT_SOURCE_DIR}/data/connaught_place/generated"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/connaught_place/generated"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${PROJECT_SOURCE_DIR}/data/central_london/generated"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/central_london/generated"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PROJECT_SOURCE_DIR}/data/cities.json"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/cities.json"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PROJECT_SOURCE_DIR}/data/connaught_place/navigation.json"
+            "${PROJECT_SOURCE_DIR}/data/connaught_place/LICENSE-ODbL.md"
+            "${PROJECT_SOURCE_DIR}/data/connaught_place/README.md"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/connaught_place"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PROJECT_SOURCE_DIR}/data/central_london/navigation.json"
+            "${PROJECT_SOURCE_DIR}/data/central_london/LICENSE-ODbL.md"
+            "${PROJECT_SOURCE_DIR}/data/central_london/README.md"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/central_london"
+    DEPENDS ${PROJECT_NAME} Shaders
+    COMMENT "Bundling checked Vulkax city and shader resources"
   )
 endif()
-add_custom_target(atlas_app_desktop DEPENDS ${PROJECT_NAME})
+if (APPLE)
+  add_custom_target(
+    atlas_app_desktop DEPENDS ${PROJECT_NAME} VulkaxAppResources)
+else()
+  add_custom_target(atlas_app_desktop DEPENDS ${PROJECT_NAME})
+endif()
 
 include(CTest)
 if (BUILD_TESTING)
@@ -374,4 +410,13 @@ if (BUILD_TESTING)
       ${PROJECT_SOURCE_DIR}/tests/test_atlas_benchmark.py
       $<TARGET_FILE:VulkaxAtlasBenchmark>
   )
+  if (APPLE)
+    add_test(
+      NAME macos_app_bundle
+      COMMAND
+        ${Python3_EXECUTABLE}
+        ${PROJECT_SOURCE_DIR}/tests/test_macos_app_bundle.py
+        ${VULKAX_ATLAS_APP_DIR}
+    )
+  endif()
 endif()

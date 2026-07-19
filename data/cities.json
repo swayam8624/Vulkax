@@ -4,12 +4,14 @@
     {
       "id": "connaught-place",
       "displayName": "Connaught Place",
+      "center": [28.63175, 77.21575, 0.0],
       "manifest": "connaught_place/generated/geobeacon.json",
       "navigation": "connaught_place/navigation.json"
     },
     {
       "id": "central-london",
       "displayName": "Central London",
+      "center": [51.5095, -0.12775, 0.0],
       "manifest": "central_london/generated/geobeacon.json",
       "navigation": "central_london/navigation.json"
     }

@@ -41,6 +41,13 @@ semantic LODs, and bounded GeoBEACON lighting path as Connaught Place. Both inst
 also available from the **Installed city** selector inside the application; switching replaces the
 active streamed scene, search index, route state, and camera without launching the globe.
 
+The **World** button opens a non-default WGS84 overview with markers for installed cities. The
+active city remains resident, the camera is constrained outside the ellipsoid, and **Open**
+returns to the selected full city. Connaught Place remains the default launch experience.
+On macOS, `build/Vulkax.app` contains its compiled shaders, both checked city databases,
+navigation graphs, and ODbL notices, so opening the application does not depend on the repository
+working directory.
+
 The local navigation database is generated deterministically from the checked OSM extract:
 
 ```bash

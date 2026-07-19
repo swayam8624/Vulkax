@@ -1,16 +1,13 @@
 #include "lve_pipeline.hpp"
 
 #include "lve_model.hpp"
+#include "runtime_paths.hpp"
 
 // std
 #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
-
-#ifndef ENGINE_DIR
-#define ENGINE_DIR "../"
-#endif
 
 namespace lve {
 
@@ -30,11 +27,12 @@ LvePipeline::~LvePipeline() {
 }
 
 std::vector<char> LvePipeline::readFile(const std::string& filepath) {
-  std::string enginePath = ENGINE_DIR + filepath;
-  std::ifstream file{enginePath, std::ios::ate | std::ios::binary};
+  const auto resourcePath = resolveRuntimeResource(filepath);
+  std::ifstream file{resourcePath, std::ios::ate | std::ios::binary};
 
   if (!file.is_open()) {
-    throw std::runtime_error("failed to open file: " + enginePath);
+    throw std::runtime_error(
+        "failed to open file: " + resourcePath.string());
   }
 
   size_t fileSize = static_cast<size_t>(file.tellg());
