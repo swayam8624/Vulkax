@@ -29,6 +29,11 @@ backend-specific schemas. `GatewayNavigationProvider` uses the normalized `/v1` 
 `ReplayNavigationProvider` provides deterministic tests and demonstrations. `.vxa` packs provide
 offline POI search and archive routing assets alongside render tiles.
 
+The gateway maps Pelias autocomplete/reverse GeoJSON and Valhalla route responses into this
+contract. Valhalla's six-decimal encoded polyline is decoded before the route reaches clients.
+Provider failures are explicit `502` responses. Replay mode does not require network access and is
+the contract-test default.
+
 ## Platform boundary
 
 `VulkanSurfaceHost` owns the platform-specific surface, extent, resize state, instance extensions,

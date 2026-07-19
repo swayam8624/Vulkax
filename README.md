@@ -58,6 +58,20 @@ python3 services/atlas_gateway/server.py \
   --content-root data
 ```
 
+Connect self-hosted Pelias and Valhalla without changing clients:
+
+```bash
+PELIAS_URL=http://127.0.0.1:4000 \
+VALHALLA_URL=http://127.0.0.1:8002 \
+python3 services/atlas_gateway/server.py \
+  --replay data/atlas/navigation_replay.json
+```
+
+Pelias autocomplete/reverse GeoJSON and Valhalla route/polyline6 responses are normalized into the
+Atlas provider model. If an explicitly configured upstream fails, the gateway returns `502` rather
+than silently substituting replay data. Transit and traffic replay remain deterministic unless
+their deployment-specific adapters are configured separately.
+
 Or build the container:
 
 ```bash
