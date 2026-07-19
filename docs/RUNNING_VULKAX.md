@@ -34,7 +34,7 @@ scripts/vulkax_macos.sh test
 This creates a Release Ninja build, compiles all shaders and executables, and runs the complete
 CTest suite.
 
-## Run the globe
+## Run Connaught Place
 
 Open the packaged native macOS application:
 
@@ -42,8 +42,14 @@ Open the packaged native macOS application:
 scripts/vulkax_macos.sh app
 ```
 
-The generated application is `build/Vulkax Atlas.app`. For terminal-attached diagnostics and
-benchmark output, run the same renderer directly:
+The generated application is `build/Vulkax.app`. It opens the complete checked Connaught Place
+GeoBEACON dataset. For terminal-attached city diagnostics and benchmark output:
+
+```bash
+scripts/vulkax_macos.sh geo --geo-policy geo-beacon-bounded
+```
+
+The incomplete globe experiment is deliberately separate:
 
 ```bash
 scripts/vulkax_macos.sh atlas

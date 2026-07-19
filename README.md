@@ -7,8 +7,9 @@ route-predictive resource scheduling, asynchronous file/HTTP/memory/SQLite tile 
 cache control, `.vxa` regional packs, normalized navigation APIs, deterministic replay, and a
 rendered WGS84 globe with route geometry.
 
-`VulkaxAtlas` is the consumer globe entrypoint. `LveEngine` remains the BEACON/GeoBEACON research
-and regression executable, preserving every existing technique and CLI identifier.
+`Vulkax.app` is the primary desktop experience and opens the checked Connaught Place GeoBEACON
+city. `VulkaxAtlas` remains an explicitly experimental globe research entrypoint. `LveEngine`
+preserves every BEACON/GeoBEACON technique and CLI identifier.
 
 ## Atlas quick start
 
@@ -19,13 +20,13 @@ scripts/vulkax_macos.sh test
 scripts/vulkax_macos.sh app
 ```
 
-The globe uses `W/A/S/D` for horizontal movement, `E/Q` for vertical movement, arrow keys for
-view rotation, and either Shift key for accelerated traversal. The window reports selected globe
-tiles and deepest selected quadtree level while permanently retaining OpenStreetMap attribution.
+The Connaught Place application uses `W/A/S/D` for horizontal movement, `E/Q` for vertical
+movement, arrow keys for view rotation, and either Shift key for accelerated traversal. It
+permanently retains OpenStreetMap attribution.
 The dependency step only needs to be run once. Later sessions normally need only
 `scripts/vulkax_macos.sh atlas`.
-Use `app` for the packaged native macOS application and `atlas` when terminal-attached logs and
-benchmark output are desired.
+Use `app` for the packaged Connaught Place application, `geo` for terminal-attached GeoBEACON
+diagnostics, and `atlas` only for the separate globe research view.
 
 Generate and validate the five checked reference manifests:
 

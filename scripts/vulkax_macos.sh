@@ -14,8 +14,8 @@ Commands:
   deps    Install Homebrew build dependencies
   build   Configure and build a Release tree
   test    Build and run all CTest suites
-  app     Build and open the native Vulkax Atlas macOS application
-  atlas   Build and run the Vulkax Atlas globe
+  app     Build and open Connaught Place in the native macOS application
+  atlas   Build and run the experimental globe research view
   geo     Build and run the GeoBEACON city renderer
 
 Environment:
@@ -99,9 +99,14 @@ case "$command" in
     ;;
   app)
     build
-    open "$BUILD_DIR/Vulkax Atlas.app" --args \
-      --atlas-manifest "$ROOT/data/atlas/regions/delhi-ncr/atlas-dataset.json" \
-      --atlas-navigation-replay "$ROOT/data/atlas/navigation_replay.json" \
+    open "$BUILD_DIR/Vulkax.app" --args \
+      --geo \
+      --geo-policy geo-beacon-bounded \
+      --geo-manifest "$ROOT/data/connaught_place/generated/geobeacon.json" \
+      --geo-cache-mode warm \
+      --lights 500 \
+      --width 1440 \
+      --height 900 \
       "$@"
     ;;
   atlas)

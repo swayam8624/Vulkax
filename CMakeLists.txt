@@ -257,7 +257,7 @@ add_custom_command(
 )
 if (APPLE)
   set(VULKAX_ATLAS_APP_DIR
-      "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Vulkax Atlas.app")
+      "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Vulkax.app")
   configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/VulkaxAtlasInfo.plist.in"
     "${PROJECT_BINARY_DIR}/VulkaxAtlasInfo.plist"
@@ -270,11 +270,11 @@ if (APPLE)
             "${VULKAX_ATLAS_APP_DIR}/Contents/MacOS"
     COMMAND ${CMAKE_COMMAND} -E copy
             $<TARGET_FILE:${PROJECT_NAME}>
-            "${VULKAX_ATLAS_APP_DIR}/Contents/MacOS/VulkaxAtlas"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/MacOS/VulkaxGeoBEACON"
     COMMAND ${CMAKE_COMMAND} -E copy
             "${PROJECT_BINARY_DIR}/VulkaxAtlasInfo.plist"
             "${VULKAX_ATLAS_APP_DIR}/Contents/Info.plist"
-    COMMENT "Packaging the Vulkax Atlas macOS application"
+    COMMENT "Packaging the Vulkax Connaught Place macOS application"
   )
 endif()
 add_custom_target(atlas_app_desktop DEPENDS ${PROJECT_NAME})
