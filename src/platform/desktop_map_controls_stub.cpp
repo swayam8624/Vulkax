@@ -4,7 +4,7 @@ namespace lve {
 
 struct DesktopMapControls::Impl {};
 
-DesktopMapControls::DesktopMapControls(GLFWwindow*)
+DesktopMapControls::DesktopMapControls(GLFWwindow*, std::string)
     : impl{std::make_unique<Impl>()} {}
 DesktopMapControls::~DesktopMapControls() = default;
 bool DesktopMapControls::available() const { return false; }

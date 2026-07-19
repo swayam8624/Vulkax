@@ -30,6 +30,15 @@ The dependency step only needs to be run once. Later sessions normally need only
 Use `app` for the packaged Connaught Place application, `geo` for terminal-attached GeoBEACON
 diagnostics, and `atlas` only for the separate globe research view.
 
+Central London is the second complete checked city slice:
+
+```bash
+scripts/vulkax_macos.sh london
+```
+
+It uses the same native search, walking/driving/cycling routing, route ribbon, route-follow camera,
+semantic LODs, and bounded GeoBEACON lighting path as Connaught Place.
+
 The local navigation database is generated deterministically from the checked OSM extract:
 
 ```bash

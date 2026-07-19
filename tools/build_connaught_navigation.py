@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the deterministic offline Connaught Place POI and routing graph."""
+"""Build a deterministic offline POI and road-routing graph from OSM XML."""
 
 from __future__ import annotations
 
@@ -81,6 +81,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--region", default="connaught-place")
+    parser.add_argument("--display-name", default="Connaught Place")
+    parser.add_argument("--subtitle", default="Connaught Place, New Delhi")
     args = parser.parse_args()
 
     source_bytes = args.source.read_bytes()
@@ -100,7 +103,7 @@ def main() -> int:
                     {
                         "id": f"osm:n{node_id}",
                         "name": node_tags["name"],
-                        "subtitle": "Connaught Place, New Delhi",
+                        "subtitle": args.subtitle,
                         "category": category(node_tags),
                         "position": [lat_lon[0], lat_lon[1], 0.0],
                     }
@@ -116,7 +119,7 @@ def main() -> int:
                     {
                         "id": f"osm:w{way_id}",
                         "name": way_tags["name"],
-                        "subtitle": "Connaught Place, New Delhi",
+                        "subtitle": args.subtitle,
                         "category": category(way_tags),
                         "position": [
                             sum(item[0] for item in valid) / len(valid),
@@ -180,7 +183,8 @@ def main() -> int:
 
     output = {
         "format": "Vulkax-local-navigation-1",
-        "region": "connaught-place",
+        "region": args.region,
+        "displayName": args.display_name,
         "source": str(args.source.name),
         "sourceSha256": hashlib.sha256(source_bytes).hexdigest(),
         "modes": {"driving": 1, "walking": 2, "cycling": 4},

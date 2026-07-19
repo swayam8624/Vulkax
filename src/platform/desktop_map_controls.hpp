@@ -29,7 +29,7 @@ class DesktopMapControls {
  public:
   struct Impl;
 
-  explicit DesktopMapControls(GLFWwindow* window);
+  DesktopMapControls(GLFWwindow* window, std::string mapName);
   ~DesktopMapControls();
 
   DesktopMapControls(const DesktopMapControls&) = delete;

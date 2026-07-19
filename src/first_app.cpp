@@ -488,7 +488,8 @@ void FirstApp::run() {
           std::make_unique<vulkax::atlas::LocalNavigationProvider>(
               navigationPath);
       mapControls =
-          std::make_unique<DesktopMapControls>(lveWindow.getGLFWwindow());
+          std::make_unique<DesktopMapControls>(
+              lveWindow.getGLFWwindow(), localNavigation->displayName());
       vulkax::atlas::SearchRequest initialSearch{};
       initialSearch.limit = 30;
       initialSearch.focus = {

@@ -15,7 +15,7 @@ from pathlib import Path
 
 DEFAULT_ENDPOINT = "https://overpass-api.de/api/interpreter"
 DEFAULT_BBOX = (28.6270, 77.2070, 28.6365, 77.2245)
-USER_AGENT = "GeoBEACON-Research/1.0 (https://github.com/swayam8624/VulkanEngine-MINI)"
+USER_AGENT = "Vulkax-GeoBEACON/1.0 (https://github.com/swayam8624/Vulkax)"
 
 
 def query_for(bbox: tuple[float, float, float, float]) -> str:
@@ -35,6 +35,12 @@ def query_for(bbox: tuple[float, float, float, float]) -> str:
   relation["leisure"="park"]({bounds});
   node["public_transport"]({bounds});
   way["public_transport"]({bounds});
+  node["name"]["amenity"]({bounds});
+  node["name"]["shop"]({bounds});
+  node["name"]["tourism"]({bounds});
+  node["name"]["historic"]({bounds});
+  node["name"]["railway"]({bounds});
+  node["name"]["place"]({bounds});
   node["barrier"]({bounds});
   way["barrier"]({bounds});
 );

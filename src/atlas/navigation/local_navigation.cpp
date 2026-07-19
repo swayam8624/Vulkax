@@ -84,6 +84,8 @@ struct LocalNavigationProvider::Impl {
   std::vector<GeodeticPosition> nodes;
   std::vector<std::vector<Edge>> adjacency;
   std::vector<SearchResult> places;
+  std::string regionId;
+  std::string displayName;
   size_t edges = 0;
 
   uint32_t nearestNode(
@@ -123,6 +125,8 @@ LocalNavigationProvider::LocalNavigationProvider(
   if (root.value("format", "") != "Vulkax-local-navigation-1") {
     throw std::runtime_error("unsupported local navigation dataset");
   }
+  impl->regionId = root.value("region", "local");
+  impl->displayName = root.value("displayName", impl->regionId);
 
   for (const auto& item : root.at("nodes")) {
     impl->nodes.push_back(
@@ -145,7 +149,7 @@ LocalNavigationProvider::LocalNavigationProvider(
         {
             item.at("id").get<std::string>(),
             item.at("name").get<std::string>(),
-            item.value("subtitle", "Connaught Place, New Delhi"),
+            item.value("subtitle", impl->displayName),
             {position.at(0).get<double>(),
              position.at(1).get<double>(),
              position.size() > 2 ? position.at(2).get<double>() : 0.0},
@@ -275,7 +279,7 @@ std::future<std::vector<RouteResult>> LocalNavigationProvider::route(
         std::reverse(path.begin(), path.end());
 
         RouteResult route{};
-        route.id = "local-connaught-place";
+        route.id = "local-" + impl->regionId;
         route.mode = request.mode;
         route.distanceMeters = distance[destination];
         route.durationSeconds =
@@ -325,6 +329,14 @@ size_t LocalNavigationProvider::nodeCount() const {
 
 size_t LocalNavigationProvider::edgeCount() const {
   return impl->edges;
+}
+
+const std::string& LocalNavigationProvider::regionId() const {
+  return impl->regionId;
+}
+
+const std::string& LocalNavigationProvider::displayName() const {
+  return impl->displayName;
 }
 
 }  // namespace vulkax::atlas

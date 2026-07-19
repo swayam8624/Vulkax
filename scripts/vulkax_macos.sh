@@ -15,6 +15,7 @@ Commands:
   build   Configure and build a Release tree
   test    Build and run all CTest suites
   app     Build and open Connaught Place in the native macOS application
+  london  Build and open Central London in the native macOS application
   atlas   Build and run the experimental globe research view
   geo     Build and run the GeoBEACON city renderer
 
@@ -99,11 +100,24 @@ case "$command" in
     ;;
   app)
     build
-    open "$BUILD_DIR/Vulkax.app" --args \
+    open -n "$BUILD_DIR/Vulkax.app" --args \
       --geo \
       --geo-policy geo-beacon-bounded \
       --geo-manifest "$ROOT/data/connaught_place/generated/geobeacon.json" \
       --geo-navigation "$ROOT/data/connaught_place/navigation.json" \
+      --geo-cache-mode warm \
+      --lights 500 \
+      --width 1440 \
+      --height 900 \
+      "$@"
+    ;;
+  london)
+    build
+    open -n "$BUILD_DIR/Vulkax.app" --args \
+      --geo \
+      --geo-policy geo-beacon-bounded \
+      --geo-manifest "$ROOT/data/central_london/generated/geobeacon.json" \
+      --geo-navigation "$ROOT/data/central_london/navigation.json" \
       --geo-cache-mode warm \
       --lights 500 \
       --width 1440 \

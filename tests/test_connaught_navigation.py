@@ -12,27 +12,55 @@ import tempfile
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
-    checked = root / "data/connaught_place/navigation.json"
+    configurations = [
+        {
+            "directory": "connaught_place",
+            "region": "connaught-place",
+            "display": "Connaught Place",
+            "subtitle": "Connaught Place, New Delhi",
+            "minimums": (3000, 6000, 200),
+        },
+        {
+            "directory": "central_london",
+            "region": "central-london",
+            "display": "Central London",
+            "subtitle": "Central London, United Kingdom",
+            "minimums": (14000, 30000, 5000),
+        },
+    ]
     with tempfile.TemporaryDirectory() as directory:
-        generated = Path(directory) / "navigation.json"
-        subprocess.run(
-            [
-                sys.executable,
-                str(root / "tools/build_connaught_navigation.py"),
-                "--source",
-                str(root / "data/connaught_place/source.osm"),
-                "--output",
-                str(generated),
-            ],
-            check=True,
-        )
-        if generated.read_bytes() != checked.read_bytes():
-            raise AssertionError("Connaught Place navigation graph checksum drift")
-    data = json.loads(checked.read_text(encoding="utf-8"))
-    assert len(data["nodes"]) > 3000
-    assert len(data["edges"]) > 6000
-    assert len(data["places"]) > 200
-    print("Connaught Place navigation graph is deterministic")
+        for configuration in configurations:
+            dataset = root / "data" / configuration["directory"]
+            checked = dataset / "navigation.json"
+            generated = Path(directory) / f"{configuration['region']}.json"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(root / "tools/build_connaught_navigation.py"),
+                    "--source",
+                    str(dataset / "source.osm"),
+                    "--output",
+                    str(generated),
+                    "--region",
+                    configuration["region"],
+                    "--display-name",
+                    configuration["display"],
+                    "--subtitle",
+                    configuration["subtitle"],
+                ],
+                check=True,
+            )
+            if generated.read_bytes() != checked.read_bytes():
+                raise AssertionError(
+                    f"{configuration['display']} navigation graph checksum drift"
+                )
+            data = json.loads(checked.read_text(encoding="utf-8"))
+            minimum_nodes, minimum_edges, minimum_places = configuration["minimums"]
+            assert len(data["nodes"]) > minimum_nodes
+            assert len(data["edges"]) > minimum_edges
+            assert len(data["places"]) > minimum_places
+            assert data["displayName"] == configuration["display"]
+    print("Checked city navigation graphs are deterministic")
     return 0
 
 

@@ -108,7 +108,7 @@ NSTextField* label(NSString* text, NSFont* font) {
 
 namespace lve {
 
-DesktopMapControls::DesktopMapControls(GLFWwindow* window)
+DesktopMapControls::DesktopMapControls(GLFWwindow* window, std::string mapName)
     : impl{std::make_unique<Impl>()} {
   NSWindow* nativeWindow = glfwGetCocoaWindow(window);
   NSView* content = nativeWindow.contentView;
@@ -132,14 +132,15 @@ DesktopMapControls::DesktopMapControls(GLFWwindow* window)
   stack.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
   NSTextField* title =
-      label(@"Connaught Place", [NSFont systemFontOfSize:20 weight:NSFontWeightSemibold]);
+      label(nsString(mapName), [NSFont systemFontOfSize:20 weight:NSFontWeightSemibold]);
   NSTextField* subtitle =
       label(@"Offline search and road navigation", [NSFont systemFontOfSize:12]);
   subtitle.textColor = NSColor.secondaryLabelColor;
 
   impl->search = [[NSSearchField alloc] initWithFrame:NSMakeRect(0, 0, 308, 28)];
   impl->search.placeholderString = @"Search places, roads, metro gates";
-  impl->search.accessibilityLabel = @"Search Connaught Place";
+  impl->search.accessibilityLabel =
+      [NSString stringWithFormat:@"Search %@", nsString(mapName)];
 
   NSButton* searchButton = [NSButton buttonWithTitle:@"Search"
                                               target:nil

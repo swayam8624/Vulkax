@@ -10,6 +10,9 @@ Refresh the canonical extract explicitly:
 ```bash
 python3 tools/fetch_osm_extract.py --force
 python3 tools/build_geobeacon_tiles.py
+python3 tools/build_connaught_navigation.py \
+  --source data/connaught_place/source.osm \
+  --output data/connaught_place/navigation.json
 ```
 
 The renderer never contacts OpenStreetMap or Overpass during build or runtime.

@@ -31,6 +31,8 @@ class LocalNavigationProvider final : public SearchProvider, public RouteProvide
   size_t placeCount() const;
   size_t nodeCount() const;
   size_t edgeCount() const;
+  const std::string& regionId() const;
+  const std::string& displayName() const;
 
  private:
   struct Impl;

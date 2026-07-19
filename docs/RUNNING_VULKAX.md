@@ -59,6 +59,16 @@ diagnostics and benchmark output:
 scripts/vulkax_macos.sh geo --geo-policy geo-beacon-bounded
 ```
 
+Open the second checked city with the same complete local workflow:
+
+```bash
+scripts/vulkax_macos.sh london
+```
+
+This loads Central London's checked OSM geometry, three semantic LODs, 5,000-plus searchable
+places, mode-aware road graph, route rendering, and route-follow camera. It is independent of the
+experimental globe and does not replace the Connaught Place default.
+
 The incomplete globe experiment is deliberately separate:
 
 ```bash

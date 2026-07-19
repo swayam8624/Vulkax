@@ -352,6 +352,11 @@ if (BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/test_connaught_navigation.py
   )
   add_test(
+    NAME city_dataset_reproducibility
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/test_city_dataset_reproducibility.py
+  )
+  add_test(
     NAME atlas_reference_manifests
     COMMAND
       ${Python3_EXECUTABLE}

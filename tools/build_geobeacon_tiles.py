@@ -465,6 +465,8 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("data/connaught_place/generated"))
     parser.add_argument("--bbox", nargs=4, type=float, default=(28.6270, 77.2070, 28.6365, 77.2245))
     parser.add_argument("--tile-size-m", type=float, default=128.0)
+    parser.add_argument("--dataset-id", default="connaught-place")
+    parser.add_argument("--display-name", default="Connaught Place")
     args = parser.parse_args()
     south, west, north, east = args.bbox
     origin = ((south + north) * 0.5, (west + east) * 0.5)
@@ -540,6 +542,8 @@ def main():
 
     dataset = {
         "format": "GeoBEACON-runtime-1",
+        "datasetId": args.dataset_id,
+        "displayName": args.display_name,
         "originWgs84": [origin[0], origin[1], 0.0],
         "boundsWgs84": [south, west, north, east],
         "tileSizeMeters": tile_size,

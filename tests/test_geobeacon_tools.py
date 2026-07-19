@@ -50,6 +50,28 @@ class GeoBeaconToolsTests(unittest.TestCase):
         manifest = json.loads((ROOT / "data/connaught_place/generated/geobeacon.json").read_text())
         self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), manifest["sourceChecksum"])
 
+    def test_central_london_dataset_glbs_reload(self):
+        root = ROOT / "data/central_london"
+        manifest_path = root / "generated/geobeacon.json"
+        manifest = json.loads(manifest_path.read_text())
+        report = json.loads((root / "generated/tile_report.json").read_text())
+        self.assertEqual(manifest["datasetId"], "central-london")
+        self.assertEqual(manifest["displayName"], "Central London")
+        self.assertGreater(len(manifest["tiles"]), 150)
+        self.assertGreater(report["featureCount"], 8000)
+        self.assertEqual(report["invalidFeatures"], {})
+        self.assertEqual(
+            hashlib.sha256((root / "source.osm").read_bytes()).hexdigest(),
+            manifest["sourceChecksum"],
+        )
+        for tile in manifest["tiles"]:
+            for representation in tile["representations"]:
+                path = manifest_path.parent / representation["uri"]
+                vertices, indices = TILES.glb_counts(path)
+                self.assertGreater(vertices, 0)
+                self.assertGreater(indices, 0)
+                self.assertEqual(path.stat().st_size, representation["bytes"])
+
 
 if __name__ == "__main__":
     unittest.main()

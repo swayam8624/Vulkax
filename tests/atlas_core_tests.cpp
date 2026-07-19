@@ -127,6 +127,29 @@ int main() {
   assert(!localRoutes.empty());
   assert(localRoutes.front().shape.size() >= 3);
   assert(localRoutes.front().distanceMeters >= 0.0);
+  assert(localNavigation.regionId() == "connaught-place");
+  assert(localNavigation.displayName() == "Connaught Place");
+
+  LocalNavigationProvider londonNavigation{
+      std::filesystem::path{ENGINE_DIR} /
+      "data/central_london/navigation.json"};
+  assert(londonNavigation.nodeCount() > 14000);
+  assert(londonNavigation.edgeCount() > 30000);
+  assert(londonNavigation.placeCount() > 5000);
+  assert(londonNavigation.regionId() == "central-london");
+  assert(londonNavigation.displayName() == "Central London");
+  const auto londonPlaces =
+      londonNavigation.search({"Trafalgar Square", "en", std::nullopt, 5})
+          .get();
+  assert(!londonPlaces.empty());
+  RouteRequest londonRouteRequest{};
+  londonRouteRequest.origin = {51.5090, -0.1280, 0.0};
+  londonRouteRequest.destination = londonPlaces.front().position;
+  londonRouteRequest.mode = TravelMode::Walking;
+  const auto londonRoutes = londonNavigation.route(londonRouteRequest).get();
+  assert(!londonRoutes.empty());
+  assert(londonRoutes.front().shape.size() >= 3);
+  assert(londonRoutes.front().id == "local-central-london");
 
   for (const auto direction : {
            glm::dvec3{1.0, 0.2, -0.4},
