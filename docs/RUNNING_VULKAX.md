@@ -36,6 +36,15 @@ CTest suite.
 
 ## Run the globe
 
+Open the packaged native macOS application:
+
+```bash
+scripts/vulkax_macos.sh app
+```
+
+The generated application is `build/Vulkax Atlas.app`. For terminal-attached diagnostics and
+benchmark output, run the same renderer directly:
+
 ```bash
 scripts/vulkax_macos.sh atlas
 ```

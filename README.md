@@ -16,7 +16,7 @@ and regression executable, preserving every existing technique and CLI identifie
 scripts/vulkax_macos.sh doctor
 scripts/vulkax_macos.sh deps
 scripts/vulkax_macos.sh test
-scripts/vulkax_macos.sh atlas
+scripts/vulkax_macos.sh app
 ```
 
 The globe uses `W/A/S/D` for horizontal movement, `E/Q` for vertical movement, arrow keys for
@@ -24,6 +24,8 @@ view rotation, and either Shift key for accelerated traversal. The window report
 tiles and deepest selected quadtree level while permanently retaining OpenStreetMap attribution.
 The dependency step only needs to be run once. Later sessions normally need only
 `scripts/vulkax_macos.sh atlas`.
+Use `app` for the packaged native macOS application and `atlas` when terminal-attached logs and
+benchmark output are desired.
 
 Generate and validate the five checked reference manifests:
 

@@ -247,7 +247,6 @@ add_custom_target(
 )
 
 add_dependencies(${PROJECT_NAME} Shaders)
-add_custom_target(atlas_app_desktop DEPENDS ${PROJECT_NAME})
 add_custom_command(
   TARGET ${PROJECT_NAME}
   POST_BUILD
@@ -256,6 +255,29 @@ add_custom_command(
           $<TARGET_FILE_DIR:${PROJECT_NAME}>/VulkaxAtlas
   COMMENT "Creating the VulkaxAtlas application entrypoint"
 )
+if (APPLE)
+  set(VULKAX_ATLAS_APP_DIR
+      "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Vulkax Atlas.app")
+  configure_file(
+    "${PROJECT_SOURCE_DIR}/cmake/VulkaxAtlasInfo.plist.in"
+    "${PROJECT_BINARY_DIR}/VulkaxAtlasInfo.plist"
+    @ONLY
+  )
+  add_custom_command(
+    TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${VULKAX_ATLAS_APP_DIR}/Contents/MacOS"
+    COMMAND ${CMAKE_COMMAND} -E copy
+            $<TARGET_FILE:${PROJECT_NAME}>
+            "${VULKAX_ATLAS_APP_DIR}/Contents/MacOS/VulkaxAtlas"
+    COMMAND ${CMAKE_COMMAND} -E copy
+            "${PROJECT_BINARY_DIR}/VulkaxAtlasInfo.plist"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Info.plist"
+    COMMENT "Packaging the Vulkax Atlas macOS application"
+  )
+endif()
+add_custom_target(atlas_app_desktop DEPENDS ${PROJECT_NAME})
 
 include(CTest)
 if (BUILD_TESTING)
