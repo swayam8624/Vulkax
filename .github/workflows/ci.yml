@@ -8,7 +8,7 @@ jobs:
   linux-vulkan:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -56,7 +56,7 @@ jobs:
             --width 320 --height 180 --warmup-frames 1 --frames 1 \
             --output /tmp/atlas-ci --quiet
       - name: Upload smoke measurements
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vulkax-lavapipe-smoke
           path: |
