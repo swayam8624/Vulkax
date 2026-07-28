@@ -1,0 +1,26 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(std430, binding = 0) writeonly buffer FieldOutput {
+  float values[];
+} outputField;
+
+layout(std140, binding = 1) uniform FieldParameters {
+  uint width;
+  uint height;
+  float time;
+  float amplitude;
+  float wavenumber;
+  float angularFrequency;
+  vec2 padding;
+} parameters;
+
+void main() {
+  uvec2 pixel = gl_GlobalInvocationID.xy;
+  if (pixel.x >= parameters.width || pixel.y >= parameters.height) return;
+  float x = (float(pixel.x) / max(1.0, float(parameters.width - 1u))) * 8.0 - 4.0;
+  uint index = pixel.y * parameters.width + pixel.x;
+  outputField.values[index] = parameters.amplitude *
+      sin(parameters.wavenumber * x - parameters.angularFrequency * parameters.time);
+}

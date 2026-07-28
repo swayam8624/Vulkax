@@ -1,0 +1,44 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(std430, binding = 0) readonly buffer CurrentA { float values[]; } currentA;
+layout(std430, binding = 1) readonly buffer CurrentB { float values[]; } currentB;
+layout(std430, binding = 2) writeonly buffer NextA { float values[]; } nextA;
+layout(std430, binding = 3) writeonly buffer NextB { float values[]; } nextB;
+
+layout(std140, binding = 4) uniform ReactionParameters {
+  uint width;
+  uint height;
+  float timestep;
+  float padding;
+  float diffusionA;
+  float diffusionB;
+  float feed;
+  float kill;
+} parameters;
+
+void main() {
+  uvec2 pixel = gl_GlobalInvocationID.xy;
+  if (pixel.x >= parameters.width || pixel.y >= parameters.height) return;
+
+  uint index = pixel.y * parameters.width + pixel.x;
+  if (pixel.x == 0u || pixel.y == 0u || pixel.x + 1u == parameters.width ||
+      pixel.y + 1u == parameters.height) {
+    nextA.values[index] = currentA.values[index];
+    nextB.values[index] = currentB.values[index];
+    return;
+  }
+
+  float a = currentA.values[index];
+  float b = currentB.values[index];
+  float reaction = a * b * b;
+  float laplaceA = currentA.values[index - 1u] + currentA.values[index + 1u] +
+      currentA.values[index - parameters.width] + currentA.values[index + parameters.width] - 4.0 * a;
+  float laplaceB = currentB.values[index - 1u] + currentB.values[index + 1u] +
+      currentB.values[index - parameters.width] + currentB.values[index + parameters.width] - 4.0 * b;
+  nextA.values[index] = clamp(a + (parameters.diffusionA * laplaceA - reaction +
+      parameters.feed * (1.0 - a)) * parameters.timestep, 0.0, 1.0);
+  nextB.values[index] = clamp(b + (parameters.diffusionB * laplaceB + reaction -
+      (parameters.kill + parameters.feed) * b) * parameters.timestep, 0.0, 1.0);
+}
