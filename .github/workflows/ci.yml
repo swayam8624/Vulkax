@@ -1,4 +1,4 @@
-name: Vulkax Atlas CI
+name: Vulkax CI
 
 on:
   push:
@@ -14,13 +14,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build g++ libglfw3-dev libglm-dev \
             nlohmann-json3-dev libsqlite3-dev libvulkan-dev vulkan-tools mesa-vulkan-drivers \
-            libcurl4-openssl-dev glslang-tools xvfb
+            libcurl4-openssl-dev glslang-tools xvfb pkg-config libopenexr-dev \
+            qt6-base-dev qt6-declarative-dev
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
       - name: Build
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: Physics Studio native smoke
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+        run: |
+          test -x "build/Vulkax Physics Studio"
+          "build/Vulkax Physics Studio" --smoke
+          "build/Vulkax Physics Studio" --preset nbody-orbits \
+            --export-sequence /tmp/physics-nbody --frames 3
+          python3 tests/test_physics_sequence.py /tmp/physics-nbody --requires-variation
+          "build/Vulkax Physics Studio" --export-exr /tmp/physics-preview.exr
+          python3 tests/test_openexr_export.py /tmp/physics-preview.exr
       - name: Validate gateway runtime entrypoint
         run: |
           python3 -m py_compile services/atlas_gateway/server.py

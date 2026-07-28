@@ -14,9 +14,11 @@ Commands:
   deps    Install Homebrew build dependencies
   build   Configure and build a Release tree
   test    Build and run all CTest suites
+  physics Build and open the Vulkax Physics Studio editor
   app     Build and open Connaught Place in the native macOS application
   london  Build and open Central London in the native macOS application
   tokyo   Build and open Central Tokyo in the native macOS application
+  nyc     Build and open Midtown Manhattan in the native macOS application
   atlas   Build and run the experimental globe research view
   geo     Build and run the GeoBEACON city renderer
 
@@ -28,10 +30,10 @@ EOF
 
 doctor() {
   local failed=0
-  echo "Vulkax Atlas macOS environment"
+  echo "Vulkax Physics Studio macOS environment"
   echo "  macOS:    $(sw_vers -productVersion)"
   echo "  CPU:      $(uname -m)"
-  for tool in brew cmake ninja glslangValidator vulkaninfo python3 container; do
+  for tool in brew cmake ninja glslangValidator vulkaninfo python3 container qmake6; do
     if command -v "$tool" >/dev/null 2>&1; then
       printf '  %-10s %s\n' "$tool:" "$(command -v "$tool")"
     else
@@ -67,7 +69,7 @@ deps() {
     echo "error: Homebrew is required: https://brew.sh" >&2
     exit 1
   }
-  brew install cmake ninja glfw glm nlohmann-json sqlite curl vulkan-loader glslang
+  brew install cmake ninja glfw glm nlohmann-json sqlite curl vulkan-loader glslang qtbase qtdeclarative qtsvg
 }
 
 build() {
@@ -89,6 +91,20 @@ build() {
   cmake --build "$BUILD_DIR" --parallel "$JOBS"
 }
 
+deploy_physics() {
+  local bundle="$BUILD_DIR/Vulkax Physics Studio.app"
+  local deploy_tool
+  deploy_tool="$(command -v macdeployqt6 || command -v macdeployqt || true)"
+  [[ -d "$bundle" ]] || { echo "error: Physics Studio bundle was not built" >&2; exit 1; }
+  [[ -n "$deploy_tool" ]] || {
+    echo "error: macdeployqt is required; install qtbase through scripts/vulkax_macos.sh deps" >&2
+    exit 1
+  }
+  "$deploy_tool" "$bundle" -always-overwrite \
+    -qmldir="$ROOT/src/vulkax/editor/qml" \
+    -libpath=/opt/homebrew/opt/qtsvg/lib
+}
+
 command="${1:-}"
 shift || true
 case "$command" in
@@ -98,6 +114,11 @@ case "$command" in
   test)
     build
     ctest --test-dir "$BUILD_DIR" --output-on-failure
+    ;;
+  physics)
+    build
+    deploy_physics
+    open -n "$BUILD_DIR/Vulkax Physics Studio.app" --args "$@"
     ;;
   app)
     build
@@ -132,6 +153,19 @@ case "$command" in
       --geo-policy geo-beacon-bounded \
       --geo-manifest "$ROOT/data/central_tokyo/generated/geobeacon.json" \
       --geo-navigation "$ROOT/data/central_tokyo/navigation.json" \
+      --geo-cache-mode warm \
+      --lights 500 \
+      --width 1440 \
+      --height 900 \
+      "$@"
+    ;;
+  nyc)
+    build
+    open -n "$BUILD_DIR/Vulkax.app" --args \
+      --geo \
+      --geo-policy geo-beacon-bounded \
+      --geo-manifest "$ROOT/data/midtown_manhattan/generated/geobeacon.json" \
+      --geo-navigation "$ROOT/data/midtown_manhattan/navigation.json" \
       --geo-cache-mode warm \
       --lights 500 \
       --width 1440 \
