@@ -30,6 +30,10 @@ find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(glm REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(CURL REQUIRED)
+find_package(PkgConfig QUIET)
+if (PkgConfig_FOUND)
+  pkg_check_modules(OPENEXR QUIET IMPORTED_TARGET OpenEXR)
+endif()
 if (TARGET SQLite3::SQLite3)
   set(ATLAS_SQLITE_TARGET SQLite3::SQLite3)
 elseif (TARGET SQLite::SQLite3)
@@ -82,6 +86,7 @@ endif()
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/src/*.cpp)
 list(FILTER SOURCES EXCLUDE REGEX "/src/atlas/")
+list(FILTER SOURCES EXCLUDE REGEX "/src/vulkax/")
 if (APPLE)
   enable_language(OBJCXX)
   list(REMOVE_ITEM SOURCES
@@ -162,6 +167,148 @@ target_link_libraries(
   INTERFACE atlas_core atlas_network atlas_navigation atlas_research
             atlas_renderer atlas_streaming
 )
+
+# Physics Studio is intentionally independent from the legacy Atlas stack so it
+# can be built, tested, and eventually hosted by a Qt/Vulkan editor on its own.
+add_library(
+  vulkax_equation STATIC
+  src/vulkax/equation/equation.cpp
+  src/vulkax/equation/glsl_compiler.cpp
+)
+target_compile_features(vulkax_equation PUBLIC cxx_std_20)
+target_include_directories(vulkax_equation PUBLIC ${PROJECT_SOURCE_DIR}/src)
+
+add_library(
+  vulkax_sim STATIC
+  src/vulkax/sim/simulation_graph.cpp
+  src/vulkax/sim/particle_system.cpp
+  src/vulkax/sim/buoyant_smoke.cpp
+)
+target_compile_features(vulkax_sim PUBLIC cxx_std_20)
+target_include_directories(vulkax_sim PUBLIC ${PROJECT_SOURCE_DIR}/src)
+
+add_library(
+  vulkax_relativity STATIC
+  src/vulkax/relativity/schwarzschild_lensing.cpp
+)
+target_compile_features(vulkax_relativity PUBLIC cxx_std_20)
+target_include_directories(vulkax_relativity PUBLIC ${PROJECT_SOURCE_DIR}/src)
+
+add_library(
+  vulkax_research STATIC
+  src/vulkax/research/quality_controller.cpp
+)
+target_compile_features(vulkax_research PUBLIC cxx_std_20)
+target_include_directories(vulkax_research PUBLIC ${PROJECT_SOURCE_DIR}/src)
+
+add_executable(VulkaxRelativityBenchmark tools/relativity_benchmark.cpp)
+set_target_properties(VulkaxRelativityBenchmark PROPERTIES OUTPUT_NAME vulkax-relativity)
+target_compile_features(VulkaxRelativityBenchmark PRIVATE cxx_std_20)
+target_link_libraries(VulkaxRelativityBenchmark PRIVATE vulkax_relativity)
+
+add_executable(VulkaxComputeBenchmark tools/vulkax_compute.cpp)
+set_target_properties(VulkaxComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-compute)
+target_compile_features(VulkaxComputeBenchmark PRIVATE cxx_std_20)
+target_compile_definitions(VulkaxComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
+target_link_libraries(VulkaxComputeBenchmark PRIVATE ${Vulkan_LIBRARIES})
+
+add_executable(VulkaxEquationShaderEmit tools/equation_shader_emit.cpp)
+set_target_properties(VulkaxEquationShaderEmit PROPERTIES OUTPUT_NAME vulkax-equation-shader)
+target_compile_features(VulkaxEquationShaderEmit PRIVATE cxx_std_20)
+target_link_libraries(VulkaxEquationShaderEmit PRIVATE vulkax_equation)
+
+add_executable(VulkaxSimulationComputeBenchmark tools/vulkax_sim_compute.cpp)
+set_target_properties(VulkaxSimulationComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-sim-compute)
+target_compile_features(VulkaxSimulationComputeBenchmark PRIVATE cxx_std_20)
+target_compile_definitions(VulkaxSimulationComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
+target_link_libraries(VulkaxSimulationComputeBenchmark PRIVATE vulkax_sim ${Vulkan_LIBRARIES})
+
+add_executable(VulkaxReactionComputeBenchmark tools/vulkax_reaction_compute.cpp)
+set_target_properties(VulkaxReactionComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-reaction-compute)
+target_compile_features(VulkaxReactionComputeBenchmark PRIVATE cxx_std_20)
+target_compile_definitions(VulkaxReactionComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
+target_link_libraries(VulkaxReactionComputeBenchmark PRIVATE vulkax_sim ${Vulkan_LIBRARIES})
+
+add_executable(VulkaxParticleComputeBenchmark tools/vulkax_particle_compute.cpp)
+set_target_properties(VulkaxParticleComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-particle-compute)
+target_compile_features(VulkaxParticleComputeBenchmark PRIVATE cxx_std_20)
+target_compile_definitions(VulkaxParticleComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
+target_link_libraries(VulkaxParticleComputeBenchmark PRIVATE vulkax_sim ${Vulkan_LIBRARIES})
+
+add_executable(VulkaxEquationBenchmark tools/equation_benchmark.cpp)
+set_target_properties(VulkaxEquationBenchmark PROPERTIES OUTPUT_NAME vulkax-equations)
+target_compile_features(VulkaxEquationBenchmark PRIVATE cxx_std_20)
+target_link_libraries(VulkaxEquationBenchmark PRIVATE vulkax_equation)
+add_custom_target(vulkax_equations DEPENDS VulkaxEquationBenchmark)
+
+add_executable(VulkaxQualityBenchmark tools/quality_benchmark.cpp)
+set_target_properties(VulkaxQualityBenchmark PROPERTIES OUTPUT_NAME vulkax-quality-benchmark)
+target_compile_features(VulkaxQualityBenchmark PRIVATE cxx_std_20)
+target_link_libraries(VulkaxQualityBenchmark PRIVATE vulkax_equation vulkax_research)
+
+# Homebrew exposes Qt 6 as split qtbase/qtdeclarative formulae on macOS. Keep
+# the hints local and optional so non-editor research builds stay portable.
+option(VULKAX_BUILD_PHYSICS_STUDIO "Build the native Qt Physics Studio editor" ON)
+if (VULKAX_BUILD_PHYSICS_STUDIO)
+  if (APPLE)
+    list(APPEND CMAKE_PREFIX_PATH
+      /opt/homebrew/opt/qtbase
+      /opt/homebrew/opt/qtdeclarative
+    )
+    # Qt 6's umbrella package uses NO_DEFAULT_PATH when resolving modules.
+    # Homebrew splits base and declarative modules, so tell Qt itself where
+    # the second package root is instead of relying on CMAKE_PREFIX_PATH.
+    set(
+      QT_ADDITIONAL_PACKAGES_PREFIX_PATH
+      "/opt/homebrew/opt/qtdeclarative"
+      CACHE STRING "Additional Homebrew Qt module prefix" FORCE
+    )
+  endif()
+  find_package(Qt6 6.5 QUIET COMPONENTS Core Gui Qml Quick QuickControls2 Widgets)
+  if (Qt6_FOUND)
+    if (APPLE)
+      add_executable(
+        VulkaxPhysicsStudio MACOSX_BUNDLE
+        src/vulkax/editor/main.cpp
+        src/vulkax/editor/studio_controller.cpp
+        src/vulkax/editor/vulkan_field_executor.cpp
+        src/vulkax/editor/resources.qrc
+      )
+    else()
+      add_executable(
+        VulkaxPhysicsStudio
+        src/vulkax/editor/main.cpp
+        src/vulkax/editor/studio_controller.cpp
+        src/vulkax/editor/vulkan_field_executor.cpp
+        src/vulkax/editor/resources.qrc
+      )
+    endif()
+    target_compile_features(VulkaxPhysicsStudio PRIVATE cxx_std_20)
+    target_compile_definitions(VulkaxPhysicsStudio PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
+    target_include_directories(VulkaxPhysicsStudio PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_link_libraries(
+      VulkaxPhysicsStudio PRIVATE
+      vulkax_equation Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
+      vulkax_research vulkax_sim vulkax_relativity ${Vulkan_LIBRARIES}
+    )
+    if (TARGET PkgConfig::OPENEXR)
+      target_link_libraries(VulkaxPhysicsStudio PRIVATE PkgConfig::OPENEXR)
+      target_compile_definitions(VulkaxPhysicsStudio PRIVATE VULKAX_HAS_OPENEXR=1)
+    endif()
+    set_target_properties(
+      VulkaxPhysicsStudio PROPERTIES
+      OUTPUT_NAME "Vulkax Physics Studio"
+      AUTOMOC ON
+      AUTORCC ON
+      MACOSX_BUNDLE_GUI_IDENTIFIER "local.vulkax.physicsstudio"
+      MACOSX_BUNDLE_BUNDLE_NAME "Vulkax Physics Studio"
+    )
+    add_custom_target(physics_studio_app DEPENDS VulkaxPhysicsStudio)
+    add_dependencies(VulkaxPhysicsStudio Shaders)
+  else()
+    message(WARNING "Qt6 Core/Gui/Qml/Quick/Widgets not found; Physics Studio app target is unavailable")
+  endif()
+endif()
 
 add_executable(VulkaxAtlasBuilder tools/atlas_build.cpp)
 set_target_properties(VulkaxAtlasBuilder PROPERTIES OUTPUT_NAME atlas-build)
@@ -257,6 +404,29 @@ add_custom_target(
     DEPENDS ${SPIRV_BINARY_FILES}
 )
 
+set(VULKAX_GENERATED_WAVE_GLSL "${PROJECT_SOURCE_DIR}/shaders/vulkax_generated_wave_field.comp")
+set(VULKAX_GENERATED_WAVE_SPIRV "${VULKAX_GENERATED_WAVE_GLSL}.spv")
+add_custom_command(
+  OUTPUT ${VULKAX_GENERATED_WAVE_GLSL}
+  COMMAND $<TARGET_FILE:VulkaxEquationShaderEmit>
+          --preset wave-field --output ${VULKAX_GENERATED_WAVE_GLSL}
+  DEPENDS VulkaxEquationShaderEmit
+  COMMENT "Emitting AST-generated Vulkax wave compute shader"
+)
+add_custom_command(
+  OUTPUT ${VULKAX_GENERATED_WAVE_SPIRV}
+  COMMAND ${GLSL_VALIDATOR} -V ${VULKAX_GENERATED_WAVE_GLSL} -o ${VULKAX_GENERATED_WAVE_SPIRV}
+  DEPENDS ${VULKAX_GENERATED_WAVE_GLSL}
+  COMMENT "Compiling AST-generated Vulkax wave compute shader"
+)
+add_custom_target(VulkaxGeneratedEquationShaders DEPENDS ${VULKAX_GENERATED_WAVE_SPIRV})
+
+add_dependencies(VulkaxComputeBenchmark Shaders)
+add_dependencies(VulkaxComputeBenchmark VulkaxGeneratedEquationShaders)
+add_dependencies(VulkaxSimulationComputeBenchmark Shaders)
+add_dependencies(VulkaxReactionComputeBenchmark Shaders)
+add_dependencies(VulkaxParticleComputeBenchmark Shaders)
+
 add_dependencies(${PROJECT_NAME} Shaders)
 add_custom_command(
   TARGET ${PROJECT_NAME}
@@ -294,6 +464,7 @@ if (APPLE)
             "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/connaught_place"
             "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/central_london"
             "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/central_tokyo"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/midtown_manhattan"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${PROJECT_SOURCE_DIR}/shaders"
             "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/shaders"
@@ -306,6 +477,9 @@ if (APPLE)
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${PROJECT_SOURCE_DIR}/data/central_tokyo/generated"
             "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/central_tokyo/generated"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${PROJECT_SOURCE_DIR}/data/midtown_manhattan/generated"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/midtown_manhattan/generated"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${PROJECT_SOURCE_DIR}/data/cities.json"
             "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/cities.json"
@@ -324,6 +498,11 @@ if (APPLE)
             "${PROJECT_SOURCE_DIR}/data/central_tokyo/LICENSE-ODbL.md"
             "${PROJECT_SOURCE_DIR}/data/central_tokyo/README.md"
             "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/central_tokyo"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PROJECT_SOURCE_DIR}/data/midtown_manhattan/navigation.json"
+            "${PROJECT_SOURCE_DIR}/data/midtown_manhattan/LICENSE-ODbL.md"
+            "${PROJECT_SOURCE_DIR}/data/midtown_manhattan/README.md"
+            "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/midtown_manhattan"
     DEPENDS ${PROJECT_NAME} Shaders
     COMMENT "Bundling checked Vulkax city and shader resources"
   )
@@ -337,6 +516,8 @@ endif()
 
 include(CTest)
 if (BUILD_TESTING)
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
   add_executable(
     BeaconCoreTests
     tests/beacon_core_tests.cpp
@@ -348,6 +529,285 @@ if (BUILD_TESTING)
   target_include_directories(BeaconCoreTests PRIVATE ${PROJECT_SOURCE_DIR}/src ${TINYOBJ_PATH})
   target_link_libraries(BeaconCoreTests PRIVATE glm::glm)
   add_test(NAME beacon_core COMMAND BeaconCoreTests)
+
+  add_executable(
+    EquationCoreTests
+    tests/equation_core_tests.cpp
+  )
+  target_compile_features(EquationCoreTests PRIVATE cxx_std_20)
+  target_link_libraries(EquationCoreTests PRIVATE vulkax_equation)
+  add_test(NAME equation_core COMMAND EquationCoreTests)
+
+  add_executable(
+    EquationGlslTests
+    tests/equation_glsl_tests.cpp
+  )
+  target_compile_features(EquationGlslTests PRIVATE cxx_std_20)
+  target_link_libraries(EquationGlslTests PRIVATE vulkax_equation)
+  add_test(NAME equation_glsl COMMAND EquationGlslTests)
+
+  add_executable(
+    SimulationGraphTests
+    tests/simulation_graph_tests.cpp
+  )
+  target_compile_features(SimulationGraphTests PRIVATE cxx_std_20)
+  target_link_libraries(SimulationGraphTests PRIVATE vulkax_sim)
+  add_test(NAME simulation_graph COMMAND SimulationGraphTests)
+
+  add_executable(
+    ParticleGravityTests
+    tests/particle_gravity_tests.cpp
+  )
+  target_compile_features(ParticleGravityTests PRIVATE cxx_std_20)
+  target_link_libraries(ParticleGravityTests PRIVATE vulkax_sim)
+  add_test(NAME particle_gravity COMMAND ParticleGravityTests)
+
+  add_executable(
+    BuoyantSmokeTests
+    tests/buoyant_smoke_tests.cpp
+  )
+  target_compile_features(BuoyantSmokeTests PRIVATE cxx_std_20)
+  target_link_libraries(BuoyantSmokeTests PRIVATE vulkax_sim)
+  add_test(NAME buoyant_smoke COMMAND BuoyantSmokeTests)
+  set_tests_properties(buoyant_smoke PROPERTIES LABELS "buoyant_smoke_example")
+
+  add_executable(
+    SchwarzschildLensingTests
+    tests/schwarzschild_lensing_tests.cpp
+  )
+  target_compile_features(SchwarzschildLensingTests PRIVATE cxx_std_20)
+  target_link_libraries(SchwarzschildLensingTests PRIVATE vulkax_relativity)
+  add_test(NAME schwarzschild_lensing COMMAND SchwarzschildLensingTests)
+  set_tests_properties(schwarzschild_lensing PROPERTIES LABELS "black_hole_example")
+
+  add_executable(
+    SchwarzschildThinDiskTests
+    tests/schwarzschild_thin_disk_tests.cpp
+  )
+  target_compile_features(SchwarzschildThinDiskTests PRIVATE cxx_std_20)
+  target_link_libraries(SchwarzschildThinDiskTests PRIVATE vulkax_relativity)
+  add_test(NAME schwarzschild_thin_disk COMMAND SchwarzschildThinDiskTests)
+  set_tests_properties(schwarzschild_thin_disk PROPERTIES LABELS "black_hole_example")
+
+  add_executable(
+    QualityControllerTests
+    tests/quality_controller_tests.cpp
+  )
+  target_compile_features(QualityControllerTests PRIVATE cxx_std_20)
+  target_link_libraries(QualityControllerTests PRIVATE vulkax_research)
+  add_test(NAME quality_controller COMMAND QualityControllerTests)
+
+  add_test(
+    NAME vulkan_wave_compute
+    COMMAND VulkaxComputeBenchmark --width 32 --height 18
+            --output ${CMAKE_BINARY_DIR}/vulkan-wave-compute
+  )
+  add_test(
+    NAME vulkan_generated_wave_compute
+    COMMAND VulkaxComputeBenchmark --generated --width 32 --height 18
+            --output ${CMAKE_BINARY_DIR}/vulkan-generated-wave-compute
+  )
+  add_test(
+    NAME vulkan_wave_simulation_compute
+    COMMAND VulkaxSimulationComputeBenchmark --steps 16
+            --output ${CMAKE_BINARY_DIR}/vulkan-wave-simulation
+  )
+  add_test(
+    NAME vulkan_reaction_diffusion_compute
+    COMMAND VulkaxReactionComputeBenchmark --steps 16
+            --output ${CMAKE_BINARY_DIR}/vulkan-reaction-diffusion
+  )
+  add_test(
+    NAME vulkan_particle_gravity_compute
+    COMMAND VulkaxParticleComputeBenchmark --steps 64
+            --output ${CMAKE_BINARY_DIR}/vulkan-particle-gravity
+  )
+  add_test(
+    NAME physics_quality_benchmark
+    COMMAND VulkaxQualityBenchmark --frames 24 --width 160 --height 90 --target-ms 0.5
+            --output ${CMAKE_BINARY_DIR}/physics-quality-benchmark
+  )
+  add_test(
+    NAME physics_quality_benchmark_validate
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_quality_benchmark.py
+            ${CMAKE_BINARY_DIR}/physics-quality-benchmark
+  )
+  set_tests_properties(
+    physics_quality_benchmark_validate PROPERTIES
+    DEPENDS physics_quality_benchmark
+  )
+
+  if (TARGET VulkaxPhysicsStudio)
+    if (APPLE)
+      set(VULKAX_QT_TEST_ENV
+        "QT_QPA_PLATFORM=cocoa;QT_QUICK_BACKEND=software")
+    else()
+      set(VULKAX_QT_TEST_ENV "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+    endif()
+    add_test(NAME physics_studio_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --smoke)
+    set_tests_properties(
+      physics_studio_smoke PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    if (TARGET PkgConfig::OPENEXR)
+      add_test(
+        NAME physics_studio_exr
+        COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+                --export-exr ${CMAKE_BINARY_DIR}/physics-studio-preview.exr
+      )
+      set_tests_properties(
+        physics_studio_exr PROPERTIES
+        ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+      )
+      add_test(
+        NAME physics_studio_exr_validate
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_openexr_export.py
+                ${CMAKE_BINARY_DIR}/physics-studio-preview.exr
+      )
+      set_tests_properties(
+        physics_studio_exr_validate PROPERTIES
+        DEPENDS physics_studio_exr
+      )
+    endif()
+    add_test(NAME physics_studio_ui_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --ui-smoke)
+    set_tests_properties(
+      physics_studio_ui_smoke PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(NAME physics_studio_project_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --project-smoke)
+    set_tests_properties(
+      physics_studio_project_smoke PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(NAME physics_studio_dynamic_project_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --dynamic-project-smoke)
+    set_tests_properties(
+      physics_studio_dynamic_project_smoke PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(NAME physics_studio_gpu_preview_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --gpu-preview-smoke)
+    set_tests_properties(
+      physics_studio_gpu_preview_smoke PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(
+      NAME physics_studio_gpu_reaction_preview_smoke
+      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --gpu-reaction-preview-smoke
+    )
+    set_tests_properties(
+      physics_studio_gpu_reaction_preview_smoke PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(
+      NAME physics_studio_sequence
+      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+              --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-sequence --frames 3
+    )
+    set_tests_properties(
+      physics_studio_sequence PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(
+      NAME physics_studio_reaction_sequence
+      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+              --preset reaction-diffusion-seed
+              --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-reaction-sequence --frames 3
+    )
+    set_tests_properties(
+      physics_studio_reaction_sequence PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(
+      NAME physics_studio_buoyant_smoke_sequence
+      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+              --preset buoyant-smoke
+              --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-buoyant-smoke-sequence --frames 3
+    )
+    set_tests_properties(
+      physics_studio_buoyant_smoke_sequence PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      LABELS "buoyant_smoke_example"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(
+      NAME physics_studio_buoyant_smoke_sequence_validate
+      COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_physics_sequence.py
+              ${CMAKE_BINARY_DIR}/physics-studio-buoyant-smoke-sequence --requires-variation
+    )
+    set_tests_properties(
+      physics_studio_buoyant_smoke_sequence_validate PROPERTIES
+      DEPENDS physics_studio_buoyant_smoke_sequence
+      LABELS "buoyant_smoke_example"
+    )
+    add_test(
+      NAME physics_studio_reaction_sequence_validate
+      COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_physics_sequence.py
+              ${CMAKE_BINARY_DIR}/physics-studio-reaction-sequence --requires-variation
+    )
+    set_tests_properties(
+      physics_studio_reaction_sequence_validate PROPERTIES
+      DEPENDS physics_studio_reaction_sequence
+    )
+    add_test(
+      NAME physics_studio_sequence_validate
+      COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_physics_sequence.py
+              ${CMAKE_BINARY_DIR}/physics-studio-sequence
+    )
+    set_tests_properties(
+      physics_studio_sequence_validate PROPERTIES
+      DEPENDS physics_studio_sequence
+    )
+    add_test(
+      NAME physics_studio_nbody_sequence
+      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+              --preset nbody-orbits
+              --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-nbody-sequence --frames 3
+    )
+    set_tests_properties(
+      physics_studio_nbody_sequence PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(
+      NAME physics_studio_nbody_sequence_validate
+      COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_physics_sequence.py
+              ${CMAKE_BINARY_DIR}/physics-studio-nbody-sequence --requires-variation
+    )
+    set_tests_properties(
+      physics_studio_nbody_sequence_validate PROPERTIES
+      DEPENDS physics_studio_nbody_sequence
+    )
+    add_test(
+      NAME physics_studio_lensing_sequence
+      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+              --preset schwarzschild-lensing
+              --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-lensing-sequence --frames 3
+    )
+    set_tests_properties(
+      physics_studio_lensing_sequence PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      LABELS "black_hole_example"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(
+      NAME physics_studio_lensing_sequence_validate
+      COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_physics_sequence.py
+              ${CMAKE_BINARY_DIR}/physics-studio-lensing-sequence
+    )
+    set_tests_properties(
+      physics_studio_lensing_sequence_validate PROPERTIES
+      DEPENDS physics_studio_lensing_sequence
+      LABELS "black_hole_example"
+    )
+  endif()
 
   add_executable(
     AtlasCoreTests
@@ -386,7 +846,6 @@ if (BUILD_TESTING)
       ${ATLAS_TEST_OUTPUT}/connaught-place.vxa
   )
 
-  find_package(Python3 COMPONENTS Interpreter REQUIRED)
   add_test(
     NAME geobeacon_tools
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_geobeacon_tools.py
