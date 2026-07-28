@@ -55,6 +55,21 @@ std::vector<GeoCityDefinition> loadGeoCityRegistry(
         center.at(1).get<double>(),
         center.size() > 2 ? center.at(2).get<double>() : 0.0,
     };
+    if (const auto camera = item.find("camera");
+        camera != item.end()) {
+      const auto& position = camera->at("position");
+      const auto& rotation = camera->at("rotation");
+      city.cameraPosition = {
+          position.at(0).get<float>(),
+          position.at(1).get<float>(),
+          position.at(2).get<float>(),
+      };
+      city.cameraRotation = {
+          rotation.at(0).get<float>(),
+          rotation.at(1).get<float>(),
+          rotation.at(2).get<float>(),
+      };
+    }
     city.manifestPath = base / item.at("manifest").get<std::string>();
     city.navigationPath = base / item.at("navigation").get<std::string>();
     city.installed =

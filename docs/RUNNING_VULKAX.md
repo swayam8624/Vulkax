@@ -1,4 +1,9 @@
-# Running Vulkax Atlas on macOS
+# Running the Preserved Vulkax Atlas/GeoBEACON Apps on macOS
+
+> This guide covers the preserved Atlas and GeoBEACON research applications. Vulkax's active
+> product direction is Physics Studio; use [the Physics Studio roadmap](VULKAX_PHYSICS_STUDIO_ROADMAP.md)
+> and the root README for the equation-core workflow. The commands below remain supported as
+> regression and research baselines.
 
 ## One-time setup
 
@@ -78,9 +83,18 @@ scripts/vulkax_macos.sh tokyo
 The Tokyo slice covers Tokyo Station, Marunouchi, Ginza, and the eastern edge of the Imperial
 Palace, with 3,000-plus searchable places and its checked mode-aware road graph.
 
+Open Midtown Manhattan:
+
+```bash
+scripts/vulkax_macos.sh nyc
+```
+
+The New York slice covers Times Square, Bryant Park, Rockefeller Center, and the surrounding
+Midtown street grid, with 3,000-plus searchable places and its checked road graph.
+
 The **Installed city** selector in the native panel switches among Connaught Place, Central
-London, and Central Tokyo in the running application. The selector reports each checked city's
-installed size.
+London, Central Tokyo, and Midtown Manhattan in the running application. The selector reports
+each checked city's installed size.
 Changing city retires old GPU resources after the in-flight frame window, clears the old route,
 loads the new local search graph, and resets the camera to the new city.
 

@@ -93,11 +93,12 @@ int main() {
 
   const auto checkedCities = lve::geo::loadGeoCityRegistry(
       std::filesystem::path{ENGINE_DIR} / "data/cities.json");
-  assert(checkedCities.size() == 3);
+  assert(checkedCities.size() == 4);
   assert(checkedCities[0].id == "connaught-place");
   assert(checkedCities[0].installed);
   assert(checkedCities[0].installedBytes > 1024 * 1024);
   assert(close(checkedCities[0].centerWgs84.x, 28.63175, 1e-8));
+  assert(close(checkedCities[0].cameraPosition.y, -130.0, 1e-6));
   assert(checkedCities[1].id == "central-london");
   assert(checkedCities[1].installed);
   assert(checkedCities[1].installedBytes > checkedCities[0].installedBytes);
@@ -106,6 +107,11 @@ int main() {
   assert(checkedCities[2].installed);
   assert(checkedCities[2].installedBytes > 1024 * 1024);
   assert(close(checkedCities[2].centerWgs84.x, 35.68025, 1e-8));
+  assert(checkedCities[3].id == "midtown-manhattan");
+  assert(checkedCities[3].installed);
+  assert(checkedCities[3].installedBytes > 1024 * 1024);
+  assert(close(checkedCities[3].centerWgs84.x, 40.759, 1e-8));
+  assert(close(checkedCities[3].cameraPosition.y, -700.0, 1e-6));
 
   const GeodeticPosition delhi{28.6139, 77.2090, 216.0};
   const std::vector<uint8_t> abc{'a', 'b', 'c'};

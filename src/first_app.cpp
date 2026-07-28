@@ -558,6 +558,8 @@ void FirstApp::run() {
   std::shared_ptr<LveModel> worldCityMarkerModel;
   glm::mat4 worldOverviewTransform{1.f};
   bool worldOverview = false;
+  glm::vec3 activeCityCameraPosition{0.f, -130.f, -720.f};
+  glm::vec3 activeCityCameraRotation{-0.18f, 0.f, 0.f};
   struct RetiredGeoCity {
     uint64_t retireAfterFrame = 0;
     std::unique_ptr<geo::GeoScene> scene;
@@ -618,6 +620,16 @@ void FirstApp::run() {
       localNavigation =
           std::make_unique<vulkax::atlas::LocalNavigationProvider>(
               navigationPath);
+      const auto activeCity = std::find_if(
+          geoCities.begin(),
+          geoCities.end(),
+          [&](const geo::GeoCityDefinition& city) {
+            return city.id == localNavigation->regionId();
+          });
+      if (activeCity != geoCities.end()) {
+        activeCityCameraPosition = activeCity->cameraPosition;
+        activeCityCameraRotation = activeCity->cameraRotation;
+      }
       mapControls =
           std::make_unique<DesktopMapControls>(
               lveWindow.getGLFWwindow(), localNavigation->displayName());
@@ -679,8 +691,8 @@ void FirstApp::run() {
     viewerObject.transform.translation = {0.f, 0.f, -28.f};
     viewerObject.transform.rotation = {0.f, 0.f, 0.f};
   } else if (config.geoEnabled) {
-    viewerObject.transform.translation = {0.f, -130.f, -720.f};
-    viewerObject.transform.rotation.x = -0.18f;
+    viewerObject.transform.translation = activeCityCameraPosition;
+    viewerObject.transform.rotation = activeCityCameraRotation;
   } else {
     viewerObject.transform.translation.z = -2.5f;
   }
@@ -926,8 +938,10 @@ void FirstApp::run() {
           followSegment = 0;
           followSegmentProgress = 0.f;
           worldOverview = false;
-          viewerObject.transform.translation = {0.f, -130.f, -720.f};
-          viewerObject.transform.rotation = {-0.18f, 0.f, 0.f};
+          activeCityCameraPosition = city->cameraPosition;
+          activeCityCameraRotation = city->cameraRotation;
+          viewerObject.transform.translation = activeCityCameraPosition;
+          viewerObject.transform.rotation = activeCityCameraRotation;
           cameraController.moveSpeed = 120.f;
           cameraController.sprintMultiplier = 5.f;
 
