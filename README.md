@@ -1,360 +1,145 @@
-# Vulkax Atlas
+# Vulkax Physics Studio
 
-Vulkax Atlas is a C++20 Vulkan globe and navigation SDK built on the reproducible BEACON and
-GeoBEACON research renderer. The current Atlas runtime provides WGS84 geodesy, double-precision
-ECEF and local frames, six-face cube-quadtree addressing, horizon/SSE tile selection,
-route-predictive resource scheduling, asynchronous file/HTTP/memory/SQLite tile sources, disk
-cache control, `.vxa` regional packs, normalized navigation APIs, deterministic replay, and a
-rendered WGS84 globe with route geometry.
+Vulkax is transitioning into a native desktop physics-visualization editor: equations and
+simulation graphs become reproducible GPU visualizations, real-time previews, and cinematic
+exports. The active product direction is **Vulkax Physics Studio**, not a globe/navigation
+application.
 
-`Vulkax.app` is the primary desktop experience and opens the checked Connaught Place GeoBEACON
-city. `VulkaxAtlas` remains an explicitly experimental globe research entrypoint. `LveEngine`
-preserves every BEACON/GeoBEACON technique and CLI identifier.
+This repository deliberately keeps the earlier Vulkan research work intact:
 
-## Atlas quick start
+- **BEACON** is the clustered-lighting research renderer and benchmark substrate.
+- **GeoBEACON** is the OpenStreetMap-based Connaught Place city/digital-twin experiment.
+- **Atlas** is a preserved experimental globe/navigation stack.
+
+They remain runnable regression baselines and source material for the editor's future adaptive
+research controller. They are not presented as unfinished requirements for Physics Studio.
+
+The complete, honest phase plan is [Vulkax Physics Studio Roadmap](docs/VULKAX_PHYSICS_STUDIO_ROADMAP.md).
+
+## Run Physics Studio
+
+The native Qt 6 editor is available on macOS as a regular application, not a local web server.
+It starts in live playback: select a preset, edit its equation, press **Compile and extract controls**,
+and every symbol other than `x`, `y`, `z`, and `t` becomes a bounded live parameter. Sliders update
+the running preview while they are dragged; playback, pause, reset, and timeline scrubbing work
+without exporting frames. The macOS interface is composited through Metal while the numerical
+compute executor remains Vulkan, avoiding a Qt Vulkan-RHI crash in the interactive UI. Wave Field
+and Gray-Scott reaction-diffusion use a persistent
+editor-owned Vulkan compute executor with timestamp queries and CPU readback into the Qt image
+provider. Other scalar, particle, and lensing previews retain their explicitly labelled CPU/reference paths.
+
+```bash
+scripts/vulkax_macos.sh physics
+```
+
+Or build it directly:
+
+```bash
+cmake -S . -B build-vulkax -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake --build build-vulkax --target physics_studio_app -j 8
+open "build-vulkax/Vulkax Physics Studio.app"
+```
+
+The editor's headless sequence job is useful for reproducible exports:
+
+```bash
+QT_QPA_PLATFORM=offscreen \
+"build-vulkax/Vulkax Physics Studio.app/Contents/MacOS/Vulkax Physics Studio" \
+  --export-sequence docs/results/my_wave_sequence --frames 120
+```
+
+## Equation Reference Runner
+
+The shared `vulkax_equation` core provides the parser, canonical AST evaluator, deterministic
+preset catalog, and GLSL compute-shader contract emitter. It ships scalar wave, gravity-potential,
+quantum wavepacket, electromagnetic-pulse, reaction-diffusion seed, and N-body orbit fields.
+
+```bash
+cmake -S . -B build-vulkax -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake --build build-vulkax --target vulkax_equations EquationCoreTests -j 8
+ctest --test-dir build-vulkax -R equation_core --output-on-failure
+build-vulkax/vulkax-equations --frames 180 --samples 512 \
+  --output docs/results/physics_studio_current
+```
+
+The runner writes raw `preset_runs.csv` and `summary.json`, explicitly labelled
+`cpu_analytic_reference`. These are the correctness inputs for the upcoming GPU compiler and
+simulation runtime; they are not performance claims.
+
+The paper-style implementation report and compiled PDF are available at
+[vulkax_physics_studio.tex](docs/paper/vulkax_physics_studio.tex) and
+[vulkax_physics_studio.pdf](docs/paper/vulkax_physics_studio.pdf).
+
+## Legacy research applications
+
+The working Connaught Place app remains the default legacy demo:
 
 ```bash
 scripts/vulkax_macos.sh doctor
-scripts/vulkax_macos.sh deps
 scripts/vulkax_macos.sh test
 scripts/vulkax_macos.sh app
 ```
 
-The Connaught Place application uses `W/A/S/D` for horizontal movement, `E/Q` for vertical
-movement, arrow keys for view rotation, and either Shift key for accelerated traversal. The
-in-window map panel searches the 242 checked offline places, calculates walking, driving, or
-cycling routes from the current camera position, draws the selected route over the city, and can
-follow it automatically. It permanently retains OpenStreetMap attribution.
-The dependency step only needs to be run once. Later sessions normally need only
-`scripts/vulkax_macos.sh app`.
-Use `app` for the packaged Connaught Place application, `geo` for terminal-attached GeoBEACON
-diagnostics, and `atlas` only for the separate globe research view.
+It provides offline city search and routing for the checked OSM dataset. Central London, Tokyo,
+and Midtown Manhattan are still selected with `scripts/vulkax_macos.sh london`, `tokyo`, and
+`nyc`. Atlas's non-default globe experiment is available through
+`scripts/vulkax_macos.sh atlas`.
 
-Central London is the second complete checked city slice:
+Existing BEACON/GeoBEACON CLI identifiers, datasets, papers, and CTest coverage are retained.
+See [the legacy operating guide](docs/RUNNING_VULKAX.md) for those commands and
+[the Atlas architecture](docs/ATLAS_ARCHITECTURE.md) for the preserved globe stack.
+
+## Current status
+
+| Component | State |
+| --- | --- |
+| Equation parsing, AST evaluation, built-in presets, raw analytical results | Implemented |
+| Qt 6 macOS editor, parameterized dynamic graphs, project I/O, timeline, PNG/sequence export | Implemented |
+| Scalar AST-to-GLSL compiler and CPU wave/reaction-diffusion graph references | Implemented |
+| Persistent editor Wave Field and Gray-Scott Vulkan compute, plus headless wave/N-body CPU/GPU agreement | Implemented |
+| Linear OpenEXR preview export | Implemented |
+| HDR accumulation, cameras, and director tooling | Next export/runtime gate |
+| Validated Schwarzschild ray reference and reference-guided lensing preview | Implemented foundation |
+| Schwarzschild thin-disk lensing and 2D buoyant-smoke equation suites | Implemented and tested |
+| Adaptive preview quality controller with live analytical MSE and raw benchmark | Implemented foundation |
+
+The Interstellar reference is an inspiration for visual rigor, not a claim of parity with DNEG's
+DNGR production renderer. Vulkax will state whether a visualization is analytical, numerically
+validated, real-time approximate, or offline reference.
+
+## Equation Examples
+
+Run the two checked example suites after building:
+
+```sh
+ctest --test-dir build -L black_hole_example --output-on-failure
+ctest --test-dir build -L buoyant_smoke_example --output-on-failure
+```
+
+The checked Schwarzschild thin-disk suite renders a black shadow from captured Schwarzschild null
+rays, maps escaped rays using the RK4 deflection reference, and samples an inclined emissive
+accretion annulus with a documented Doppler-brightness heuristic. It is not a Kerr or ray-bundle
+renderer.
+
+The checked buoyant-smoke suite solves a deterministic 2D stable-fluid chain: semi-Lagrangian
+advection, pressure projection for near-zero divergence, temperature/density buoyancy, and
+vorticity confinement. It is not a 3D volume-rendered fire system.
+
+## Build prerequisites
+
+The legacy Vulkan programs require CMake, GLFW, GLM, nlohmann-json, SQLite, CURL, Vulkan, and
+`glslangValidator`. On macOS:
 
 ```bash
-scripts/vulkax_macos.sh london
+brew install cmake ninja glfw glm nlohmann-json sqlite curl vulkan-loader glslang qtbase qtdeclarative qtsvg
 ```
 
-It uses the same native search, walking/driving/cycling routing, route ribbon, route-follow camera,
-semantic LODs, and bounded GeoBEACON lighting path as Connaught Place. Both installed cities are
-also available from the **Installed city** selector inside the application; switching replaces the
-active streamed scene, search index, route state, and camera without launching the globe.
-
-Central Tokyo is the third complete checked city slice:
-
-```bash
-scripts/vulkax_macos.sh tokyo
-```
-
-It covers Tokyo Station, Marunouchi, Ginza, and the eastern edge of the Imperial Palace with the
-same semantic tile, offline search, local routing, route rendering, and route-follow workflow.
-
-The **World** button opens a non-default WGS84 overview with markers for installed cities. The
-active city remains resident, the camera is constrained outside the ellipsoid, and **Open**
-returns to the selected full city. Connaught Place remains the default launch experience.
-On macOS, `build/Vulkax.app` contains its compiled shaders, all three checked city databases,
-navigation graphs, and ODbL notices, so opening the application does not depend on the repository
-working directory.
-
-The local navigation database is generated deterministically from the checked OSM extract:
-
-```bash
-python3 tools/build_connaught_navigation.py \
-  --source data/connaught_place/source.osm \
-  --output data/connaught_place/navigation.json
-```
-
-Generate and validate the five checked reference manifests:
-
-```bash
-for region in delhi-ncr greater-london tokyo-metro new-york-metro swiss-alps; do
-  build/atlas-build generate-manifest \
-    config/atlas/regions/$region.json \
-    data/atlas/regions/$region/atlas-dataset.json
-  build/atlas-build validate data/atlas/regions/$region/atlas-dataset.json
-done
-```
-
-Create an offline `.vxa` pack from the checked Connaught Place GeoBEACON database:
-
-```bash
-build/atlas-build pack-geobeacon \
-  data/connaught_place/generated/geobeacon.json \
-  build/connaught-place.vxa
-```
-
-## Navigation gateway
-
-The SDK and applications use one self-hostable contract: `/v1/search`, `/v1/reverse`,
-`/v1/route`, `/v1/transit`, `/v1/traffic`, `/v1/status`, and range-addressable
-`/v1/content/*`. Run the deterministic local gateway:
-
-```bash
-python3 services/atlas_gateway/server.py \
-  --replay data/atlas/navigation_replay.json \
-  --content-root data
-```
-
-Connect self-hosted Pelias and Valhalla without changing clients:
-
-```bash
-PELIAS_URL=http://127.0.0.1:4000 \
-VALHALLA_URL=http://127.0.0.1:8002 \
-python3 services/atlas_gateway/server.py \
-  --replay data/atlas/navigation_replay.json
-```
-
-Pelias autocomplete/reverse GeoJSON and Valhalla route/polyline6 responses are normalized into the
-Atlas provider model. If an explicitly configured upstream fails, the gateway returns `502` rather
-than silently substituting replay data. Transit and traffic replay remain deterministic unless
-their deployment-specific adapters are configured separately.
-
-On Apple silicon with macOS 26 or newer, run the gateway with Apple `container`:
-
-```bash
-scripts/atlas_gateway_container.sh setup
-scripts/atlas_gateway_container.sh start
-scripts/atlas_gateway_container.sh health
-```
-
-The first `setup` may request permission to install Apple's recommended Linux kernel. Later
-sessions only need `start`; use `stop`, `restart`, `status`, or `logs` for lifecycle management.
-The recipe is the OCI-standard `services/atlas_gateway/Containerfile`, and the runtime binds the
-checked `data` directory read-only for range-addressable content.
-
-To connect real self-hosted services:
-
-```bash
-PELIAS_URL=http://pelias-host:4000 \
-VALHALLA_URL=http://valhalla-host:8002 \
-scripts/atlas_gateway_container.sh restart
-```
-
-The native `GatewayNavigationProvider` and `CurlHttpTransport` consume this contract. The same
-provider interfaces also support deterministic replay and offline SQLite POI search.
-
-## Atlas research claim
-
-Atlas evaluates route-predictive joint allocation of tile detail, residency, upload bandwidth,
-cluster depth, light-list representation, and bounded diffuse-light error. Globe rendering,
-routing, LOD, HTTP streaming, and clustered lighting are supporting systems; the research variable
-is whether route probability, time-to-arrival, maneuver importance, and semantic importance reduce
-deadline misses and wasted prefetch bandwidth at a fixed frame/memory budget.
-
-Architecture and dataset details are in [docs/ATLAS_ARCHITECTURE.md](docs/ATLAS_ARCHITECTURE.md)
-and [docs/ATLAS_REGIONAL_PACKS.md](docs/ATLAS_REGIONAL_PACKS.md). The complete local operating
-guide is [docs/RUNNING_VULKAX.md](docs/RUNNING_VULKAX.md).
-
-## Checked Atlas controller result
-
-`docs/results/atlas_scheduler_current` contains a 600-frame constrained scheduler experiment across
-seven policies. It is explicitly an analytical scheduler simulation, not a Vulkan timing set.
-
-| Policy | Route-corridor deadline misses | Wasted prefetch bytes |
-| --- | ---: | ---: |
-| distance-only | 644 | 3,145,728 |
-| velocity-only | 204 | 2,818,048 |
-| route-only | 8 | 2,686,976 |
-| route-semantics | 4 | 2,686,976 |
-| full-atlas | 4 | 2,686,976 |
-
-Regenerate the raw rows and figures:
-
-```bash
-build/atlas-benchmark --frames 600 \
-  --output docs/results/atlas_scheduler_current
-python3 scripts/generate_atlas_figures.py \
-  docs/results/atlas_scheduler_current \
-  docs/results/atlas_scheduler_current/figures
-```
-
-The dedicated paper is
-[`docs/paper/vulkax_atlas_research.pdf`](docs/paper/vulkax_atlas_research.pdf).
-
-## GeoBEACON foundation
-
-GeoBEACON is the checked urban digital-twin research baseline built around an OpenStreetMap extract
-of Connaught Place, New Delhi. It provides semantic tile selection, asynchronous city streaming,
-memory and upload budgets, deterministic camera routes, exact diffuse reference captures, and
-separate GPU-query, CPU-fallback, and analytical measurement classes.
-
-## Research claim
-
-GeoBEACON evaluates whether joint semantic and view-aware allocation of geometry detail, streaming
-bandwidth, resident memory, and diffuse-light accuracy provides more task-relevant utility per
-millisecond than fixed LOD, distance-only LOD, semantic-only LOD, or lighting-only adaptation.
-SSBO lighting, instancing, clustered lighting, bounded pruning, glTF, and 3D Tiles are supporting
-infrastructure rather than novelty claims.
-
-## Implemented policies
-
-| CLI policy | Geometry allocation | Lighting |
-| --- | --- | --- |
-| `fixed-lod1` | LOD1 for every selected tile | camera-space fixed GPU clusters |
-| `distance-lod` | distance thresholds | camera-space fixed GPU clusters |
-| `semantic-lod` | distance scaled by semantic importance | camera-space fixed GPU clusters |
-| `geo-beacon-exact` | semantic budget controller | adaptive exact diffuse lists |
-| `geo-beacon-bounded` | semantic budget controller | adaptive aggregate-bounded pruning |
-
-The original BEACON CLI identifiers remain available: `baseline`, `ssbo`, `ssbo-diffuse`,
-`instanced`, `cpu-clustered`, `fixed-cluster-cost-model`, `gpu-clustered`, `adaptive-exact`,
-`adaptive-bounded`, and `beacon`.
-
-The fixed GPU clustered path projects finite-radius lights into screen tiles and logarithmic
-camera-space depth slices. Assignment is implemented as clear, light-centric count, hierarchical
-exclusive scan, offset propagation, and scatter compute stages. Overflow is flagged and rendered
-through an exact all-light fallback.
-
-## Dataset
-
-The canonical study area is:
-
-```text
-Connaught Place, New Delhi
-south 28.6270, west 77.2070, north 28.6365, east 77.2245
-```
-
-`data/connaught_place/source.osm` is the authoritative checked source. The deterministic
-preprocessor emits 151 spatial tiles, three GLB representations per tile, a 3D Tiles 1.1
-`tileset.json`, runtime metadata, checksums, and a validation report. Runtime rendering permanently
-shows `© OpenStreetMap contributors`.
-
-Regenerate the committed tile database:
-
-```bash
-python3 tools/build_geobeacon_tiles.py \
-  --source data/connaught_place/source.osm \
-  --output data/connaught_place/generated
-ctest --test-dir build --output-on-failure
-```
-
-Network acquisition is explicit and never runs during build or startup:
-
-```bash
-python3 tools/fetch_osm_extract.py --output data/connaught_place/source.osm
-```
-
-## Build and test
-
-macOS prerequisites include CMake, GLFW, GLM, nlohmann-json, a Vulkan loader, and
-`glslangValidator`.
-
-```bash
-brew install cmake glfw glm nlohmann-json vulkan-loader glslang
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
-cmake --build build -j 8
-ctest --test-dir build --output-on-failure
-```
-
-List devices and select one deterministically:
-
-```bash
-build/LveEngine --list-devices
-build/LveEngine --geo --device-index 0
-build/LveEngine --geo --device-name "Apple M2 Pro"
-build/LveEngine --geo --device-uuid 0000106b-1a05-0208-0000-000000000000
-```
-
-## Run
-
-Interactive city rendering:
-
-```bash
-build/LveEngine --geo --geo-policy geo-beacon-bounded \
-  --lights 500 --geo-budget-frame-ms 16.67 \
-  --geo-budget-memory-mib 512 --geo-budget-upload-mibps 100
-```
-
-Interactive controls use `W/A/S/D` for horizontal movement, `E/Q` for vertical movement, arrow
-keys for view rotation, and either Shift key for fast traversal. City mode uses metre-scale movement
-speeds appropriate for the full Connaught Place extent. In the native application, enter a place or
-road in the search field, select a result and travel mode, then use **Route**, **Follow**, or
-**Clear**. Search and route calculation run locally from the checked Connaught Place OSM data and
-do not require the Atlas gateway or an API key.
-
-Deterministic measured run:
-
-```bash
-build/LveEngine --geo --geo-policy geo-beacon-bounded \
-  --geo-camera-path landmark-approach --geo-cache-mode cold \
-  --lights 500 --width 1920 --height 1080 \
-  --warmup-frames 600 --frames 1800 --capture-reference true \
-  --output docs/results/my_run
-```
-
-Camera routes are `outer-orbit`, `street-drive`, `intersection-dwell`, `landmark-approach`, and
-`rapid-teleport`. Each measured run writes frame-level CSV, a reproducibility manifest, exact and
-test PPM captures when enabled, and a summary. Terminal runs include a progress bar unless
-`--quiet` is supplied.
-
-## Experiments
-
-The full resumable matrix encodes five policies, five routes, 100/500/2,000 lights, two frame
-budgets, three memory budgets, three upload limits, three resolutions, cold/warm caches, two local
-ICDs, and five trials:
-
-```bash
-python3 scripts/run_geobeacon_matrix.py \
-  --binary build/LveEngine \
-  --output docs/results/geobeacon_full \
-  --profile full
-python3 scripts/generate_beacon_figures.py \
-  docs/results/geobeacon_full \
-  docs/results/geobeacon_full/figures
-```
-
-`smoke` and `core` profiles use the same runner for validation and intermediate studies.
-
-## Checked results
-
-`docs/results/geobeacon_smoke` contains 20 completed dual-driver pilot cases: all five policies,
-outer-orbit and rapid-teleport, 100 lights, a 256 MiB memory budget, a 25 MiB/s upload limit, 30
-warm-up frames, and 60 measured frames. This is an execution and instrumentation validation set,
-not the full repeated-trial claim.
-
-| Driver / timing class | Policy | CPU p50 ms | CPU p95 ms | GPU cluster + light p50 ms |
-| --- | --- | ---: | ---: | ---: |
-| MoltenVK / Vulkan timestamps | fixed LOD1 | 8.232 | 11.920 | 0.3086 |
-| MoltenVK / Vulkan timestamps | GeoBEACON exact | 8.108 | 12.651 | 0.2866 |
-| MoltenVK / Vulkan timestamps | GeoBEACON bounded | 7.915 | 12.361 | 0.2621 |
-| KosmicKrisp / Vulkan CPU fallback | fixed LOD1 | 16.562 | 25.909 | unavailable |
-| KosmicKrisp / Vulkan CPU fallback | GeoBEACON exact | 16.046 | 21.421 | unavailable |
-| KosmicKrisp / Vulkan CPU fallback | GeoBEACON bounded | 16.105 | 21.838 | unavailable |
-
-MoltenVK reports timestamp-query support on this Apple M2 Pro. KosmicKrisp does not, so its rows
-are explicitly classified as Vulkan CPU measurements. Exact and bounded runs store rendered MSE,
-PSNR, SSIM, maximum pixel error, and temporal MSE variation separately from conservative modeled
-bounds. Every policy is compared with a separately streamed maximum-LOD diffuse reference; the
-pilot's mean MSE ranges from `3.09e-4` for fixed LOD1 to approximately `5.11e-4` for the semantic
-adaptive policies.
-
-## Key files
-
-- `tools/build_geobeacon_tiles.py`: deterministic OSM-to-GLB/3D Tiles preprocessing
-- `src/geobeacon/geo_scene.cpp`: tile selection, worker loading, upload integration, and eviction
-- `src/geobeacon/geo_camera_path.cpp`: deterministic benchmark routes
-- `src/beacon/adaptive_vulkan_builder.cpp`: adaptive hierarchy, pruning, encoding, and hysteresis
-- `src/systems/clustered_lighting_system.cpp`: count/scan/scatter GPU assignment
-- `src/beacon/offscreen_comparison.cpp`: exact captures and image metrics
-- `scripts/run_geobeacon_matrix.py`: resumable research matrix
-- `scripts/generate_beacon_figures.py`: raw-CSV figure regeneration
-- `scripts/android/`: Android Vulkan capability and benchmark harness
-- `.github/workflows/ci.yml`: Linux build, CTest, and Lavapipe smoke validation
-- `docs/paper/geobeacon_research.tex`: paper source
-- `docs/paper/geobeacon_research.pdf`: compiled paper
-
-## Research scope
-
-The formal error account covers opaque, unshadowed diffuse finite-radius point lighting. Strict
-specular bounds, shadows, transparency, neural rendering, imagery, Gaussian splats, sensor
-simulation, ROS, CARLA, and live network streaming are outside the evaluated claim.
-
-## Attribution and licenses
-
-Engine and preprocessing code are MIT licensed. The renderer substrate derives from Brendan
-Galea's Little Vulkan Engine tutorial under MIT. The checked OSM extract and derived tile database
-are covered separately by ODbL; see `data/connaught_place/LICENSE-ODbL.md`.
-
-Map data: © OpenStreetMap contributors,
-[copyright and license](https://www.openstreetmap.org/copyright).
+Use a new build directory when changing CMake generators. For example, if an existing `build/`
+was configured with Unix Makefiles, do not reconfigure it with Ninja; use `build-vulkax/` as shown
+above.
+
+## Attribution
+
+Vulkax code is MIT. The renderer substrate derives from Brendan Galea's Little Vulkan Engine under
+MIT. The preserved OpenStreetMap data and derived GeoBEACON city data carry separate ODbL notices;
+see `data/connaught_place/LICENSE-ODbL.md` and [OpenStreetMap copyright](https://www.openstreetmap.org/copyright).

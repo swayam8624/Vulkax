@@ -1,0 +1,8 @@
+{
+  "measurement_class": "vulkan_ast_generated_compute_readback",
+  "device": "Apple M2 Pro",
+  "width": 64,
+  "height": 36,
+  "mse": 1.90944e-13,
+  "max_error": 8.69864e-07
+}
