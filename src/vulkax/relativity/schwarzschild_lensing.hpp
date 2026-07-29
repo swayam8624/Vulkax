@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -23,6 +24,44 @@ struct SchwarzschildRayResult {
     double angularStep = 0.0005);
 
 [[nodiscard]] double weakFieldDeflectionRadians(double mass, double impactParameter);
+
+struct SchwarzschildVec3 {
+  double x = 0.0;
+  double y = 0.0;
+  double z = 0.0;
+};
+
+struct SchwarzschildGeodesicConfig {
+  double mass = 1.0;
+  double affineStep = 0.02;
+  double minimumAffineStep = 1e-5;
+  double maximumAffineStep = 0.10;
+  double relativeTolerance = 1e-7;
+  double maximumAffineDistance = 4096.0;
+  uint32_t maximumSteps = 250000;
+  uint32_t recordedPathStride = 8;
+};
+
+struct SchwarzschildGeodesicResult {
+  bool captured = false;
+  bool escaped = false;
+  double initialEnergy = 0.0;
+  double minimumRadius = 0.0;
+  double azimuthRadians = 0.0;
+  double maximumRelativeEnergyDrift = 0.0;
+  uint32_t integrationSteps = 0;
+  std::vector<SchwarzschildVec3> path;
+};
+
+// Integrates a null geodesic in an arbitrary orbital plane around a
+// Schwarzschild black hole. Spherical symmetry keeps every geodesic planar,
+// but the returned positions are reconstructed in the caller's 3D frame. The
+// integrator evolves r, dr/dlambda, and phi using the exact radial effective
+// potential and reports conserved-energy drift for validation/step control.
+[[nodiscard]] SchwarzschildGeodesicResult integrateSchwarzschildGeodesic(
+    const SchwarzschildGeodesicConfig& config,
+    SchwarzschildVec3 observerPosition,
+    SchwarzschildVec3 initialDirection);
 
 struct SchwarzschildDeflectionSample {
   double impactParameter = 0.0;

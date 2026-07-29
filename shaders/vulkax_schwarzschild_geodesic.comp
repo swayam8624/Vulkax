@@ -1,0 +1,79 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct RayResult {
+  float minimumRadius;
+  float status;  // 0 = unfinished, 1 = captured, 2 = escaped
+  float relativeEnergyDrift;
+  float azimuth;
+};
+
+layout(std430, binding = 0) writeonly buffer Results {
+  RayResult rays[];
+} outputResults;
+
+layout(std140, binding = 1) uniform Parameters {
+  uint rayCount;
+  uint maximumSteps;
+  float mass;
+  float observerRadius;
+  float affineStep;
+  float raySpread;
+  vec2 padding;
+} parameters;
+
+vec3 derivative(vec3 state, float angularMomentum) {
+  float r = state.x;
+  float r2 = r * r;
+  float r3 = r2 * r;
+  float r4 = r3 * r;
+  return vec3(
+      state.y,
+      angularMomentum * angularMomentum / r3 -
+          3.0 * parameters.mass * angularMomentum * angularMomentum / r4,
+      angularMomentum / r2);
+}
+
+vec3 rk4(vec3 state, float angularMomentum, float step) {
+  vec3 k1 = derivative(state, angularMomentum);
+  vec3 k2 = derivative(state + 0.5 * step * k1, angularMomentum);
+  vec3 k3 = derivative(state + 0.5 * step * k2, angularMomentum);
+  vec3 k4 = derivative(state + step * k3, angularMomentum);
+  return state + step * (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0;
+}
+
+void main() {
+  uint index = gl_GlobalInvocationID.x;
+  if (index >= parameters.rayCount) return;
+  uint columns = uint(ceil(sqrt(float(parameters.rayCount))));
+  uint rows = (parameters.rayCount + columns - 1u) / columns;
+  uint row = index / columns;
+  uint column = index % columns;
+  vec3 direction = normalize(vec3(
+      -1.0,
+      ((float(column) + 0.5) / float(columns) * 2.0 - 1.0) * parameters.raySpread,
+      ((float(row) + 0.5) / float(rows) * 2.0 - 1.0) * parameters.raySpread));
+  float radialVelocity = direction.x;
+  float tangentialLength = length(direction.yz);
+  float angularMomentum = parameters.observerRadius * tangentialLength;
+  float horizon = 2.0 * parameters.mass;
+  float energySquared = radialVelocity * radialVelocity +
+      (1.0 - horizon / parameters.observerRadius) * angularMomentum * angularMomentum /
+          (parameters.observerRadius * parameters.observerRadius);
+  vec3 state = vec3(parameters.observerRadius, radialVelocity, 0.0);
+  float minimumRadius = state.x;
+  float maximumDrift = 0.0;
+  float status = 0.0;
+  for (uint step = 0u; step < parameters.maximumSteps; ++step) {
+    minimumRadius = min(minimumRadius, state.x);
+    float energyInvariant = state.y * state.y +
+        (1.0 - horizon / state.x) * angularMomentum * angularMomentum / (state.x * state.x);
+    maximumDrift = max(maximumDrift, abs(energyInvariant - energySquared) / max(energySquared, 1e-12));
+    if (state.x <= horizon * (1.0 + 1e-5)) { status = 1.0; break; }
+    if (step > 0u && state.x >= parameters.observerRadius && state.y > 0.0) { status = 2.0; break; }
+    state = rk4(state, angularMomentum, parameters.affineStep);
+    if (any(isnan(state)) || any(isinf(state)) || state.x <= 0.0) break;
+  }
+  outputResults.rays[index] = RayResult(minimumRadius, status, maximumDrift, state.z);
+}
