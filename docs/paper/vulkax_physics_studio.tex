@@ -81,8 +81,20 @@ CPU interpreter, GLSL emitter, and MSL emitter consume that same program. GLSL i
 the native Metal verification path. On the checked Apple M2 Pro, Metal reported maximum absolute
 error $1.16\times10^{-6}$ and MSE $8.61\times10^{-14}$ against the analytical reference; the Vulkan
 gate retained its $10^{-5}$ maximum-error threshold. This establishes checked
-AST-to-IR-to-Vulkan and AST-to-IR-to-Metal paths for scalar fields. Coupled equations, stencil
-operators, and generated time-stepping kernels remain separate validation requirements.
+AST-to-IR-to-Vulkan and AST-to-IR-to-Metal paths for scalar fields.
+
+A second executable IR handles one scalar evolution equation. It expands
+\texttt{laplacian(field)} and directional gradients into centred finite-difference samples,
+lowers an explicit Euler update, and materializes open, periodic, or fixed-value boundary reads.
+The same canonical program runs in a CPU oracle and emits GLSL/SPIR-V and MSL. The Apple Metal
+compiler accepts the generated MSL, while a generated periodic diffusion-decay SPIR-V kernel
+matched the CPU oracle with zero measured error on the Apple M2 Pro Vulkan path. This is a real
+generated stencil kernel. The same IR now supports simultaneous coupled scalar updates with
+cross-field samples and per-field boundary conditions. A generated two-field Gray--Scott kernel
+uses one interleaved old-state buffer and one new-state buffer, compiles through
+\texttt{glslangValidator} and Apple's Metal compiler, and matched the CPU IR oracle with maximum
+error $5.96\times10^{-8}$ on Vulkan. Vector/tensor equations, implicit solvers, generated
+advection, and automatic solver scheduling remain separate validation requirements.
 
 The Qt 6 Quick application is a native macOS bundle. Its primary workflow contains a preset library,
 equation editor, parameter controls, timeline, field viewport, native project open/save dialogs,
@@ -116,6 +128,18 @@ curl, and radiance ranges and obstacle occupancy, and exactly replay their half-
 fresh GPU dispatch sequences. This is a real-time incompressible volume foundation, not a combustion,
 sparse-grid, or film-production smoke solver.
 
+A portable Vulkan stage independently validates the staggered-grid indexing and projection
+contract. It applies buoyancy to face-centred velocity, computes cell-centred divergence, performs
+80 Jacobi pressure iterations, and projects all three face components. The same command stream then
+performs midpoint-RK2 scalar backtracing, bounded MacCormack density and temperature correction,
+persistent source injection, and a 96-sample HDR volume ray march into a storage buffer. On the
+checked Apple M2 Pro one-step run, it reduced divergence L2 from 0.0193272 to 0.00216895, matched an
+independent CPU projection oracle within $5.89\times10^{-7}$, produced finite luminance from
+0.005008 to 0.409979, and measured 2.45863 ms by Vulkan timestamps. A separate 48-step batch reduced
+divergence from 0.0241489 to 0.000134002 while retaining finite transported scalars and radiance.
+The portable path still uses Jacobi rather than the Metal two-level multigrid solve and does not
+include the Metal GPU CFL controller, obstacle/curl passes, or direct swapchain volume display.
+
 The portable Vulkan presentation reference is a separate GLFW swapchain target. It dispatches an
 animated field into a device-local RGBA16F storage image, synchronizes compute output to a graphics
 sampling pass, tone maps the sampled radiance, and presents without Qt, \texttt{QImage}, or a CPU
@@ -141,10 +165,17 @@ The matching CPU reference checks the analytic outer horizon, Schwarzschild-limi
 symmetry, central capture, spin-induced prograde/retrograde asymmetry, and convergence under step
 refinement. A symmetric five-ray reference ($0,\pm x,\pm y$) additionally estimates the
 source-space Jacobian, singular values, magnification, shear, principal orientation, and caustic
-risk; tests cover differential refinement and Schwarzschild bundle symmetry. The Vulkan path uses
-the same symmetric footprint to select anisotropic celestial filtering. This is a finite-difference
-bundle, not full Jacobi/geodesic-deviation propagation. A recorded Apple M2 Pro MoltenVK smoke run at a bounded $512\times288$ compute extent
-measured approximately $38.8$ ms for the three-ray Kerr compute dispatch. The resulting linear
+risk; tests cover differential refinement and Schwarzschild bundle symmetry. The integrator also
+reconstructs covariant momenta and evaluates the normalized null-Hamiltonian residual at each
+accepted step; local truncation error and null drift jointly gate acceptance outside the stretched
+horizon used to avoid the Boyer--Lindquist coordinate-time singularity. A twelve-band CPU disk
+reference evaluates a Planck spectrum at the redshifted emitted frequency, applies the invariant
+$I_\nu/\nu^3$ as a $g^3$ intensity transfer, and integrates approximate CIE matching functions.
+The Vulkan path uses the same symmetric footprint to select anisotropic celestial filtering and a
+reduced six-band thermal transfer for central disk hits. This is a finite-difference bundle, not
+full Jacobi/geodesic-deviation propagation. A recorded Apple M2 Pro MoltenVK run at a bounded
+$384\times216$ compute extent measured approximately 99.3 ms for the central and four differential
+Kerr traces with spectral disk transfer. The resulting linear
 OpenEXR passed finite-value, dark-capture-region, luminous-radiance, and structural checks.
 The direct renderer can perform an explicit post-frame transfer of its untouched RGBA16F radiance
 image into a linear OpenEXR. That path is restricted to export and validation: normal presentation
@@ -285,13 +316,14 @@ the intended parameters and time.
 \section{Scope Boundaries}
 
 The current repository proves CPU/GPU agreement and Vulkan timestamp measurements only for the
-checked wave, Gray--Scott, and seven-body particle workloads, and separately validates a
+checked wave, generated diffusion, generated coupled Gray--Scott, handwritten Gray--Scott,
+seven-body particle, and staggered-MAC volume workloads, and separately validates a
 fixed-step Vulkan Schwarzschild compute kernel against its CPU reference. It additionally checks a
 CPU Kerr/Carter reference and executes the corresponding direct Vulkan preview with differential
 neighbour rays. It does \emph{not}
 establish general numerical convergence for arbitrary equations, shared Qt/Vulkan rendering
 resources, combustion chemistry or an adaptive deep/sparse volume solver, full Jacobi-matrix ray-bundle transport,
-spectral disk radiative transfer, or a controller connected to all live renderer timings. Direct
+high-resolution spectral line transport, or a controller connected to all live renderer timings. Direct
 Vulkan Wave, Schwarzschild, and Kerr EXR export reads the RGBA16F radiance target directly; the
 remaining export paths retain their labelled preview or
 reference behavior. These are scope boundaries, not implicit achievements.
