@@ -234,6 +234,11 @@ set_target_properties(VulkaxEquationShaderEmit PROPERTIES OUTPUT_NAME vulkax-equ
 target_compile_features(VulkaxEquationShaderEmit PRIVATE cxx_std_20)
 target_link_libraries(VulkaxEquationShaderEmit PRIVATE vulkax_physics_ir)
 
+add_executable(VulkaxStencilShaderEmit tools/stencil_shader_emit.cpp)
+set_target_properties(VulkaxStencilShaderEmit PROPERTIES OUTPUT_NAME vulkax-stencil-shader)
+target_compile_features(VulkaxStencilShaderEmit PRIVATE cxx_std_20)
+target_link_libraries(VulkaxStencilShaderEmit PRIVATE vulkax_physics_ir)
+
 add_executable(VulkaxSimulationComputeBenchmark tools/vulkax_sim_compute.cpp)
 set_target_properties(VulkaxSimulationComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-sim-compute)
 target_compile_features(VulkaxSimulationComputeBenchmark PRIVATE cxx_std_20)
