@@ -53,10 +53,11 @@ GPU durations for the final presented frame.
 capture/escape classification, equatorial disk crossings, and the same direct HDR compute-to-present
 path. Its bounded 512-pixel-wide compute extent keeps this research preview interactive.
 `--kerr` selects the Carter-separated Kerr null-geodesic mode. `--spin` accepts a dimensionless
-spin strictly between -1 and 1. The shader traces a central ray plus two differential neighbour
-rays, uses their escaped source coordinates as a first-order filtering footprint, and progressively
-accumulates jittered samples in the same device-local HDR image. Disk crossings use a Kerr
-Keplerian frequency-shift estimate rather than the Schwarzschild mode's image-space beaming term.
+spin strictly between -1 and 1. The shader traces a central ray plus symmetric `+/-x` and `+/-y`
+differential rays, uses their escaped source coordinates as a first-order filtering footprint, and
+progressively accumulates jittered samples in the same device-local HDR image. Disk crossings use a
+six-band redshifted thermal model with Kerr orbital frequency rather than the Schwarzschild mode's
+image-space beaming term.
 `--output` performs an export-only transfer after the final frame and writes the untouched linear
 half-float radiance to OpenEXR. The exporter rejects non-finite frames or captures lacking both
 shadow and luminous radiance; interactive frames still perform no readback.
@@ -160,6 +161,8 @@ See [the legacy operating guide](docs/RUNNING_VULKAX.md) for those commands and
 | Equation parsing, AST evaluation, built-in presets, raw analytical results | Implemented |
 | Qt 6 macOS editor, parameterized dynamic graphs, project I/O, timeline, PNG/sequence export | Implemented |
 | Executable scalar Physics IR with CPU interpreter, common-subexpression elimination, constant folding, GLSL/MSL emission, and Vulkan/Metal wave agreement | Implemented foundation |
+| Scalar evolution/stencil IR with Laplacian and directional gradients, explicit time stepping, open/periodic/fixed boundaries, CPU oracle, generated SPIR-V/MSL, and Vulkan agreement | Implemented foundation |
+| Coupled scalar evolution IR with cross-field stencils, simultaneous old/new state semantics, per-field boundaries, generated SPIR-V/MSL, and CPU/Vulkan Gray-Scott agreement | Implemented foundation |
 | Persistent editor Wave Field and Gray-Scott Vulkan compute, plus headless wave/N-body CPU/GPU agreement | Implemented |
 | Linear OpenEXR preview export | Implemented |
 | Typed physics IR, dimension/type validation, explicit solver-pass lowering, and executable scalar-field programs | Implemented foundation |
@@ -167,11 +170,12 @@ See [the legacy operating guide](docs/RUNNING_VULKAX.md) for those commands and
 | Direct Vulkan/MoltenVK compute-to-swapchain field presenter with no CPU image bridge | Implemented and smoke-tested on Apple M2 Pro |
 | Direct Vulkan/MoltenVK Schwarzschild GPU preview with timestamped compute-to-present path | Implemented foundation and smoke-tested on Apple M2 Pro |
 | Direct Vulkan Schwarzschild linear HDR OpenEXR capture with content validation | Implemented and tested |
-| CPU Kerr/Carter reference plus validated five-ray source-Jacobian bundle, direct Vulkan symmetric differential bundle, progressive HDR, and EXR validation | Implemented research foundation and smoke-tested on Apple M2 Pro |
+| CPU Kerr/Carter reference with null-constraint telemetry, 12-band disk transfer, validated five-ray source-Jacobian bundle, direct Vulkan symmetric differential bundle and six-band disk transfer, progressive HDR, and EXR validation | Implemented research foundation and smoke-tested on Apple M2 Pro |
 | Wave-field direct Vulkan HDR OpenEXR export | Implemented |
 | Schwarzschild CPU reference, Vulkan fixed-step compute check, and interactive Metal 3D orbital-plane visual | Implemented foundation |
 | Schwarzschild thin-disk lensing and 2D buoyant-smoke equation suites | Implemented and tested |
 | Interactive GPU 3D MAC smoke with staggered face velocity, RK2/MacCormack transport, obstacle-aware two-level multigrid projection, curl, temperature, and volume ray marching | Implemented research foundation |
+| Portable Vulkan staggered-MAC projection, RK2/MacCormack scalar transport, source injection, and HDR volume ray march with timestamping and CPU projection-oracle agreement | Implemented foundation |
 | Adaptive preview quality controller with live analytical MSE and raw benchmark | Implemented foundation |
 
 The Interstellar reference is an inspiration for visual rigor, not a claim of parity with DNEG's
@@ -185,6 +189,7 @@ Run the two checked example suites after building:
 ```sh
 ctest --test-dir build -L black_hole_example --output-on-failure
 ctest --test-dir build -L buoyant_smoke_example --output-on-failure
+ctest --test-dir build -R 'vulkan_generated_coupled_stencil_compute|vulkan_mac_projection_compute' --output-on-failure
 ```
 
 The checked Schwarzschild thin-disk suite renders a black shadow from captured Schwarzschild null
@@ -198,6 +203,14 @@ advection, pressure projection for near-zero divergence, temperature/density buo
 vorticity confinement. Separately, the native Metal target contains an interactive 3D staggered
 MAC-grid smoke foundation with private face-velocity, density, temperature, pressure, divergence,
 obstacle, and curl fields plus HDR ray marching. It is not a combustion or film-production solver.
+The portable Vulkan test validates the same staggered face indexing through buoyancy, divergence,
+80 Jacobi pressure iterations, and projection. It then performs midpoint-RK2 scalar backtracing,
+bounded MacCormack density/temperature correction, persistent source injection, and a 96-sample
+HDR volume ray march into a storage buffer. On the checked M2 Pro one-step run, it reduced
+divergence from `0.0193272` to `0.00216895`, matched the independent CPU projection oracle within
+`5.89e-07`, produced finite luminance in `[0.005008, 0.409979]`, and measured `2.45863 ms` for the
+recorded Vulkan command stream. The Vulkan path does not yet include the Metal path's two-level
+multigrid projection, GPU CFL controller, obstacle/curl passes, or direct swapchain volume display.
 
 ## Build prerequisites
 
