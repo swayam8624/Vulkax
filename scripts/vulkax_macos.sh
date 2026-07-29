@@ -15,6 +15,7 @@ Commands:
   build   Configure and build a Release tree
   test    Build and run all CTest suites
   physics Build and open the Vulkax Physics Studio editor
+  physics-vulkan  Build and run the direct Vulkan compute-to-present viewport
   app     Build and open Connaught Place in the native macOS application
   london  Build and open Central London in the native macOS application
   tokyo   Build and open Central Tokyo in the native macOS application
@@ -119,6 +120,10 @@ case "$command" in
     build
     deploy_physics
     open -n "$BUILD_DIR/Vulkax Physics Studio.app" --args "$@"
+    ;;
+  physics-vulkan)
+    build
+    exec "$BUILD_DIR/vulkax-physics-vulkan-direct" "$@"
     ;;
   app)
     build

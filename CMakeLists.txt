@@ -188,7 +188,17 @@ target_compile_features(vulkax_sim PUBLIC cxx_std_20)
 target_include_directories(vulkax_sim PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
 add_library(
+  vulkax_physics_ir STATIC
+  src/vulkax/physics/physics_ir.cpp
+  src/vulkax/physics/compute_ir.cpp
+)
+target_compile_features(vulkax_physics_ir PUBLIC cxx_std_20)
+target_include_directories(vulkax_physics_ir PUBLIC ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(vulkax_physics_ir PUBLIC vulkax_equation)
+
+add_library(
   vulkax_relativity STATIC
+  src/vulkax/relativity/kerr_geodesic.cpp
   src/vulkax/relativity/schwarzschild_lensing.cpp
 )
 target_compile_features(vulkax_relativity PUBLIC cxx_std_20)
@@ -212,10 +222,16 @@ target_compile_features(VulkaxComputeBenchmark PRIVATE cxx_std_20)
 target_compile_definitions(VulkaxComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
 target_link_libraries(VulkaxComputeBenchmark PRIVATE ${Vulkan_LIBRARIES})
 
+add_executable(VulkaxSchwarzschildComputeBenchmark tools/vulkax_schwarzschild_compute.cpp)
+set_target_properties(VulkaxSchwarzschildComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-schwarzschild-compute)
+target_compile_features(VulkaxSchwarzschildComputeBenchmark PRIVATE cxx_std_20)
+target_compile_definitions(VulkaxSchwarzschildComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
+target_link_libraries(VulkaxSchwarzschildComputeBenchmark PRIVATE vulkax_relativity ${Vulkan_LIBRARIES})
+
 add_executable(VulkaxEquationShaderEmit tools/equation_shader_emit.cpp)
 set_target_properties(VulkaxEquationShaderEmit PROPERTIES OUTPUT_NAME vulkax-equation-shader)
 target_compile_features(VulkaxEquationShaderEmit PRIVATE cxx_std_20)
-target_link_libraries(VulkaxEquationShaderEmit PRIVATE vulkax_equation)
+target_link_libraries(VulkaxEquationShaderEmit PRIVATE vulkax_physics_ir)
 
 add_executable(VulkaxSimulationComputeBenchmark tools/vulkax_sim_compute.cpp)
 set_target_properties(VulkaxSimulationComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-sim-compute)
@@ -305,6 +321,38 @@ if (VULKAX_BUILD_PHYSICS_STUDIO)
     )
     add_custom_target(physics_studio_app DEPENDS VulkaxPhysicsStudio)
     add_dependencies(VulkaxPhysicsStudio Shaders)
+    # Keep CTest independent from a locally deployed .app. The release target
+    # is a macOS bundle, while the test runner uses the development Qt runtime
+    # directly. This prevents a deployed bundle's copied frameworks from being
+    # loaded alongside Homebrew Qt during headless and QML smoke tests.
+    if (BUILD_TESTING AND APPLE)
+      add_executable(
+        VulkaxPhysicsStudioTestRunner
+        src/vulkax/editor/main.cpp
+        src/vulkax/editor/studio_controller.cpp
+        src/vulkax/editor/vulkan_field_executor.cpp
+        src/vulkax/editor/resources.qrc
+      )
+      target_compile_features(VulkaxPhysicsStudioTestRunner PRIVATE cxx_std_20)
+      target_compile_definitions(VulkaxPhysicsStudioTestRunner PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
+      target_include_directories(VulkaxPhysicsStudioTestRunner PRIVATE ${PROJECT_SOURCE_DIR}/src)
+      target_link_libraries(
+        VulkaxPhysicsStudioTestRunner PRIVATE
+        vulkax_equation Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
+        vulkax_research vulkax_sim vulkax_relativity ${Vulkan_LIBRARIES}
+      )
+      if (TARGET PkgConfig::OPENEXR)
+        target_link_libraries(VulkaxPhysicsStudioTestRunner PRIVATE PkgConfig::OPENEXR)
+        target_compile_definitions(VulkaxPhysicsStudioTestRunner PRIVATE VULKAX_HAS_OPENEXR=1)
+      endif()
+      set_target_properties(
+        VulkaxPhysicsStudioTestRunner PROPERTIES
+        OUTPUT_NAME "vulkax-physics-studio-test"
+        AUTOMOC ON
+        AUTORCC ON
+      )
+      add_dependencies(VulkaxPhysicsStudioTestRunner Shaders)
+    endif()
   else()
     message(WARNING "Qt6 Core/Gui/Qml/Quick/Widgets not found; Physics Studio app target is unavailable")
   endif()
@@ -406,6 +454,7 @@ add_custom_target(
 
 set(VULKAX_GENERATED_WAVE_GLSL "${PROJECT_SOURCE_DIR}/shaders/vulkax_generated_wave_field.comp")
 set(VULKAX_GENERATED_WAVE_SPIRV "${VULKAX_GENERATED_WAVE_GLSL}.spv")
+set(VULKAX_GENERATED_WAVE_MSL "${CMAKE_BINARY_DIR}/generated/shaders/vulkax_generated_wave_field.metal")
 add_custom_command(
   OUTPUT ${VULKAX_GENERATED_WAVE_GLSL}
   COMMAND $<TARGET_FILE:VulkaxEquationShaderEmit>
@@ -419,13 +468,55 @@ add_custom_command(
   DEPENDS ${VULKAX_GENERATED_WAVE_GLSL}
   COMMENT "Compiling AST-generated Vulkax wave compute shader"
 )
-add_custom_target(VulkaxGeneratedEquationShaders DEPENDS ${VULKAX_GENERATED_WAVE_SPIRV})
+add_custom_command(
+  OUTPUT ${VULKAX_GENERATED_WAVE_MSL}
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/generated/shaders
+  COMMAND $<TARGET_FILE:VulkaxEquationShaderEmit>
+          --preset wave-field --backend msl --output ${VULKAX_GENERATED_WAVE_MSL}
+  DEPENDS VulkaxEquationShaderEmit
+  COMMENT "Emitting Physics-IR-generated Vulkax wave Metal shader"
+)
+add_custom_target(
+  VulkaxGeneratedEquationShaders
+  DEPENDS ${VULKAX_GENERATED_WAVE_SPIRV} ${VULKAX_GENERATED_WAVE_MSL}
+)
 
 add_dependencies(VulkaxComputeBenchmark Shaders)
 add_dependencies(VulkaxComputeBenchmark VulkaxGeneratedEquationShaders)
+add_dependencies(VulkaxSchwarzschildComputeBenchmark Shaders)
 add_dependencies(VulkaxSimulationComputeBenchmark Shaders)
 add_dependencies(VulkaxReactionComputeBenchmark Shaders)
 add_dependencies(VulkaxParticleComputeBenchmark Shaders)
+
+# A deliberately small direct Vulkan presentation target. It shares the
+# established swapchain implementation with the legacy renderer, but owns no
+# Qt surface or CPU image bridge. This is the portable reference path for the
+# Physics Studio GPU-frame architecture.
+add_executable(
+  VulkaxPhysicsVulkanDirect
+  tools/vulkax_physics_vulkan_direct.cpp
+  src/lve_window.cpp
+  src/lve_device.cpp
+  src/lve_swap_chain.cpp
+  src/lve_renderer.cpp
+  src/lve_pipeline.cpp
+  src/lve_buffer.cpp
+  src/lve_model.cpp
+  src/runtime_paths.cpp
+)
+set_target_properties(VulkaxPhysicsVulkanDirect PROPERTIES OUTPUT_NAME vulkax-physics-vulkan-direct)
+target_compile_features(VulkaxPhysicsVulkanDirect PRIVATE cxx_std_20)
+target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
+target_include_directories(VulkaxPhysicsVulkanDirect PRIVATE ${PROJECT_SOURCE_DIR}/src ${TINYOBJ_PATH})
+target_link_libraries(VulkaxPhysicsVulkanDirect PRIVATE glfw ${Vulkan_LIBRARIES})
+if (TARGET PkgConfig::OPENEXR)
+  target_link_libraries(VulkaxPhysicsVulkanDirect PRIVATE PkgConfig::OPENEXR)
+  target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE VULKAX_HAS_OPENEXR=1)
+endif()
+if (APPLE)
+  target_link_libraries(VulkaxPhysicsVulkanDirect PRIVATE "-framework Cocoa" "-framework QuartzCore")
+endif()
+add_dependencies(VulkaxPhysicsVulkanDirect Shaders)
 
 add_dependencies(${PROJECT_NAME} Shaders)
 add_custom_command(
@@ -518,6 +609,95 @@ include(CTest)
 if (BUILD_TESTING)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
+  # Tests use assert() for compact numerical and contract checks. Release
+  # builds define NDEBUG, so explicitly retain assertions for every C++ test
+  # executable instead of allowing a green suite with its checks compiled out.
+  function(vulkax_enable_test_assertions target_name)
+    if (TARGET ${target_name})
+      if (MSVC)
+        target_compile_options(${target_name} PRIVATE /UNDEBUG)
+      else()
+        target_compile_options(${target_name} PRIVATE -UNDEBUG)
+      endif()
+    endif()
+  endfunction()
+
+  if (APPLE)
+    add_test(
+      NAME physics_vulkan_direct_presentation
+      COMMAND VulkaxPhysicsVulkanDirect --smoke
+    )
+    set_tests_properties(
+      physics_vulkan_direct_presentation PROPERTIES
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      LABELS "native_gpu;vulkan_presentation"
+    )
+    add_test(
+      NAME physics_vulkan_direct_schwarzschild_presentation
+      COMMAND VulkaxPhysicsVulkanDirect --black-hole --smoke
+    )
+    set_tests_properties(
+      physics_vulkan_direct_schwarzschild_presentation PROPERTIES
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      LABELS "native_gpu;vulkan_presentation;black_hole_example"
+    )
+    add_test(
+      NAME physics_vulkan_direct_kerr_presentation
+      COMMAND VulkaxPhysicsVulkanDirect --kerr --spin 0.8 --smoke
+    )
+    set_tests_properties(
+      physics_vulkan_direct_kerr_presentation PROPERTIES
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      LABELS "native_gpu;vulkan_presentation;black_hole_example;kerr_reference"
+    )
+    if (TARGET PkgConfig::OPENEXR)
+      set(VULKAX_DIRECT_SCHWARZSCHILD_EXR
+          ${CMAKE_BINARY_DIR}/direct-vulkan-captures/schwarzschild.exr)
+      add_test(
+        NAME physics_vulkan_direct_schwarzschild_exr
+        COMMAND VulkaxPhysicsVulkanDirect --black-hole --smoke
+                --output ${VULKAX_DIRECT_SCHWARZSCHILD_EXR}
+      )
+      set_tests_properties(
+        physics_vulkan_direct_schwarzschild_exr PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        LABELS "native_gpu;vulkan_presentation;black_hole_example;hdr_export"
+      )
+      add_test(
+        NAME physics_vulkan_direct_schwarzschild_exr_validate
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_openexr_export.py
+                ${VULKAX_DIRECT_SCHWARZSCHILD_EXR}
+      )
+      set_tests_properties(
+        physics_vulkan_direct_schwarzschild_exr_validate PROPERTIES
+        DEPENDS physics_vulkan_direct_schwarzschild_exr
+        LABELS "black_hole_example;hdr_export"
+      )
+      set(VULKAX_DIRECT_KERR_EXR
+          ${CMAKE_BINARY_DIR}/direct-vulkan-captures/kerr.exr)
+      add_test(
+        NAME physics_vulkan_direct_kerr_exr
+        COMMAND VulkaxPhysicsVulkanDirect --kerr --spin 0.8 --smoke
+                --output ${VULKAX_DIRECT_KERR_EXR}
+      )
+      set_tests_properties(
+        physics_vulkan_direct_kerr_exr PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        LABELS "native_gpu;vulkan_presentation;black_hole_example;kerr_reference;hdr_export"
+      )
+      add_test(
+        NAME physics_vulkan_direct_kerr_exr_validate
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_openexr_export.py
+                ${VULKAX_DIRECT_KERR_EXR}
+      )
+      set_tests_properties(
+        physics_vulkan_direct_kerr_exr_validate PROPERTIES
+        DEPENDS physics_vulkan_direct_kerr_exr
+        LABELS "black_hole_example;kerr_reference;hdr_export"
+      )
+    endif()
+  endif()
+
   add_executable(
     BeaconCoreTests
     tests/beacon_core_tests.cpp
@@ -545,6 +725,14 @@ if (BUILD_TESTING)
   target_compile_features(EquationGlslTests PRIVATE cxx_std_20)
   target_link_libraries(EquationGlslTests PRIVATE vulkax_equation)
   add_test(NAME equation_glsl COMMAND EquationGlslTests)
+
+  add_executable(
+    PhysicsIrTests
+    tests/physics_ir_tests.cpp
+  )
+  target_compile_features(PhysicsIrTests PRIVATE cxx_std_20)
+  target_link_libraries(PhysicsIrTests PRIVATE vulkax_physics_ir)
+  add_test(NAME physics_ir COMMAND PhysicsIrTests)
 
   add_executable(
     SimulationGraphTests
@@ -581,6 +769,16 @@ if (BUILD_TESTING)
   set_tests_properties(schwarzschild_lensing PROPERTIES LABELS "black_hole_example")
 
   add_executable(
+    KerrGeodesicTests
+    tests/kerr_geodesic_tests.cpp
+  )
+  target_compile_features(KerrGeodesicTests PRIVATE cxx_std_20)
+  target_link_libraries(KerrGeodesicTests PRIVATE vulkax_relativity)
+  vulkax_enable_test_assertions(KerrGeodesicTests)
+  add_test(NAME kerr_geodesic COMMAND KerrGeodesicTests)
+  set_tests_properties(kerr_geodesic PROPERTIES LABELS "black_hole_example;kerr_reference")
+
+  add_executable(
     SchwarzschildThinDiskTests
     tests/schwarzschild_thin_disk_tests.cpp
   )
@@ -606,6 +804,11 @@ if (BUILD_TESTING)
     NAME vulkan_generated_wave_compute
     COMMAND VulkaxComputeBenchmark --generated --width 32 --height 18
             --output ${CMAKE_BINARY_DIR}/vulkan-generated-wave-compute
+  )
+  add_test(
+    NAME vulkan_schwarzschild_compute
+    COMMAND VulkaxSchwarzschildComputeBenchmark --rays 16 --steps 30000
+            --output ${CMAKE_BINARY_DIR}/vulkan-schwarzschild-compute
   )
   add_test(
     NAME vulkan_wave_simulation_compute
@@ -638,13 +841,29 @@ if (BUILD_TESTING)
   )
 
   if (TARGET VulkaxPhysicsStudio)
+    if (TARGET VulkaxPhysicsStudioTestRunner)
+      set(VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE $<TARGET_FILE:VulkaxPhysicsStudioTestRunner>)
+    else()
+      set(VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE $<TARGET_FILE:VulkaxPhysicsStudio>)
+    endif()
     if (APPLE)
+      # The development executable links Homebrew Qt. A previously deployed
+      # app bundle may also contain Qt frameworks/plugins; letting Qt discover
+      # those bundled plugins loads two Qt copies in one test process. Force
+      # CTest to resolve plugins and QML modules from the same Homebrew prefix
+      # as the linked frameworks.
+      get_filename_component(VULKAX_QTBASE_PREFIX "${Qt6_DIR}/../../.." REALPATH)
+      get_filename_component(VULKAX_QML_PREFIX "${Qt6Qml_DIR}/../../.." REALPATH)
       set(VULKAX_QT_TEST_ENV
-        "QT_QPA_PLATFORM=cocoa;QT_QUICK_BACKEND=software")
+        "QT_QPA_PLATFORM=cocoa"
+        "QT_QUICK_BACKEND=software"
+        "QT_PLUGIN_PATH=${VULKAX_QTBASE_PREFIX}/share/qt/plugins"
+        "QT_QPA_PLATFORM_PLUGIN_PATH=${VULKAX_QTBASE_PREFIX}/share/qt/plugins/platforms"
+        "QML2_IMPORT_PATH=${VULKAX_QML_PREFIX}/share/qt/qml")
     else()
       set(VULKAX_QT_TEST_ENV "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
     endif()
-    add_test(NAME physics_studio_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --smoke)
+    add_test(NAME physics_studio_smoke COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --smoke)
     set_tests_properties(
       physics_studio_smoke PROPERTIES
       ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
@@ -653,7 +872,7 @@ if (BUILD_TESTING)
     if (TARGET PkgConfig::OPENEXR)
       add_test(
         NAME physics_studio_exr
-        COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+        COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE}
                 --export-exr ${CMAKE_BINARY_DIR}/physics-studio-preview.exr
       )
       set_tests_properties(
@@ -671,25 +890,31 @@ if (BUILD_TESTING)
         DEPENDS physics_studio_exr
       )
     endif()
-    add_test(NAME physics_studio_ui_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --ui-smoke)
+    add_test(NAME physics_studio_ui_smoke COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --ui-smoke)
     set_tests_properties(
       physics_studio_ui_smoke PROPERTIES
       ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
-    add_test(NAME physics_studio_project_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --project-smoke)
+    add_test(NAME physics_studio_project_smoke COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --project-smoke)
     set_tests_properties(
       physics_studio_project_smoke PROPERTIES
       ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
-    add_test(NAME physics_studio_dynamic_project_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --dynamic-project-smoke)
+    add_test(NAME physics_studio_dynamic_project_smoke COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --dynamic-project-smoke)
     set_tests_properties(
       physics_studio_dynamic_project_smoke PROPERTIES
       ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
-    add_test(NAME physics_studio_gpu_preview_smoke COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --gpu-preview-smoke)
+    add_test(NAME physics_studio_unavailable_error_smoke COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --unavailable-error-smoke)
+    set_tests_properties(
+      physics_studio_unavailable_error_smoke PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(NAME physics_studio_gpu_preview_smoke COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --gpu-preview-smoke)
     set_tests_properties(
       physics_studio_gpu_preview_smoke PROPERTIES
       ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
@@ -697,7 +922,7 @@ if (BUILD_TESTING)
     )
     add_test(
       NAME physics_studio_gpu_reaction_preview_smoke
-      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio> --gpu-reaction-preview-smoke
+      COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --gpu-reaction-preview-smoke
     )
     set_tests_properties(
       physics_studio_gpu_reaction_preview_smoke PROPERTIES
@@ -706,7 +931,7 @@ if (BUILD_TESTING)
     )
     add_test(
       NAME physics_studio_sequence
-      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+      COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE}
               --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-sequence --frames 3
     )
     set_tests_properties(
@@ -716,7 +941,7 @@ if (BUILD_TESTING)
     )
     add_test(
       NAME physics_studio_reaction_sequence
-      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+      COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE}
               --preset reaction-diffusion-seed
               --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-reaction-sequence --frames 3
     )
@@ -727,7 +952,7 @@ if (BUILD_TESTING)
     )
     add_test(
       NAME physics_studio_buoyant_smoke_sequence
-      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+      COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE}
               --preset buoyant-smoke
               --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-buoyant-smoke-sequence --frames 3
     )
@@ -767,7 +992,7 @@ if (BUILD_TESTING)
     )
     add_test(
       NAME physics_studio_nbody_sequence
-      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+      COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE}
               --preset nbody-orbits
               --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-nbody-sequence --frames 3
     )
@@ -787,7 +1012,7 @@ if (BUILD_TESTING)
     )
     add_test(
       NAME physics_studio_lensing_sequence
-      COMMAND $<TARGET_FILE:VulkaxPhysicsStudio>
+      COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE}
               --preset schwarzschild-lensing
               --export-sequence ${CMAKE_BINARY_DIR}/physics-studio-lensing-sequence --frames 3
     )
@@ -806,6 +1031,46 @@ if (BUILD_TESTING)
       physics_studio_lensing_sequence_validate PROPERTIES
       DEPENDS physics_studio_lensing_sequence
       LABELS "black_hole_example"
+    )
+  endif()
+
+  if (APPLE AND EXISTS "${PROJECT_SOURCE_DIR}/scripts/vulkax_physics_metal.sh")
+    add_test(
+      NAME physics_studio_native_metal_gpu
+      COMMAND ${PROJECT_SOURCE_DIR}/scripts/vulkax_physics_metal.sh --native-gpu-smoke
+    )
+    set_tests_properties(
+      physics_studio_native_metal_gpu PROPERTIES
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      LABELS "native_gpu"
+    )
+    add_test(
+      NAME physics_studio_native_metal_schwarzschild_gpu
+      COMMAND ${PROJECT_SOURCE_DIR}/scripts/vulkax_physics_metal.sh --native-black-hole-gpu-smoke
+    )
+    set_tests_properties(
+      physics_studio_native_metal_schwarzschild_gpu PROPERTIES
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      LABELS "native_gpu;black_hole_example"
+    )
+    add_test(
+      NAME physics_studio_native_metal_volume_gpu
+      COMMAND ${PROJECT_SOURCE_DIR}/scripts/vulkax_physics_metal.sh --native-volume-gpu-smoke
+    )
+    set_tests_properties(
+      physics_studio_native_metal_volume_gpu PROPERTIES
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      LABELS "native_gpu;volume_example"
+    )
+    add_test(
+      NAME physics_studio_native_metal_physics_ir_gpu
+      COMMAND ${PROJECT_SOURCE_DIR}/scripts/vulkax_physics_metal.sh
+              --native-physics-ir-gpu-smoke ${VULKAX_GENERATED_WAVE_MSL}
+    )
+    set_tests_properties(
+      physics_studio_native_metal_physics_ir_gpu PROPERTIES
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      LABELS "native_gpu;physics_ir"
     )
   endif()
 
@@ -887,4 +1152,20 @@ if (BUILD_TESTING)
         ${VULKAX_ATLAS_APP_DIR}
     )
   endif()
+
+  foreach(vulkax_test_target
+      BeaconCoreTests
+      EquationCoreTests
+      EquationGlslTests
+      PhysicsIrTests
+      SimulationGraphTests
+      ParticleGravityTests
+      BuoyantSmokeTests
+      SchwarzschildLensingTests
+      SchwarzschildThinDiskTests
+      QualityControllerTests
+      AtlasCoreTests
+      VulkaxPhysicsStudioTestRunner)
+    vulkax_enable_test_assertions(${vulkax_test_target})
+  endforeach()
 endif()
