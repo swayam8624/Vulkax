@@ -313,7 +313,11 @@ class DirectPhysicsPresenter final {
 
   [[nodiscard]] VkExtent2D renderExtent(VkExtent2D drawableExtent) const {
     if (!schwarzschild_ && !kerr_) return drawableExtent;
-    constexpr uint32_t maximumWidth = 512;
+    // Five Kerr rays plus spectral transfer are substantially more expensive
+    // than the single Schwarzschild trace. Keep each Metal command buffer
+    // below the macOS interactivity watchdog and reconstruct through the
+    // graphics sampler while progressive samples converge.
+    const uint32_t maximumWidth = kerr_ ? 384u : 512u;
     if (drawableExtent.width <= maximumWidth) return drawableExtent;
     const float scale = static_cast<float>(maximumWidth) / static_cast<float>(drawableExtent.width);
     return {
