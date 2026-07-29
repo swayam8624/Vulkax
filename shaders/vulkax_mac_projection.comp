@@ -1,0 +1,339 @@
+#version 450
+
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+layout(std430, binding = 0) buffer Density { float values[]; } density;
+layout(std430, binding = 1) buffer Temperature { float values[]; } temperature;
+layout(std430, binding = 2) buffer FaceU0 { float values[]; } faceU0;
+layout(std430, binding = 3) buffer FaceV0 { float values[]; } faceV0;
+layout(std430, binding = 4) buffer FaceW0 { float values[]; } faceW0;
+layout(std430, binding = 5) buffer FaceU1 { float values[]; } faceU1;
+layout(std430, binding = 6) buffer FaceV1 { float values[]; } faceV1;
+layout(std430, binding = 7) buffer FaceW1 { float values[]; } faceW1;
+layout(std430, binding = 8) buffer Divergence { float values[]; } divergence;
+layout(std430, binding = 9) buffer Pressure0 { float values[]; } pressure0;
+layout(std430, binding = 10) buffer Pressure1 { float values[]; } pressure1;
+layout(std430, binding = 11) buffer DivergenceBefore { float values[]; } divergenceBefore;
+layout(std430, binding = 12) buffer DensityForward { float values[]; } densityForward;
+layout(std430, binding = 13) buffer TemperatureForward { float values[]; } temperatureForward;
+layout(std430, binding = 14) buffer DensityBackward { float values[]; } densityBackward;
+layout(std430, binding = 15) buffer TemperatureBackward { float values[]; } temperatureBackward;
+layout(std430, binding = 16) buffer DensityOutput { float values[]; } densityOutput;
+layout(std430, binding = 17) buffer TemperatureOutput { float values[]; } temperatureOutput;
+layout(std430, binding = 18) buffer RadianceOutput { float values[]; } radianceOutput;
+
+layout(push_constant) uniform MacPass {
+  uint nx;
+  uint ny;
+  uint nz;
+  uint pass;
+  float dt;
+  float buoyancy;
+  float smokeWeight;
+  float parity;
+  uint outputWidth;
+  uint outputHeight;
+  float extinction;
+  float emission;
+} pushData;
+
+uint cellIndex(uvec3 cell) {
+  return (cell.z * pushData.ny + cell.y) * pushData.nx + cell.x;
+}
+
+uint uIndex(uvec3 face) {
+  return (face.z * pushData.ny + face.y) * (pushData.nx + 1u) + face.x;
+}
+
+uint vIndex(uvec3 face) {
+  return (face.z * (pushData.ny + 1u) + face.y) * pushData.nx + face.x;
+}
+
+uint wIndex(uvec3 face) {
+  return (face.z * pushData.ny + face.y) * pushData.nx + face.x;
+}
+
+float pressureAt(ivec3 cell, bool readSecond) {
+  ivec3 maximum = ivec3(pushData.nx, pushData.ny, pushData.nz) - 1;
+  cell = clamp(cell, ivec3(0), maximum);
+  const uint index = cellIndex(uvec3(cell));
+  return readSecond ? pressure1.values[index] : pressure0.values[index];
+}
+
+void applyForces(uvec3 id) {
+  if (id.x <= pushData.nx && id.y < pushData.ny && id.z < pushData.nz) {
+    const uint index = uIndex(id);
+    faceU1.values[index] = (id.x == 0u || id.x == pushData.nx) ? 0.0 : faceU0.values[index];
+  }
+  if (id.x < pushData.nx && id.y <= pushData.ny && id.z < pushData.nz) {
+    const uint index = vIndex(id);
+    if (id.y == 0u || id.y == pushData.ny) {
+      faceV1.values[index] = 0.0;
+    } else {
+      const uint below = cellIndex(uvec3(id.x, id.y - 1u, id.z));
+      const uint above = cellIndex(uvec3(id.x, id.y, id.z));
+      const float heat = 0.5 * (temperature.values[below] + temperature.values[above]);
+      const float smoke = 0.5 * (density.values[below] + density.values[above]);
+      faceV1.values[index] = faceV0.values[index] +
+          pushData.dt * (pushData.buoyancy * heat - pushData.smokeWeight * smoke);
+    }
+  }
+  if (id.x < pushData.nx && id.y < pushData.ny && id.z <= pushData.nz) {
+    const uint index = wIndex(id);
+    faceW1.values[index] = (id.z == 0u || id.z == pushData.nz) ? 0.0 : faceW0.values[index];
+  }
+}
+
+float velocityDivergence(uvec3 cell, bool projected) {
+  const float hx = 1.0 / float(pushData.nx);
+  const float hy = 1.0 / float(pushData.ny);
+  const float hz = 1.0 / float(pushData.nz);
+  if (projected) {
+    return (faceU0.values[uIndex(cell + uvec3(1, 0, 0))] - faceU0.values[uIndex(cell)]) / hx +
+        (faceV0.values[vIndex(cell + uvec3(0, 1, 0))] - faceV0.values[vIndex(cell)]) / hy +
+        (faceW0.values[wIndex(cell + uvec3(0, 0, 1))] - faceW0.values[wIndex(cell)]) / hz;
+  }
+  return (faceU1.values[uIndex(cell + uvec3(1, 0, 0))] - faceU1.values[uIndex(cell)]) / hx +
+      (faceV1.values[vIndex(cell + uvec3(0, 1, 0))] - faceV1.values[vIndex(cell)]) / hy +
+      (faceW1.values[wIndex(cell + uvec3(0, 0, 1))] - faceW1.values[wIndex(cell)]) / hz;
+}
+
+void computeDivergence(uvec3 id, bool projected) {
+  if (any(greaterThanEqual(id, uvec3(pushData.nx, pushData.ny, pushData.nz)))) return;
+  const uint index = cellIndex(id);
+  const float value = velocityDivergence(id, projected);
+  divergence.values[index] = value;
+  if (!projected) divergenceBefore.values[index] = value;
+}
+
+void solvePressure(uvec3 id) {
+  if (any(greaterThanEqual(id, uvec3(pushData.nx, pushData.ny, pushData.nz)))) return;
+  const bool readSecond = pushData.parity > 0.5;
+  const float inverseHx2 = float(pushData.nx * pushData.nx);
+  const float inverseHy2 = float(pushData.ny * pushData.ny);
+  const float inverseHz2 = float(pushData.nz * pushData.nz);
+  const ivec3 cell = ivec3(id);
+  const float neighbours = inverseHx2 *
+          (pressureAt(cell + ivec3(-1, 0, 0), readSecond) +
+           pressureAt(cell + ivec3(1, 0, 0), readSecond)) +
+      inverseHy2 *
+          (pressureAt(cell + ivec3(0, -1, 0), readSecond) +
+           pressureAt(cell + ivec3(0, 1, 0), readSecond)) +
+      inverseHz2 *
+          (pressureAt(cell + ivec3(0, 0, -1), readSecond) +
+           pressureAt(cell + ivec3(0, 0, 1), readSecond));
+  const float diagonal = 2.0 * (inverseHx2 + inverseHy2 + inverseHz2);
+  const float result = (neighbours - divergence.values[cellIndex(id)] / pushData.dt) / diagonal;
+  if (readSecond) pressure0.values[cellIndex(id)] = result;
+  else pressure1.values[cellIndex(id)] = result;
+}
+
+void projectVelocity(uvec3 id) {
+  const bool readSecond = pushData.parity > 0.5;
+  const float hx = 1.0 / float(pushData.nx);
+  const float hy = 1.0 / float(pushData.ny);
+  const float hz = 1.0 / float(pushData.nz);
+  if (id.x <= pushData.nx && id.y < pushData.ny && id.z < pushData.nz) {
+    const uint index = uIndex(id);
+    if (id.x == 0u || id.x == pushData.nx) faceU0.values[index] = 0.0;
+    else faceU0.values[index] = faceU1.values[index] - pushData.dt *
+        (pressureAt(ivec3(id) , readSecond) - pressureAt(ivec3(id) - ivec3(1, 0, 0), readSecond)) / hx;
+  }
+  if (id.x < pushData.nx && id.y <= pushData.ny && id.z < pushData.nz) {
+    const uint index = vIndex(id);
+    if (id.y == 0u || id.y == pushData.ny) faceV0.values[index] = 0.0;
+    else faceV0.values[index] = faceV1.values[index] - pushData.dt *
+        (pressureAt(ivec3(id), readSecond) - pressureAt(ivec3(id) - ivec3(0, 1, 0), readSecond)) / hy;
+  }
+  if (id.x < pushData.nx && id.y < pushData.ny && id.z <= pushData.nz) {
+    const uint index = wIndex(id);
+    if (id.z == 0u || id.z == pushData.nz) faceW0.values[index] = 0.0;
+    else faceW0.values[index] = faceW1.values[index] - pushData.dt *
+        (pressureAt(ivec3(id), readSecond) - pressureAt(ivec3(id) - ivec3(0, 0, 1), readSecond)) / hz;
+  }
+}
+
+float scalarValue(uint field, ivec3 cell) {
+  const ivec3 maximum = ivec3(pushData.nx, pushData.ny, pushData.nz) - 1;
+  const uint index = cellIndex(uvec3(clamp(cell, ivec3(0), maximum)));
+  if (field == 0u) return density.values[index];
+  if (field == 1u) return temperature.values[index];
+  if (field == 2u) return densityForward.values[index];
+  if (field == 3u) return temperatureForward.values[index];
+  if (field == 4u) return densityBackward.values[index];
+  if (field == 5u) return temperatureBackward.values[index];
+  if (field == 6u) return densityOutput.values[index];
+  return temperatureOutput.values[index];
+}
+
+float sampleScalar(uint field, vec3 position) {
+  const vec3 extent = vec3(pushData.nx, pushData.ny, pushData.nz);
+  const vec3 gridPosition = clamp(position, vec3(0.0), vec3(1.0)) * extent - 0.5;
+  const ivec3 base = ivec3(floor(gridPosition));
+  const vec3 fraction = fract(gridPosition);
+  float result = 0.0;
+  for (int dz = 0; dz <= 1; ++dz) {
+    for (int dy = 0; dy <= 1; ++dy) {
+      for (int dx = 0; dx <= 1; ++dx) {
+        const vec3 weight = mix(vec3(1.0) - fraction, fraction, vec3(dx, dy, dz));
+        result += weight.x * weight.y * weight.z *
+            scalarValue(field, base + ivec3(dx, dy, dz));
+      }
+    }
+  }
+  return result;
+}
+
+vec3 velocityAtCell(ivec3 cell) {
+  const ivec3 maximum = ivec3(pushData.nx, pushData.ny, pushData.nz) - 1;
+  cell = clamp(cell, ivec3(0), maximum);
+  const uvec3 resolved = uvec3(cell);
+  return vec3(
+      0.5 * (faceU0.values[uIndex(resolved)] +
+             faceU0.values[uIndex(resolved + uvec3(1, 0, 0))]),
+      0.5 * (faceV0.values[vIndex(resolved)] +
+             faceV0.values[vIndex(resolved + uvec3(0, 1, 0))]),
+      0.5 * (faceW0.values[wIndex(resolved)] +
+             faceW0.values[wIndex(resolved + uvec3(0, 0, 1))]));
+}
+
+vec3 sampleVelocity(vec3 position) {
+  const vec3 extent = vec3(pushData.nx, pushData.ny, pushData.nz);
+  const vec3 gridPosition = clamp(position, vec3(0.0), vec3(1.0)) * extent - 0.5;
+  const ivec3 base = ivec3(floor(gridPosition));
+  const vec3 fraction = fract(gridPosition);
+  vec3 result = vec3(0.0);
+  for (int dz = 0; dz <= 1; ++dz) {
+    for (int dy = 0; dy <= 1; ++dy) {
+      for (int dx = 0; dx <= 1; ++dx) {
+        const vec3 weight = mix(vec3(1.0) - fraction, fraction, vec3(dx, dy, dz));
+        result += weight.x * weight.y * weight.z *
+            velocityAtCell(base + ivec3(dx, dy, dz));
+      }
+    }
+  }
+  return result;
+}
+
+void advectScalars(uvec3 id, bool backward) {
+  if (any(greaterThanEqual(id, uvec3(pushData.nx, pushData.ny, pushData.nz)))) return;
+  const vec3 extent = vec3(pushData.nx, pushData.ny, pushData.nz);
+  const vec3 position = (vec3(id) + 0.5) / extent;
+  const float signedDt = backward ? -pushData.dt : pushData.dt;
+  const vec3 velocity = sampleVelocity(position);
+  const vec3 midpoint = position - 0.5 * signedDt * velocity;
+  const vec3 departure = position - signedDt * sampleVelocity(midpoint);
+  const uint densityField = backward ? 2u : 0u;
+  const uint temperatureField = backward ? 3u : 1u;
+  const uint index = cellIndex(id);
+  if (backward) {
+    densityBackward.values[index] = sampleScalar(densityField, departure);
+    temperatureBackward.values[index] = sampleScalar(temperatureField, departure);
+  } else {
+    densityForward.values[index] = sampleScalar(densityField, departure);
+    temperatureForward.values[index] = sampleScalar(temperatureField, departure);
+  }
+}
+
+void correctScalars(uvec3 id) {
+  if (any(greaterThanEqual(id, uvec3(pushData.nx, pushData.ny, pushData.nz)))) return;
+  const ivec3 cell = ivec3(id);
+  float densityMinimum = 1e30;
+  float densityMaximum = -1e30;
+  float temperatureMinimum = 1e30;
+  float temperatureMaximum = -1e30;
+  for (int dz = -1; dz <= 1; ++dz) {
+    for (int dy = -1; dy <= 1; ++dy) {
+      for (int dx = -1; dx <= 1; ++dx) {
+        const float sourceDensity = scalarValue(0u, cell + ivec3(dx, dy, dz));
+        const float sourceTemperature = scalarValue(1u, cell + ivec3(dx, dy, dz));
+        densityMinimum = min(densityMinimum, sourceDensity);
+        densityMaximum = max(densityMaximum, sourceDensity);
+        temperatureMinimum = min(temperatureMinimum, sourceTemperature);
+        temperatureMaximum = max(temperatureMaximum, sourceTemperature);
+      }
+    }
+  }
+  const uint index = cellIndex(id);
+  densityOutput.values[index] = 0.998 * clamp(
+      densityForward.values[index] + 0.5 *
+          (density.values[index] - densityBackward.values[index]),
+      densityMinimum, densityMaximum);
+  temperatureOutput.values[index] = 0.996 * clamp(
+      temperatureForward.values[index] + 0.5 *
+          (temperature.values[index] - temperatureBackward.values[index]),
+      temperatureMinimum, temperatureMaximum);
+}
+
+void commitAndInject(uvec3 id) {
+  if (any(greaterThanEqual(id, uvec3(pushData.nx, pushData.ny, pushData.nz)))) return;
+  const vec3 position = (vec3(id) + 0.5) /
+      vec3(pushData.nx, pushData.ny, pushData.nz);
+  const vec3 sourcePosition = vec3(0.5, 0.11, 0.5);
+  const vec3 sourceDelta = position - sourcePosition;
+  const float source = exp(-dot(sourceDelta * vec3(1.0, 1.8, 1.0),
+                                sourceDelta * vec3(1.0, 1.8, 1.0)) / 0.008);
+  const uint index = cellIndex(id);
+  density.values[index] = min(1.0, densityOutput.values[index] + pushData.dt * 2.2 * source);
+  temperature.values[index] = min(
+      1.0, temperatureOutput.values[index] + pushData.dt * 3.5 * source);
+}
+
+vec2 intersectUnitBox(vec3 origin, vec3 direction) {
+  const vec3 inverseDirection = 1.0 / direction;
+  const vec3 nearPlane = (vec3(0.0) - origin) * inverseDirection;
+  const vec3 farPlane = (vec3(1.0) - origin) * inverseDirection;
+  const vec3 minimumDistance = min(nearPlane, farPlane);
+  const vec3 maximumDistance = max(nearPlane, farPlane);
+  return vec2(
+      max(max(minimumDistance.x, minimumDistance.y), minimumDistance.z),
+      min(min(maximumDistance.x, maximumDistance.y), maximumDistance.z));
+}
+
+void rayMarchVolume(uvec3 id) {
+  if (id.z != 0u || id.x >= pushData.outputWidth || id.y >= pushData.outputHeight) return;
+  const vec2 uv = (vec2(id.xy) + 0.5) / vec2(pushData.outputWidth, pushData.outputHeight);
+  const float aspect = float(pushData.outputWidth) / float(pushData.outputHeight);
+  const vec3 origin = vec3(0.5, 0.48, -0.92);
+  const vec3 direction = normalize(vec3((uv.x - 0.5) * 0.95 * aspect, (uv.y - 0.5) * 0.95, 1.0));
+  const vec2 intersection = intersectUnitBox(origin, direction);
+  vec3 radiance = vec3(0.003, 0.005, 0.011);
+  float transmittance = 1.0;
+  if (intersection.y > max(intersection.x, 0.0)) {
+    const float begin = max(intersection.x, 0.0);
+    const float stepLength = (intersection.y - begin) / 96.0;
+    for (uint step = 0u; step < 96u; ++step) {
+      const float distance = begin + (float(step) + 0.5) * stepLength;
+      const vec3 position = origin + distance * direction;
+      const float smoke = max(sampleScalar(0u, position), 0.0);
+      const float heat = max(sampleScalar(1u, position), 0.0);
+      const float opticalDepth = pushData.extinction * smoke * stepLength;
+      const float absorption = 1.0 - exp(-opticalDepth);
+      const vec3 sootScatter = mix(vec3(0.10, 0.12, 0.16), vec3(0.72, 0.75, 0.82), heat);
+      const vec3 fire = pushData.emission * heat * heat *
+          mix(vec3(1.9, 0.18, 0.015), vec3(1.4, 0.72, 0.16), heat);
+      radiance += transmittance * absorption * (sootScatter + fire);
+      transmittance *= exp(-opticalDepth);
+      if (transmittance < 0.005) break;
+    }
+  }
+  const uint pixel = id.y * pushData.outputWidth + id.x;
+  radianceOutput.values[pixel * 4u + 0u] = radiance.r;
+  radianceOutput.values[pixel * 4u + 1u] = radiance.g;
+  radianceOutput.values[pixel * 4u + 2u] = radiance.b;
+  radianceOutput.values[pixel * 4u + 3u] = 1.0;
+}
+
+void main() {
+  const uvec3 id = gl_GlobalInvocationID.xyz;
+  if (pushData.pass == 0u) applyForces(id);
+  else if (pushData.pass == 1u) computeDivergence(id, false);
+  else if (pushData.pass == 2u) solvePressure(id);
+  else if (pushData.pass == 3u) projectVelocity(id);
+  else if (pushData.pass == 4u) computeDivergence(id, true);
+  else if (pushData.pass == 5u) advectScalars(id, false);
+  else if (pushData.pass == 6u) advectScalars(id, true);
+  else if (pushData.pass == 7u) correctScalars(id);
+  else if (pushData.pass == 8u) rayMarchVolume(id);
+  else if (pushData.pass == 9u) commitAndInject(id);
+}
