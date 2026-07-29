@@ -25,18 +25,25 @@ which parts are real-time approximations and which are offline reference calcula
 | GeoBEACON city demo | Connaught Place plus London, Tokyo, and Midtown data | Preserved legacy application |
 | Atlas globe and navigation | `atlas_*` libraries and tools | Preserved legacy experiment |
 | Equation core | `vulkax_equation`, parser, AST evaluation, deterministic preset catalog | Implemented |
-| GLSL compute contract | AST-to-GLSL emission, glslang SPIR-V compilation, and wave GPU agreement | Implemented for wave |
+| Typed physics IR | dimensions, scalar/vector fields, placements, validated operators, explicit solver-pass lowering, and executable scalar register programs | Implemented foundation |
+| Portable compute lowering | one canonical scalar IR hash, CPU interpreter, constant folding/CSE, GLSL/SPIR-V and MSL emission, and Vulkan/Metal wave agreement | Implemented for scalar fields |
 | Vulkan field compute | persistent editor-owned Wave Field and Gray-Scott executors, GPU timestamp query, CPU image-provider readback, and headless agreement | Implemented |
 | Vulkan dynamic simulation | wave, two-field Gray-Scott, and two-pass N-body velocity-Verlet solvers with CPU/GPU agreement | Implemented |
 | Simulation references | deterministic wave, Gray-Scott, and softened N-body velocity-Verlet graphs | Implemented foundation |
 | Qt editor | `Vulkax Physics Studio.app`, parameterized dynamic graphs, live preview, project I/O, timeline, PNG/sequence export | Implemented |
 | Physics benchmark | `vulkax-equations`, raw CSV and JSON output | Implemented |
-| Relativity reference | Schwarzschild equatorial null-ray RK4 runner and captured-ray classification | Implemented foundation |
+| Relativity reference | adaptive 3D Schwarzschild CPU reference, CPU Kerr/Carter reference, fixed-step Vulkan agreement check, and 3D orbital-plane Metal viewport trace | Implemented foundation |
+| Direct macOS GPU viewport | SwiftUI/Metal `CAMetalLayer` application, private RGBA16F radiance, HDR presentation, and temporal accumulation | Implemented |
+| Direct Vulkan presentation | GLFW/MoltenVK compute-to-swapchain presenter: device-local RGBA16F storage image, Wave, Schwarzschild, and Kerr compute modes, progressive accumulation, graphics sampling, timestamp queries, finite-frame smoke mode, and export-only linear EXR capture | Implemented foundation |
+| GPU volume visual | 64 x 96 x 64 staggered MAC velocity, density/temperature, obstacle, pressure/divergence, curl, RK2/MacCormack transport, two-level multigrid projection, GPU CFL substeps, and HDR ray marching | Implemented research foundation |
 | Adaptive preview budget | EWMA timing/error controller connected to editor preview scale | Implemented foundation |
 
 The equation benchmark is an analytical CPU reference. It does not claim GPU timing, numerical PDE
 accuracy, or an interactive editor. Its purpose is to give every future GPU implementation a
 deterministic input/output baseline.
+
+All C++ test targets explicitly undefine `NDEBUG`, including in a Release build, so `assert`-based
+numerical, parser, and contract checks execute in CI and local CTest runs.
 
 Reaction-diffusion exposes diffusion, feed, and kill controls; N-body exposes central mass,
 orbiter mass, and softening. Editing any dynamic parameter rebuilds the deterministic state at the
@@ -80,9 +87,12 @@ Qt Quick RHI, and scalar, particle, and lensing previews remain visibly labelled
 Gate: every shipped equation has CPU/GPU agreement within a declared tolerance and malformed input
 produces a location-aware diagnostic instead of a shader crash.
 
-Current evidence: the wave AST emits GLSL, compiles through `glslangValidator`, and executes in a
-Vulkan storage-buffer pipeline with CPU readback (`max_error 8.70e-07` on Apple M2 Pro). Agreement
-across every shipped equation remains a separate gate.
+Current evidence: the wave AST lowers into a backend-neutral scalar register program after typed
+output-field validation. The same canonical IR hash executes through the CPU interpreter, emits
+GLSL compiled by `glslangValidator` for Vulkan, and emits runtime-compiled MSL for native Metal.
+The checked Apple M2 Pro runs report Vulkan `max_error < 1e-5` and Metal
+`max_error = 1.16e-06` against the analytical reference. Coupled equations, stencil operators,
+boundary lowering, and agreement across every shipped equation remain separate gates.
 
 ### Phase 3: GPU simulation runtime
 
@@ -131,17 +141,25 @@ boundaries explicitly and is regenerated from `vulkax_physics_studio.tex`.
 ### Phase 5: Relativity flagship
 
 - Build a documented Schwarzschild lensing preset first, with a ray-integration reference mode.
-- Add Kerr-style approximations only after validation against published/analytic test cases.
+- Add Kerr transport only with explicit horizon, symmetry, spin-asymmetry, and convergence tests.
 - Treat film-grade ray-bundle rendering as an offline research path, never as an unqualified
   real-time claim.
 
 Gate: camera trajectories, units, numerical integrator, precision, and reference comparisons are
 all exposed in the project and report.
 
-Current evidence: the native editor has a checked `schwarzschild-lensing` preset. It maps a
-an inclined emissive disk through a Schwarzschild RK4 deflection lookup, keeps photon-sphere
-capture explicit, and uses a documented Doppler-brightness heuristic. It is a thin-disk
-Schwarzschild visualization, not a Kerr, ray-bundle, or film-grade renderer.
+Current evidence: the native Metal viewport has an interactive Schwarzschild visual with an
+RK4 null-ray approximation, progressive HDR accumulation, explicit capture, and a Doppler-style
+thin-disk heuristic. The C++ reference module also provides an adaptive 3D Schwarzschild
+geodesic integrator and a Vulkan fixed-step compute agreement check. A separate C++ Kerr reference
+uses the Carter-separated first-order equations and verifies the horizon, Schwarzschild-limit
+symmetry, central capture, spin-induced prograde/retrograde asymmetry, and step refinement. Its
+five-ray central-difference reference computes a source-space Jacobian, singular values,
+magnification, shear, principal orientation, and caustic-risk classification, with differential,
+integrator-refinement, and Schwarzschild-symmetry checks. The direct Vulkan Kerr mode uses the same
+conserved-quantity formulation, progressive jittered HDR, and symmetric `+/-x`, `+/-y`
+differential rays to derive an anisotropic source footprint. This remains a finite-difference
+bundle rather than full Jacobi/geodesic-deviation propagation, spectral transfer, or a film-grade renderer.
 
 ### Phase 5B: Buoyant Smoke Example
 
@@ -154,7 +172,19 @@ native export sequence.
 
 Current evidence: the buoyant-smoke numerical suite verifies deterministic replay, finite
 density/temperature, bounded divergence, and plume rise. The editor preset renders the same 2D
-incompressible reference and has a checked varying PNG sequence export.
+incompressible reference and has a checked varying PNG sequence export. The direct Metal target
+executes an interactive 3D staggered MAC grid: scalar fields are cell-centred, velocity components
+use separate face textures, velocity backtracing is RK2, density and temperature use limited
+MacCormack correction, and the two-level pressure V-cycle respects solid obstacles. It also stores
+curl and pre/post-projection divergence before HDR volume ray marching. A GPU maximum-velocity
+reduction computes the Courant number and selects one or two fixed-upper-bound command-stream
+substeps, avoiding an interactive CPU synchronization point. The stress verification measured
+CFL 0.779541, selected two 0.025-second substeps, and reduced divergence L2 from 0.688996 to
+0.008427. Its low-CFL counterpart measured 0.086629, selected one 0.016667-second substep, and
+reduced divergence from 0.243419 to 0.004010. Both cases retain the multigrid-versus-40-Jacobi
+ablation, verify finite scalar/curl/radiance ranges, and reproduce identical half-float output
+signatures in independent dispatch sequences. Combustion chemistry, deeper adaptive multigrid, sparse bricks, and
+film-production validation remain outside this implementation.
 
 ### Phase 6: Adaptive research controller
 
