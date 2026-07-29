@@ -27,6 +27,8 @@ which parts are real-time approximations and which are offline reference calcula
 | Equation core | `vulkax_equation`, parser, AST evaluation, deterministic preset catalog | Implemented |
 | Typed physics IR | dimensions, scalar/vector fields, placements, validated operators, explicit solver-pass lowering, and executable scalar register programs | Implemented foundation |
 | Portable compute lowering | one canonical scalar IR hash, CPU interpreter, constant folding/CSE, GLSL/SPIR-V and MSL emission, and Vulkan/Metal wave agreement | Implemented for scalar fields |
+| Scalar PDE stencil lowering | Laplacian/directional-gradient expansion, explicit Euler update, open/periodic/fixed boundaries, CPU oracle, generated SPIR-V/MSL, and Vulkan agreement | Implemented for scalar fields |
+| Coupled PDE lowering | simultaneous cross-field scalar updates, per-field boundaries, interleaved GPU ABI, generated SPIR-V/MSL, and CPU/Vulkan Gray-Scott agreement | Implemented foundation |
 | Vulkan field compute | persistent editor-owned Wave Field and Gray-Scott executors, GPU timestamp query, CPU image-provider readback, and headless agreement | Implemented |
 | Vulkan dynamic simulation | wave, two-field Gray-Scott, and two-pass N-body velocity-Verlet solvers with CPU/GPU agreement | Implemented |
 | Simulation references | deterministic wave, Gray-Scott, and softened N-body velocity-Verlet graphs | Implemented foundation |
@@ -36,6 +38,7 @@ which parts are real-time approximations and which are offline reference calcula
 | Direct macOS GPU viewport | SwiftUI/Metal `CAMetalLayer` application, private RGBA16F radiance, HDR presentation, and temporal accumulation | Implemented |
 | Direct Vulkan presentation | GLFW/MoltenVK compute-to-swapchain presenter: device-local RGBA16F storage image, Wave, Schwarzschild, and Kerr compute modes, progressive accumulation, graphics sampling, timestamp queries, finite-frame smoke mode, and export-only linear EXR capture | Implemented foundation |
 | GPU volume visual | 64 x 96 x 64 staggered MAC velocity, density/temperature, obstacle, pressure/divergence, curl, RK2/MacCormack transport, two-level multigrid projection, GPU CFL substeps, and HDR ray marching | Implemented research foundation |
+| Portable Vulkan MAC volume path | face-staggered buoyancy/projection, RK2/MacCormack scalar transport, source injection, HDR ray march, timestamps, and independent CPU projection agreement | Implemented foundation |
 | Adaptive preview budget | EWMA timing/error controller connected to editor preview scale | Implemented foundation |
 
 The equation benchmark is an analytical CPU reference. It does not claim GPU timing, numerical PDE
@@ -91,8 +94,15 @@ Current evidence: the wave AST lowers into a backend-neutral scalar register pro
 output-field validation. The same canonical IR hash executes through the CPU interpreter, emits
 GLSL compiled by `glslangValidator` for Vulkan, and emits runtime-compiled MSL for native Metal.
 The checked Apple M2 Pro runs report Vulkan `max_error < 1e-5` and Metal
-`max_error = 1.16e-06` against the analytical reference. Coupled equations, stencil operators,
-boundary lowering, and agreement across every shipped equation remain separate gates.
+`max_error = 1.16e-06` against the analytical reference. A separate scalar-evolution IR lowers
+`laplacian(field)` and directional gradients to centred finite-difference samples, applies explicit
+time stepping, and materializes open, periodic, or fixed-value boundary reads. A generated periodic
+diffusion-decay kernel compiles to SPIR-V and MSL; its Vulkan dispatch matched the CPU IR oracle with
+zero measured error on Apple M2 Pro. The IR now also lowers simultaneous coupled scalar updates:
+the checked Gray--Scott system reads both old fields, writes two new fields through one interleaved
+kernel, compiles as SPIR-V and Apple AIR, and matched its CPU oracle with maximum error
+`5.96e-08`. Vector/tensor equations, implicit solvers, generated advection, source-span diagnostics,
+and agreement across every shipped equation remain separate gates.
 
 ### Phase 3: GPU simulation runtime
 
@@ -158,8 +168,13 @@ five-ray central-difference reference computes a source-space Jacobian, singular
 magnification, shear, principal orientation, and caustic-risk classification, with differential,
 integrator-refinement, and Schwarzschild-symmetry checks. The direct Vulkan Kerr mode uses the same
 conserved-quantity formulation, progressive jittered HDR, and symmetric `+/-x`, `+/-y`
-differential rays to derive an anisotropic source footprint. This remains a finite-difference
-bundle rather than full Jacobi/geodesic-deviation propagation, spectral transfer, or a film-grade renderer.
+differential rays to derive an anisotropic source footprint. The CPU integrator now evaluates the
+normalized null-Hamiltonian constraint at accepted steps and includes that residual in step
+acceptance; tests also bound local error and accepted step sizes. Its thin-disk reference samples
+12 observed wavelength bands, applies the invariant `I_nu/nu^3` through a `g^3` transfer, and
+integrates approximate CIE matching functions. The direct Vulkan path uses a reduced six-band
+version for central disk hits. This remains a finite-difference bundle rather than full
+Jacobi/geodesic-deviation propagation or a film-grade renderer.
 
 ### Phase 5B: Buoyant Smoke Example
 
@@ -185,6 +200,18 @@ reduced divergence from 0.243419 to 0.004010. Both cases retain the multigrid-ve
 ablation, verify finite scalar/curl/radiance ranges, and reproduce identical half-float output
 signatures in independent dispatch sequences. Combustion chemistry, deeper adaptive multigrid, sparse bricks, and
 film-production validation remain outside this implementation.
+
+The portable Vulkan path has a separate validated staggered-MAC volume stage. It stores the three
+velocity components on their corresponding faces, applies cell-centred buoyancy, computes
+divergence, runs 80 Jacobi pressure iterations, and projects velocity. It then performs midpoint-RK2
+backtracing, bounded MacCormack density/temperature correction, persistent source injection, and a
+96-sample HDR volume ray march into a storage buffer. On the checked Apple M2 Pro one-step run it
+reduced divergence L2 from `0.0193272` to `0.00216895`, matched an independent CPU projection oracle
+within `5.89e-07`, produced finite luminance in `[0.005008, 0.409979]`, and measured `2.45863 ms`
+for the recorded Vulkan command stream. A 48-step batch reduced divergence from `0.0241489` to
+`0.000134002` and produced finite density, temperature, and radiance. The Vulkan path still uses
+Jacobi rather than the Metal path's two-level multigrid cycle and does not yet include its GPU CFL
+controller, obstacle/curl passes, or direct swapchain volume display.
 
 ### Phase 6: Adaptive research controller
 
