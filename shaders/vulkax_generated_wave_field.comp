@@ -12,9 +12,18 @@ layout(std140, binding = 1) uniform FieldParameters {
 void main() {
   uvec2 pixel = gl_GlobalInvocationID.xy;
   if (pixel.x >= parameters.width || pixel.y >= parameters.height) return;
-  float x = (float(pixel.x) / max(1.0, float(parameters.width - 1u))) * 8.0 - 4.0;
-  float y = (float(pixel.y) / max(1.0, float(parameters.height - 1u))) * 8.0 - 4.0;
+  float x = mix(-4.0, 4.0, float(pixel.x) / max(1.0, float(parameters.width - 1u)));
+  float y = mix(-4.0, 4.0, float(pixel.y) / max(1.0, float(parameters.height - 1u)));
   float z = 0.0;
-  float t = parameters.t;
-  outputField.values[pixel.y * parameters.width + pixel.x] = (parameters.amplitude * sin(((parameters.wavenumber * x) - (parameters.angular_frequency * t))));
+  float r0 = parameters.amplitude;
+  float r1 = parameters.wavenumber;
+  float r2 = x;
+  float r3 = (r1 * r2);
+  float r4 = parameters.angular_frequency;
+  float r5 = parameters.t;
+  float r6 = (r4 * r5);
+  float r7 = (r3 - r6);
+  float r8 = sin(r7);
+  float r9 = (r0 * r8);
+  outputField.values[pixel.y * parameters.width + pixel.x] = r9;
 }
