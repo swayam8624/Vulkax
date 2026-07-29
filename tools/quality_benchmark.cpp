@@ -123,7 +123,8 @@ PolicySummary runPolicy(
     if (adaptive) controller.update({frameMilliseconds, 0.0, error});
     csv << policy << ',' << frame << ',' << std::setprecision(17) << frameMilliseconds << ',' << error << ','
         << scale << ',' << state.samplesPerPixel << ',' << width << ',' << height << ','
-        << controller.frameTimeEwma() << ',' << controller.visualErrorEwma() << '\n';
+        << controller.frameTimeEwma() << ','
+        << controller.visualErrorEwma().value_or(std::numeric_limits<double>::quiet_NaN()) << '\n';
     summary.frameMilliseconds.push_back(frameMilliseconds);
     summary.visualErrors.push_back(error);
   }

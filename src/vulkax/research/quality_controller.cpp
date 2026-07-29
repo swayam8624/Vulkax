@@ -21,14 +21,14 @@ void QualityController::reset(QualityState initial) {
       initial.samplesPerPixel, budget_.minimumSamples, budget_.maximumSamples);
   state_.simulationSubsteps = std::max(1u, initial.simulationSubsteps);
   frameTimeEwma_ = 0.0;
-  visualErrorEwma_ = 0.0;
+  visualErrorEwma_.reset();
   initialized_ = false;
   changeCount_ = 0;
 }
 
 void QualityController::update(const QualityMeasurements& measurements) {
-  if (measurements.frameMilliseconds < 0.0 || measurements.visualError < 0.0 ||
-      measurements.numericalError < 0.0) {
+  if (measurements.frameMilliseconds < 0.0 || measurements.numericalError < 0.0 ||
+      (measurements.visualError && *measurements.visualError < 0.0)) {
     throw std::invalid_argument("quality measurements must be non-negative");
   }
   constexpr double alpha = 0.15;
@@ -38,18 +38,23 @@ void QualityController::update(const QualityMeasurements& measurements) {
     initialized_ = true;
   } else {
     frameTimeEwma_ = alpha * measurements.frameMilliseconds + (1.0 - alpha) * frameTimeEwma_;
-    visualErrorEwma_ = alpha * measurements.visualError + (1.0 - alpha) * visualErrorEwma_;
+    if (measurements.visualError) {
+      visualErrorEwma_ = visualErrorEwma_
+          ? alpha * *measurements.visualError + (1.0 - alpha) * *visualErrorEwma_
+          : *measurements.visualError;
+    }
   }
 
   // Separate thresholds prevent per-frame oscillation at the two budgets.
   const bool timingPressure = frameTimeEwma_ > budget_.targetFrameMilliseconds * 1.08;
-  const bool qualityPressure = visualErrorEwma_ > budget_.targetVisualError * 1.04 ||
+  const bool visualErrorMeasured = visualErrorEwma_.has_value();
+  const bool qualityPressure = (visualErrorMeasured && *visualErrorEwma_ > budget_.targetVisualError * 1.04) ||
                                measurements.numericalError > budget_.targetVisualError;
   const bool timingHeadroom = frameTimeEwma_ < budget_.targetFrameMilliseconds * 0.78;
-  const bool qualityHeadroom = visualErrorEwma_ < budget_.targetVisualError * 0.70;
+  const bool qualityHeadroom = visualErrorMeasured && *visualErrorEwma_ < budget_.targetVisualError * 0.70;
   const QualityState previous = state_;
 
-  if (timingPressure && !qualityPressure) {
+  if (timingPressure && visualErrorMeasured && !qualityPressure) {
     state_.resolutionScale = std::max(budget_.minimumResolutionScale, state_.resolutionScale * 0.92);
     if (state_.samplesPerPixel > budget_.minimumSamples) --state_.samplesPerPixel;
   } else if (qualityPressure && !timingPressure) {

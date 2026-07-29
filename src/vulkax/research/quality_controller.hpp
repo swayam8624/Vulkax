@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace vulkax::research {
 
@@ -22,7 +23,10 @@ struct QualityState {
 struct QualityMeasurements {
   double frameMilliseconds = 0.0;
   double numericalError = 0.0;
-  double visualError = 0.0;
+  // An absent measurement must not be represented by zero: zero is a strong
+  // claim of exact visual agreement and would otherwise authorize a quality
+  // reduction under timing pressure.
+  std::optional<double> visualError;
 };
 
 // Transparent EWMA controller for preview and offline-quality decisions. It
@@ -35,14 +39,14 @@ class QualityController {
   void update(const QualityMeasurements& measurements);
   [[nodiscard]] const QualityState& state() const { return state_; }
   [[nodiscard]] double frameTimeEwma() const { return frameTimeEwma_; }
-  [[nodiscard]] double visualErrorEwma() const { return visualErrorEwma_; }
+  [[nodiscard]] std::optional<double> visualErrorEwma() const { return visualErrorEwma_; }
   [[nodiscard]] uint32_t changeCount() const { return changeCount_; }
 
  private:
   QualityBudget budget_;
   QualityState state_;
   double frameTimeEwma_ = 0.0;
-  double visualErrorEwma_ = 0.0;
+  std::optional<double> visualErrorEwma_;
   bool initialized_ = false;
   uint32_t changeCount_ = 0;
 };

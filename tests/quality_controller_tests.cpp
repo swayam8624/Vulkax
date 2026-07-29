@@ -15,6 +15,12 @@ int main() {
   assert(controller.state().resolutionScale >= 0.35);
   assert(controller.state().samplesPerPixel >= 1);
   assert(controller.changeCount() > changesAfterPressure);
+
+  controller.reset({1.0, 4, 1});
+  for (int index = 0; index < 20; ++index) controller.update({35.0, 0.001, std::nullopt});
+  assert(!controller.visualErrorEwma().has_value());
+  assert(controller.state().resolutionScale == 1.0);
+  assert(controller.state().samplesPerPixel == 4);
   std::cout << "Vulkax quality controller tests passed\n";
   return 0;
 }
