@@ -191,6 +191,7 @@ add_library(
   vulkax_physics_ir STATIC
   src/vulkax/physics/physics_ir.cpp
   src/vulkax/physics/compute_ir.cpp
+  src/vulkax/physics/stencil_ir.cpp
 )
 target_compile_features(vulkax_physics_ir PUBLIC cxx_std_20)
 target_include_directories(vulkax_physics_ir PUBLIC ${PROJECT_SOURCE_DIR}/src)
