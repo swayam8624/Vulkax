@@ -8,16 +8,21 @@
 namespace vulkax::atlas {
 namespace {
 
-double pointSegmentDistance(
+struct SegmentProjection {
+  double distance = 0.0;
+  double fraction = 0.0;
+};
+
+SegmentProjection projectPointToSegment(
     const glm::dvec3& point,
     const glm::dvec3& start,
     const glm::dvec3& end) {
   const glm::dvec3 segment = end - start;
   const double lengthSquared = glm::dot(segment, segment);
-  if (lengthSquared <= 1e-9) return glm::length(point - start);
+  if (lengthSquared <= 1e-9) return {glm::length(point - start), 0.0};
   const double amount =
       std::clamp(glm::dot(point - start, segment) / lengthSquared, 0.0, 1.0);
-  return glm::length(point - (start + segment * amount));
+  return {glm::length(point - (start + segment * amount)), amount};
 }
 
 }  // namespace
@@ -42,15 +47,15 @@ RoutePredictiveScheduler::RouteScore RoutePredictiveScheduler::scoreRoute(
   double distanceAlongRoute = 0.0;
   double nearestDistanceAlongRoute = 0.0;
   for (size_t index = 1; index < routePoints.size(); ++index) {
-    const double segmentDistance = pointSegmentDistance(
+    const SegmentProjection projection = projectPointToSegment(
         candidate.center.meters,
         routePoints[index - 1].meters,
         routePoints[index].meters);
     const double segmentLength =
         glm::length(routePoints[index].meters - routePoints[index - 1].meters);
-    if (segmentDistance < nearestDistance) {
-      nearestDistance = segmentDistance;
-      nearestDistanceAlongRoute = distanceAlongRoute + segmentLength * 0.5;
+    if (projection.distance < nearestDistance) {
+      nearestDistance = projection.distance;
+      nearestDistanceAlongRoute = distanceAlongRoute + segmentLength * projection.fraction;
     }
     distanceAlongRoute += segmentLength;
   }

@@ -293,7 +293,8 @@ int main() {
   const auto decisions = scheduler.select(frame, {offRoute, onRoute}, &route);
   assert(!decisions.empty());
   assert(decisions.front().key == onRoute.key);
-  assert(decisions.front().routeProbability > 0.5);
+  assert(decisions.front().routeProbability > 0.99);
+  assert(decisions.front().secondsUntilNeeded < 0.01);
 
   auto runtimeSource = std::make_shared<MemoryTileSource>();
   runtimeSource->put(
