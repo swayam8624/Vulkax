@@ -1,0 +1,334 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, rgba16f) uniform image2D outputRadiance;
+
+layout(push_constant) uniform DirectFrameConstants {
+  float timeSeconds;
+  float width;
+  float height;
+  float exposure;
+  float mode;
+  float mass;
+  float diskGain;
+  float cameraScale;
+  float spin;
+  float sampleIndex;
+  float observerInclination;
+  float bundleScale;
+} frame;
+
+struct GeodesicState {
+  float radius;
+  float radialVelocity;
+  float azimuth;
+};
+
+GeodesicState derivative(GeodesicState state, float mass, float angularMomentum) {
+  const float radius2 = state.radius * state.radius;
+  const float radius3 = radius2 * state.radius;
+  const float radius4 = radius3 * state.radius;
+  return GeodesicState(
+      state.radialVelocity,
+      angularMomentum * angularMomentum / radius3 - 3.0 * mass * angularMomentum * angularMomentum / radius4,
+      angularMomentum / radius2);
+}
+
+GeodesicState rk4(GeodesicState state, float mass, float angularMomentum, float step) {
+  const GeodesicState k1 = derivative(state, mass, angularMomentum);
+  const GeodesicState k2 = derivative(GeodesicState(
+      state.radius + 0.5 * step * k1.radius,
+      state.radialVelocity + 0.5 * step * k1.radialVelocity,
+      state.azimuth + 0.5 * step * k1.azimuth), mass, angularMomentum);
+  const GeodesicState k3 = derivative(GeodesicState(
+      state.radius + 0.5 * step * k2.radius,
+      state.radialVelocity + 0.5 * step * k2.radialVelocity,
+      state.azimuth + 0.5 * step * k2.azimuth), mass, angularMomentum);
+  const GeodesicState k4 = derivative(GeodesicState(
+      state.radius + step * k3.radius,
+      state.radialVelocity + step * k3.radialVelocity,
+      state.azimuth + step * k3.azimuth), mass, angularMomentum);
+  return GeodesicState(
+      state.radius + step * (k1.radius + 2.0 * k2.radius + 2.0 * k3.radius + k4.radius) / 6.0,
+      state.radialVelocity + step * (k1.radialVelocity + 2.0 * k2.radialVelocity + 2.0 * k3.radialVelocity + k4.radialVelocity) / 6.0,
+      state.azimuth + step * (k1.azimuth + 2.0 * k2.azimuth + 2.0 * k3.azimuth + k4.azimuth) / 6.0);
+}
+
+float hash21(vec2 value) {
+  value = fract(value * vec2(123.34, 345.45));
+  value += dot(value, value + 34.345);
+  return fract(value.x * value.y);
+}
+
+vec3 celestialRadiance(vec2 direction) {
+  const vec2 cell = floor(direction * vec2(37.0, 19.0));
+  const vec2 local = fract(direction * vec2(37.0, 19.0)) - 0.5;
+  const float star = smoothstep(0.06, 0.0, length(local - (vec2(hash21(cell), hash21(cell + 19.17)) - 0.5)));
+  const float temperature = 0.45 + 0.55 * hash21(cell + 7.2);
+  return vec3(0.002, 0.004, 0.012) + star * mix(vec3(0.35, 0.48, 1.1), vec3(1.4, 0.72, 0.36), temperature);
+}
+
+vec3 schwarzschildRadiance(vec2 uv) {
+  const float aspect = frame.width / max(frame.height, 1.0);
+  const vec2 image = (uv - 0.5) * vec2(2.0 * aspect, 2.0) / max(frame.cameraScale, 0.1);
+  const float mass = max(frame.mass, 0.2);
+  const float observerRadius = 52.0;
+  const vec3 radial = vec3(1.0, 0.0, 0.0);
+  const vec3 direction = normalize(vec3(-1.0, image.x, image.y));
+  const float radialVelocity = dot(direction, radial);
+  const vec3 tangentVector = direction - radial * radialVelocity;
+  const float tangentLength = length(tangentVector);
+  if (tangentLength < 1e-5) return vec3(0.0);
+  const vec3 tangent = tangentVector / tangentLength;
+  const float angularMomentum = observerRadius * tangentLength;
+  GeodesicState state = GeodesicState(observerRadius, radialVelocity, 0.0);
+  vec3 previousPoint = radial * observerRadius;
+  bool diskHit = false;
+  float diskRadius = 0.0;
+  bool escaped = false;
+  const float step = 0.10;
+  for (uint iteration = 0u; iteration < 1024u; ++iteration) {
+    state = rk4(state, mass, angularMomentum, step);
+    if (isnan(state.radius) || isinf(state.radius) || isnan(state.radialVelocity) || isinf(state.radialVelocity) || state.radius <= 0.0) return vec3(0.0);
+    if (state.radius <= 2.0 * mass * (1.0 + 1e-4)) return vec3(0.0);
+    const vec3 orbitalDirection = radial * cos(state.azimuth) + tangent * sin(state.azimuth);
+    const vec3 point = orbitalDirection * state.radius;
+    if (!diskHit && previousPoint.z * point.z <= 0.0 && state.radius >= 3.2 * mass && state.radius <= 17.0 * mass) {
+      diskHit = true;
+      diskRadius = state.radius;
+    }
+    previousPoint = point;
+    if (iteration > 2u && state.radius >= observerRadius && state.radialVelocity > 0.0) {
+      escaped = true;
+      break;
+    }
+  }
+  if (!escaped) return vec3(0.0);
+  const vec3 escapedDirection = normalize(previousPoint);
+  const vec2 source = vec2(
+      atan(escapedDirection.y, escapedDirection.x) / (2.0 * 3.14159265359) + 0.5,
+      asin(clamp(escapedDirection.z, -1.0, 1.0)) / 3.14159265359 + 0.5);
+  vec3 radiance = celestialRadiance(source);
+  if (diskHit) {
+    const float disk = (1.0 - smoothstep(4.2 * mass, 17.0 * mass, diskRadius)) * smoothstep(3.2 * mass, 4.0 * mass, diskRadius);
+    const float beaming = pow(max(0.08, 1.0 + 0.55 * tangent.y), 3.0);
+    const float temperature = pow(4.0 * mass / max(diskRadius, 4.0 * mass), 0.75);
+    radiance += vec3(2.3, 0.54, 0.08) * disk * temperature * beaming * max(frame.diskGain, 0.0);
+  }
+  return radiance;
+}
+
+vec2 kerrPotentials(vec4 state, vec2 conserved, float mass, float spin) {
+  const float radius = state.x;
+  const float polar = state.y;
+  const float radius2 = radius * radius;
+  const float delta = radius2 - 2.0 * mass * radius + spin * spin;
+  const float sine2 = max(sin(polar) * sin(polar), 1e-7);
+  const float cosine2 = cos(polar) * cos(polar);
+  const float axialMomentum = conserved.x;
+  const float carter = conserved.y;
+  const float p = radius2 + spin * spin - spin * axialMomentum;
+  const float shiftedMomentum = axialMomentum - spin;
+  return vec2(
+      p * p - delta * (shiftedMomentum * shiftedMomentum + carter),
+      carter + spin * spin * cosine2 - axialMomentum * axialMomentum * cosine2 / sine2);
+}
+
+vec4 kerrDerivative(vec4 state, vec2 conserved, vec2 signs, float mass, float spin) {
+  const float radius = state.x;
+  const float polar = state.y;
+  const float radius2 = radius * radius;
+  const float sine2 = max(sin(polar) * sin(polar), 1e-7);
+  const float cosine2 = cos(polar) * cos(polar);
+  const float sigma = max(radius2 + spin * spin * cosine2, 1e-7);
+  const float delta = max(radius2 - 2.0 * mass * radius + spin * spin, 1e-6);
+  const float p = radius2 + spin * spin - spin * conserved.x;
+  const vec2 potential = max(kerrPotentials(state, conserved, mass, spin), vec2(0.0));
+  return vec4(
+      signs.x * sqrt(potential.x) / sigma,
+      signs.y * sqrt(potential.y) / sigma,
+      (conserved.x / sine2 - spin + spin * p / delta) / sigma,
+      (-spin * (spin * sine2 - conserved.x) + (radius2 + spin * spin) * p / delta) / sigma);
+}
+
+vec4 kerrRk4(vec4 state, vec2 conserved, vec2 signs, float mass, float spin, float step) {
+  const vec4 k1 = kerrDerivative(state, conserved, signs, mass, spin);
+  const vec4 k2 = kerrDerivative(state + 0.5 * step * k1, conserved, signs, mass, spin);
+  const vec4 k3 = kerrDerivative(state + 0.5 * step * k2, conserved, signs, mass, spin);
+  const vec4 k4 = kerrDerivative(state + step * k3, conserved, signs, mass, spin);
+  return state + step * (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0;
+}
+
+struct KerrTrace {
+  vec2 source;
+  vec3 diskRadiance;
+  float status;  // 1 = captured, 2 = escaped, 3 = invalid
+};
+
+float progradeIsco(float mass, float spin) {
+  const float normalizedSpin = clamp(spin / mass, -0.998, 0.998);
+  const float z1 = 1.0 + pow(1.0 - normalizedSpin * normalizedSpin, 1.0 / 3.0) *
+      (pow(1.0 + normalizedSpin, 1.0 / 3.0) + pow(1.0 - normalizedSpin, 1.0 / 3.0));
+  const float z2 = sqrt(3.0 * normalizedSpin * normalizedSpin + z1 * z1);
+  return mass * (3.0 + z2 - sign(normalizedSpin + 1e-7) *
+      sqrt(max(0.0, (3.0 - z1) * (3.0 + z1 + 2.0 * z2))));
+}
+
+KerrTrace traceKerr(vec2 imagePlane) {
+  const float mass = max(frame.mass, 0.2);
+  const float spin = clamp(frame.spin, -0.998 * mass, 0.998 * mass);
+  const float observerRadius = 52.0 * mass;
+  const float observerPolar = clamp(frame.observerInclination, 0.08, 3.0615);
+  const float sineObserver = sin(observerPolar);
+  const float cosineObserver = cos(observerPolar);
+  const float axialMomentum = -imagePlane.x * sineObserver;
+  const float carter = imagePlane.y * imagePlane.y +
+      cosineObserver * cosineObserver * (imagePlane.x * imagePlane.x - spin * spin);
+  const vec2 conserved = vec2(axialMomentum, carter);
+  vec2 signs = vec2(-1.0, imagePlane.y >= 0.0 ? 1.0 : -1.0);
+  vec4 state = vec4(observerRadius, observerPolar, 0.0, 0.0);
+  const float horizon = mass + sqrt(max(0.0, mass * mass - spin * spin));
+  const float diskInner = max(progradeIsco(mass, spin), horizon * 1.08);
+  const float diskOuter = 18.0 * mass;
+  vec3 diskRadiance = vec3(0.0);
+  float previousPolar = state.y;
+  const float step = 0.055 * mass;
+  for (uint iteration = 0u; iteration < 1800u; ++iteration) {
+    if (state.x <= horizon * 1.0008) return KerrTrace(vec2(0.0), diskRadiance, 1.0);
+    if (iteration > 3u && signs.x > 0.0 && state.x >= observerRadius) {
+      const vec2 source = vec2(
+          fract(state.z / (2.0 * 3.14159265359) + 0.5),
+          clamp(state.y / 3.14159265359, 0.0, 1.0));
+      return KerrTrace(source, diskRadiance, 2.0);
+    }
+    const vec4 candidate = kerrRk4(state, conserved, signs, mass, spin, step);
+    if (any(isnan(candidate)) || any(isinf(candidate))) {
+      return KerrTrace(vec2(0.0), diskRadiance, 3.0);
+    }
+    const vec2 candidatePotential = kerrPotentials(candidate, conserved, mass, spin);
+    if (candidatePotential.x < 0.0) {
+      signs.x = -signs.x;
+      continue;
+    }
+    if (candidatePotential.y < 0.0) {
+      signs.y = -signs.y;
+      continue;
+    }
+    const bool equatorCrossing =
+        (previousPolar - 0.5 * 3.14159265359) * (candidate.y - 0.5 * 3.14159265359) <= 0.0 &&
+        abs(candidate.y - previousPolar) > 1e-7;
+    if (equatorCrossing && candidate.x >= diskInner && candidate.x <= diskOuter) {
+      const float radius = candidate.x / mass;
+      const float omega = 1.0 / (pow(radius, 1.5) + spin / mass);
+      const float denominator = max(0.08, pow(radius, 1.5) - 3.0 * sqrt(radius) + 2.0 * spin / mass);
+      const float emitterTime = (pow(radius, 1.5) + spin / mass) / sqrt(pow(radius, 1.5) * denominator);
+      const float frequencyShift = clamp(1.0 / max(0.05, emitterTime * (1.0 - omega * axialMomentum / mass)), 0.08, 3.5);
+      const float temperature = pow(max(diskInner / mass, 1.0) / radius, 0.75);
+      const float emissivity = smoothstep(diskInner, diskInner * 1.15, candidate.x) *
+          (1.0 - smoothstep(diskOuter * 0.75, diskOuter, candidate.x));
+      const vec3 thermal = mix(vec3(1.7, 0.24, 0.025), vec3(0.68, 0.88, 1.65),
+                               clamp(frequencyShift * temperature * 0.42, 0.0, 1.0));
+      diskRadiance += thermal * emissivity * pow(frequencyShift, 3.0) *
+          max(frame.diskGain, 0.0) * 0.72;
+    }
+    previousPolar = candidate.y;
+    state = candidate;
+  }
+  return KerrTrace(vec2(0.0), diskRadiance, 3.0);
+}
+
+vec2 wrappedSourceDelta(vec2 target, vec2 origin) {
+  vec2 delta = target - origin;
+  delta.x = fract(delta.x + 0.5) - 0.5;
+  return delta;
+}
+
+vec3 filteredCelestialRadiance(
+    vec2 source, vec2 sourceDx, vec2 sourceDy,
+    float sourceAreaScale, float bundleShear) {
+  const vec2 grid = vec2(71.0, 37.0);
+  const vec2 cell = floor(source * grid);
+  const vec2 local = fract(source * grid) - 0.5;
+  const vec2 starOffset = vec2(hash21(cell), hash21(cell + 19.17)) - 0.5;
+  const float majorFootprint = max(length(sourceDx * grid), length(sourceDy * grid));
+  const float areaFootprint = sqrt(max(sourceAreaScale * grid.x * grid.y, 0.0));
+  const float footprint = clamp(
+      max(majorFootprint, areaFootprint) * mix(1.0, 1.35, bundleShear), 0.0, 0.42);
+  const float star = smoothstep(0.055 + footprint, 0.006 + 0.25 * footprint,
+                                length(local - starOffset));
+  const float temperature = 0.45 + 0.55 * hash21(cell + 7.2);
+  const vec3 background = vec3(0.0015, 0.003, 0.010) +
+      0.003 * vec3(0.4, 0.22, 0.62) * (0.5 + 0.5 * sin(source.y * 19.0));
+  return background + star * mix(vec3(0.32, 0.52, 1.4), vec3(1.75, 0.68, 0.28), temperature);
+}
+
+vec3 kerrRadiance(vec2 uv) {
+  const float aspect = frame.width / max(frame.height, 1.0);
+  const vec2 screen = (uv - 0.5) * vec2(2.0 * aspect, 2.0) / max(frame.cameraScale, 0.1);
+  const vec2 imagePlane = screen * (8.5 * max(frame.mass, 0.2));
+  const KerrTrace central = traceKerr(imagePlane);
+  if (central.status < 1.5) return central.diskRadiance;
+  if (central.status > 2.5) return vec3(0.0);
+
+  // Differential neighbour rays form a first-order source-space footprint.
+  // This is a finite-difference ray bundle, not merely duplicate samples.
+  const vec2 pixelFootprint = vec2(
+      17.0 * aspect * max(frame.mass, 0.2) / max(frame.width, 1.0),
+      17.0 * max(frame.mass, 0.2) / max(frame.height, 1.0)) * max(frame.bundleScale, 0.0);
+  const KerrTrace neighbourX = traceKerr(imagePlane + vec2(pixelFootprint.x, 0.0));
+  const KerrTrace neighbourY = traceKerr(imagePlane + vec2(0.0, pixelFootprint.y));
+  const KerrTrace neighbourNegativeX = traceKerr(imagePlane - vec2(pixelFootprint.x, 0.0));
+  const KerrTrace neighbourNegativeY = traceKerr(imagePlane - vec2(0.0, pixelFootprint.y));
+  vec2 sourceDx = vec2(0.0);
+  vec2 sourceDy = vec2(0.0);
+  if (neighbourX.status > 1.5 && neighbourX.status < 2.5 &&
+      neighbourNegativeX.status > 1.5 && neighbourNegativeX.status < 2.5) {
+    sourceDx = 0.5 * wrappedSourceDelta(neighbourX.source, neighbourNegativeX.source);
+  }
+  if (neighbourY.status > 1.5 && neighbourY.status < 2.5 &&
+      neighbourNegativeY.status > 1.5 && neighbourNegativeY.status < 2.5) {
+    sourceDy = 0.5 * wrappedSourceDelta(neighbourY.source, neighbourNegativeY.source);
+  }
+  const float sourceAreaScale = abs(sourceDx.x * sourceDy.y - sourceDx.y * sourceDy.x);
+  const float trace = dot(sourceDx, sourceDx) + dot(sourceDy, sourceDy);
+  const float discriminant = sqrt(max(0.0, trace * trace - 4.0 * sourceAreaScale * sourceAreaScale));
+  const float maximumSingular = sqrt(max(0.0, 0.5 * (trace + discriminant)));
+  const float minimumSingular = sqrt(max(0.0, 0.5 * (trace - discriminant)));
+  const float bundleShear = (maximumSingular - minimumSingular) /
+      max(maximumSingular + minimumSingular, 1e-7);
+  return filteredCelestialRadiance(
+      central.source, sourceDx, sourceDy, sourceAreaScale, bundleShear) + central.diskRadiance;
+}
+
+void main() {
+  const uvec2 pixel = gl_GlobalInvocationID.xy;
+  if (pixel.x >= uint(frame.width) || pixel.y >= uint(frame.height)) return;
+  vec2 jitter = vec2(0.0);
+  if (frame.mode > 0.5) {
+    const float rotation = hash21(vec2(pixel) + 0.37);
+    jitter = fract(vec2(0.754877666, 0.569840296) * (frame.sampleIndex + 1.0) + rotation) - 0.5;
+  }
+  const vec2 uv = (vec2(pixel) + 0.5 + jitter) / vec2(frame.width, frame.height);
+  vec3 radiance;
+  if (frame.mode > 1.5) {
+    radiance = kerrRadiance(uv);
+  } else if (frame.mode > 0.5) {
+    radiance = schwarzschildRadiance(uv);
+  } else {
+    const float aspect = frame.width / max(frame.height, 1.0);
+    const vec2 p = (uv - 0.5) * vec2(8.0 * aspect, 8.0);
+    const float phase = 2.4 * p.x - 2.6 * frame.timeSeconds;
+    const float rings = 0.18 * sin(1.35 * length(p) - 0.7 * frame.timeSeconds);
+    const float t = 0.5 + 0.5 * tanh(sin(phase) + rings);
+    radiance = 2.25 * vec3(
+        0.025 + 0.91 * pow(t, 1.55),
+        0.055 + 0.54 * sin(t * 1.47),
+        0.13 + 0.70 * (1.0 - t) * (1.0 - t));
+  }
+  if (frame.mode > 0.5 && frame.sampleIndex > 0.5) {
+    const vec3 previous = imageLoad(outputRadiance, ivec2(pixel)).rgb;
+    radiance = (previous * frame.sampleIndex + radiance) / (frame.sampleIndex + 1.0);
+  }
+  imageStore(outputRadiance, ivec2(pixel), vec4(radiance, 1.0));
+}
