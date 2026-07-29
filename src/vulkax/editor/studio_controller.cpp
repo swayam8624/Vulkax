@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <set>
 #include <stdexcept>
 #include <unordered_map>
@@ -136,11 +137,13 @@ double StudioController::renderFrameMilliseconds() const { return renderFrameMil
 double StudioController::gpuDispatchMilliseconds() const { return gpuDispatchMilliseconds_; }
 QString StudioController::previewBackend() const { return previewBackend_; }
 double StudioController::resolutionScale() const { return qualityController_.state().resolutionScale; }
-double StudioController::visualError() const { return visualError_; }
+double StudioController::visualError() const {
+  return visualError_.value_or(std::numeric_limits<double>::quiet_NaN());
+}
+bool StudioController::visualErrorAvailable() const { return visualError_.has_value(); }
 QString StudioController::errorMetric() const {
-  if (simulation_ && gpuReactionActive_) return "GPU/CPU solver MSE";
-  if (simulation_ || smokeSimulation_ || particleSystem_ || lensingRenderer_) return "reference unavailable";
-  return "sampling MSE";
+  if (!visualError_) return "reference unavailable";
+  return simulation_ && gpuReactionActive_ ? "GPU/CPU solver MSE" : "sampling MSE";
 }
 
 QImage StudioController::previewImage() const {
@@ -260,10 +263,24 @@ bool StudioController::compileExpression() {
     const std::set<std::string> coordinates{"x", "y", "z", "t"};
     std::map<std::string, equation::Parameter> existing;
     for (const auto& parameter : activePreset_.parameters) existing.emplace(parameter.name, parameter);
+    const auto canonicalPreset = std::find_if(presets_.begin(), presets_.end(), [&](const auto& preset) {
+      return preset.id == activePreset_.id;
+    });
+    const bool solverBackedPreset = activePreset_.id == "reaction-diffusion-seed" ||
+        activePreset_.id == "buoyant-smoke" || activePreset_.id == "nbody-orbits";
+    // Dynamic solvers own parameters that are not necessarily present in their
+    // scalar seed/preview equation (for example Gray--Scott feed and kill).
+    // Recover their declarations from the immutable preset catalog so a
+    // compile or project reload cannot silently drop serialized solver state.
+    if (solverBackedPreset && canonicalPreset != presets_.end()) {
+      for (const auto& parameter : canonicalPreset->parameters) {
+        existing.try_emplace(parameter.name, parameter);
+      }
+    }
     std::vector<equation::Parameter> derived;
     std::map<std::string, double> nextValues;
-    for (const std::string& symbol : symbols) {
-      if (coordinates.contains(symbol)) continue;
+    const auto appendParameter = [&](const std::string& symbol) {
+      if (coordinates.contains(symbol) || nextValues.contains(symbol)) return;
       const auto known = existing.find(symbol);
       const double value = parameterValues_.contains(symbol) ? parameterValues_.at(symbol) :
           (known == existing.end() ? 1.0 : known->second.value);
@@ -273,6 +290,14 @@ bool StudioController::compileExpression() {
         derived.push_back({symbol, value, "", -10.0, 10.0});
       }
       nextValues.emplace(symbol, value);
+    };
+    for (const std::string& symbol : symbols) {
+      appendParameter(symbol);
+    }
+    if (solverBackedPreset && canonicalPreset != presets_.end()) {
+      for (const auto& parameter : canonicalPreset->parameters) {
+        appendParameter(parameter.name);
+      }
     }
     activePreset_.parameters = std::move(derived);
     parameterValues_ = std::move(nextValues);
@@ -393,7 +418,7 @@ void StudioController::renderPreview() {
       }
     }
     renderFrameMilliseconds_ = static_cast<double>(timer.nsecsElapsed()) / 1'000'000.0;
-    visualError_ = 0.0;  // No independent exact image reference for lensing preview.
+    visualError_.reset();
     // Lensing has no independent image reference. It must never report an
     // invented zero error to the quality controller.
     emit performanceChanged();
@@ -417,7 +442,7 @@ void StudioController::renderPreview() {
       paintParticle(image, x, y, index == 0 ? 10 : 4, index == 0 ? qRgba(255, 206, 96, 255) : qRgba(112, 210, 255, 255));
     }
     renderFrameMilliseconds_ = static_cast<double>(timer.nsecsElapsed()) / 1'000'000.0;
-    visualError_ = 0.0;  // Particle raster output is not yet compared against a separate image reference.
+    visualError_.reset();
     // Particle output has no independent image reference.
     emit performanceChanged();
     {
@@ -456,7 +481,7 @@ void StudioController::renderPreview() {
       }
     }
     renderFrameMilliseconds_ = static_cast<double>(timer.nsecsElapsed()) / 1'000'000.0;
-    visualError_ = 0.0;
+    visualError_.reset();
     // Smoke has no independently measured image error. Keep full viewport
     // resolution rather than treating unavailable error as zero.
     emit performanceChanged();
@@ -536,7 +561,7 @@ void StudioController::renderPreview() {
       }
       visualError_ = squaredError / static_cast<double>(gpuReactionSecondary_.size());
     } else {
-      visualError_ = 0.0;  // A CPU PDE output needs an independent simulation reference.
+      visualError_.reset();
     }
   } else {
     // Compare the selected preview grid to an independent fixed analytical
@@ -562,8 +587,8 @@ void StudioController::renderPreview() {
     }
     visualError_ = squaredError / static_cast<double>(kErrorReferenceWidth * kErrorReferenceHeight);
   }
-  if (!freezeQuality_ && hasMeasuredVisualError) {
-    qualityController_.update({renderFrameMilliseconds_, 0.0, visualError_});
+  if (!freezeQuality_ && hasMeasuredVisualError && visualError_) {
+    qualityController_.update({renderFrameMilliseconds_, 0.0, *visualError_});
   }
   emit performanceChanged();
   {
@@ -647,34 +672,58 @@ void StudioController::exportPngDialog() {
 
 bool StudioController::exportExr(const QString& filePath) {
 #if defined(VULKAX_HAS_OPENEXR)
-  const QImage image = previewImage().convertToFormat(QImage::Format_ARGB32);
-  if (image.isNull()) {
-    setStatus("Could not export EXR: no preview frame");
-    return false;
-  }
   try {
-    std::vector<OPENEXR_IMF_NAMESPACE::Rgba> pixels(
-        static_cast<size_t>(image.width()) * static_cast<size_t>(image.height()));
-    for (int row = 0; row < image.height(); ++row) {
-      const auto* source = reinterpret_cast<const QRgb*>(image.constScanLine(row));
-      for (int column = 0; column < image.width(); ++column) {
-        const QRgb color = source[column];
-        auto& destination = pixels[static_cast<size_t>(row) * image.width() + column];
-        destination.r = srgbToLinear(static_cast<float>(qRed(color)) / 255.0f);
-        destination.g = srgbToLinear(static_cast<float>(qGreen(color)) / 255.0f);
-        destination.b = srgbToLinear(static_cast<float>(qBlue(color)) / 255.0f);
-        destination.a = static_cast<float>(qAlpha(color)) / 255.0f;
+    int width = 0;
+    int height = 0;
+    bool gpuHdr = false;
+    std::vector<OPENEXR_IMF_NAMESPACE::Rgba> pixels;
+    if (activePreset_.id == "wave-field" && gpuFieldExecutor_.available()) {
+      const GpuHdrFrame frame = gpuFieldExecutor_.readHdrFrame();
+      width = static_cast<int>(frame.width);
+      height = static_cast<int>(frame.height);
+      if (width > 0 && height > 0 && frame.rgba.size() == static_cast<size_t>(width) * height * 4u) {
+        pixels.resize(static_cast<size_t>(width) * height);
+        for (size_t index = 0; index < pixels.size(); ++index) {
+          auto& destination = pixels[index];
+          destination.r = frame.rgba[index * 4 + 0];
+          destination.g = frame.rgba[index * 4 + 1];
+          destination.b = frame.rgba[index * 4 + 2];
+          destination.a = frame.rgba[index * 4 + 3];
+        }
+        gpuHdr = true;
+      }
+    }
+    if (!gpuHdr) {
+      const QImage image = previewImage().convertToFormat(QImage::Format_ARGB32);
+      if (image.isNull()) {
+        setStatus("Could not export EXR: no preview frame");
+        return false;
+      }
+      width = image.width();
+      height = image.height();
+      pixels.resize(static_cast<size_t>(width) * height);
+      for (int row = 0; row < height; ++row) {
+        const auto* source = reinterpret_cast<const QRgb*>(image.constScanLine(row));
+        for (int column = 0; column < width; ++column) {
+          const QRgb color = source[column];
+          auto& destination = pixels[static_cast<size_t>(row) * width + column];
+          destination.r = srgbToLinear(static_cast<float>(qRed(color)) / 255.0f);
+          destination.g = srgbToLinear(static_cast<float>(qGreen(color)) / 255.0f);
+          destination.b = srgbToLinear(static_cast<float>(qBlue(color)) / 255.0f);
+          destination.a = static_cast<float>(qAlpha(color)) / 255.0f;
+        }
       }
     }
     OPENEXR_IMF_NAMESPACE::RgbaOutputFile output(
-        filePath.toStdString().c_str(), image.width(), image.height(), OPENEXR_IMF_NAMESPACE::WRITE_RGBA);
-    output.setFrameBuffer(pixels.data(), 1, image.width());
-    output.writePixels(image.height());
+        filePath.toStdString().c_str(), width, height, OPENEXR_IMF_NAMESPACE::WRITE_RGBA);
+    output.setFrameBuffer(pixels.data(), 1, width);
+    output.writePixels(height);
+    setStatus((gpuHdr ? "Exported Vulkan HDR EXR: " : "Exported linear EXR preview: ") +
+              QFileInfo(filePath).fileName());
   } catch (const std::exception& error) {
     setStatus("Could not export EXR: " + QString::fromUtf8(error.what()));
     return false;
   }
-  setStatus("Exported linear EXR preview: " + QFileInfo(filePath).fileName());
   return true;
 #else
   Q_UNUSED(filePath);

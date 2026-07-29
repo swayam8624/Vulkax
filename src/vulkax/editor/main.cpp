@@ -46,6 +46,7 @@ int main(int argc, char* argv[]) {
   const bool uiSmoke = application.arguments().contains("--ui-smoke");
   const bool projectSmoke = application.arguments().contains("--project-smoke");
   const bool dynamicProjectSmoke = application.arguments().contains("--dynamic-project-smoke");
+  const bool unavailableErrorSmoke = application.arguments().contains("--unavailable-error-smoke");
   const bool gpuPreviewSmoke = application.arguments().contains("--gpu-preview-smoke");
   const bool gpuReactionPreviewSmoke = application.arguments().contains("--gpu-reaction-preview-smoke");
   const int sequenceArgument = application.arguments().indexOf("--export-sequence");
@@ -108,6 +109,14 @@ int main(int argc, char* argv[]) {
         "Physics Studio dynamic project smoke failed");
     return opened && restored ? 0 : 1;
   }
+  if (unavailableErrorSmoke) {
+    controller.selectPreset("schwarzschild-lensing");
+    const bool unavailable = !controller.visualErrorAvailable() && std::isnan(controller.visualError()) &&
+        controller.errorMetric() == "reference unavailable";
+    qInfo().noquote() << (unavailable ? "Physics Studio unavailable-error smoke passed" :
+        "Physics Studio unavailable-error smoke failed");
+    return unavailable ? 0 : 1;
+  }
   if (gpuPreviewSmoke) {
     controller.selectPreset("wave-field");
     const bool rendered = !controller.previewImage().isNull();
@@ -122,7 +131,7 @@ int main(int argc, char* argv[]) {
     controller.seek(0.5);
     const bool rendered = !controller.previewImage().isNull();
     const bool gpu = controller.previewBackend().startsWith("Persistent Vulkan Gray-Scott compute:");
-    const bool agrees = controller.visualError() < 1e-10;
+    const bool agrees = controller.visualErrorAvailable() && controller.visualError() < 1e-10;
     qInfo().noquote() << (rendered && gpu && agrees ? "Physics Studio persistent GPU reaction preview smoke passed" :
         "Physics Studio persistent GPU reaction preview smoke failed: " + controller.previewBackend());
     return rendered && gpu && agrees ? 0 : 1;

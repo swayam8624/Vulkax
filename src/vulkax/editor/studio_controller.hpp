@@ -36,6 +36,7 @@ class StudioController final : public QObject {
   Q_PROPERTY(QString previewBackend READ previewBackend NOTIFY performanceChanged)
   Q_PROPERTY(double resolutionScale READ resolutionScale NOTIFY performanceChanged)
   Q_PROPERTY(double visualError READ visualError NOTIFY performanceChanged)
+  Q_PROPERTY(bool visualErrorAvailable READ visualErrorAvailable NOTIFY performanceChanged)
   Q_PROPERTY(QString errorMetric READ errorMetric NOTIFY performanceChanged)
 
  public:
@@ -55,6 +56,7 @@ class StudioController final : public QObject {
   [[nodiscard]] QString previewBackend() const;
   [[nodiscard]] double resolutionScale() const;
   [[nodiscard]] double visualError() const;
+  [[nodiscard]] bool visualErrorAvailable() const;
   [[nodiscard]] QString errorMetric() const;
   [[nodiscard]] QImage previewImage() const;
 
@@ -123,7 +125,7 @@ class StudioController final : public QObject {
   double renderFrameMilliseconds_ = 0.0;
   double gpuDispatchMilliseconds_ = -1.0;
   QString previewBackend_ = "CPU analytical reference";
-  double visualError_ = 0.0;
+  std::optional<double> visualError_;
   bool freezeQuality_ = false;
 };
 

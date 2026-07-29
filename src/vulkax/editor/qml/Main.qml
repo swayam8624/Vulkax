@@ -160,7 +160,7 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             Button { text: studio.playing ? "Pause live" : "Play live"; onClicked: studio.togglePlayback() }
                             Button { text: "Reset"; onClicked: studio.seek(0) }
-                            Label { text: "Preview " + studio.renderFrameMilliseconds.toFixed(2) + " ms  |  GPU " + (studio.gpuDispatchMilliseconds < 0 ? "n/a" : studio.gpuDispatchMilliseconds.toFixed(3) + " ms") + "  |  " + studio.errorMetric + " " + studio.visualError.toFixed(5); color: "#9db0ca"; font.pixelSize: 11; Layout.leftMargin: 8 }
+                            Label { text: "Preview " + studio.renderFrameMilliseconds.toFixed(2) + " ms  |  GPU " + (studio.gpuDispatchMilliseconds < 0 ? "n/a" : studio.gpuDispatchMilliseconds.toFixed(3) + " ms") + "  |  " + studio.errorMetric + " " + (studio.visualErrorAvailable ? studio.visualError.toFixed(5) : "n/a"); color: "#9db0ca"; font.pixelSize: 11; Layout.leftMargin: 8 }
                         }
                     }
                 }
