@@ -23,6 +23,13 @@ struct GpuFieldResult {
   bool hdrFrameProduced = false;
 };
 
+struct GpuHdrFrame {
+  uint32_t width = 0;
+  uint32_t height = 0;
+  // Linear RGBA radiance decoded from the canonical Vulkan RGBA16F image.
+  std::vector<float> rgba;
+};
+
 struct GpuReactionConfig {
   uint32_t width = 0;
   uint32_t height = 0;
@@ -61,6 +68,10 @@ class VulkanFieldExecutor final {
   // only for requests that exceed capacity; device failures switch explicitly
   // to fallback.
   [[nodiscard]] GpuFieldResult evaluateWave(const GpuFieldRequest& request);
+
+  // Offline/export-only readback of the device-local HDR frame. Interactive
+  // presentation must not call this method.
+  [[nodiscard]] GpuHdrFrame readHdrFrame();
 
   // Keeps the Gray-Scott state resident between calls. The provided seed
   // fields must match the requested extent exactly. resetReaction performs no

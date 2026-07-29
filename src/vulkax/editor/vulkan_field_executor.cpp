@@ -91,6 +91,33 @@ uint32_t findDeviceLocalMemoryType(VkPhysicalDevice physical, uint32_t typeMask)
   throw std::runtime_error("no device-local Vulkan memory type");
 }
 
+float halfToFloat(uint16_t value) {
+  const uint32_t sign = static_cast<uint32_t>(value & 0x8000u) << 16;
+  int exponent = (value >> 10) & 0x1fu;
+  uint32_t mantissa = value & 0x03ffu;
+  uint32_t bits = 0;
+  if (exponent == 0) {
+    if (mantissa == 0) {
+      bits = sign;
+    } else {
+      exponent = 1;
+      while ((mantissa & 0x0400u) == 0) {
+        mantissa <<= 1;
+        --exponent;
+      }
+      mantissa &= 0x03ffu;
+      bits = sign | (static_cast<uint32_t>(exponent + 112) << 23) | (mantissa << 13);
+    }
+  } else if (exponent == 31) {
+    bits = sign | 0x7f800000u | (mantissa << 13);
+  } else {
+    bits = sign | (static_cast<uint32_t>(exponent + 112) << 23) | (mantissa << 13);
+  }
+  float result = 0.0f;
+  std::memcpy(&result, &bits, sizeof(result));
+  return result;
+}
+
 }  // namespace
 
 struct VulkanFieldExecutor::Impl {
@@ -114,6 +141,9 @@ struct VulkanFieldExecutor::Impl {
   VkImageView hdrImageView = VK_NULL_HANDLE;
   VkExtent2D hdrExtent{};
   bool hdrImageInitialized = false;
+  VkBuffer hdrReadback = VK_NULL_HANDLE;
+  VkDeviceMemory hdrReadbackMemory = VK_NULL_HANDLE;
+  VkDeviceSize hdrReadbackCapacity = 0;
   VkDescriptorSetLayout hdrDescriptorLayout = VK_NULL_HANDLE;
   VkPipelineLayout hdrPipelineLayout = VK_NULL_HANDLE;
   VkPipeline hdrPipeline = VK_NULL_HANDLE;
@@ -190,6 +220,8 @@ struct VulkanFieldExecutor::Impl {
     }
     destroyBuffer(reactionUniform, reactionUniformMemory);
     destroyHdrImage();
+    destroyBuffer(hdrReadback, hdrReadbackMemory);
+    hdrReadbackCapacity = 0;
     destroyBuffer(output, outputMemory);
     destroyBuffer(uniform, uniformMemory);
     if (device != VK_NULL_HANDLE) vkDestroyDevice(device, nullptr);
@@ -278,6 +310,13 @@ struct VulkanFieldExecutor::Impl {
     check(vkCreateImageView(device, &view, nullptr, &hdrImageView), "vkCreateImageView HDR preview");
     hdrExtent = {width, height};
     updateHdrDescriptors();
+  }
+
+  void ensureHdrReadbackCapacity(VkDeviceSize bytes) {
+    if (bytes <= hdrReadbackCapacity) return;
+    destroyBuffer(hdrReadback, hdrReadbackMemory);
+    allocateBuffer(bytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT, hdrReadback, hdrReadbackMemory);
+    hdrReadbackCapacity = bytes;
   }
 
   void ensureReactionCapacity(VkDeviceSize bytes) {
@@ -621,6 +660,70 @@ GpuFieldResult VulkanFieldExecutor::evaluateWave(const GpuFieldRequest& request)
   } catch (const std::exception& error) {
     impl_->ready = false;
     impl_->diagnostic = std::string("GPU preview failed; CPU fallback: ") + error.what();
+    throw;
+  }
+}
+
+GpuHdrFrame VulkanFieldExecutor::readHdrFrame() {
+  if (!available() || !impl_->hdrImageInitialized || impl_->hdrExtent.width == 0 || impl_->hdrExtent.height == 0) {
+    throw std::runtime_error("Vulkan HDR frame is unavailable for export");
+  }
+  try {
+    const VkDeviceSize bytes = static_cast<VkDeviceSize>(impl_->hdrExtent.width) * impl_->hdrExtent.height *
+        4u * sizeof(uint16_t);
+    impl_->ensureHdrReadbackCapacity(bytes);
+    check(vkResetFences(impl_->device, 1, &impl_->fence), "vkResetFences HDR readback");
+    check(vkResetCommandBuffer(impl_->command, 0), "vkResetCommandBuffer HDR readback");
+    VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    check(vkBeginCommandBuffer(impl_->command, &begin), "vkBeginCommandBuffer HDR readback");
+    VkImageMemoryBarrier toCopy{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    toCopy.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    toCopy.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    toCopy.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    toCopy.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    toCopy.image = impl_->hdrImage;
+    toCopy.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    toCopy.subresourceRange.levelCount = 1;
+    toCopy.subresourceRange.layerCount = 1;
+    vkCmdPipelineBarrier(impl_->command, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &toCopy);
+    VkBufferImageCopy copy{};
+    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy.imageSubresource.layerCount = 1;
+    copy.imageExtent = {impl_->hdrExtent.width, impl_->hdrExtent.height, 1};
+    vkCmdCopyImageToBuffer(impl_->command, impl_->hdrImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           impl_->hdrReadback, 1, &copy);
+    VkImageMemoryBarrier restore{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    restore.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    restore.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    restore.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    restore.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    restore.image = impl_->hdrImage;
+    restore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    restore.subresourceRange.levelCount = 1;
+    restore.subresourceRange.layerCount = 1;
+    vkCmdPipelineBarrier(impl_->command, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &restore);
+    check(vkEndCommandBuffer(impl_->command), "vkEndCommandBuffer HDR readback");
+    VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &impl_->command;
+    check(vkQueueSubmit(impl_->queue, 1, &submit, impl_->fence), "vkQueueSubmit HDR readback");
+    check(vkWaitForFences(impl_->device, 1, &impl_->fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+          "vkWaitForFences HDR readback");
+    std::vector<uint16_t> encoded(static_cast<size_t>(bytes / sizeof(uint16_t)));
+    void* mapped = nullptr;
+    check(vkMapMemory(impl_->device, impl_->hdrReadbackMemory, 0, bytes, 0, &mapped), "vkMapMemory HDR readback");
+    std::memcpy(encoded.data(), mapped, static_cast<size_t>(bytes));
+    vkUnmapMemory(impl_->device, impl_->hdrReadbackMemory);
+    GpuHdrFrame result{};
+    result.width = impl_->hdrExtent.width;
+    result.height = impl_->hdrExtent.height;
+    result.rgba.resize(encoded.size());
+    std::transform(encoded.begin(), encoded.end(), result.rgba.begin(), halfToFloat);
+    return result;
+  } catch (const std::exception& error) {
+    impl_->diagnostic = std::string("GPU HDR export failed: ") + error.what();
     throw;
   }
 }
