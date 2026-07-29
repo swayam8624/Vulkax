@@ -10,6 +10,9 @@ namespace vulkax::relativity {
 namespace {
 
 constexpr double kPi = 3.1415926535897932384626433832795;
+constexpr double kPlanck = 6.62607015e-34;
+constexpr double kLightSpeed = 299792458.0;
+constexpr double kBoltzmann = 1.380649e-23;
 
 struct State {
   double radius = 0.0;
@@ -133,6 +136,31 @@ void normalizePolar(State& state, double& polarSign) {
   }
 }
 
+double gaussian(double wavelength, double mean, double leftWidth, double rightWidth) {
+  const double width = wavelength < mean ? leftWidth : rightWidth;
+  const double normalized = (wavelength - mean) / width;
+  return std::exp(-0.5 * normalized * normalized);
+}
+
+std::array<double, 3> cieApproximation(double wavelengthNanometres) {
+  const double x = 1.056 * gaussian(wavelengthNanometres, 599.8, 37.9, 31.0) +
+      0.362 * gaussian(wavelengthNanometres, 442.0, 16.0, 26.7) -
+      0.065 * gaussian(wavelengthNanometres, 501.1, 20.4, 26.2);
+  const double y = 0.821 * gaussian(wavelengthNanometres, 568.8, 46.9, 40.5) +
+      0.286 * gaussian(wavelengthNanometres, 530.9, 16.3, 31.1);
+  const double z = 1.217 * gaussian(wavelengthNanometres, 437.0, 11.8, 36.0) +
+      0.681 * gaussian(wavelengthNanometres, 459.0, 26.0, 13.8);
+  return {std::max(0.0, x), std::max(0.0, y), std::max(0.0, z)};
+}
+
+double planckFrequencyRadiance(double wavelengthMetres, double temperatureKelvin) {
+  const double frequency = kLightSpeed / wavelengthMetres;
+  const double exponent = kPlanck * frequency / (kBoltzmann * temperatureKelvin);
+  if (exponent > 700.0) return 0.0;
+  return 2.0 * kPlanck * frequency * frequency * frequency /
+      (kLightSpeed * kLightSpeed * std::expm1(exponent));
+}
+
 }  // namespace
 
 double kerrOuterHorizonRadius(double mass, double spin) {
@@ -140,6 +168,17 @@ double kerrOuterHorizonRadius(double mass, double spin) {
     throw std::invalid_argument("Kerr requires finite mass > 0 and |spin| < mass");
   }
   return mass + std::sqrt(mass * mass - spin * spin);
+}
+
+double kerrProgradeIscoRadius(double mass, double spin) {
+  static_cast<void>(kerrOuterHorizonRadius(mass, spin));
+  const double normalizedSpin = std::clamp(spin / mass, -0.998, 0.998);
+  const double z1 = 1.0 + std::cbrt(1.0 - normalizedSpin * normalizedSpin) *
+      (std::cbrt(1.0 + normalizedSpin) + std::cbrt(1.0 - normalizedSpin));
+  const double z2 = std::sqrt(3.0 * normalizedSpin * normalizedSpin + z1 * z1);
+  const double direction = normalizedSpin >= 0.0 ? -1.0 : 1.0;
+  return mass * (3.0 + z2 + direction *
+      std::sqrt(std::max(0.0, (3.0 - z1) * (3.0 + z1 + 2.0 * z2))));
 }
 
 KerrConstants kerrConstantsFromImagePlane(
@@ -154,11 +193,59 @@ KerrConstants kerrConstantsFromImagePlane(
   return constants;
 }
 
+double kerrNormalizedNullConstraint(
+    const KerrGeodesicConfig& config, const KerrConstants& constants,
+    double radius, double polarRadians, double radialSign, double polarSign) {
+  static_cast<void>(kerrOuterHorizonRadius(config.mass, config.spin));
+  if (!(radius > 0.0) || !std::isfinite(radius) || !std::isfinite(polarRadians) ||
+      !std::isfinite(radialSign) || !std::isfinite(polarSign)) {
+    return std::numeric_limits<double>::infinity();
+  }
+  const State state{radius, polarRadians, 0.0, 0.0};
+  const Potentials potential = potentials(config, constants, state);
+  if (potential.radial < 0.0 || potential.polar < 0.0) {
+    return std::numeric_limits<double>::infinity();
+  }
+  const double radius2 = radius * radius;
+  const double spin2 = config.spin * config.spin;
+  const double sine = std::sin(polarRadians);
+  const double cosine = std::cos(polarRadians);
+  const double sine2 = std::max(sine * sine, 1e-14);
+  const double sigma = radius2 + spin2 * cosine * cosine;
+  const double delta = radius2 - 2.0 * config.mass * radius + spin2;
+  if (!(delta > 0.0) || !(sigma > 0.0)) return std::numeric_limits<double>::infinity();
+
+  const double gtt = -((radius2 + spin2) * (radius2 + spin2) - spin2 * delta * sine2) /
+      (sigma * delta);
+  const double gtPhi = -2.0 * config.mass * config.spin * radius / (sigma * delta);
+  const double gPhiPhi = (delta - spin2 * sine2) / (sigma * delta * sine2);
+  const double grr = delta / sigma;
+  const double gThetaTheta = 1.0 / sigma;
+  const double pt = -constants.energy;
+  const double pPhi = constants.axialAngularMomentum;
+  const double pr = radialSign * std::sqrt(potential.radial) / delta;
+  const double pTheta = polarSign * std::sqrt(potential.polar);
+  const std::array<double, 5> terms{
+      gtt * pt * pt,
+      2.0 * gtPhi * pt * pPhi,
+      gPhiPhi * pPhi * pPhi,
+      grr * pr * pr,
+      gThetaTheta * pTheta * pTheta};
+  double sum = 0.0;
+  double scale = 0.0;
+  for (const double term : terms) {
+    sum += term;
+    scale += std::abs(term);
+  }
+  return std::abs(sum) / std::max(scale, 1e-30);
+}
+
 KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alpha, double beta) {
   if (!(config.observerRadius > 2.0 * config.mass) || !(config.affineStep > 0.0) ||
       !(config.minimumAffineStep > 0.0) ||
       !(config.maximumAffineStep >= config.minimumAffineStep) ||
-      !(config.relativeTolerance > 0.0) || config.maximumSteps == 0) {
+      !(config.relativeTolerance > 0.0) || !(config.nullConstraintTolerance > 0.0) ||
+      !(config.horizonRelativeEpsilon > 0.0) || config.maximumSteps == 0) {
     throw std::invalid_argument("invalid Kerr geodesic integration configuration");
   }
   KerrRayResult result{};
@@ -173,7 +260,7 @@ KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alp
   for (uint32_t iteration = 0; iteration < config.maximumSteps; ++iteration) {
     result.integrationSteps = iteration + 1;
     result.minimumRadius = std::min(result.minimumRadius, state.radius);
-    if (state.radius <= result.horizonRadius * (1.0 + 2e-6)) {
+    if (state.radius <= result.horizonRadius * (1.0 + config.horizonRelativeEpsilon)) {
       result.status = KerrRayStatus::Captured;
       break;
     }
@@ -196,18 +283,32 @@ KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alp
     State accepted{};
     double error = 0.0;
     bool acceptedStep = false;
+    double acceptedPolarSign = polarSign;
     for (uint32_t attempt = 0; attempt < 12; ++attempt) {
       const State coarse = rk4(config, result.constants, state, radialSign, polarSign, step);
       const State half = rk4(config, result.constants, state, radialSign, polarSign, 0.5 * step);
       State refined = rk4(config, result.constants, half, radialSign, polarSign, 0.5 * step);
-      normalizePolar(refined, polarSign);
+      double candidatePolarSign = polarSign;
+      normalizePolar(refined, candidatePolarSign);
       error = normalizedError(coarse, refined);
+      if (finite(refined) && refined.radius <=
+              result.horizonRadius * (1.0 + config.horizonRelativeEpsilon)) {
+        accepted = refined;
+        acceptedPolarSign = candidatePolarSign;
+        acceptedStep = true;
+        result.maximumLocalError = std::max(result.maximumLocalError, error);
+        break;
+      }
+      const double nullConstraint = kerrNormalizedNullConstraint(
+          config, result.constants, refined.radius, refined.polar,
+          radialSign, candidatePolarSign);
       const Potentials nextPotential = potentials(config, result.constants, refined);
       const bool crossedRadialTurningPoint = nextPotential.radial < 0.0;
       const bool crossedPolarTurningPoint = nextPotential.polar < 0.0;
       if (crossedRadialTurningPoint || crossedPolarTurningPoint) {
         if (step > config.minimumAffineStep * 1.01) {
           step = std::max(config.minimumAffineStep, step * 0.5);
+          ++result.rejectedSteps;
           continue;
         }
         if (crossedRadialTurningPoint) {
@@ -220,12 +321,24 @@ KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alp
         }
         continue;
       }
-      if (error <= config.relativeTolerance || step <= config.minimumAffineStep * 1.01) {
+      const bool localErrorAccepted = error <= config.relativeTolerance;
+      const bool constraintAccepted = nullConstraint <= config.nullConstraintTolerance;
+      if (localErrorAccepted && constraintAccepted) {
         accepted = refined;
+        acceptedPolarSign = candidatePolarSign;
         acceptedStep = true;
+        result.maximumLocalError = std::max(result.maximumLocalError, error);
+        result.maximumNullConstraintDrift = std::max(
+            result.maximumNullConstraintDrift, nullConstraint);
+        break;
+      }
+      if (step <= config.minimumAffineStep * 1.01) {
+        result.maximumNullConstraintDrift = std::max(
+            result.maximumNullConstraintDrift, nullConstraint);
         break;
       }
       step = std::max(config.minimumAffineStep, step * 0.5);
+      ++result.rejectedSteps;
     }
     if (!acceptedStep || !finite(accepted)) {
       result.status = KerrRayStatus::Invalid;
@@ -244,6 +357,11 @@ KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alp
       }
     }
     state = accepted;
+    polarSign = acceptedPolarSign;
+    ++result.acceptedSteps;
+    result.minimumAcceptedStep = result.minimumAcceptedStep == 0.0 ? step :
+        std::min(result.minimumAcceptedStep, step);
+    result.maximumAcceptedStep = std::max(result.maximumAcceptedStep, step);
 
     if (error < config.relativeTolerance * 0.05) {
       step = std::min(config.maximumAffineStep, step * 1.35);
@@ -315,6 +433,65 @@ KerrRayBundleResult integrateKerrImageRayBundle(
                  bundle.maximumSingularValue >= bundle.minimumSingularValue &&
                  bundle.shear >= 0.0 && bundle.shear <= 1.0 + 1e-12;
   return bundle;
+}
+
+KerrDiskSpectrum evaluateKerrThinDiskSpectrum(
+    const KerrGeodesicConfig& config, const KerrConstants& constants,
+    double diskRadius, double maximumTemperatureKelvin) {
+  KerrDiskSpectrum result{};
+  if (!(maximumTemperatureKelvin > 0.0) || !std::isfinite(maximumTemperatureKelvin) ||
+      !std::isfinite(diskRadius)) return result;
+  const double innerRadius = std::max(
+      kerrProgradeIscoRadius(config.mass, config.spin),
+      kerrOuterHorizonRadius(config.mass, config.spin) * 1.01);
+  if (diskRadius <= innerRadius || diskRadius > config.diskOuterRadius) return result;
+  const double normalizedRadius = diskRadius / config.mass;
+  const double normalizedSpin = config.spin / config.mass;
+  const double radiusPower = std::pow(normalizedRadius, 1.5);
+  const double denominatorSquared = radiusPower * radiusPower -
+      3.0 * normalizedRadius * normalizedRadius + 2.0 * normalizedSpin * radiusPower;
+  if (!(denominatorSquared > 0.0)) return result;
+  const double angularVelocity = 1.0 / (radiusPower + normalizedSpin);
+  const double emitterTimeComponent = (radiusPower + normalizedSpin) /
+      std::sqrt(denominatorSquared);
+  const double redshiftDenominator = emitterTimeComponent *
+      (1.0 - angularVelocity * constants.axialAngularMomentum / config.mass);
+  if (!(redshiftDenominator > 0.0) || !std::isfinite(redshiftDenominator)) return result;
+  result.frequencyShift = 1.0 / redshiftDenominator;
+  if (!(result.frequencyShift > 0.0) || !std::isfinite(result.frequencyShift)) return result;
+  result.invariantIntensityScale = std::pow(result.frequencyShift, 3.0);
+  const double innerRatio = innerRadius / diskRadius;
+  result.emitterTemperatureKelvin = maximumTemperatureKelvin * std::pow(innerRatio, 0.75) *
+      std::pow(std::max(0.0, 1.0 - std::sqrt(innerRatio)), 0.25);
+  if (!(result.emitterTemperatureKelvin > 0.0)) return result;
+
+  constexpr double firstWavelength = 390.0;
+  constexpr double wavelengthStep = 30.0;
+  std::array<double, 3> xyz{};
+  for (size_t index = 0; index < result.spectralRadiance.size(); ++index) {
+    const double observedWavelength = firstWavelength + wavelengthStep * index;
+    const double emittedWavelength = result.frequencyShift * observedWavelength;
+    const double radiance = result.invariantIntensityScale * planckFrequencyRadiance(
+        emittedWavelength * 1e-9, result.emitterTemperatureKelvin);
+    result.observedWavelengthNanometres[index] = observedWavelength;
+    result.spectralRadiance[index] = radiance;
+    const auto matching = cieApproximation(observedWavelength);
+    for (size_t component = 0; component < 3; ++component) xyz[component] += radiance * matching[component];
+  }
+  result.relativeLuminance = xyz[1];
+  const std::array<double, 3> rgb{
+      3.2406 * xyz[0] - 1.5372 * xyz[1] - 0.4986 * xyz[2],
+      -0.9689 * xyz[0] + 1.8758 * xyz[1] + 0.0415 * xyz[2],
+      0.0557 * xyz[0] - 0.2040 * xyz[1] + 1.0570 * xyz[2]};
+  const double maximumComponent = std::max({rgb[0], rgb[1], rgb[2], 1e-30});
+  for (size_t component = 0; component < 3; ++component) {
+    result.linearSrgb[component] = std::max(0.0, rgb[component]) / maximumComponent;
+  }
+  result.valid = std::all_of(result.spectralRadiance.begin(), result.spectralRadiance.end(),
+                             [](double value) { return std::isfinite(value) && value >= 0.0; }) &&
+      std::all_of(result.linearSrgb.begin(), result.linearSrgb.end(),
+                  [](double value) { return std::isfinite(value) && value >= 0.0; });
+  return result;
 }
 
 }  // namespace vulkax::relativity

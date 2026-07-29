@@ -16,6 +16,11 @@ struct KerrGeodesicConfig {
   double minimumAffineStep = 0.00125;
   double maximumAffineStep = 0.08;
   double relativeTolerance = 2e-5;
+  double nullConstraintTolerance = 1e-10;
+  // Boyer-Lindquist coordinate time is singular at the horizon. Classify a
+  // ray on a small stretched horizon before that coordinate singularity can
+  // dominate otherwise finite spatial integration.
+  double horizonRelativeEpsilon = 1e-2;
   double escapeRadius = 52.0;
   double diskInnerRadius = 3.0;
   double diskOuterRadius = 18.0;
@@ -48,7 +53,13 @@ struct KerrRayResult {
   uint32_t radialTurningPoints = 0;
   uint32_t polarTurningPoints = 0;
   uint32_t integrationSteps = 0;
+  uint32_t acceptedSteps = 0;
+  uint32_t rejectedSteps = 0;
   double maximumPotentialViolation = 0.0;
+  double maximumLocalError = 0.0;
+  double maximumNullConstraintDrift = 0.0;
+  double minimumAcceptedStep = 0.0;
+  double maximumAcceptedStep = 0.0;
 };
 
 // First-order source-space footprint from a central geodesic and differential
@@ -71,12 +82,34 @@ struct KerrRayBundleResult {
   bool valid = false;
 };
 
+struct KerrDiskSpectrum {
+  std::array<double, 12> observedWavelengthNanometres{};
+  std::array<double, 12> spectralRadiance{};
+  std::array<double, 3> linearSrgb{};
+  double frequencyShift = 0.0;
+  double invariantIntensityScale = 0.0;
+  double emitterTemperatureKelvin = 0.0;
+  double relativeLuminance = 0.0;
+  bool valid = false;
+};
+
 [[nodiscard]] double kerrOuterHorizonRadius(double mass, double spin);
+[[nodiscard]] double kerrProgradeIscoRadius(double mass, double spin);
 
 // Converts Bardeen image-plane coordinates (alpha, beta) at a distant
 // observer into the conserved null-geodesic quantities E, Lz, and Q.
 [[nodiscard]] KerrConstants kerrConstantsFromImagePlane(
     const KerrGeodesicConfig& config, double alpha, double beta);
+
+// Reconstructs covariant momenta from the separated potentials and evaluates
+// |g^munu p_mu p_nu| relative to the sum of its metric terms.
+[[nodiscard]] double kerrNormalizedNullConstraint(
+    const KerrGeodesicConfig& config,
+    const KerrConstants& constants,
+    double radius,
+    double polarRadians,
+    double radialSign,
+    double polarSign);
 
 // Integrates a backward null ray with the Carter-separated first-order Kerr
 // equations. The implementation adaptively compares one full RK4 step with
@@ -89,5 +122,14 @@ struct KerrRayBundleResult {
     double alpha,
     double beta,
     double imagePlaneDifferential = 1e-3);
+
+// Twelve-band thin-disk reference. It evaluates a circular equatorial emitter,
+// applies g^3 to I_nu, samples the emitted Planck spectrum at nu_observed / g,
+// and integrates approximate CIE matching functions into linear sRGB.
+[[nodiscard]] KerrDiskSpectrum evaluateKerrThinDiskSpectrum(
+    const KerrGeodesicConfig& config,
+    const KerrConstants& constants,
+    double diskRadius,
+    double maximumTemperatureKelvin = 18000.0);
 
 }  // namespace vulkax::relativity
