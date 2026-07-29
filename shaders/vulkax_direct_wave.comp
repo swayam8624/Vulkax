@@ -66,7 +66,7 @@ vec3 celestialRadiance(vec2 direction) {
   const vec2 local = fract(direction * vec2(37.0, 19.0)) - 0.5;
   const float star = smoothstep(0.06, 0.0, length(local - (vec2(hash21(cell), hash21(cell + 19.17)) - 0.5)));
   const float temperature = 0.45 + 0.55 * hash21(cell + 7.2);
-  return vec3(0.002, 0.004, 0.012) + star * mix(vec3(0.35, 0.48, 1.1), vec3(1.4, 0.72, 0.36), temperature);
+  return vec3(0.006, 0.010, 0.026) + star * mix(vec3(0.48, 0.72, 1.8), vec3(2.0, 0.92, 0.42), temperature);
 }
 
 vec3 schwarzschildRadiance(vec2 uv) {
@@ -175,7 +175,42 @@ float progradeIsco(float mass, float spin) {
       sqrt(max(0.0, (3.0 - z1) * (3.0 + z1 + 2.0 * z2))));
 }
 
-KerrTrace traceKerr(vec2 imagePlane) {
+float asymmetricGaussian(float wavelength, float mean, float leftWidth, float rightWidth) {
+  const float width = wavelength < mean ? leftWidth : rightWidth;
+  const float value = (wavelength - mean) / width;
+  return exp(-0.5 * value * value);
+}
+
+vec3 cieMatching(float wavelength) {
+  const float x = 1.056 * asymmetricGaussian(wavelength, 599.8, 37.9, 31.0) +
+      0.362 * asymmetricGaussian(wavelength, 442.0, 16.0, 26.7) -
+      0.065 * asymmetricGaussian(wavelength, 501.1, 20.4, 26.2);
+  const float y = 0.821 * asymmetricGaussian(wavelength, 568.8, 46.9, 40.5) +
+      0.286 * asymmetricGaussian(wavelength, 530.9, 16.3, 31.1);
+  const float z = 1.217 * asymmetricGaussian(wavelength, 437.0, 11.8, 36.0) +
+      0.681 * asymmetricGaussian(wavelength, 459.0, 26.0, 13.8);
+  return max(vec3(x, y, z), vec3(0.0));
+}
+
+vec3 redshiftedThermalRgb(float temperatureKelvin, float frequencyShift) {
+  const float wavelengths[6] = float[6](400.0, 460.0, 520.0, 580.0, 640.0, 700.0);
+  vec3 xyz = vec3(0.0);
+  for (uint band = 0u; band < 6u; ++band) {
+    const float observedWavelength = wavelengths[band];
+    const float emittedWavelength = frequencyShift * observedWavelength;
+    const float exponent = 1.4387769e7 / max(emittedWavelength * temperatureKelvin, 1.0);
+    const float planckFrequency = 1.0 /
+        max(pow(emittedWavelength, 3.0) * (exp(min(exponent, 80.0)) - 1.0), 1e-30);
+    xyz += pow(frequencyShift, 3.0) * planckFrequency * cieMatching(observedWavelength);
+  }
+  const vec3 rgb = max(vec3(
+      3.2406 * xyz.x - 1.5372 * xyz.y - 0.4986 * xyz.z,
+      -0.9689 * xyz.x + 1.8758 * xyz.y + 0.0415 * xyz.z,
+      0.0557 * xyz.x - 0.2040 * xyz.y + 1.0570 * xyz.z), vec3(0.0));
+  return rgb / max(max(rgb.r, rgb.g), max(rgb.b, 1e-20));
+}
+
+KerrTrace traceKerr(vec2 imagePlane, bool shadeDisk) {
   const float mass = max(frame.mass, 0.2);
   const float spin = clamp(frame.spin, -0.998 * mass, 0.998 * mass);
   const float observerRadius = 52.0 * mass;
@@ -190,11 +225,15 @@ KerrTrace traceKerr(vec2 imagePlane) {
   vec4 state = vec4(observerRadius, observerPolar, 0.0, 0.0);
   const float horizon = mass + sqrt(max(0.0, mass * mass - spin * spin));
   const float diskInner = max(progradeIsco(mass, spin), horizon * 1.08);
-  const float diskOuter = 18.0 * mass;
+  const float diskOuter = 13.5 * mass;
   vec3 diskRadiance = vec3(0.0);
   float previousPolar = state.y;
-  const float step = 0.055 * mass;
-  for (uint iteration = 0u; iteration < 1800u; ++iteration) {
+  const float step = 0.07 * mass;
+  // The observer is 52M away, so even a weakly deflected escaping ray needs
+  // slightly more than 104M of affine travel to return to the escape sphere.
+  // This bounded preview profile covers 133M without crossing the Metal GPU
+  // watchdog threshold seen with a substantially longer command buffer.
+  for (uint iteration = 0u; iteration < 1900u; ++iteration) {
     if (state.x <= horizon * 1.0008) return KerrTrace(vec2(0.0), diskRadiance, 1.0);
     if (iteration > 3u && signs.x > 0.0 && state.x >= observerRadius) {
       const vec2 source = vec2(
@@ -218,19 +257,37 @@ KerrTrace traceKerr(vec2 imagePlane) {
     const bool equatorCrossing =
         (previousPolar - 0.5 * 3.14159265359) * (candidate.y - 0.5 * 3.14159265359) <= 0.0 &&
         abs(candidate.y - previousPolar) > 1e-7;
-    if (equatorCrossing && candidate.x >= diskInner && candidate.x <= diskOuter) {
-      const float radius = candidate.x / mass;
+    if (shadeDisk && equatorCrossing) {
+      const float crossingFraction = clamp(
+          (0.5 * 3.14159265359 - previousPolar) / (candidate.y - previousPolar), 0.0, 1.0);
+      const float crossingRadius = mix(state.x, candidate.x, crossingFraction);
+      if (crossingRadius < diskInner || crossingRadius > diskOuter) {
+        previousPolar = candidate.y;
+        state = candidate;
+        continue;
+      }
+      const float radius = crossingRadius / mass;
       const float omega = 1.0 / (pow(radius, 1.5) + spin / mass);
       const float denominator = max(0.08, pow(radius, 1.5) - 3.0 * sqrt(radius) + 2.0 * spin / mass);
       const float emitterTime = (pow(radius, 1.5) + spin / mass) / sqrt(pow(radius, 1.5) * denominator);
       const float frequencyShift = clamp(1.0 / max(0.05, emitterTime * (1.0 - omega * axialMomentum / mass)), 0.08, 3.5);
-      const float temperature = pow(max(diskInner / mass, 1.0) / radius, 0.75);
-      const float emissivity = smoothstep(diskInner, diskInner * 1.15, candidate.x) *
-          (1.0 - smoothstep(diskOuter * 0.75, diskOuter, candidate.x));
-      const vec3 thermal = mix(vec3(1.7, 0.24, 0.025), vec3(0.68, 0.88, 1.65),
-                               clamp(frequencyShift * temperature * 0.42, 0.0, 1.0));
-      diskRadiance += thermal * emissivity * pow(frequencyShift, 3.0) *
-          max(frame.diskGain, 0.0) * 0.72;
+      const float innerRatio = diskInner / crossingRadius;
+      const float temperatureKelvin = 32000.0 * pow(innerRatio, 0.75) *
+          pow(max(0.0, 1.0 - sqrt(innerRatio)), 0.25);
+      const float radialWindow = smoothstep(diskInner, diskInner * 1.12, crossingRadius) *
+          (1.0 - smoothstep(diskOuter * 0.72, diskOuter, crossingRadius));
+      const float turbulence = 0.94 + 0.06 * sin(7.0 * log(max(radius, 1.0)));
+      const float emissivity = radialWindow * turbulence;
+      const vec3 thermal = redshiftedThermalRgb(temperatureKelvin, frequencyShift);
+      const float bolometricTransfer = pow(frequencyShift, 4.0) *
+          pow(max(temperatureKelvin, 1000.0) / 14000.0, 4.0);
+      diskRadiance = thermal * emissivity * bolometricTransfer *
+          max(frame.diskGain, 0.0) * 0.34;
+      // This preview model is an optically thick geometrically thin disk.
+      // The first physical surface crossing absorbs the backward ray; summing
+      // subsequent crossings treated the disk as transparent and produced
+      // unstable orbit-order stripes near the critical curve.
+      return KerrTrace(vec2(0.0), diskRadiance, 1.0);
     }
     previousPolar = candidate.y;
     state = candidate;
@@ -248,38 +305,75 @@ vec3 filteredCelestialRadiance(
     vec2 source, vec2 sourceDx, vec2 sourceDy,
     float sourceAreaScale, float bundleShear) {
   const vec2 grid = vec2(71.0, 37.0);
-  const vec2 cell = floor(source * grid);
-  const vec2 local = fract(source * grid) - 0.5;
-  const vec2 starOffset = vec2(hash21(cell), hash21(cell + 19.17)) - 0.5;
-  const float majorFootprint = max(length(sourceDx * grid), length(sourceDy * grid));
-  const float areaFootprint = sqrt(max(sourceAreaScale * grid.x * grid.y, 0.0));
-  const float footprint = clamp(
-      max(majorFootprint, areaFootprint) * mix(1.0, 1.35, bundleShear), 0.0, 0.42);
-  const float star = smoothstep(0.055 + footprint, 0.006 + 0.25 * footprint,
-                                length(local - starOffset));
-  const float temperature = 0.45 + 0.55 * hash21(cell + 7.2);
-  const vec3 background = vec3(0.0015, 0.003, 0.010) +
-      0.003 * vec3(0.4, 0.22, 0.62) * (0.5 + 0.5 * sin(source.y * 19.0));
-  return background + star * mix(vec3(0.32, 0.52, 1.4), vec3(1.75, 0.68, 0.28), temperature);
+  const vec2 gridPoint = source * grid;
+  const ivec2 baseCell = ivec2(floor(gridPoint));
+  vec2 bundleX = sourceDx * grid;
+  vec2 bundleY = sourceDy * grid;
+  const float maximumFootprint = 0.34;
+  if (length(bundleX) > maximumFootprint) bundleX *= maximumFootprint / length(bundleX);
+  if (length(bundleY) > maximumFootprint) bundleY *= maximumFootprint / length(bundleY);
+
+  // A pixel is a finite box, so its source-space covariance is J J^T / 12.
+  // The determinant ratio preserves each procedural star's integrated energy
+  // as a highly sheared bundle spreads it over a larger source footprint.
+  const float baseSigma = 0.028;
+  const float baseVariance = baseSigma * baseSigma;
+  const float footprintScale = mix(1.0, 1.25, bundleShear) / 12.0;
+  const float covarianceXX = baseVariance + footprintScale *
+      (bundleX.x * bundleX.x + bundleY.x * bundleY.x);
+  const float covarianceXY = footprintScale *
+      (bundleX.x * bundleX.y + bundleY.x * bundleY.y);
+  const float covarianceYY = baseVariance + footprintScale *
+      (bundleX.y * bundleX.y + bundleY.y * bundleY.y);
+  const float determinant = max(
+      covarianceXX * covarianceYY - covarianceXY * covarianceXY,
+      baseVariance * baseVariance);
+  const mat2 inverseCovariance = mat2(
+      covarianceYY, -covarianceXY,
+      -covarianceXY, covarianceXX) / determinant;
+  const float conservedPeak = baseVariance / sqrt(determinant);
+
+  vec3 stars = vec3(0.0);
+  for (int offsetY = -1; offsetY <= 1; ++offsetY) {
+    const int unwrappedY = baseCell.y + offsetY;
+    if (unwrappedY < 0 || unwrappedY >= int(grid.y)) continue;
+    for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+      const int unwrappedX = baseCell.x + offsetX;
+      const float wrappedX = mod(float(unwrappedX), grid.x);
+      const vec2 canonicalCell = vec2(wrappedX, float(unwrappedY));
+      const vec2 starPosition = vec2(float(unwrappedX), float(unwrappedY)) +
+          vec2(hash21(canonicalCell), hash21(canonicalCell + 19.17));
+      const vec2 delta = gridPoint - starPosition;
+      const float exponent = -0.5 * dot(delta, inverseCovariance * delta);
+      const float starPresence = smoothstep(0.86, 0.92, hash21(canonicalCell + 31.73));
+      const float star = starPresence * conservedPeak * exp(max(exponent, -32.0));
+      const float temperature = 0.45 + 0.55 * hash21(canonicalCell + 7.2);
+      stars += star * mix(
+          vec3(0.48, 0.74, 2.0), vec3(2.2, 0.88, 0.34), temperature);
+    }
+  }
+  const vec3 background = vec3(0.006, 0.010, 0.030) +
+      0.008 * vec3(0.4, 0.22, 0.62) * (0.5 + 0.5 * sin(source.y * 19.0));
+  return background + stars;
 }
 
 vec3 kerrRadiance(vec2 uv) {
   const float aspect = frame.width / max(frame.height, 1.0);
   const vec2 screen = (uv - 0.5) * vec2(2.0 * aspect, 2.0) / max(frame.cameraScale, 0.1);
-  const vec2 imagePlane = screen * (8.5 * max(frame.mass, 0.2));
-  const KerrTrace central = traceKerr(imagePlane);
+  const vec2 imagePlane = screen * (17.0 * max(frame.mass, 0.2));
+  const KerrTrace central = traceKerr(imagePlane, true);
   if (central.status < 1.5) return central.diskRadiance;
   if (central.status > 2.5) return vec3(0.0);
 
   // Differential neighbour rays form a first-order source-space footprint.
   // This is a finite-difference ray bundle, not merely duplicate samples.
   const vec2 pixelFootprint = vec2(
-      17.0 * aspect * max(frame.mass, 0.2) / max(frame.width, 1.0),
-      17.0 * max(frame.mass, 0.2) / max(frame.height, 1.0)) * max(frame.bundleScale, 0.0);
-  const KerrTrace neighbourX = traceKerr(imagePlane + vec2(pixelFootprint.x, 0.0));
-  const KerrTrace neighbourY = traceKerr(imagePlane + vec2(0.0, pixelFootprint.y));
-  const KerrTrace neighbourNegativeX = traceKerr(imagePlane - vec2(pixelFootprint.x, 0.0));
-  const KerrTrace neighbourNegativeY = traceKerr(imagePlane - vec2(0.0, pixelFootprint.y));
+      34.0 * aspect * max(frame.mass, 0.2) / max(frame.width, 1.0),
+      34.0 * max(frame.mass, 0.2) / max(frame.height, 1.0)) * max(frame.bundleScale, 0.0);
+  const KerrTrace neighbourX = traceKerr(imagePlane + vec2(pixelFootprint.x, 0.0), false);
+  const KerrTrace neighbourY = traceKerr(imagePlane + vec2(0.0, pixelFootprint.y), false);
+  const KerrTrace neighbourNegativeX = traceKerr(imagePlane - vec2(pixelFootprint.x, 0.0), false);
+  const KerrTrace neighbourNegativeY = traceKerr(imagePlane - vec2(0.0, pixelFootprint.y), false);
   vec2 sourceDx = vec2(0.0);
   vec2 sourceDy = vec2(0.0);
   if (neighbourX.status > 1.5 && neighbourX.status < 2.5 &&
