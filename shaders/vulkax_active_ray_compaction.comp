@@ -1,0 +1,113 @@
+#version 450
+
+layout(local_size_x = 256) in;
+
+struct RayState {
+    uint remainingSteps;
+    uint completedSteps;
+    uint status;
+    uint padding;
+};
+
+layout(set = 0, binding = 0, std430) buffer RayStates { RayState values[]; } rays;
+layout(set = 0, binding = 1, std430) buffer ActiveA { uint values[]; } activeA;
+layout(set = 0, binding = 2, std430) buffer ActiveB { uint values[]; } activeB;
+layout(set = 0, binding = 3, std430) buffer Flags { uint values[]; } flags;
+layout(set = 0, binding = 4, std430) buffer Offsets { uint values[]; } offsets;
+layout(set = 0, binding = 5, std430) buffer Control {
+    uint activeCount;
+    uint previousCount;
+    uint maximumCount;
+    uint iterations;
+} control;
+layout(set = 0, binding = 6, std430) buffer IndirectCommand {
+    uint x;
+    uint y;
+    uint z;
+} indirectCommand;
+
+layout(push_constant) uniform Push {
+    uint phase;
+    uint sourceQueue;
+    uint padding0;
+    uint padding1;
+} pushData;
+
+shared uint scanA[1024];
+shared uint scanB[1024];
+
+uint activeRay(uint slot) {
+    return pushData.sourceQueue == 0 ? activeA.values[slot] : activeB.values[slot];
+}
+
+void writeNext(uint slot, uint rayIndex) {
+    if (pushData.sourceQueue == 0)
+        activeB.values[slot] = rayIndex;
+    else
+        activeA.values[slot] = rayIndex;
+}
+
+void integrateActiveRay() {
+    const uint slot = gl_GlobalInvocationID.x;
+    if (slot >= control.activeCount) return;
+    const uint rayIndex = activeRay(slot);
+    RayState ray = rays.values[rayIndex];
+    if (ray.remainingSteps > 0) {
+        --ray.remainingSteps;
+        ++ray.completedSteps;
+    }
+    ray.status = ray.remainingSteps == 0 ? 1 : 0;
+    rays.values[rayIndex] = ray;
+    flags.values[slot] = ray.status == 0 ? 1 : 0;
+}
+
+void exclusiveScan() {
+    const uint lane = gl_LocalInvocationID.x;
+    for (uint index = lane; index < 1024; index += 256) {
+        scanA[index] = index < control.activeCount ? flags.values[index] : 0;
+    }
+    barrier();
+    bool sourceA = true;
+    for (uint stride = 1; stride < 1024; stride <<= 1) {
+        for (uint index = lane; index < 1024; index += 256) {
+            const uint own = sourceA ? scanA[index] : scanB[index];
+            const uint preceding = index >= stride ?
+                (sourceA ? scanA[index - stride] : scanB[index - stride]) : 0;
+            if (sourceA)
+                scanB[index] = own + preceding;
+            else
+                scanA[index] = own + preceding;
+        }
+        barrier();
+        sourceA = !sourceA;
+    }
+    for (uint index = lane; index < 1024; index += 256) {
+        const uint inclusive = sourceA ? scanA[index] : scanB[index];
+        offsets.values[index] = inclusive - (index < control.activeCount ? flags.values[index] : 0);
+    }
+    barrier();
+    if (lane == 0) {
+        const uint nextCount = sourceA ? scanA[1023] : scanB[1023];
+        control.previousCount = control.activeCount;
+        control.activeCount = nextCount;
+        ++control.iterations;
+        indirectCommand.x = (nextCount + 255) / 256;
+        indirectCommand.y = 1;
+        indirectCommand.z = 1;
+    }
+}
+
+void scatterActiveRays() {
+    const uint slot = gl_GlobalInvocationID.x;
+    if (slot >= control.previousCount || flags.values[slot] == 0) return;
+    writeNext(offsets.values[slot], activeRay(slot));
+}
+
+void main() {
+    if (pushData.phase == 0)
+        integrateActiveRay();
+    else if (pushData.phase == 1)
+        exclusiveScan();
+    else
+        scatterActiveRays();
+}

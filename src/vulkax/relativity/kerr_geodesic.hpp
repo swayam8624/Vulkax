@@ -33,6 +33,21 @@ struct KerrConstants {
   double carterConstant = 0.0;
 };
 
+enum class KerrIntersectionKind : uint8_t {
+  Horizon,
+  DiskMidplane,
+};
+
+struct KerrIntersection {
+  KerrIntersectionKind kind = KerrIntersectionKind::DiskMidplane;
+  double affineDistance = 0.0;
+  double radius = 0.0;
+  double polarRadians = 0.0;
+  double azimuthRadians = 0.0;
+  double coordinateTime = 0.0;
+  uint32_t imageOrder = 0;
+};
+
 enum class KerrRayStatus : uint8_t {
   Unfinished,
   Captured,
@@ -60,6 +75,9 @@ struct KerrRayResult {
   double maximumNullConstraintDrift = 0.0;
   double minimumAcceptedStep = 0.0;
   double maximumAcceptedStep = 0.0;
+  std::array<KerrIntersection, 16> intersections{};
+  uint32_t intersectionCount = 0;
+  uint32_t droppedIntersections = 0;
 };
 
 // First-order source-space footprint from a central geodesic and differential
@@ -90,6 +108,25 @@ struct KerrDiskSpectrum {
   double invariantIntensityScale = 0.0;
   double emitterTemperatureKelvin = 0.0;
   double relativeLuminance = 0.0;
+  bool valid = false;
+};
+
+struct KerrDiskMedium {
+  double halfThickness = 0.15;
+  double verticalOpticalDepth = 2.0;
+  double singleScatteringAlbedo = 0.25;
+  double coronaTemperatureKelvin = 1.0e8;
+  double coronaOpticalDepth = 0.08;
+};
+
+struct KerrTransferResult {
+  std::array<double, 3> linearSrgb{};
+  double emittedLuminance = 0.0;
+  double transmittedLuminance = 0.0;
+  double scatteredLuminance = 0.0;
+  double accumulatedOpticalDepth = 0.0;
+  uint32_t contributingIntersections = 0;
+  bool selfOccluded = false;
   bool valid = false;
 };
 
@@ -130,6 +167,14 @@ struct KerrDiskSpectrum {
     const KerrGeodesicConfig& config,
     const KerrConstants& constants,
     double diskRadius,
+    double maximumTemperatureKelvin = 18000.0);
+
+// Applies front-to-back finite-thickness disk absorption and a bounded
+// single-scattering corona term across all root-refined disk intersections.
+[[nodiscard]] KerrTransferResult evaluateKerrDiskTransfer(
+    const KerrGeodesicConfig& config,
+    const KerrRayResult& ray,
+    const KerrDiskMedium& medium = {},
     double maximumTemperatureKelvin = 18000.0);
 
 }  // namespace vulkax::relativity

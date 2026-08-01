@@ -1,15 +1,15 @@
-#include "vulkax/equation/equation.hpp"
-
 #include <cassert>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
 
+#include "vulkax/equation/equation.hpp"
+
 namespace {
 bool close(double left, double right, double tolerance = 1e-10) {
   return std::abs(left - right) <= tolerance;
 }
-}
+}  // namespace
 
 int main() {
   using namespace vulkax::equation;
@@ -21,6 +21,22 @@ int main() {
   assert(close(parseScalarExpression("-x + 2").evaluate({{"x", 5.0}}), -3.0));
   const auto symbols = variableNames(parseScalarExpression("amplitude * sin(k * x - omega * t)"));
   assert((symbols == std::vector<std::string>{"amplitude", "k", "omega", "t", "x"}));
+
+  const auto bounded = analyzeRange(
+      parseScalarExpression("amplitude * sin(k*x)"),
+      {{"amplitude", {0.5, 2.0}}, {"k", {1.0, 4.0}}, {"x", {-3.0, 3.0}}});
+  assert(bounded.safe());
+  assert(bounded.range.minimum <= -2.0 && bounded.range.maximum >= 2.0);
+  const auto singular = analyzeRange(
+      parseScalarExpression("1 / (x - critical)"),
+      {{"x", {-1.0, 1.0}}, {"critical", {0.0, 0.0}}});
+  assert(!singular.safe());
+  assert(!singular.diagnostics.empty());
+  const auto invalidRoot = analyzeRange(parseScalarExpression("sqrt(x)"), {{"x", {-1.0, 4.0}}});
+  assert(!invalidRoot.safe());
+  const auto safeRoot = analyzeRange(parseScalarExpression("sqrt(x)"), {{"x", {0.0, 4.0}}});
+  assert(safeRoot.safe());
+  assert(close(safeRoot.range.maximum, 2.0));
 
   bool invalidExpressionRejected = false;
   try {

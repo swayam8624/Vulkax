@@ -1,5 +1,7 @@
 #pragma once
 
+#include "vulkax/runtime_contract.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -62,6 +64,8 @@ class VulkanFieldExecutor final {
   [[nodiscard]] bool available() const;
   [[nodiscard]] const std::string& diagnostic() const;
   [[nodiscard]] const std::string& deviceName() const;
+  [[nodiscard]] VulkaxRuntimeCapabilities runtimeCapabilities() const;
+  [[nodiscard]] VulkaxFrameTelemetry latestTelemetry() const;
 
   // Dispatches the checked Wave Field and its GPU visualization pass. Returns
   // a CPU-visible scalar copy only for validation/legacy UI bridging. Throws

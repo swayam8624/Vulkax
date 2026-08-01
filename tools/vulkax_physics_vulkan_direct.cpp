@@ -20,6 +20,7 @@
 #include "lve_pipeline.hpp"
 #include "lve_renderer.hpp"
 #include "lve_window.hpp"
+#include "vulkax/runtime/runtime_contract.hpp"
 
 #if defined(VULKAX_HAS_OPENEXR)
 #include <OpenEXR/ImfRgbaFile.h>
@@ -90,16 +91,26 @@ class DirectPhysicsPresenter final {
       uint32_t frameLimit,
       bool schwarzschild,
       bool kerr,
+      bool volume,
       float spin,
       std::optional<std::filesystem::path> exportPath)
       : frameLimit_{frameLimit},
         schwarzschild_{schwarzschild},
         kerr_{kerr},
+        volume_{volume},
         spin_{spin},
         exportPath_{std::move(exportPath)},
         window_{1280, 720, "Vulkax Physics Studio - Direct Vulkan"},
         device_{window_, benchmarkConfig_},
         renderer_{window_, device_} {
+    capabilities_.abiVersion = VULKAX_RUNTIME_ABI_VERSION;
+    capabilities_.backend = VULKAX_RUNTIME_BACKEND_VULKAN;
+    capabilities_.maximumFramesInFlight = lve::LveSwapChain::MAX_FRAMES_IN_FLIGHT;
+    capabilities_.gpuResidentHdr = 1;
+    capabilities_.asynchronousSubmission = 1;
+    telemetry_.abiVersion = VULKAX_RUNTIME_ABI_VERSION;
+    telemetry_.backend = VULKAX_RUNTIME_BACKEND_VULKAN;
+    telemetry_.framesInFlight = capabilities_.maximumFramesInFlight;
     createDescriptorsAndPipelines();
     createTimestampQueryPool();
   }
@@ -125,19 +136,39 @@ class DirectPhysicsPresenter final {
 
   void run() {
     const auto begin = std::chrono::steady_clock::now();
+    auto previousFrame = begin;
     uint32_t renderedFrames = 0;
     while (!window_.shouldClose() && (frameLimit_ == 0 || renderedFrames < frameLimit_)) {
       glfwPollEvents();
       ensureWaveImage(renderExtent(window_.getExtent()));
       const auto now = std::chrono::steady_clock::now();
       const float timeSeconds = std::chrono::duration<float>(now - begin).count();
+      const float deltaSeconds = std::chrono::duration<float>(now - previousFrame).count();
+      previousFrame = now;
       if (auto commandBuffer = renderer_.beginFrame()) {
+        const std::array<float, 4> parameters{1.0f, 1.0f, 1.0f, spin_};
+        VulkaxFrameRequest request{};
+        request.abiVersion = VULKAX_RUNTIME_ABI_VERSION;
+        request.visualization =
+            volume_ ? VULKAX_VISUALIZATION_VOLUME
+                    : ((schwarzschild_ || kerr_) ? VULKAX_VISUALIZATION_RELATIVITY
+                                                 : VULKAX_VISUALIZATION_SCALAR_FIELD);
+        request.drawableWidth = waveExtent_.width;
+        request.drawableHeight = waveExtent_.height;
+        request.frameIndex = renderedFrames;
+        request.timelineSeconds = timeSeconds;
+        request.deltaSeconds = std::max(0.0f, deltaSeconds);
+        request.renderScale = 1.0f;
+        request.resetHistory = accumulatedSamples_ == 0 ? 1u : 0u;
+        request.parameterCount = static_cast<uint32_t>(parameters.size());
+        request.parameterHash = 0x564b58564c4b4e31ull;
+        vulkax::runtime::validateFrameRequest(request, parameters);
         const DirectFrameConstants constants{
-            timeSeconds,
+            request.timelineSeconds,
             static_cast<float>(waveExtent_.width),
             static_cast<float>(waveExtent_.height),
             1.0f,
-            kerr_ ? 2.0f : (schwarzschild_ ? 1.0f : 0.0f),
+            volume_ ? 3.0f : (kerr_ ? 2.0f : (schwarzschild_ ? 1.0f : 0.0f)),
             1.0f,
             1.0f,
             1.0f,
@@ -168,6 +199,9 @@ class DirectPhysicsPresenter final {
         writeRenderTimestamp(commandBuffer);
         renderer_.endSwapChainRenderPass(commandBuffer);
         renderer_.endFrame();
+        telemetry_.frameIndex = request.frameIndex;
+        telemetry_.historySamples = accumulatedSamples_;
+        telemetry_.frameSubmitted = 1;
         if (schwarzschild_ || kerr_) ++accumulatedSamples_;
         ++renderedFrames;
       }
@@ -175,9 +209,12 @@ class DirectPhysicsPresenter final {
     renderer_.waitForLastSubmittedFrame();
     reportGpuTiming();
     if (exportPath_) captureHdr(*exportPath_);
-    const char* modeName = kerr_ ? "Kerr " : (schwarzschild_ ? "Schwarzschild " : "wave ");
+    const char* modeName =
+        volume_ ? "volume " : (kerr_ ? "Kerr " : (schwarzschild_ ? "Schwarzschild " : "wave "));
     std::cout << "Vulkax direct Vulkan " << modeName << "compute-to-present completed "
-              << renderedFrames << " frame(s)\n";
+              << renderedFrames << " frame(s); runtime ABI " << VULKAX_RUNTIME_ABI_VERSION << ", "
+              << capabilities_.maximumFramesInFlight << " frames in flight, GPU HDR "
+              << (capabilities_.gpuResidentHdr ? "enabled" : "disabled") << "\n";
   }
 
   void hideWindowForSmoke() { glfwHideWindow(window_.getGLFWwindow()); }
@@ -312,12 +349,12 @@ class DirectPhysicsPresenter final {
   }
 
   [[nodiscard]] VkExtent2D renderExtent(VkExtent2D drawableExtent) const {
-    if (!schwarzschild_ && !kerr_) return drawableExtent;
+    if (!schwarzschild_ && !kerr_ && !volume_) return drawableExtent;
     // Five Kerr rays plus spectral transfer are substantially more expensive
     // than the single Schwarzschild trace. Keep each Metal command buffer
     // below the macOS interactivity watchdog and reconstruct through the
     // graphics sampler while progressive samples converge.
-    const uint32_t maximumWidth = kerr_ ? 384u : 512u;
+    const uint32_t maximumWidth = kerr_ ? 384u : (volume_ ? 640u : 512u);
     if (drawableExtent.width <= maximumWidth) return drawableExtent;
     const float scale = static_cast<float>(maximumWidth) / static_cast<float>(drawableExtent.width);
     return {
@@ -518,6 +555,10 @@ class DirectPhysicsPresenter final {
     constexpr double kNanosecondsPerMillisecond = 1'000'000.0;
     const double computeMs =
         static_cast<double>(ticks[1] - ticks[0]) * timestampPeriod_ / kNanosecondsPerMillisecond;
+    telemetry_.simulationMilliseconds = computeMs;
+    telemetry_.renderingMilliseconds =
+        static_cast<double>(ticks[2] - ticks[1]) * timestampPeriod_ / kNanosecondsPerMillisecond;
+    telemetry_.framePresented = 1;
     const double frameMs =
         static_cast<double>(ticks[2] - ticks[0]) * timestampPeriod_ / kNanosecondsPerMillisecond;
     std::cout << "Vulkax Vulkan timestamps: compute=" << computeMs << " ms gpu-frame=" << frameMs
@@ -668,6 +709,7 @@ class DirectPhysicsPresenter final {
   uint32_t frameLimit_ = 0;
   bool schwarzschild_ = false;
   bool kerr_ = false;
+  bool volume_ = false;
   float spin_ = 0.75f;
   std::optional<std::filesystem::path> exportPath_;
   lve::LveWindow window_;
@@ -691,6 +733,8 @@ class DirectPhysicsPresenter final {
   uint32_t accumulatedSamples_ = 0;
   VkQueryPool timestampPool_ = VK_NULL_HANDLE;
   float timestampPeriod_ = 0.0f;
+  VulkaxRuntimeCapabilities capabilities_{};
+  VulkaxFrameTelemetry telemetry_{};
 };
 
 uint32_t parseFrameLimit(
@@ -699,6 +743,7 @@ uint32_t parseFrameLimit(
     bool& smoke,
     bool& schwarzschild,
     bool& kerr,
+    bool& volume,
     float& spin,
     std::optional<std::filesystem::path>& exportPath) {
   uint32_t frameLimit = 0;
@@ -712,19 +757,27 @@ uint32_t parseFrameLimit(
     } else if (option == "--black-hole") {
       schwarzschild = true;
       kerr = false;
+      volume = false;
     } else if (option == "--kerr") {
       kerr = true;
+      schwarzschild = false;
+      volume = false;
+    } else if (option == "--volume") {
+      volume = true;
+      kerr = false;
       schwarzschild = false;
     } else if (option == "--spin" && index + 1 < argc) {
       spin = std::stof(argv[++index]);
       if (!(std::abs(spin) < 1.0f)) throw std::invalid_argument("--spin requires |spin| < 1");
       kerr = true;
       schwarzschild = false;
+      volume = false;
     } else if (option == "--output" && index + 1 < argc) {
       exportPath = std::filesystem::path{argv[++index]};
     } else {
       throw std::invalid_argument(
-          "usage: vulkax-physics-vulkan-direct [--frames N] [--smoke] [--black-hole|--kerr] "
+          "usage: vulkax-physics-vulkan-direct [--frames N] [--smoke] "
+          "[--black-hole|--kerr|--volume] "
           "[--spin (-1,1)] [--output frame.exr]");
     }
   }
@@ -738,11 +791,14 @@ int main(int argc, char** argv) {
     bool smoke = false;
     bool schwarzschild = false;
     bool kerr = false;
+    bool volume = false;
     float spin = 0.75f;
     std::optional<std::filesystem::path> exportPath;
-    uint32_t frameLimit = parseFrameLimit(argc, argv, smoke, schwarzschild, kerr, spin, exportPath);
+    uint32_t frameLimit =
+        parseFrameLimit(argc, argv, smoke, schwarzschild, kerr, volume, spin, exportPath);
     if (exportPath && frameLimit == 0) frameLimit = 1;
-    DirectPhysicsPresenter presenter{frameLimit, schwarzschild, kerr, spin, std::move(exportPath)};
+    DirectPhysicsPresenter
+        presenter{frameLimit, schwarzschild, kerr, volume, spin, std::move(exportPath)};
     if (smoke) presenter.hideWindowForSmoke();
     presenter.run();
     return EXIT_SUCCESS;

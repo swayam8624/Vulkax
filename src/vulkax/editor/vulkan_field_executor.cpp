@@ -1,4 +1,5 @@
 #include "vulkax/editor/vulkan_field_executor.hpp"
+#include "vulkax/runtime/runtime_contract.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -176,6 +177,9 @@ struct VulkanFieldExecutor::Impl {
   bool ready = false;
   std::string diagnostic;
   std::string deviceName;
+  uint64_t frameIndex = 0;
+  VulkaxRuntimeCapabilities capabilities{};
+  VulkaxFrameTelemetry telemetry{};
 
   ~Impl() { destroy(); }
 
@@ -403,6 +407,14 @@ struct VulkanFieldExecutor::Impl {
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(physical, &properties);
     deviceName = properties.deviceName;
+    capabilities.abiVersion = VULKAX_RUNTIME_ABI_VERSION;
+    capabilities.backend = VULKAX_RUNTIME_BACKEND_VULKAN;
+    capabilities.maximumFramesInFlight = 1;
+    capabilities.gpuResidentHdr = 1;
+    capabilities.asynchronousSubmission = 0;
+    telemetry.abiVersion = VULKAX_RUNTIME_ABI_VERSION;
+    telemetry.backend = VULKAX_RUNTIME_BACKEND_VULKAN;
+    telemetry.framesInFlight = 1;
     timestampPeriod = properties.limits.timestampPeriod;
     uint32_t familyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physical, &familyCount, nullptr);
@@ -585,10 +597,29 @@ VulkanFieldExecutor::~VulkanFieldExecutor() { delete impl_; }
 bool VulkanFieldExecutor::available() const { return impl_ != nullptr && impl_->ready; }
 const std::string& VulkanFieldExecutor::diagnostic() const { return impl_->diagnostic; }
 const std::string& VulkanFieldExecutor::deviceName() const { return impl_->deviceName; }
+VulkaxRuntimeCapabilities VulkanFieldExecutor::runtimeCapabilities() const {
+  return impl_ == nullptr ? VulkaxRuntimeCapabilities{} : impl_->capabilities;
+}
+VulkaxFrameTelemetry VulkanFieldExecutor::latestTelemetry() const {
+  return impl_ == nullptr ? VulkaxFrameTelemetry{} : impl_->telemetry;
+}
 
 GpuFieldResult VulkanFieldExecutor::evaluateWave(const GpuFieldRequest& request) {
   if (!available()) throw std::runtime_error(impl_->diagnostic);
-  if (request.width == 0 || request.height == 0) throw std::invalid_argument("GPU field extent must be positive");
+  const std::array<float, 3> runtimeParameters{
+      request.amplitude, request.wavenumber, request.angularFrequency};
+  VulkaxFrameRequest frame{};
+  frame.abiVersion = VULKAX_RUNTIME_ABI_VERSION;
+  frame.visualization = VULKAX_VISUALIZATION_SCALAR_FIELD;
+  frame.drawableWidth = request.width;
+  frame.drawableHeight = request.height;
+  frame.frameIndex = impl_->frameIndex++;
+  frame.timelineSeconds = request.time;
+  frame.deltaSeconds = 0.0f;
+  frame.renderScale = 1.0f;
+  frame.parameterCount = static_cast<uint32_t>(runtimeParameters.size());
+  frame.parameterHash = 0x776176652d666965ull;
+  runtime::validateFrameRequest(frame, runtimeParameters);
   const VkDeviceSize bytes = static_cast<VkDeviceSize>(request.width) * request.height * sizeof(float);
   try {
     impl_->ensureOutputCapacity(bytes);
@@ -656,6 +687,12 @@ GpuFieldResult VulkanFieldExecutor::evaluateWave(const GpuFieldRequest& request)
             "vkGetQueryPoolResults");
       result.dispatchMilliseconds = static_cast<double>(ticks[1] - ticks[0]) * impl_->timestampPeriod / 1'000'000.0;
     }
+    impl_->telemetry.frameIndex = frame.frameIndex;
+    impl_->telemetry.simulationMilliseconds = std::max(0.0, result.dispatchMilliseconds);
+    impl_->telemetry.renderingMilliseconds = 0.0;
+    impl_->telemetry.historySamples = 0;
+    impl_->telemetry.frameSubmitted = 1;
+    impl_->telemetry.framePresented = 0;
     return result;
   } catch (const std::exception& error) {
     impl_->ready = false;

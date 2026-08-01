@@ -56,6 +56,32 @@ struct EvaluationResult {
   std::vector<double> values;
 };
 
+struct Interval {
+  double minimum = 0.0;
+  double maximum = 0.0;
+  bool finite = true;
+
+  [[nodiscard]] bool contains(double value) const { return minimum <= value && value <= maximum; }
+};
+
+enum class AnalysisSeverity : uint8_t {
+  Warning,
+  Error,
+};
+
+struct AnalysisDiagnostic {
+  AnalysisSeverity severity = AnalysisSeverity::Warning;
+  std::string nodePath;
+  std::string message;
+};
+
+struct RangeAnalysis {
+  Interval range{};
+  std::vector<AnalysisDiagnostic> diagnostics;
+
+  [[nodiscard]] bool safe() const;
+};
+
 struct PresetRunConfig {
   uint32_t frames = 120;
   uint32_t samplesPerFrame = 256;
@@ -76,8 +102,7 @@ class ScalarExpression {
  public:
   explicit ScalarExpression(EquationNode root);
 
-  [[nodiscard]] double evaluate(
-      const std::unordered_map<std::string, double>& variables) const;
+  [[nodiscard]] double evaluate(const std::unordered_map<std::string, double>& variables) const;
   [[nodiscard]] const EquationNode& root() const { return root_; }
 
  private:
@@ -88,6 +113,11 @@ class ScalarExpression {
 // Returns every variable symbol referenced by an expression, once and in stable
 // lexical order. Function names and constants are not returned.
 [[nodiscard]] std::vector<std::string> variableNames(const ScalarExpression& expression);
+// Conservatively propagates variable/parameter intervals through the parsed
+// expression. Diagnostics identify possible poles, invalid function domains,
+// non-real powers, and floating-point overflow before shader generation.
+[[nodiscard]] RangeAnalysis analyzeRange(
+    const ScalarExpression& expression, const std::map<std::string, Interval>& bindings);
 
 [[nodiscard]] std::vector<EquationPreset> builtInPresets();
 [[nodiscard]] std::optional<EquationPreset> findPreset(const std::string& id);
@@ -96,7 +126,6 @@ class ScalarExpression {
     const Sample& sample,
     const std::map<std::string, double>& parameterOverrides = {});
 [[nodiscard]] PresetRunSummary runPreset(
-    const EquationPreset& preset,
-    const PresetRunConfig& config);
+    const EquationPreset& preset, const PresetRunConfig& config);
 
 }  // namespace vulkax::equation

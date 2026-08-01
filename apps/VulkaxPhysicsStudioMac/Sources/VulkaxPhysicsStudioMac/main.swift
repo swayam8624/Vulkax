@@ -2,6 +2,8 @@ import SwiftUI
 import MetalKit
 import ObjectiveC
 import Darwin
+import VulkaxRuntimeContract
+import UniformTypeIdentifiers
 
 enum VisualizerMode: Float, CaseIterable, Identifiable {
     case wave = 0
@@ -19,9 +21,17 @@ enum VisualizerMode: Float, CaseIterable, Identifiable {
 }
 
 final class PhysicsModel: ObservableObject {
-    @Published var amplitude: Float = 1.0
-    @Published var wavenumber: Float = 2.0
-    @Published var angularFrequency: Float = 3.0
+    @Published var projectName = "Untitled Physics"
+    @Published var scalarPresetId = "wave-field"
+    @Published var equationSource = ScalarPreset.builtins[0].equation
+    @Published var liveParameters = ScalarPreset.builtins[0].parameters
+    @Published private(set) var equationStatus = "Ready"
+    @Published private(set) var compiledMetalSource = ""
+    @Published private(set) var compiledParameterNames: [String] = []
+    @Published private(set) var compiledSourceHash: UInt64 = 0
+    @Published private(set) var compileRevision: UInt64 = 0
+    @Published private(set) var projectURL: URL?
+    @Published private(set) var runtimeStatus = "Metal runtime starting"
     @Published var blackHoleMass: Float = 1.0
     @Published var diskGain: Float = 1.0
     @Published var cameraScale: Float = 1.0
@@ -29,16 +39,215 @@ final class PhysicsModel: ObservableObject {
     @Published var smokeTurbulence: Float = 1.0
     @Published var volumeExtinction: Float = 2.2
     @Published var volumeEmission: Float = 1.0
+    @Published private(set) var obstacleMesh: ImportedObstacleMesh?
+    @Published private(set) var obstacleMeshURL: URL?
+    @Published private(set) var obstacleMeshRevision: UInt64 = 0
     @Published var accumulationResetToken: UInt32 = 0
     @Published var playing = true
     @Published var time: Float = 0.0
-    @Published var mode: VisualizerMode = .wave
+    @Published var executionGraph = EquationRuntimeGraph.builtIn(
+        for: .wave, scalarEquation: ScalarPreset.builtins[0].equation)
+    @Published var mode: VisualizerMode = .wave {
+        didSet {
+            executionGraph = .builtIn(for: mode, scalarEquation: equationSource)
+            accumulationResetToken &+= 1
+        }
+    }
 
     init() {
         if CommandLine.arguments.contains("--black-hole-smoke") {
             mode = .schwarzschild
         } else if CommandLine.arguments.contains("--volume-smoke") {
             mode = .volumeSmoke
+        }
+        compileEquation()
+    }
+
+    func scalarParameter(_ name: String, fallback: Float = 0) -> Float {
+        liveParameters.first(where: { $0.name == name })?.value ?? fallback
+    }
+
+    func parameterValuesInCompilerOrder() -> [Float] {
+        compiledParameterNames.map { scalarParameter($0) }
+    }
+
+    func updateParameter(id: String, value: Float) {
+        guard let index = liveParameters.firstIndex(where: { $0.id == id }) else { return }
+        liveParameters[index].value = min(max(value, liveParameters[index].minimum), liveParameters[index].maximum)
+        accumulationResetToken &+= 1
+    }
+
+    func selectScalarPreset(_ id: String) {
+        guard let preset = ScalarPreset.builtins.first(where: { $0.id == id }) else { return }
+        scalarPresetId = preset.id
+        equationSource = preset.equation
+        liveParameters = preset.parameters
+        mode = .wave
+        compileEquation()
+    }
+
+    func compileEquation() {
+        do {
+            let compiled = try ScalarEquationCompiler.compile(equationSource)
+            let old = Dictionary(uniqueKeysWithValues: liveParameters.map { ($0.name, $0) })
+            let preset = ScalarPreset.builtins.first(where: { $0.id == scalarPresetId })
+            let defaults = Dictionary(uniqueKeysWithValues: (preset?.parameters ?? []).map { ($0.name, $0) })
+            liveParameters = compiled.parameterNames.map { name in
+                old[name] ?? defaults[name] ?? LiveParameter(
+                    name: name, value: 1, minimum: -10, maximum: 10, units: "scalar")
+            }
+            compiledMetalSource = compiled.metalSource
+            compiledParameterNames = compiled.parameterNames
+            compiledSourceHash = compiled.sourceHash
+            if mode == .wave {
+                executionGraph = .builtIn(for: .wave, scalarEquation: equationSource)
+            }
+            compileRevision &+= 1
+            accumulationResetToken &+= 1
+            equationStatus = "Compiling GPU pipeline..."
+        } catch {
+            equationStatus = error.localizedDescription
+        }
+    }
+
+    func reportPipelineResult(revision: UInt64, error: Error?) {
+        guard revision == compileRevision else { return }
+        equationStatus = error.map { "GPU compile failed: \($0.localizedDescription)" } ??
+            "GPU pipeline active · \(compiledParameterNames.count) live parameter\(compiledParameterNames.count == 1 ? "" : "s")"
+    }
+
+    func reportFrame(_ telemetry: VulkaxFrameTelemetry) {
+        guard telemetry.framePresented != 0 else { return }
+        runtimeStatus = String(
+            format: "Metal · %.2f ms GPU · %u in flight · %u history",
+            telemetry.simulationMilliseconds + telemetry.renderingMilliseconds,
+            telemetry.framesInFlight,
+            telemetry.historySamples)
+    }
+
+    func newProject() {
+        projectName = "Untitled Physics"
+        projectURL = nil
+        time = 0
+        playing = true
+        selectScalarPreset("wave-field")
+    }
+
+    func saveProject() {
+        if let projectURL {
+            saveProject(to: projectURL)
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "vxp") ?? .json]
+        panel.nameFieldStringValue = projectName.replacingOccurrences(of: " ", with: "-") + ".vxp"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        saveProject(to: url)
+    }
+
+    func openProject() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "vxp") ?? .json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let project = try PhysicsProjectIO.load(from: url)
+            projectName = project.name
+            projectURL = url
+            scalarPresetId = project.preset
+            mode = Self.mode(for: project.visualization)
+            executionGraph = project.graph
+            if let path = project.obstacleMeshPath {
+                let meshURL = URL(fileURLWithPath: path, relativeTo: url.deletingLastPathComponent())
+                    .standardizedFileURL
+                try loadObstacleMesh(from: meshURL)
+            }
+            equationSource = project.expression
+            time = project.timelineSeconds
+            compileEquation()
+            for (name, value) in project.parameters {
+                switch name {
+                case "black_hole_mass": blackHoleMass = value
+                case "disk_gain": diskGain = value
+                case "camera_scale": cameraScale = value
+                case "smoke_buoyancy": smokeBuoyancy = value
+                case "smoke_turbulence": smokeTurbulence = value
+                case "volume_extinction": volumeExtinction = value
+                case "volume_emission": volumeEmission = value
+                default: updateParameter(id: name, value: value)
+                }
+            }
+            equationStatus = "Opened \(url.lastPathComponent)"
+        } catch {
+            equationStatus = "Open failed: \(error.localizedDescription)"
+        }
+    }
+
+    func importObstacleMesh() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "obj") ?? .data]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try loadObstacleMesh(from: url)
+            mode = .volumeSmoke
+            equationStatus = "GPU obstacle active: \(url.lastPathComponent)"
+        } catch {
+            equationStatus = "Mesh import failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func loadObstacleMesh(from url: URL) throws {
+        obstacleMesh = try ImportedObstacleMesh.loadOBJ(from: url)
+        obstacleMeshURL = url
+        obstacleMeshRevision &+= 1
+        accumulationResetToken &+= 1
+    }
+
+    private func saveProject(to url: URL) {
+        do {
+            let project = PhysicsProjectFile(
+                name: projectName,
+                preset: scalarPresetId,
+                visualization: Self.key(for: mode),
+                expression: equationSource,
+                timelineSeconds: time,
+                parameters: projectParameters(),
+                graph: executionGraph,
+                obstacleMeshPath: obstacleMeshURL?.path)
+            try PhysicsProjectIO.save(project, to: url)
+            projectURL = url
+            equationStatus = "Saved \(url.lastPathComponent)"
+        } catch {
+            equationStatus = "Save failed: \(error.localizedDescription)"
+        }
+    }
+
+    private static func key(for mode: VisualizerMode) -> String {
+        switch mode {
+        case .wave: return "scalar-field"
+        case .schwarzschild: return "relativity"
+        case .volumeSmoke: return "volume"
+        }
+    }
+
+    private func projectParameters() -> [String: Float] {
+        var values = Dictionary(uniqueKeysWithValues: liveParameters.map { ($0.name, $0.value) })
+        values["black_hole_mass"] = blackHoleMass
+        values["disk_gain"] = diskGain
+        values["camera_scale"] = cameraScale
+        values["smoke_buoyancy"] = smokeBuoyancy
+        values["smoke_turbulence"] = smokeTurbulence
+        values["volume_extinction"] = volumeExtinction
+        values["volume_emission"] = volumeEmission
+        return values
+    }
+
+    private static func mode(for key: String) -> VisualizerMode {
+        switch key {
+        case "relativity": return .schwarzschild
+        case "volume": return .volumeSmoke
+        default: return .wave
         }
     }
 }
@@ -386,6 +595,104 @@ kernel void seedMacFields(
     density.write(half4(half(emitter * 0.45), 0.0h, 0.0h, 1.0h), cell);
     temperature.write(half4(half(emitter), 0.0h, 0.0h, 1.0h), cell);
     obstacles.write(half4(half(obstacle ? 1.0 : 0.0), 0.0h, 0.0h, 1.0h), cell);
+}
+
+struct RigidMeshState {
+    float4 position;
+    float4 velocity;
+};
+
+bool rayIntersectsTriangle(float3 origin, float3 a, float3 b, float3 c) {
+    const float3 direction = float3(1.0, 0.0, 0.0);
+    const float3 edge1 = b - a;
+    const float3 edge2 = c - a;
+    const float3 h = cross(direction, edge2);
+    const float determinant = dot(edge1, h);
+    if (abs(determinant) < 1e-7) return false;
+    const float inverse = 1.0 / determinant;
+    const float3 s = origin - a;
+    const float u = inverse * dot(s, h);
+    if (u < 0.0 || u > 1.0) return false;
+    const float3 q = cross(s, edge1);
+    const float v = inverse * dot(direction, q);
+    if (v < 0.0 || u + v > 1.0) return false;
+    return inverse * dot(edge2, q) > 1e-6;
+}
+
+float triangleSolidAngle(float3 point, float3 a, float3 b, float3 c) {
+    const float3 va = a - point;
+    const float3 vb = b - point;
+    const float3 vc = c - point;
+    const float numerator = dot(va, cross(vb, vc));
+    const float denominator = length(va) * length(vb) * length(vc) +
+        dot(va, vb) * length(vc) + dot(vb, vc) * length(va) + dot(vc, va) * length(vb);
+    return 2.0 * atan2(numerator, denominator);
+}
+
+kernel void voxelizeObstacleMesh(
+    texture3d<half, access::write> obstacles [[texture(0)]],
+    device const packed_float4* vertices [[buffer(0)]],
+    device const uint* indices [[buffer(1)]],
+    device const RigidMeshState* body [[buffer(2)]],
+    constant uint& triangleCount [[buffer(3)]],
+    device atomic_uint* occupiedCells [[buffer(4)]],
+    uint3 cell [[thread_position_in_grid]]) {
+    if (cell.x >= obstacles.get_width() || cell.y >= obstacles.get_height() || cell.z >= obstacles.get_depth()) return;
+    const float3 point = (float3(cell) + 0.5) /
+        float3(obstacles.get_width(), obstacles.get_height(), obstacles.get_depth());
+    float winding = 0.0;
+    for (uint triangle = 0; triangle < triangleCount; ++triangle) {
+        const uint base = triangle * 3;
+        const float3 a = vertices[indices[base]].xyz + body[0].position.xyz;
+        const float3 b = vertices[indices[base + 1]].xyz + body[0].position.xyz;
+        const float3 c = vertices[indices[base + 2]].xyz + body[0].position.xyz;
+        winding += abs(triangleSolidAngle(point, a, b, c));
+    }
+    const bool solid = cell.y == 0 || winding > 2.0 * M_PI_F;
+    if (solid) atomic_fetch_add_explicit(occupiedCells, 1u, memory_order_relaxed);
+    obstacles.write(half4(half(solid ? 1.0 : 0.0), 0.0h, 0.0h, 1.0h), cell);
+}
+
+kernel void computeObstaclePressureForces(
+    texture3d<half, access::read> pressure [[texture(0)]],
+    device const packed_float4* vertices [[buffer(0)]],
+    device const uint* indices [[buffer(1)]],
+    device const RigidMeshState* body [[buffer(2)]],
+    device packed_float4* forces [[buffer(3)]],
+    device packed_float4* torques [[buffer(4)]],
+    constant uint& triangleCount [[buffer(5)]],
+    uint triangle [[thread_position_in_grid]]) {
+    if (triangle >= triangleCount) return;
+    const uint base = triangle * 3;
+    const float3 offset = body[0].position.xyz;
+    const float3 a = vertices[indices[base]].xyz + offset;
+    const float3 b = vertices[indices[base + 1]].xyz + offset;
+    const float3 c = vertices[indices[base + 2]].xyz + offset;
+    const float3 areaNormal = 0.5 * cross(b - a, c - a);
+    const float3 centroid = (a + b + c) / 3.0;
+    const int3 dimensions = int3(pressure.get_width(), pressure.get_height(), pressure.get_depth());
+    const int3 cell = clamp(int3(centroid * float3(dimensions)), int3(0), dimensions - 1);
+    const float localPressure = float(pressure.read(uint3(cell)).r);
+    const float3 force = -localPressure * areaNormal;
+    forces[triangle] = packed_float4(force, 0.0);
+    torques[triangle] = packed_float4(cross(centroid - (float3(0.66, 0.30, 0.50) + offset), force), 0.0);
+}
+
+kernel void integrateObstacleBody(
+    device RigidMeshState* body [[buffer(0)]],
+    device const packed_float4* forces [[buffer(1)]],
+    constant uint& triangleCount [[buffer(2)]],
+    constant float& dt [[buffer(3)]],
+    uint index [[thread_position_in_grid]]) {
+    if (index != 0) return;
+    float3 totalForce = float3(0.0);
+    for (uint triangle = 0; triangle < triangleCount; ++triangle) totalForce += forces[triangle].xyz;
+    float3 velocity = body[0].velocity.xyz + totalForce * max(dt, 1e-4) / 2.0;
+    velocity *= 0.998;
+    float3 position = body[0].position.xyz + velocity * max(dt, 1e-4);
+    position = clamp(position, float3(-0.20, -0.20, -0.20), float3(0.20, 0.35, 0.20));
+    body[0].velocity = float4(velocity, 0.0);
+    body[0].position = float4(position, 0.0);
 }
 
 kernel void advectMacVelocity(
@@ -1462,6 +1769,115 @@ private func runNativeGpuSmoke(
     }
 }
 
+private func runImportedMeshGpuSmoke(path: String) -> Bool {
+    guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return false }
+    do {
+        let mesh = try ImportedObstacleMesh.loadOBJ(from: URL(fileURLWithPath: path))
+        let library = try device.makeLibrary(source: waveShader, options: nil)
+        guard let voxelFunction = library.makeFunction(name: "voxelizeObstacleMesh"),
+              let forceFunction = library.makeFunction(name: "computeObstaclePressureForces"),
+              let integrateFunction = library.makeFunction(name: "integrateObstacleBody"),
+              let clearFunction = library.makeFunction(name: "clearScalarVolume") else { return false }
+        let voxelPipeline = try device.makeComputePipelineState(function: voxelFunction)
+        let forcePipeline = try device.makeComputePipelineState(function: forceFunction)
+        let integratePipeline = try device.makeComputePipelineState(function: integrateFunction)
+        let clearPipeline = try device.makeComputePipelineState(function: clearFunction)
+        let descriptor = MTLTextureDescriptor()
+        descriptor.textureType = .type3D
+        descriptor.pixelFormat = .r16Float
+        descriptor.width = 32
+        descriptor.height = 32
+        descriptor.depth = 32
+        descriptor.usage = [.shaderRead, .shaderWrite]
+        descriptor.storageMode = .private
+        guard let obstacles = device.makeTexture(descriptor: descriptor),
+              let pressure = device.makeTexture(descriptor: descriptor) else { return false }
+        let vertices = mesh.vertices.withUnsafeBytes { bytes in
+            device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+        }
+        let indices = mesh.indices.withUnsafeBytes { bytes in
+            device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+        }
+        let bodyValues = [SIMD4<Float>(0, 0, 0, 0), SIMD4<Float>(0.04, 0, 0, 0)]
+        let body = bodyValues.withUnsafeBytes { bytes in
+            device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+        }
+        var triangleCount = UInt32(mesh.indices.count / 3)
+        let forceBytes = Int(triangleCount) * MemoryLayout<SIMD4<Float>>.stride
+        guard let vertices, let indices, let body,
+              let forces = device.makeBuffer(length: forceBytes, options: .storageModePrivate),
+              let torques = device.makeBuffer(length: forceBytes, options: .storageModePrivate),
+              let occupied = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared),
+              let command = queue.makeCommandBuffer() else { return false }
+        occupied.contents().bindMemory(to: UInt32.self, capacity: 1)[0] = 0
+        let dispatch3D = { (encoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState) in
+            encoder.setComputePipelineState(pipeline)
+            encoder.dispatchThreadgroups(MTLSize(width: 8, height: 8, depth: 8),
+                                          threadsPerThreadgroup: MTLSize(width: 4, height: 4, depth: 4))
+        }
+        for texture in [obstacles, pressure] {
+            guard let clear = command.makeComputeCommandEncoder() else { return false }
+            clear.setTexture(texture, index: 0)
+            dispatch3D(clear, clearPipeline)
+            clear.endEncoding()
+        }
+        guard let voxel = command.makeComputeCommandEncoder() else { return false }
+        voxel.setTexture(obstacles, index: 0)
+        voxel.setBuffer(vertices, offset: 0, index: 0)
+        voxel.setBuffer(indices, offset: 0, index: 1)
+        voxel.setBuffer(body, offset: 0, index: 2)
+        voxel.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 3)
+        voxel.setBuffer(occupied, offset: 0, index: 4)
+        dispatch3D(voxel, voxelPipeline)
+        voxel.endEncoding()
+        guard let pressureForces = command.makeComputeCommandEncoder() else { return false }
+        pressureForces.setComputePipelineState(forcePipeline)
+        pressureForces.setTexture(pressure, index: 0)
+        pressureForces.setBuffer(vertices, offset: 0, index: 0)
+        pressureForces.setBuffer(indices, offset: 0, index: 1)
+        pressureForces.setBuffer(body, offset: 0, index: 2)
+        pressureForces.setBuffer(forces, offset: 0, index: 3)
+        pressureForces.setBuffer(torques, offset: 0, index: 4)
+        pressureForces.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 5)
+        pressureForces.dispatchThreads(MTLSize(width: Int(triangleCount), height: 1, depth: 1),
+                                       threadsPerThreadgroup: MTLSize(width: min(64, Int(triangleCount)), height: 1, depth: 1))
+        pressureForces.endEncoding()
+        guard let integrate = command.makeComputeCommandEncoder() else { return false }
+        var timestep: Float = 1.0 / 30.0
+        integrate.setComputePipelineState(integratePipeline)
+        integrate.setBuffer(body, offset: 0, index: 0)
+        integrate.setBuffer(forces, offset: 0, index: 1)
+        integrate.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 2)
+        integrate.setBytes(&timestep, length: MemoryLayout<Float>.stride, index: 3)
+        integrate.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1),
+                                  threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+        integrate.endEncoding()
+        command.commit()
+        command.waitUntilCompleted()
+        guard command.status == .completed else { return false }
+        var occupancy = [UInt16](repeating: 0, count: 32 * 32 * 32)
+        occupancy.withUnsafeMutableBytes {
+            obstacles.getBytes($0.baseAddress!, bytesPerRow: 32 * MemoryLayout<UInt16>.stride,
+                               bytesPerImage: 32 * 32 * MemoryLayout<UInt16>.stride,
+                               from: MTLRegionMake3D(0, 0, 0, 32, 32, 32), mipmapLevel: 0, slice: 0)
+        }
+        let textureSolidCells = occupancy.reduce(0) { $0 + (Float16(bitPattern: $1) > 0.5 ? 1 : 0) }
+        let solidCells = Int(occupied.contents().bindMemory(to: UInt32.self, capacity: 1)[0])
+        let state = body.contents().bindMemory(to: SIMD4<Float>.self, capacity: 2)
+        let displacement = simd_length(SIMD3<Float>(state[0].x, state[0].y, state[0].z))
+        guard solidCells > 0, solidCells < occupancy.count, displacement > 0 else {
+            FileHandle.standardError.write(Data(
+                "Vulkax imported-mesh Metal validation failed: triangles=\(triangleCount) gpu_solid_cells=\(solidCells) texture_solid_cells=\(textureSolidCells) displacement=\(displacement)\n".utf8))
+            return false
+        }
+        print("Vulkax imported-mesh Metal GPU smoke passed: \(device.name) triangles=\(triangleCount) solid_cells=\(solidCells) displacement=\(displacement)")
+        return true
+    } catch {
+        FileHandle.standardError.write(Data("Vulkax imported-mesh Metal GPU smoke failed: \(error)\n".utf8))
+        return false
+    }
+}
+
 private func runGeneratedPhysicsIrGpuSmoke(shaderPath: String) -> Bool {
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
         FileHandle.standardError.write(Data("Vulkax Physics IR Metal smoke failed: no Metal device\n".utf8))
@@ -1527,7 +1943,12 @@ private func runGeneratedPhysicsIrGpuSmoke(shaderPath: String) -> Bool {
     }
 }
 
-final class MetalWaveRenderer: NSObject, MTKViewDelegate {
+private protocol GpuRuntimeBackend: AnyObject {
+    var runtimeCapabilities: VulkaxRuntimeCapabilities { get }
+    var latestTelemetry: VulkaxFrameTelemetry { get }
+}
+
+final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
     private weak var model: PhysicsModel?
     private let commandQueue: MTLCommandQueue
     private let displayPipeline: MTLRenderPipelineState
@@ -1536,6 +1957,9 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
     private let clearVectorVolumePipeline: MTLComputePipelineState
     private let seedMacPipeline: MTLComputePipelineState
     private let seedMacVelocityPipeline: MTLComputePipelineState
+    private let voxelizeObstaclePipeline: MTLComputePipelineState
+    private let obstaclePressurePipeline: MTLComputePipelineState
+    private let integrateObstaclePipeline: MTLComputePipelineState
     private let reduceMacMaximumSpeedPipeline: MTLComputePipelineState
     private let finalizeMacCflPipeline: MTLComputePipelineState
     private let velocitySimulationPipeline: MTLComputePipelineState
@@ -1551,6 +1975,11 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
     private let curlPipeline: MTLComputePipelineState
     private let volumeRenderPipeline: MTLComputePipelineState
     private let accumulationPipeline: MTLComputePipelineState
+    private let pipelineCompilationQueue = DispatchQueue(label: "vulkax.metal-equation-compiler", qos: .userInitiated)
+    private let pipelineLock = NSLock()
+    private var compiledEquationPipeline: MTLComputePipelineState?
+    private var activeEquationRevision: UInt64 = 0
+    private var pendingEquationRevision: UInt64 = 0
     private var hdrRadiance: MTLTexture?
     private var accumulationRadiance: [MTLTexture] = []
     private var activeAccumulationRadiance = 0
@@ -1576,14 +2005,33 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
     private var volumeCurl: MTLTexture?
     private var volumeScalarScratch: [MTLTexture] = []
     private var volumeCflControl: MTLBuffer?
+    private var obstacleVertices: MTLBuffer?
+    private var obstacleIndices: MTLBuffer?
+    private var obstacleForces: MTLBuffer?
+    private var obstacleTorques: MTLBuffer?
+    private var obstacleBody: MTLBuffer?
+    private var obstacleOccupancy: MTLBuffer?
+    private var obstacleTriangleCount: UInt32 = 0
+    private var activeObstacleRevision: UInt64 = .max
     private var volumeInitialized = false
     private var lastTime = CACurrentMediaTime()
     private let inFlightFrames = DispatchSemaphore(value: 3)
+    private var frameIndex: UInt64 = 0
+    private var lastResetToken: UInt32 = 0
+    private(set) var latestTelemetry = VulkaxFrameTelemetry()
+    let runtimeCapabilities: VulkaxRuntimeCapabilities
 
     init?(view: MTKView, model: PhysicsModel) {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return nil }
         self.model = model
         self.commandQueue = queue
+        var capabilities = VulkaxRuntimeCapabilities()
+        capabilities.abiVersion = VULKAX_RUNTIME_ABI_VERSION
+        capabilities.backend = UInt32(VULKAX_RUNTIME_BACKEND_METAL.rawValue)
+        capabilities.maximumFramesInFlight = 3
+        capabilities.gpuResidentHdr = 1
+        capabilities.asynchronousSubmission = 1
+        self.runtimeCapabilities = capabilities
         do {
             let library = try device.makeLibrary(source: waveShader, options: nil)
             let descriptor = MTLRenderPipelineDescriptor()
@@ -1597,6 +2045,9 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
                   let clearVectorVolume = library.makeFunction(name: "clearVectorVolume"),
                   let seedMac = library.makeFunction(name: "seedMacFields"),
                   let seedMacVelocity = library.makeFunction(name: "seedMacVelocity"),
+                  let voxelizeObstacle = library.makeFunction(name: "voxelizeObstacleMesh"),
+                  let obstaclePressure = library.makeFunction(name: "computeObstaclePressureForces"),
+                  let integrateObstacle = library.makeFunction(name: "integrateObstacleBody"),
                   let reduceMacMaximumSpeed = library.makeFunction(name: "reduceMacMaximumSpeed"),
                   let finalizeMacCfl = library.makeFunction(name: "finalizeMacCfl"),
                   let velocitySimulation = library.makeFunction(name: "advectMacVelocity"),
@@ -1617,6 +2068,9 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
             self.clearVectorVolumePipeline = try device.makeComputePipelineState(function: clearVectorVolume)
             self.seedMacPipeline = try device.makeComputePipelineState(function: seedMac)
             self.seedMacVelocityPipeline = try device.makeComputePipelineState(function: seedMacVelocity)
+            self.voxelizeObstaclePipeline = try device.makeComputePipelineState(function: voxelizeObstacle)
+            self.obstaclePressurePipeline = try device.makeComputePipelineState(function: obstaclePressure)
+            self.integrateObstaclePipeline = try device.makeComputePipelineState(function: integrateObstacle)
             self.reduceMacMaximumSpeedPipeline = try device.makeComputePipelineState(function: reduceMacMaximumSpeed)
             self.finalizeMacCflPipeline = try device.makeComputePipelineState(function: finalizeMacCfl)
             self.velocitySimulationPipeline = try device.makeComputePipelineState(function: velocitySimulation)
@@ -1643,9 +2097,53 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
         view.enableSetNeedsDisplay = false
         view.isPaused = false
         view.preferredFramesPerSecond = 60
+        scheduleEquationPipeline(device: device, model: model)
     }
 
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        hdrRadiance = nil
+        accumulationRadiance = []
+        accumulationSamples = 0
+        accumulatedMode = nil
+        accumulationSignature = nil
+        model?.accumulationResetToken &+= 1
+    }
+
+    private func scheduleEquationPipeline(device: MTLDevice, model: PhysicsModel) {
+        let revision = model.compileRevision
+        let source = model.compiledMetalSource
+        let sourceHash = model.compiledSourceHash
+        guard revision != 0, !source.isEmpty else { return }
+        pipelineLock.lock()
+        let needsCompilation = revision != activeEquationRevision && revision != pendingEquationRevision
+        if needsCompilation { pendingEquationRevision = revision }
+        pipelineLock.unlock()
+        guard needsCompilation else { return }
+        pipelineCompilationQueue.async { [weak self, weak model] in
+            do {
+                let pipeline = try MetalPipelineArtifactCache.shared.pipeline(
+                    device: device, source: source, sourceHash: sourceHash)
+                self?.pipelineLock.lock()
+                if self?.pendingEquationRevision == revision {
+                    self?.compiledEquationPipeline = pipeline
+                    self?.activeEquationRevision = revision
+                }
+                self?.pipelineLock.unlock()
+                DispatchQueue.main.async { model?.reportPipelineResult(revision: revision, error: nil) }
+            } catch {
+                self?.pipelineLock.lock()
+                if self?.pendingEquationRevision == revision { self?.pendingEquationRevision = 0 }
+                self?.pipelineLock.unlock()
+                DispatchQueue.main.async { model?.reportPipelineResult(revision: revision, error: error) }
+            }
+        }
+    }
+
+    private func activeScalarPipeline() -> MTLComputePipelineState? {
+        pipelineLock.lock()
+        defer { pipelineLock.unlock() }
+        return compiledEquationPipeline
+    }
 
     private func ensureHdrRadiance(_ size: CGSize, scale: CGFloat, device: MTLDevice) -> MTLTexture? {
         let width = max(1, Int(size.width * scale))
@@ -1754,6 +2252,93 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
         return true
     }
 
+    private func prepareObstacleMesh(device: MTLDevice, model: PhysicsModel) -> Bool {
+        guard activeObstacleRevision != model.obstacleMeshRevision else { return true }
+        activeObstacleRevision = model.obstacleMeshRevision
+        obstacleVertices = nil
+        obstacleIndices = nil
+        obstacleForces = nil
+        obstacleTorques = nil
+        obstacleBody = nil
+        obstacleOccupancy = nil
+        obstacleTriangleCount = 0
+        volumeInitialized = false
+        guard let mesh = model.obstacleMesh else { return true }
+        obstacleVertices = mesh.vertices.withUnsafeBytes { bytes in
+            guard let address = bytes.baseAddress else { return nil }
+            return device.makeBuffer(bytes: address, length: bytes.count, options: .storageModeShared)
+        }
+        obstacleIndices = mesh.indices.withUnsafeBytes { bytes in
+            guard let address = bytes.baseAddress else { return nil }
+            return device.makeBuffer(bytes: address, length: bytes.count, options: .storageModeShared)
+        }
+        obstacleTriangleCount = UInt32(mesh.indices.count / 3)
+        let vectorBytes = max(1, Int(obstacleTriangleCount)) * MemoryLayout<SIMD4<Float>>.stride
+        obstacleForces = device.makeBuffer(length: vectorBytes, options: .storageModePrivate)
+        obstacleTorques = device.makeBuffer(length: vectorBytes, options: .storageModePrivate)
+        let body = [SIMD4<Float>(0, 0, 0, 0), SIMD4<Float>(0.035, 0, 0, 0)]
+        obstacleBody = body.withUnsafeBytes { bytes in
+            guard let address = bytes.baseAddress else { return nil }
+            return device.makeBuffer(bytes: address, length: bytes.count, options: .storageModeShared)
+        }
+        obstacleOccupancy = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared)
+        return obstacleVertices != nil && obstacleIndices != nil && obstacleForces != nil &&
+            obstacleTorques != nil && obstacleBody != nil && obstacleOccupancy != nil
+    }
+
+    private func encodeObstacleVoxelization(
+        command: MTLCommandBuffer, obstacles: MTLTexture
+    ) -> Bool {
+        guard obstacleTriangleCount > 0,
+              let vertices = obstacleVertices, let indices = obstacleIndices,
+              let body = obstacleBody, let occupied = obstacleOccupancy,
+              let encoder = command.makeComputeCommandEncoder() else { return obstacleTriangleCount == 0 }
+        occupied.contents().bindMemory(to: UInt32.self, capacity: 1)[0] = 0
+        var triangleCount = obstacleTriangleCount
+        encoder.setTexture(obstacles, index: 0)
+        encoder.setBuffer(vertices, offset: 0, index: 0)
+        encoder.setBuffer(indices, offset: 0, index: 1)
+        encoder.setBuffer(body, offset: 0, index: 2)
+        encoder.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 3)
+        encoder.setBuffer(occupied, offset: 0, index: 4)
+        dispatch3D(encoder, pipeline: voxelizeObstaclePipeline, texture: obstacles)
+        encoder.endEncoding()
+        return true
+    }
+
+    private func encodeObstacleCoupling(
+        command: MTLCommandBuffer, pressure: MTLTexture, delta: Float
+    ) -> Bool {
+        guard obstacleTriangleCount > 0 else { return true }
+        guard let vertices = obstacleVertices, let indices = obstacleIndices,
+              let body = obstacleBody, let forces = obstacleForces, let torques = obstacleTorques,
+              let forceEncoder = command.makeComputeCommandEncoder() else { return false }
+        var triangleCount = obstacleTriangleCount
+        forceEncoder.setComputePipelineState(obstaclePressurePipeline)
+        forceEncoder.setTexture(pressure, index: 0)
+        forceEncoder.setBuffer(vertices, offset: 0, index: 0)
+        forceEncoder.setBuffer(indices, offset: 0, index: 1)
+        forceEncoder.setBuffer(body, offset: 0, index: 2)
+        forceEncoder.setBuffer(forces, offset: 0, index: 3)
+        forceEncoder.setBuffer(torques, offset: 0, index: 4)
+        forceEncoder.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 5)
+        forceEncoder.dispatchThreads(
+            MTLSize(width: Int(triangleCount), height: 1, depth: 1),
+            threadsPerThreadgroup: MTLSize(width: min(64, Int(triangleCount)), height: 1, depth: 1))
+        forceEncoder.endEncoding()
+        guard let integrate = command.makeComputeCommandEncoder() else { return false }
+        var timestep = max(delta, 1.0 / 240.0)
+        integrate.setComputePipelineState(integrateObstaclePipeline)
+        integrate.setBuffer(body, offset: 0, index: 0)
+        integrate.setBuffer(forces, offset: 0, index: 1)
+        integrate.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 2)
+        integrate.setBytes(&timestep, length: MemoryLayout<Float>.stride, index: 3)
+        integrate.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1),
+                                  threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+        integrate.endEncoding()
+        return true
+    }
+
     private func dispatch3D(_ encoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, texture: MTLTexture) {
         dispatch3D(encoder, pipeline: pipeline, width: texture.width, height: texture.height, depth: texture.depth)
     }
@@ -1774,36 +2359,58 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
         guard inFlightFrames.wait(timeout: .now()) == .success else { return }
         var submitted = false
         defer { if !submitted { inFlightFrames.signal() } }
-        let renderScale: CGFloat = model.mode == .schwarzschild ? 0.55 : 1.0
+        let isRelativity = model.executionGraph.contains("integrate_active_rays")
+        let isVolume = model.executionGraph.contains("volume_transport")
+        let isScalar = model.executionGraph.contains("evaluate_scalar_field")
+        let renderScale: CGFloat = isRelativity ? 0.55 : 1.0
         guard let radiance = ensureHdrRadiance(view.drawableSize, scale: renderScale, device: device) else { return }
         let now = CACurrentMediaTime()
         let delta = min(Float(now - lastTime), 1.0 / 20.0)
         lastTime = now
-        let accumulate = model.mode == .schwarzschild
+        scheduleEquationPipeline(device: device, model: model)
+        frameIndex &+= 1
+        let scalarParameters = model.parameterValuesInCompilerOrder()
+        var frameRequest = VulkaxFrameRequest()
+        frameRequest.abiVersion = VULKAX_RUNTIME_ABI_VERSION
+        frameRequest.visualization = UInt32(isScalar ? VULKAX_VISUALIZATION_SCALAR_FIELD.rawValue :
+            isRelativity ? VULKAX_VISUALIZATION_RELATIVITY.rawValue : VULKAX_VISUALIZATION_VOLUME.rawValue)
+        frameRequest.drawableWidth = UInt32(max(1, Int(view.drawableSize.width)))
+        frameRequest.drawableHeight = UInt32(max(1, Int(view.drawableSize.height)))
+        frameRequest.frameIndex = frameIndex
+        frameRequest.timelineSeconds = model.time
+        frameRequest.deltaSeconds = delta
+        frameRequest.renderScale = isRelativity ? 0.55 : 1.0
+        frameRequest.resetHistory = model.accumulationResetToken == lastResetToken ? 0 : 1
+        lastResetToken = model.accumulationResetToken
+        frameRequest.parameterCount = UInt32(scalarParameters.count)
+        frameRequest.parameterHash = model.compiledSourceHash
+        let accumulate = isRelativity
         let schwarzschildSignature = SIMD4<Float>(
             model.blackHoleMass, model.diskGain, model.cameraScale,
             Float(model.accumulationResetToken))
         let renderParameters: SIMD4<Float>
-        switch model.mode {
-        case .schwarzschild:
+        if isRelativity {
             renderParameters = schwarzschildSignature
-        case .volumeSmoke:
+        } else if isVolume {
             renderParameters = SIMD4(
                 model.smokeBuoyancy, model.smokeTurbulence,
                 model.volumeExtinction, model.volumeEmission)
-        case .wave:
+        } else {
             renderParameters = .zero
         }
         let resetAccumulation = accumulatedMode != model.mode || accumulationSignature != schwarzschildSignature
-        let uniforms = WaveUniforms(time: model.time, amplitude: model.amplitude, wavenumber: model.wavenumber,
-                                   angularFrequency: model.angularFrequency, width: Float(radiance.width),
+        let uniforms = WaveUniforms(time: model.time,
+                                   amplitude: model.scalarParameter("amplitude", fallback: 1),
+                                   wavenumber: model.scalarParameter("wavenumber", fallback: 2),
+                                   angularFrequency: model.scalarParameter("angular_frequency", fallback: 3),
+                                   width: Float(radiance.width),
                                    height: Float(radiance.height),
-                                   control: SIMD4(model.mode.rawValue, resetAccumulation ? 1 : 0,
+                                   control: SIMD4(isScalar ? 0 : (isRelativity ? 1 : 2), resetAccumulation ? 1 : 0,
                                                   Float(accumulationSamples), 0),
                                    renderParameters: renderParameters)
         var copy = uniforms
-        if model.mode == .volumeSmoke {
-            guard ensureVolumeSolver(device: device),
+        if isVolume {
+            guard ensureVolumeSolver(device: device), prepareObstacleMesh(device: device, model: model),
                   let divergence = volumeDivergence,
                   let postDivergence = volumePostDivergence,
                   let pressureResidual = volumePressureResidual,
@@ -1839,6 +2446,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
                 seed.setTexture(obstacles, index: 2)
                 dispatch3D(seed, pipeline: seedMacPipeline, texture: volumeDensity[activeVolumeDensity])
                 seed.endEncoding()
+                guard encodeObstacleVoxelization(command: command, obstacles: obstacles) else { return }
                 guard let seedVelocity = command.makeComputeCommandEncoder() else { return }
                 seedVelocity.setTexture(volumeFaceU[activeVolumeVelocity], index: 0)
                 seedVelocity.setTexture(volumeFaceV[activeVolumeVelocity], index: 1)
@@ -1969,6 +2577,10 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
             }
             activeVolumePressure = pressureSource
 
+            guard encodeObstacleCoupling(
+                command: command, pressure: volumePressure[activeVolumePressure], delta: copy.control.w),
+                  encodeObstacleVoxelization(command: command, obstacles: obstacles) else { return }
+
             guard let pressureResidualEncoder = command.makeComputeCommandEncoder() else { return }
             pressureResidualEncoder.setTexture(volumePressure[activeVolumePressure], index: 0)
             pressureResidualEncoder.setTexture(divergence, index: 1)
@@ -2064,9 +2676,18 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
             volumeRender.endEncoding()
         } else {
             guard let compute = command.makeComputeCommandEncoder() else { return }
-            compute.setComputePipelineState(simulationPipeline)
+            let scalarPipeline = isScalar ? activeScalarPipeline() : nil
+            compute.setComputePipelineState(scalarPipeline ?? simulationPipeline)
             compute.setTexture(radiance, index: 0)
             compute.setBytes(&copy, length: MemoryLayout<WaveUniforms>.stride, index: 0)
+            if scalarPipeline != nil {
+                let parameterBlock = scalarParameters.isEmpty ? [Float(0)] : scalarParameters
+                parameterBlock.withUnsafeBytes { bytes in
+                    if let address = bytes.baseAddress {
+                        compute.setBytes(address, length: bytes.count, index: 1)
+                    }
+                }
+            }
             let threads = MTLSize(width: 16, height: 16, depth: 1)
             let groups = MTLSize(width: (radiance.width + 15) / 16, height: (radiance.height + 15) / 16, depth: 1)
             compute.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
@@ -2104,7 +2725,23 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate {
         encoder.setFragmentBytes(&copy, length: MemoryLayout<WaveUniforms>.stride, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         encoder.endEncoding()
-        command.addCompletedHandler { [inFlightFrames] _ in inFlightFrames.signal() }
+        let submittedFrame = frameRequest
+        let submittedHistory = UInt32(accumulationSamples)
+        command.addCompletedHandler { [weak self, weak model, inFlightFrames] completed in
+            var telemetry = VulkaxFrameTelemetry()
+            telemetry.abiVersion = VULKAX_RUNTIME_ABI_VERSION
+            telemetry.backend = UInt32(VULKAX_RUNTIME_BACKEND_METAL.rawValue)
+            telemetry.frameIndex = submittedFrame.frameIndex
+            telemetry.simulationMilliseconds = max(0, completed.gpuEndTime - completed.gpuStartTime) * 1_000
+            telemetry.renderingMilliseconds = 0
+            telemetry.framesInFlight = 3
+            telemetry.historySamples = submittedHistory
+            telemetry.frameSubmitted = 1
+            telemetry.framePresented = completed.status == .completed ? 1 : 0
+            self?.latestTelemetry = telemetry
+            DispatchQueue.main.async { model?.reportFrame(telemetry) }
+            inFlightFrames.signal()
+        }
         command.present(drawable)
         command.commit()
         submitted = true
@@ -2132,22 +2769,62 @@ struct ContentView: View {
     @StateObject private var model = PhysicsModel()
 
     var body: some View {
-        HSplitView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("VULKAX").font(.system(size: 24, weight: .bold, design: .rounded)).foregroundStyle(.mint)
-                Text("PHYSICS STUDIO").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Divider()
-                Text("DIRECT GPU VIEWPORT").font(.caption.weight(.bold)).foregroundStyle(.secondary)
-                Label("CAMetalLayer presentation", systemImage: "display")
-                Label("Metal compute plus HDR presentation", systemImage: "cpu")
-                Label("No CPU image bridge", systemImage: "bolt.fill")
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("VULKAX").font(.system(size: 20, weight: .bold, design: .rounded)).foregroundStyle(.mint)
+                TextField("Project name", text: $model.projectName)
+                    .textFieldStyle(.plain)
+                    .font(.headline)
+                    .frame(maxWidth: 280)
+                Divider().frame(height: 22)
+                Button { model.newProject() } label: { Label("New", systemImage: "doc.badge.plus") }
+                Button { model.openProject() } label: { Label("Open", systemImage: "folder") }
+                Button { model.saveProject() } label: { Label("Save", systemImage: "square.and.arrow.down") }
                 Spacer()
+                Text(model.runtimeStatus).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
-            .frame(minWidth: 210, idealWidth: 230)
-            .padding(20)
-            .background(Color(red: 0.045, green: 0.07, blue: 0.12))
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 16)
+            .frame(height: 48)
+            .background(Color(red: 0.035, green: 0.05, blue: 0.075))
 
-            VStack(spacing: 0) {
+            HSplitView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("SCENE").font(.caption.bold()).foregroundStyle(.secondary)
+                    Picker("Visualization", selection: $model.mode) {
+                        ForEach(VisualizerMode.allCases) { mode in Text(mode.title).tag(mode) }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.radioGroup)
+                    Divider()
+                    Text("TIMELINE").font(.caption.bold()).foregroundStyle(.secondary)
+                    HStack {
+                        Button {
+                            model.playing.toggle()
+                        } label: {
+                            Image(systemName: model.playing ? "pause.fill" : "play.fill")
+                        }
+                        .help(model.playing ? "Pause" : "Play")
+                        Button {
+                            model.time = 0
+                            model.accumulationResetToken &+= 1
+                        } label: {
+                            Image(systemName: "backward.end.fill")
+                        }
+                        .help("Reset timeline")
+                    }
+                    Slider(value: $model.time, in: 0...12) { editing in
+                        if editing { model.playing = false }
+                        model.accumulationResetToken &+= 1
+                    }
+                    Text(String(format: "%.3f s", model.time)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .frame(minWidth: 190, idealWidth: 210)
+                .padding(16)
+                .background(Color(red: 0.045, green: 0.07, blue: 0.12))
+
+                VStack(spacing: 0) {
                 MetalWaveView(model: model)
                     .overlay(alignment: .topLeading) {
                         Text(model.playing ? "LIVE GPU" : "PAUSED")
@@ -2155,48 +2832,63 @@ struct ContentView: View {
                             .padding(8).background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 4))
                             .padding(14)
                     }
-                HStack {
-                    Button(model.playing ? "Pause" : "Play") { model.playing.toggle() }
-                    Button("Reset") {
-                        model.time = 0
-                        model.accumulationResetToken &+= 1
-                    }
-                    Spacer()
-                    Text(String(format: "t = %.2f s", model.time)).monospacedDigit().foregroundStyle(.secondary)
-                }.padding(14).background(.thinMaterial)
-            }
-            .frame(minWidth: 640, minHeight: 540)
+                }
+                .frame(minWidth: 620, minHeight: 540)
 
-            VStack(alignment: .leading, spacing: 18) {
-                Picker("Visualization", selection: $model.mode) {
-                    ForEach(VisualizerMode.allCases) { mode in Text(mode.title).tag(mode) }
-                }.pickerStyle(.segmented)
-                Text(model.mode == .wave ? "WAVE FIELD" : model.mode == .schwarzschild ? "SCHWARZSCHILD LENSING" : "3D VOLUME SMOKE").font(.headline)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("INSPECTOR").font(.caption.bold()).foregroundStyle(.secondary)
                 if model.mode == .wave {
-                    parameter("Amplitude", value: $model.amplitude, range: 0...4)
-                    parameter("Wavenumber", value: $model.wavenumber, range: 0.1...18)
-                    parameter("Frequency", value: $model.angularFrequency, range: 0.1...18)
+                            Picker("Preset", selection: Binding(
+                                get: { model.scalarPresetId },
+                                set: { model.selectScalarPreset($0) })) {
+                                ForEach(ScalarPreset.builtins) { preset in Text(preset.title).tag(preset.id) }
+                            }
+                            Text("EQUATION").font(.caption.bold()).foregroundStyle(.secondary)
+                            TextEditor(text: $model.equationSource)
+                                .font(.system(.body, design: .monospaced))
+                                .frame(minHeight: 118)
+                                .padding(6)
+                                .background(Color.black.opacity(0.28))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                            HStack {
+                                Button { model.compileEquation() } label: {
+                                    Label("Compile", systemImage: "hammer.fill")
+                                }
+                                Spacer()
+                                Text(String(model.compiledSourceHash, radix: 16).prefix(8))
+                                    .font(.caption.monospaced()).foregroundStyle(.secondary)
+                            }
+                            Text(model.equationStatus)
+                                .font(.caption)
+                                .foregroundStyle(model.equationStatus.contains("failed") || model.equationStatus.contains("Column") ? .red : .secondary)
+                            Divider()
+                            ForEach(model.liveParameters) { value in
+                                parameter(value)
+                            }
                 } else if model.mode == .schwarzschild {
                     parameter("Mass", value: $model.blackHoleMass, range: 0.25...1.6)
                     parameter("Disk gain", value: $model.diskGain, range: 0...4)
                     parameter("Camera scale", value: $model.cameraScale, range: 0.5...2.0)
-                    Text("GPU 3D Schwarzschild RK4 with disk-plane crossings").font(.subheadline).foregroundStyle(.secondary)
-                    Text("Progressive subpixel rays reset after a lens parameter change").font(.subheadline).foregroundStyle(.secondary)
                 } else {
+                    Button { model.importObstacleMesh() } label: {
+                        Label("Import obstacle", systemImage: "cube.transparent")
+                    }
+                    .help("Import an OBJ mesh for GPU voxelization and fluid coupling")
+                    Text(model.obstacleMeshURL?.lastPathComponent ?? "No mesh obstacle")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
                     parameter("Buoyancy", value: $model.smokeBuoyancy, range: 0...3)
                     parameter("Turbulence", value: $model.smokeTurbulence, range: 0...3)
                     parameter("Extinction", value: $model.volumeExtinction, range: 0.1...5)
                     parameter("Emission", value: $model.volumeEmission, range: 0...3)
-                    Text("GPU-resident 64 x 96 x 64 staggered MAC grid").font(.subheadline).foregroundStyle(.secondary)
-                    Text("RK2/MacCormack transport, two-level multigrid, and HDR ray marching").font(.subheadline).foregroundStyle(.secondary)
                 }
-                Spacer()
-                Text("The displayed radiance is computed at backing resolution, held in RGBA16Float, then tone-mapped into the Metal drawable.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(16)
+                }
+                .frame(minWidth: 280, idealWidth: 330)
+                .background(Color(red: 0.045, green: 0.07, blue: 0.12))
             }
-            .frame(minWidth: 260, idealWidth: 300)
-            .padding(20)
-            .background(Color(red: 0.045, green: 0.07, blue: 0.12))
         }
         .frame(minWidth: 1120, minHeight: 720)
         .preferredColorScheme(.dark)
@@ -2208,10 +2900,30 @@ struct ContentView: View {
             Slider(value: value, in: range)
         }
     }
+
+    @ViewBuilder private func parameter(_ parameter: LiveParameter) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(parameter.name.replacingOccurrences(of: "_", with: " ").capitalized)
+                    .font(.subheadline.weight(.medium))
+                Spacer()
+                Text(String(format: "%.3f", parameter.value)).monospacedDigit().foregroundStyle(.secondary)
+            }
+            Slider(
+                value: Binding(
+                    get: { model.liveParameters.first(where: { $0.id == parameter.id })?.value ?? parameter.value },
+                    set: { model.updateParameter(id: parameter.id, value: $0) }),
+                in: parameter.minimum...parameter.maximum)
+        }
+    }
 }
 
 @main struct VulkaxPhysicsStudioMacApp: App {
     init() {
+        if let option = CommandLine.arguments.firstIndex(of: "--native-imported-mesh-gpu-smoke") {
+            guard option + 1 < CommandLine.arguments.count else { exit(EXIT_FAILURE) }
+            exit(runImportedMeshGpuSmoke(path: CommandLine.arguments[option + 1]) ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
         if let option = CommandLine.arguments.firstIndex(of: "--native-physics-ir-gpu-smoke") {
             guard option + 1 < CommandLine.arguments.count else {
                 FileHandle.standardError.write(Data("--native-physics-ir-gpu-smoke requires an MSL path\n".utf8))
@@ -2228,6 +2940,9 @@ struct ContentView: View {
         }
         if CommandLine.arguments.contains("--native-volume-gpu-smoke") {
             exit(runNativeGpuSmoke(volume: true) ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
+        if CommandLine.arguments.contains("--native-dynamic-equation-project-gpu-smoke") {
+            exit(runDynamicEquationProjectGpuSmoke() ? EXIT_SUCCESS : EXIT_FAILURE)
         }
     }
 

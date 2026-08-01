@@ -144,12 +144,12 @@ double gaussian(double wavelength, double mean, double leftWidth, double rightWi
 
 std::array<double, 3> cieApproximation(double wavelengthNanometres) {
   const double x = 1.056 * gaussian(wavelengthNanometres, 599.8, 37.9, 31.0) +
-      0.362 * gaussian(wavelengthNanometres, 442.0, 16.0, 26.7) -
-      0.065 * gaussian(wavelengthNanometres, 501.1, 20.4, 26.2);
+                   0.362 * gaussian(wavelengthNanometres, 442.0, 16.0, 26.7) -
+                   0.065 * gaussian(wavelengthNanometres, 501.1, 20.4, 26.2);
   const double y = 0.821 * gaussian(wavelengthNanometres, 568.8, 46.9, 40.5) +
-      0.286 * gaussian(wavelengthNanometres, 530.9, 16.3, 31.1);
+                   0.286 * gaussian(wavelengthNanometres, 530.9, 16.3, 31.1);
   const double z = 1.217 * gaussian(wavelengthNanometres, 437.0, 11.8, 36.0) +
-      0.681 * gaussian(wavelengthNanometres, 459.0, 26.0, 13.8);
+                   0.681 * gaussian(wavelengthNanometres, 459.0, 26.0, 13.8);
   return {std::max(0.0, x), std::max(0.0, y), std::max(0.0, z)};
 }
 
@@ -158,7 +158,63 @@ double planckFrequencyRadiance(double wavelengthMetres, double temperatureKelvin
   const double exponent = kPlanck * frequency / (kBoltzmann * temperatureKelvin);
   if (exponent > 700.0) return 0.0;
   return 2.0 * kPlanck * frequency * frequency * frequency /
-      (kLightSpeed * kLightSpeed * std::expm1(exponent));
+         (kLightSpeed * kLightSpeed * std::expm1(exponent));
+}
+
+State equatorRoot(
+    const KerrGeodesicConfig& config,
+    const KerrConstants& constants,
+    const State& start,
+    double radialSign,
+    double polarSign,
+    double step) {
+  double low = 0.0;
+  double high = 1.0;
+  const double startValue = start.polar - 0.5 * kPi;
+  State best = start;
+  for (uint32_t iteration = 0; iteration < 40; ++iteration) {
+    const double fraction = 0.5 * (low + high);
+    best = rk4(config, constants, start, radialSign, polarSign, step * fraction);
+    double ignoredSign = polarSign;
+    normalizePolar(best, ignoredSign);
+    const double value = best.polar - 0.5 * kPi;
+    if ((startValue <= 0.0 && value <= 0.0) || (startValue >= 0.0 && value >= 0.0)) {
+      low = fraction;
+    } else {
+      high = fraction;
+    }
+  }
+  return best;
+}
+
+State radiusRoot(
+    const KerrGeodesicConfig& config,
+    const KerrConstants& constants,
+    const State& start,
+    double radialSign,
+    double polarSign,
+    double step,
+    double targetRadius) {
+  double low = 0.0;
+  double high = 1.0;
+  State best = start;
+  for (uint32_t iteration = 0; iteration < 40; ++iteration) {
+    const double fraction = 0.5 * (low + high);
+    best = rk4(config, constants, start, radialSign, polarSign, step * fraction);
+    if (best.radius > targetRadius)
+      low = fraction;
+    else
+      high = fraction;
+  }
+  return best;
+}
+
+void appendIntersection(KerrRayResult& result, const KerrIntersection& intersection) {
+  if (result.intersectionCount < result.intersections.size()) {
+    result.intersections[result.intersectionCount++] = intersection;
+  } else {
+    ++result.droppedIntersections;
+  }
 }
 
 }  // namespace
@@ -174,11 +230,11 @@ double kerrProgradeIscoRadius(double mass, double spin) {
   static_cast<void>(kerrOuterHorizonRadius(mass, spin));
   const double normalizedSpin = std::clamp(spin / mass, -0.998, 0.998);
   const double z1 = 1.0 + std::cbrt(1.0 - normalizedSpin * normalizedSpin) *
-      (std::cbrt(1.0 + normalizedSpin) + std::cbrt(1.0 - normalizedSpin));
+                              (std::cbrt(1.0 + normalizedSpin) + std::cbrt(1.0 - normalizedSpin));
   const double z2 = std::sqrt(3.0 * normalizedSpin * normalizedSpin + z1 * z1);
   const double direction = normalizedSpin >= 0.0 ? -1.0 : 1.0;
-  return mass * (3.0 + z2 + direction *
-      std::sqrt(std::max(0.0, (3.0 - z1) * (3.0 + z1 + 2.0 * z2))));
+  return mass *
+         (3.0 + z2 + direction * std::sqrt(std::max(0.0, (3.0 - z1) * (3.0 + z1 + 2.0 * z2))));
 }
 
 KerrConstants kerrConstantsFromImagePlane(
@@ -194,8 +250,12 @@ KerrConstants kerrConstantsFromImagePlane(
 }
 
 double kerrNormalizedNullConstraint(
-    const KerrGeodesicConfig& config, const KerrConstants& constants,
-    double radius, double polarRadians, double radialSign, double polarSign) {
+    const KerrGeodesicConfig& config,
+    const KerrConstants& constants,
+    double radius,
+    double polarRadians,
+    double radialSign,
+    double polarSign) {
   static_cast<void>(kerrOuterHorizonRadius(config.mass, config.spin));
   if (!(radius > 0.0) || !std::isfinite(radius) || !std::isfinite(polarRadians) ||
       !std::isfinite(radialSign) || !std::isfinite(polarSign)) {
@@ -215,8 +275,8 @@ double kerrNormalizedNullConstraint(
   const double delta = radius2 - 2.0 * config.mass * radius + spin2;
   if (!(delta > 0.0) || !(sigma > 0.0)) return std::numeric_limits<double>::infinity();
 
-  const double gtt = -((radius2 + spin2) * (radius2 + spin2) - spin2 * delta * sine2) /
-      (sigma * delta);
+  const double gtt =
+      -((radius2 + spin2) * (radius2 + spin2) - spin2 * delta * sine2) / (sigma * delta);
   const double gtPhi = -2.0 * config.mass * config.spin * radius / (sigma * delta);
   const double gPhiPhi = (delta - spin2 * sine2) / (sigma * delta * sine2);
   const double grr = delta / sigma;
@@ -256,11 +316,21 @@ KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alp
   double radialSign = -1.0;
   double polarSign = beta >= 0.0 ? 1.0 : -1.0;
   double step = std::clamp(config.affineStep, config.minimumAffineStep, config.maximumAffineStep);
+  double affineDistance = 0.0;
 
   for (uint32_t iteration = 0; iteration < config.maximumSteps; ++iteration) {
     result.integrationSteps = iteration + 1;
     result.minimumRadius = std::min(result.minimumRadius, state.radius);
     if (state.radius <= result.horizonRadius * (1.0 + config.horizonRelativeEpsilon)) {
+      appendIntersection(
+          result,
+          {KerrIntersectionKind::Horizon,
+           affineDistance,
+           state.radius,
+           state.polar,
+           state.azimuth,
+           state.coordinateTime,
+           0});
       result.status = KerrRayStatus::Captured;
       break;
     }
@@ -291,8 +361,8 @@ KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alp
       double candidatePolarSign = polarSign;
       normalizePolar(refined, candidatePolarSign);
       error = normalizedError(coarse, refined);
-      if (finite(refined) && refined.radius <=
-              result.horizonRadius * (1.0 + config.horizonRelativeEpsilon)) {
+      if (finite(refined) &&
+          refined.radius <= result.horizonRadius * (1.0 + config.horizonRelativeEpsilon)) {
         accepted = refined;
         acceptedPolarSign = candidatePolarSign;
         acceptedStep = true;
@@ -300,8 +370,12 @@ KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alp
         break;
       }
       const double nullConstraint = kerrNormalizedNullConstraint(
-          config, result.constants, refined.radius, refined.polar,
-          radialSign, candidatePolarSign);
+          config,
+          result.constants,
+          refined.radius,
+          refined.polar,
+          radialSign,
+          candidatePolarSign);
       const Potentials nextPotential = potentials(config, result.constants, refined);
       const bool crossedRadialTurningPoint = nextPotential.radial < 0.0;
       const bool crossedPolarTurningPoint = nextPotential.polar < 0.0;
@@ -328,13 +402,13 @@ KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alp
         acceptedPolarSign = candidatePolarSign;
         acceptedStep = true;
         result.maximumLocalError = std::max(result.maximumLocalError, error);
-        result.maximumNullConstraintDrift = std::max(
-            result.maximumNullConstraintDrift, nullConstraint);
+        result.maximumNullConstraintDrift =
+            std::max(result.maximumNullConstraintDrift, nullConstraint);
         break;
       }
       if (step <= config.minimumAffineStep * 1.01) {
-        result.maximumNullConstraintDrift = std::max(
-            result.maximumNullConstraintDrift, nullConstraint);
+        result.maximumNullConstraintDrift =
+            std::max(result.maximumNullConstraintDrift, nullConstraint);
         break;
       }
       step = std::max(config.minimumAffineStep, step * 0.5);
@@ -345,22 +419,59 @@ KerrRayResult integrateKerrImageRay(const KerrGeodesicConfig& config, double alp
       break;
     }
 
+    const double stretchedHorizon = result.horizonRadius * (1.0 + config.horizonRelativeEpsilon);
+    if (state.radius > stretchedHorizon && accepted.radius <= stretchedHorizon) {
+      const State crossing = radiusRoot(
+          config,
+          result.constants,
+          state,
+          radialSign,
+          polarSign,
+          step,
+          stretchedHorizon);
+      appendIntersection(
+          result,
+          {KerrIntersectionKind::Horizon,
+           affineDistance + step,
+           crossing.radius,
+           crossing.polar,
+           crossing.azimuth,
+           crossing.coordinateTime,
+           0});
+      state = crossing;
+      result.minimumRadius = std::min(result.minimumRadius, stretchedHorizon);
+      affineDistance += step;
+      ++result.acceptedSteps;
+      result.status = KerrRayStatus::Captured;
+      break;
+    }
+
     const bool crossedEquator = (state.polar - 0.5 * kPi) * (accepted.polar - 0.5 * kPi) <= 0.0 &&
                                 std::abs(accepted.polar - state.polar) > 1e-12;
     if (crossedEquator) {
-      const double denominator = accepted.polar - state.polar;
-      const double fraction = std::clamp((0.5 * kPi - state.polar) / denominator, 0.0, 1.0);
-      const double crossingRadius = state.radius + fraction * (accepted.radius - state.radius);
+      const State crossing =
+          equatorRoot(config, result.constants, state, radialSign, polarSign, step);
+      const double crossingRadius = crossing.radius;
       if (crossingRadius >= config.diskInnerRadius && crossingRadius <= config.diskOuterRadius) {
         if (result.diskCrossings == 0) result.firstDiskRadius = crossingRadius;
+        appendIntersection(
+            result,
+            {KerrIntersectionKind::DiskMidplane,
+             affineDistance + step,
+             crossingRadius,
+             crossing.polar,
+             crossing.azimuth,
+             crossing.coordinateTime,
+             result.diskCrossings});
         ++result.diskCrossings;
       }
     }
     state = accepted;
+    affineDistance += step;
     polarSign = acceptedPolarSign;
     ++result.acceptedSteps;
-    result.minimumAcceptedStep = result.minimumAcceptedStep == 0.0 ? step :
-        std::min(result.minimumAcceptedStep, step);
+    result.minimumAcceptedStep =
+        result.minimumAcceptedStep == 0.0 ? step : std::min(result.minimumAcceptedStep, step);
     result.maximumAcceptedStep = std::max(result.maximumAcceptedStep, step);
 
     if (error < config.relativeTolerance * 0.05) {
@@ -402,19 +513,22 @@ KerrRayBundleResult integrateKerrImageRayBundle(
                        bundle.imagePlaneX.finalAzimuthRadians,
                        bundle.imagePlaneNegativeX.finalAzimuthRadians) *
                    inverseDifferential;
-  const double b = (bundle.imagePlaneX.finalPolarRadians - bundle.imagePlaneNegativeX.finalPolarRadians) /
-                   kPi * inverseDifferential;
+  const double b =
+      (bundle.imagePlaneX.finalPolarRadians - bundle.imagePlaneNegativeX.finalPolarRadians) / kPi *
+      inverseDifferential;
   const double c = wrappedAzimuth(
                        bundle.imagePlaneY.finalAzimuthRadians,
                        bundle.imagePlaneNegativeY.finalAzimuthRadians) *
                    inverseDifferential;
-  const double d = (bundle.imagePlaneY.finalPolarRadians - bundle.imagePlaneNegativeY.finalPolarRadians) /
-                   kPi * inverseDifferential;
+  const double d =
+      (bundle.imagePlaneY.finalPolarRadians - bundle.imagePlaneNegativeY.finalPolarRadians) / kPi *
+      inverseDifferential;
   bundle.sourceJacobian = {a, b, c, d};
 
   const double trace = a * a + b * b + c * c + d * d;
   const double determinant = a * d - b * c;
-  const double discriminant = std::sqrt(std::max(0.0, trace * trace - 4.0 * determinant * determinant));
+  const double discriminant =
+      std::sqrt(std::max(0.0, trace * trace - 4.0 * determinant * determinant));
   const double maximumEigenvalue = 0.5 * (trace + discriminant);
   const double minimumEigenvalue = std::max(0.0, 0.5 * (trace - discriminant));
   bundle.maximumSingularValue = std::sqrt(maximumEigenvalue);
@@ -424,8 +538,8 @@ KerrRayBundleResult integrateKerrImageRayBundle(
   bundle.shear = (bundle.maximumSingularValue - bundle.minimumSingularValue) /
                  std::max(bundle.maximumSingularValue + bundle.minimumSingularValue, 1e-12);
   // Principal-axis orientation of J^T J in image-plane coordinates.
-  bundle.orientationRadians = 0.5 * std::atan2(
-      2.0 * (a * c + b * d), a * a + b * b - c * c - d * d);
+  bundle.orientationRadians =
+      0.5 * std::atan2(2.0 * (a * c + b * d), a * a + b * b - c * c - d * d);
   bundle.causticRisk = bundle.sourceAreaScale < 1e-4 || bundle.shear > 0.95;
   bundle.valid = std::isfinite(bundle.minimumSingularValue) &&
                  std::isfinite(bundle.maximumSingularValue) &&
@@ -436,11 +550,14 @@ KerrRayBundleResult integrateKerrImageRayBundle(
 }
 
 KerrDiskSpectrum evaluateKerrThinDiskSpectrum(
-    const KerrGeodesicConfig& config, const KerrConstants& constants,
-    double diskRadius, double maximumTemperatureKelvin) {
+    const KerrGeodesicConfig& config,
+    const KerrConstants& constants,
+    double diskRadius,
+    double maximumTemperatureKelvin) {
   KerrDiskSpectrum result{};
   if (!(maximumTemperatureKelvin > 0.0) || !std::isfinite(maximumTemperatureKelvin) ||
-      !std::isfinite(diskRadius)) return result;
+      !std::isfinite(diskRadius))
+    return result;
   const double innerRadius = std::max(
       kerrProgradeIscoRadius(config.mass, config.spin),
       kerrOuterHorizonRadius(config.mass, config.spin) * 1.01);
@@ -449,20 +566,21 @@ KerrDiskSpectrum evaluateKerrThinDiskSpectrum(
   const double normalizedSpin = config.spin / config.mass;
   const double radiusPower = std::pow(normalizedRadius, 1.5);
   const double denominatorSquared = radiusPower * radiusPower -
-      3.0 * normalizedRadius * normalizedRadius + 2.0 * normalizedSpin * radiusPower;
+                                    3.0 * normalizedRadius * normalizedRadius +
+                                    2.0 * normalizedSpin * radiusPower;
   if (!(denominatorSquared > 0.0)) return result;
   const double angularVelocity = 1.0 / (radiusPower + normalizedSpin);
-  const double emitterTimeComponent = (radiusPower + normalizedSpin) /
-      std::sqrt(denominatorSquared);
-  const double redshiftDenominator = emitterTimeComponent *
-      (1.0 - angularVelocity * constants.axialAngularMomentum / config.mass);
+  const double emitterTimeComponent =
+      (radiusPower + normalizedSpin) / std::sqrt(denominatorSquared);
+  const double redshiftDenominator =
+      emitterTimeComponent * (1.0 - angularVelocity * constants.axialAngularMomentum / config.mass);
   if (!(redshiftDenominator > 0.0) || !std::isfinite(redshiftDenominator)) return result;
   result.frequencyShift = 1.0 / redshiftDenominator;
   if (!(result.frequencyShift > 0.0) || !std::isfinite(result.frequencyShift)) return result;
   result.invariantIntensityScale = std::pow(result.frequencyShift, 3.0);
   const double innerRatio = innerRadius / diskRadius;
   result.emitterTemperatureKelvin = maximumTemperatureKelvin * std::pow(innerRatio, 0.75) *
-      std::pow(std::max(0.0, 1.0 - std::sqrt(innerRatio)), 0.25);
+                                    std::pow(std::max(0.0, 1.0 - std::sqrt(innerRatio)), 0.25);
   if (!(result.emitterTemperatureKelvin > 0.0)) return result;
 
   constexpr double firstWavelength = 390.0;
@@ -471,12 +589,14 @@ KerrDiskSpectrum evaluateKerrThinDiskSpectrum(
   for (size_t index = 0; index < result.spectralRadiance.size(); ++index) {
     const double observedWavelength = firstWavelength + wavelengthStep * index;
     const double emittedWavelength = result.frequencyShift * observedWavelength;
-    const double radiance = result.invariantIntensityScale * planckFrequencyRadiance(
-        emittedWavelength * 1e-9, result.emitterTemperatureKelvin);
+    const double radiance =
+        result.invariantIntensityScale *
+        planckFrequencyRadiance(emittedWavelength * 1e-9, result.emitterTemperatureKelvin);
     result.observedWavelengthNanometres[index] = observedWavelength;
     result.spectralRadiance[index] = radiance;
     const auto matching = cieApproximation(observedWavelength);
-    for (size_t component = 0; component < 3; ++component) xyz[component] += radiance * matching[component];
+    for (size_t component = 0; component < 3; ++component)
+      xyz[component] += radiance * matching[component];
   }
   result.relativeLuminance = xyz[1];
   const std::array<double, 3> rgb{
@@ -487,10 +607,63 @@ KerrDiskSpectrum evaluateKerrThinDiskSpectrum(
   for (size_t component = 0; component < 3; ++component) {
     result.linearSrgb[component] = std::max(0.0, rgb[component]) / maximumComponent;
   }
-  result.valid = std::all_of(result.spectralRadiance.begin(), result.spectralRadiance.end(),
-                             [](double value) { return std::isfinite(value) && value >= 0.0; }) &&
-      std::all_of(result.linearSrgb.begin(), result.linearSrgb.end(),
-                  [](double value) { return std::isfinite(value) && value >= 0.0; });
+  result.valid = std::all_of(
+                     result.spectralRadiance.begin(),
+                     result.spectralRadiance.end(),
+                     [](double value) { return std::isfinite(value) && value >= 0.0; }) &&
+                 std::all_of(result.linearSrgb.begin(), result.linearSrgb.end(), [](double value) {
+                   return std::isfinite(value) && value >= 0.0;
+                 });
+  return result;
+}
+
+KerrTransferResult evaluateKerrDiskTransfer(
+    const KerrGeodesicConfig& config,
+    const KerrRayResult& ray,
+    const KerrDiskMedium& medium,
+    double maximumTemperatureKelvin) {
+  KerrTransferResult result{};
+  if (medium.halfThickness < 0.0 || medium.verticalOpticalDepth < 0.0 ||
+      medium.singleScatteringAlbedo < 0.0 || medium.singleScatteringAlbedo > 1.0 ||
+      medium.coronaTemperatureKelvin <= 0.0 || medium.coronaOpticalDepth < 0.0)
+    return result;
+  double transmittance = 1.0;
+  for (uint32_t index = 0; index < ray.intersectionCount; ++index) {
+    const KerrIntersection& intersection = ray.intersections[index];
+    if (intersection.kind != KerrIntersectionKind::DiskMidplane) continue;
+    const KerrDiskSpectrum spectrum = evaluateKerrThinDiskSpectrum(
+        config,
+        ray.constants,
+        intersection.radius,
+        maximumTemperatureKelvin);
+    if (!spectrum.valid) continue;
+    const double radialScale = std::max(intersection.radius, config.mass);
+    const double thicknessScale = std::clamp(2.0 * medium.halfThickness / radialScale, 1e-4, 1.0);
+    const double opticalDepth = medium.verticalOpticalDepth * thicknessScale;
+    const double absorbed = 1.0 - std::exp(-opticalDepth);
+    const double direct = transmittance * absorbed;
+    const double scattered =
+        direct * medium.singleScatteringAlbedo * (1.0 - std::exp(-medium.coronaOpticalDepth));
+    for (size_t component = 0; component < result.linearSrgb.size(); ++component) {
+      result.linearSrgb[component] += spectrum.linearSrgb[component] * (direct + scattered);
+    }
+    result.emittedLuminance += spectrum.relativeLuminance;
+    result.transmittedLuminance += spectrum.relativeLuminance * direct;
+    result.scatteredLuminance += spectrum.relativeLuminance * scattered;
+    result.accumulatedOpticalDepth += opticalDepth;
+    transmittance *= std::exp(-opticalDepth);
+    ++result.contributingIntersections;
+    if (transmittance < 1e-4) {
+      result.selfOccluded = index + 1 < ray.intersectionCount;
+      break;
+    }
+  }
+  const double maximum =
+      std::max({result.linearSrgb[0], result.linearSrgb[1], result.linearSrgb[2], 1e-30});
+  for (double& component : result.linearSrgb) component /= maximum;
+  result.valid = result.contributingIntersections > 0 &&
+                 std::isfinite(result.transmittedLuminance) &&
+                 std::isfinite(result.scatteredLuminance);
   return result;
 }
 

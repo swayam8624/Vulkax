@@ -227,13 +227,15 @@ KerrTrace traceKerr(vec2 imagePlane, bool shadeDisk) {
   const float diskInner = max(progradeIsco(mass, spin), horizon * 1.08);
   const float diskOuter = 13.5 * mass;
   vec3 diskRadiance = vec3(0.0);
+  float diskTransmittance = 1.0;
+  uint diskIntersections = 0u;
   float previousPolar = state.y;
-  const float step = 0.07 * mass;
+  float step = 0.07 * mass;
   // The observer is 52M away, so even a weakly deflected escaping ray needs
   // slightly more than 104M of affine travel to return to the escape sphere.
   // This bounded preview profile covers 133M without crossing the Metal GPU
   // watchdog threshold seen with a substantially longer command buffer.
-  for (uint iteration = 0u; iteration < 1900u; ++iteration) {
+  for (uint iteration = 0u; iteration < 1700u; ++iteration) {
     if (state.x <= horizon * 1.0008) return KerrTrace(vec2(0.0), diskRadiance, 1.0);
     if (iteration > 3u && signs.x > 0.0 && state.x >= observerRadius) {
       const vec2 source = vec2(
@@ -241,9 +243,40 @@ KerrTrace traceKerr(vec2 imagePlane, bool shadeDisk) {
           clamp(state.y / 3.14159265359, 0.0, 1.0));
       return KerrTrace(source, diskRadiance, 2.0);
     }
-    const vec4 candidate = kerrRk4(state, conserved, signs, mass, spin, step);
+    const vec2 currentPotential = kerrPotentials(state, conserved, mass, spin);
+    const float radialMargin = abs(currentPotential.x) / max(pow(state.x, 4.0), 1.0);
+    const float polarMargin = abs(currentPotential.y) /
+        max(1.0, conserved.y + spin * spin + conserved.x * conserved.x);
+    if (min(radialMargin, polarMargin) < 2e-4) step = max(0.004 * mass, step * 0.65);
+    const vec4 coarseCandidate = kerrRk4(state, conserved, signs, mass, spin, step);
+    vec4 candidate = coarseCandidate;
+    float localError = 0.0;
+    if (shadeDisk) {
+      const vec4 halfCandidate = kerrRk4(state, conserved, signs, mass, spin, 0.5 * step);
+      candidate = kerrRk4(halfCandidate, conserved, signs, mass, spin, 0.5 * step);
+      const vec4 errorScale = max(abs(candidate), vec4(1.0));
+      localError = max(max(abs(candidate.x - coarseCandidate.x) / errorScale.x,
+                           abs(candidate.y - coarseCandidate.y) / errorScale.y),
+                       max(abs(candidate.z - coarseCandidate.z) / errorScale.z,
+                           abs(candidate.w - coarseCandidate.w) / errorScale.w));
+    }
     if (any(isnan(candidate)) || any(isinf(candidate))) {
       return KerrTrace(vec2(0.0), diskRadiance, 3.0);
+    }
+    if (shadeDisk && localError > 2e-5 && step > 0.004 * mass) {
+      step = max(0.004 * mass, step * 0.5);
+      continue;
+    }
+    if (state.x > horizon * 1.0008 && candidate.x <= horizon * 1.0008) {
+      float low = 0.0;
+      float high = 1.0;
+      for (uint rootIteration = 0u; rootIteration < 12u; ++rootIteration) {
+        const float fraction = 0.5 * (low + high);
+        const vec4 crossing = kerrRk4(state, conserved, signs, mass, spin, step * fraction);
+        if (crossing.x > horizon * 1.0008) low = fraction;
+        else high = fraction;
+      }
+      return KerrTrace(vec2(0.0), diskRadiance, 1.0);
     }
     const vec2 candidatePotential = kerrPotentials(candidate, conserved, mass, spin);
     if (candidatePotential.x < 0.0) {
@@ -258,9 +291,18 @@ KerrTrace traceKerr(vec2 imagePlane, bool shadeDisk) {
         (previousPolar - 0.5 * 3.14159265359) * (candidate.y - 0.5 * 3.14159265359) <= 0.0 &&
         abs(candidate.y - previousPolar) > 1e-7;
     if (shadeDisk && equatorCrossing) {
-      const float crossingFraction = clamp(
-          (0.5 * 3.14159265359 - previousPolar) / (candidate.y - previousPolar), 0.0, 1.0);
-      const float crossingRadius = mix(state.x, candidate.x, crossingFraction);
+      float low = 0.0;
+      float high = 1.0;
+      vec4 crossing = state;
+      const float initialSide = state.y - 0.5 * 3.14159265359;
+      for (uint rootIteration = 0u; rootIteration < 12u; ++rootIteration) {
+        const float fraction = 0.5 * (low + high);
+        crossing = kerrRk4(state, conserved, signs, mass, spin, step * fraction);
+        const float side = crossing.y - 0.5 * 3.14159265359;
+        if ((initialSide <= 0.0 && side <= 0.0) || (initialSide >= 0.0 && side >= 0.0)) low = fraction;
+        else high = fraction;
+      }
+      const float crossingRadius = crossing.x;
       if (crossingRadius < diskInner || crossingRadius > diskOuter) {
         previousPolar = candidate.y;
         state = candidate;
@@ -281,16 +323,21 @@ KerrTrace traceKerr(vec2 imagePlane, bool shadeDisk) {
       const vec3 thermal = redshiftedThermalRgb(temperatureKelvin, frequencyShift);
       const float bolometricTransfer = pow(frequencyShift, 4.0) *
           pow(max(temperatureKelvin, 1000.0) / 14000.0, 4.0);
-      diskRadiance = thermal * emissivity * bolometricTransfer *
-          max(frame.diskGain, 0.0) * 0.34;
-      // This preview model is an optically thick geometrically thin disk.
-      // The first physical surface crossing absorbs the backward ray; summing
-      // subsequent crossings treated the disk as transparent and produced
-      // unstable orbit-order stripes near the critical curve.
-      return KerrTrace(vec2(0.0), diskRadiance, 1.0);
+      const float thickness = 0.14 * mass;
+      const float opticalDepth = 2.2 * clamp(2.0 * thickness / crossingRadius, 0.02, 1.0);
+      const float absorbed = 1.0 - exp(-opticalDepth);
+      const float coronaScatter = absorbed * 0.22 * (1.0 - exp(-0.08));
+      diskRadiance += diskTransmittance * (absorbed + coronaScatter) * thermal * emissivity *
+          bolometricTransfer * max(frame.diskGain, 0.0) * 0.34;
+      diskTransmittance *= exp(-opticalDepth);
+      ++diskIntersections;
+      if (diskTransmittance < 0.002 || diskIntersections >= 6u) {
+        return KerrTrace(vec2(0.0), diskRadiance, 1.0);
+      }
     }
     previousPolar = candidate.y;
     state = candidate;
+    if (shadeDisk && localError < 1e-6) step = min(0.09 * mass, step * 1.25);
   }
   return KerrTrace(vec2(0.0), diskRadiance, 3.0);
 }
@@ -395,6 +442,53 @@ vec3 kerrRadiance(vec2 uv) {
       central.source, sourceDx, sourceDy, sourceAreaScale, bundleShear) + central.diskRadiance;
 }
 
+float volumeDensity(vec3 point) {
+  const vec3 animated = point + vec3(
+      0.18 * sin(frame.timeSeconds * 0.7 + point.y * 2.0),
+      -0.35 * frame.timeSeconds,
+      0.14 * cos(frame.timeSeconds * 0.5 + point.y * 1.7));
+  const float column = exp(-3.4 * dot(animated.xz, animated.xz));
+  const float cap = smoothstep(-1.4, -0.8, animated.y) *
+      (1.0 - smoothstep(0.8, 1.7, animated.y));
+  const float billow = 0.55 + 0.45 * sin(5.1 * animated.x + 3.7 * animated.y) *
+      sin(4.3 * animated.z - 2.9 * animated.y);
+  return max(0.0, column * cap * (0.58 + 0.42 * billow));
+}
+
+vec3 volumeRadiance(vec2 uv) {
+  const float aspect = frame.width / max(frame.height, 1.0);
+  const vec2 screen = (uv - 0.5) * vec2(2.0 * aspect, 2.0);
+  const vec3 origin = vec3(0.0, 0.15, 3.4);
+  const vec3 direction = normalize(vec3(screen.x, screen.y, -2.2));
+  const vec3 lightDirection = normalize(vec3(-0.55, 0.82, 0.38));
+  float distanceAlongRay = 0.0;
+  float transmittance = 1.0;
+  vec3 radiance = vec3(0.0);
+  for (uint step = 0u; step < 128u && transmittance > 0.01; ++step) {
+    const vec3 point = origin + direction * distanceAlongRay;
+    const float density = volumeDensity(point);
+    if (density < 0.008) {
+      distanceAlongRay += 0.07;
+      continue;
+    }
+    float lightTransmittance = 1.0;
+    for (uint shadowStep = 1u; shadowStep <= 8u; ++shadowStep) {
+      const float shadowDensity = volumeDensity(point + lightDirection * (0.08 * float(shadowStep)));
+      lightTransmittance *= exp(-shadowDensity * 0.11);
+    }
+    const float absorbed = 1.0 - exp(-density * 0.12);
+    const float forward = 0.45 + 0.55 * pow(max(dot(direction, lightDirection), 0.0), 4.0);
+    const vec3 scattering =
+        mix(vec3(0.18, 0.24, 0.32), vec3(1.0, 0.64, 0.28), density) *
+        lightTransmittance * (0.55 + 0.45 * forward);
+    radiance += transmittance * absorbed * scattering;
+    transmittance *= 1.0 - absorbed;
+    distanceAlongRay += 0.035;
+  }
+  const vec3 background = mix(vec3(0.012, 0.017, 0.028), vec3(0.07, 0.10, 0.15), uv.y);
+  return radiance * 3.0 + transmittance * background;
+}
+
 void main() {
   const uvec2 pixel = gl_GlobalInvocationID.xy;
   if (pixel.x >= uint(frame.width) || pixel.y >= uint(frame.height)) return;
@@ -405,7 +499,9 @@ void main() {
   }
   const vec2 uv = (vec2(pixel) + 0.5 + jitter) / vec2(frame.width, frame.height);
   vec3 radiance;
-  if (frame.mode > 1.5) {
+  if (frame.mode > 2.5) {
+    radiance = volumeRadiance(uv);
+  } else if (frame.mode > 1.5) {
     radiance = kerrRadiance(uv);
   } else if (frame.mode > 0.5) {
     radiance = schwarzschildRadiance(uv);

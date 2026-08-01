@@ -14,7 +14,8 @@ Commands:
   deps    Install Homebrew build dependencies
   build   Configure and build a Release tree
   test    Build and run all CTest suites
-  physics Build and open the Vulkax Physics Studio editor
+  physics Build and open the GPU-resident SwiftUI/Metal Physics Studio editor
+  physics-qt Build and open the Qt compatibility/export editor
   physics-vulkan  Build and run the direct Vulkan compute-to-present viewport
   app     Build and open Connaught Place in the native macOS application
   london  Build and open Central London in the native macOS application
@@ -117,6 +118,9 @@ case "$command" in
     ctest --test-dir "$BUILD_DIR" --output-on-failure
     ;;
   physics)
+    exec "$ROOT/scripts/vulkax_physics_metal.sh" "$@"
+    ;;
+  physics-qt)
     build
     deploy_physics
     open -n "$BUILD_DIR/Vulkax Physics Studio.app" --args "$@"
