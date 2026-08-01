@@ -18,15 +18,34 @@ The complete, honest phase plan is [Vulkax Physics Studio Roadmap](docs/VULKAX_P
 
 ## Run Physics Studio
 
-The native Qt 6 editor is available on macOS as a regular application, not a local web server.
-It starts in live playback: select a preset, edit its equation, press **Compile and extract controls**,
-and every symbol other than `x`, `y`, `z`, and `t` becomes a bounded live parameter. Sliders update
-the running preview while they are dragged; playback, pause, reset, and timeline scrubbing work
-without exporting frames. The macOS interface is composited through Metal while the numerical
-compute executor remains Vulkan, avoiding a Qt Vulkan-RHI crash in the interactive UI. Wave Field
-and Gray-Scott reaction-diffusion use a persistent
-editor-owned Vulkan compute executor with timestamp queries and CPU readback into the Qt image
-provider. Other scalar, particle, and lensing previews retain their explicitly labelled CPU/reference paths.
+On macOS, the product editor is the native SwiftUI application with a direct `MTKView`; it is not
+a local web server and it does not route interactive frames through `QImage`. Select a scalar
+preset or edit the equation directly, press **Compile**, and every symbol other than `x`, `y`, `z`,
+and `t` becomes a live parameter. The shared equation core exposes conservative range/singularity
+analysis. Native compilation creates or restores a device-keyed Metal compute pipeline
+asynchronously while the previous valid pipeline remains active. Project open/save, parameter changes, playback,
+reset, and timeline scrubbing all feed that GPU viewport directly.
+
+```bash
+scripts/vulkax_macos.sh physics
+```
+
+Interactive scalar, Schwarzschild, and volume frames remain in private floating-point GPU textures
+until presentation. The renderer uses three frames in flight, command-buffer completion telemetry,
+resize-safe drawable resources, and no per-frame fence wait or mapped readback. Vulkan and Metal
+consume the same versioned `VulkaxFrameRequest` ABI and report the same capabilities/telemetry
+structures. This verifies a custom equation plus `.vxp` project round trip on the GPU:
+
+```bash
+scripts/vulkax_physics_metal.sh --native-dynamic-equation-project-gpu-smoke
+```
+
+The Qt application remains available as the cross-platform compatibility, deterministic export,
+and CI surface. Its image provider is not the canonical interactive renderer:
+
+```bash
+scripts/vulkax_macos.sh physics-qt
+```
 
 The portable direct-presentation reference is separate from the Qt editor and uses the Vulkan
 swapchain without a Qt surface or CPU image bridge:
@@ -41,6 +60,7 @@ scripts/vulkax_macos.sh physics-vulkan --black-hole --smoke \
 scripts/vulkax_macos.sh physics-vulkan --kerr --spin 0.8
 scripts/vulkax_macos.sh physics-vulkan --kerr --spin 0.8 --smoke \
   --output build/direct-vulkan-captures/kerr.exr
+scripts/vulkax_macos.sh physics-vulkan --volume
 ```
 
 The interactive command dispatches a compute shader into a device-local `RGBA16F` image, samples
@@ -62,11 +82,7 @@ image-space beaming term.
 half-float radiance to OpenEXR. The exporter rejects non-finite frames or captures lacking both
 shadow and luminous radiance; interactive frames still perform no readback.
 
-```bash
-scripts/vulkax_macos.sh physics
-```
-
-Or build it directly:
+Build the compatibility target directly with:
 
 ```bash
 cmake -S . -B build-vulkax -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
@@ -82,7 +98,7 @@ QT_QPA_PLATFORM=offscreen \
   --export-sequence docs/results/my_wave_sequence --frames 120
 ```
 
-For the direct native macOS viewport, which bypasses the Qt image bridge, run:
+The native macOS viewport and its deterministic GPU checks can also be run directly:
 
 ```bash
 scripts/vulkax_physics_metal.sh
@@ -91,11 +107,13 @@ scripts/vulkax_physics_metal.sh --volume-smoke
 scripts/vulkax_physics_metal.sh --native-gpu-smoke
 scripts/vulkax_physics_metal.sh --native-black-hole-gpu-smoke
 scripts/vulkax_physics_metal.sh --native-volume-gpu-smoke
+scripts/vulkax_physics_metal.sh --native-imported-mesh-gpu-smoke \
+  tests/fixtures/airflow_cube.obj
+scripts/vulkax_physics_metal.sh --native-dynamic-equation-project-gpu-smoke
 ```
 
-This target presents through `CAMetalLayer`. Wave, the interactive Schwarzschild visual, and the
-3D volume smoke visual execute in Metal compute with private GPU textures. The Qt/Vulkan editor
-remains the cross-platform authoring and reproducible export application.
+This target presents through `CAMetalLayer`. Scalar equations, the interactive Schwarzschild
+visual, and the 3D volume smoke visual execute in Metal compute with private GPU textures.
 
 The three `--native-*-gpu-smoke` commands are deterministic verification modes. They dispatch
 the actual wave, progressive Schwarzschild, and volume kernels. The volume test uses separate
@@ -109,6 +127,13 @@ and reduced divergence from `0.243419` to `0.004010`. The GPU test also runs a 4
 fine-grid Jacobi ablation, verifies multigrid has the lower residual, and reproduces each half-float
 radiance signature in a second independent dispatch. Only these tests use shared textures for a minimal result readback;
 interactive frames remain GPU-resident until presentation.
+
+In Volume Smoke mode, **Import obstacle** accepts a closed OBJ mesh. The editor normalizes and
+uploads its triangles, voxelizes the moving mesh into the obstacle texture on Metal, samples the
+pressure field on its triangles, and advances its rigid-body state on the GPU. The project file
+persists the mesh path. The checked cube test reports 12 triangles, 2,598 occupied cells, and
+nonzero GPU-computed displacement. The portable Vulkan MAC test provides the corresponding OBJ,
+voxelization, force/torque, and body-advance path.
 
 ## Equation Reference Runner
 
@@ -158,24 +183,27 @@ See [the legacy operating guide](docs/RUNNING_VULKAX.md) for those commands and
 
 | Component | State |
 | --- | --- |
-| Equation parsing, AST evaluation, built-in presets, raw analytical results | Implemented |
+| Equation parsing, conservative interval/singularity analysis, AST evaluation, built-in presets, raw analytical results | Implemented |
 | Qt 6 macOS editor, parameterized dynamic graphs, project I/O, timeline, PNG/sequence export | Implemented |
 | Executable scalar Physics IR with CPU interpreter, common-subexpression elimination, constant folding, GLSL/MSL emission, and Vulkan/Metal wave agreement | Implemented foundation |
 | Scalar evolution/stencil IR with Laplacian and directional gradients, explicit time stepping, open/periodic/fixed boundaries, CPU oracle, generated SPIR-V/MSL, and Vulkan agreement | Implemented foundation |
 | Coupled scalar evolution IR with cross-field stencils, simultaneous old/new state semantics, per-field boundaries, generated SPIR-V/MSL, and CPU/Vulkan Gray-Scott agreement | Implemented foundation |
 | Persistent editor Wave Field and Gray-Scott Vulkan compute, plus headless wave/N-body CPU/GPU agreement | Implemented |
 | Linear OpenEXR preview export | Implemented |
-| Typed physics IR, dimension/type validation, explicit solver-pass lowering, and executable scalar-field programs | Implemented foundation |
+| Typed physics IR, explicit equation-defined pass graphs, reflected resource layouts, automatic Vulkan layout/pool materialization, persistent pipeline artifacts, and executable scalar-field programs | Implemented foundation |
 | Direct macOS Metal viewport with GPU-resident HDR radiance and presentation | Implemented |
 | Direct Vulkan/MoltenVK compute-to-swapchain field presenter with no CPU image bridge | Implemented and smoke-tested on Apple M2 Pro |
 | Direct Vulkan/MoltenVK Schwarzschild GPU preview with timestamped compute-to-present path | Implemented foundation and smoke-tested on Apple M2 Pro |
 | Direct Vulkan Schwarzschild linear HDR OpenEXR capture with content validation | Implemented and tested |
-| CPU Kerr/Carter reference with null-constraint telemetry, 12-band disk transfer, validated five-ray source-Jacobian bundle, direct Vulkan symmetric differential bundle and six-band disk transfer, progressive HDR, and EXR validation | Implemented research foundation and smoke-tested on Apple M2 Pro |
+| CPU Kerr/Carter reference with null-constraint telemetry, curvature-driven Jacobi/geodesic-deviation transport, root-refined multi-intersection events, finite-thickness disk/corona transfer, adaptive central Vulkan ray, progressive HDR, and measured EXR quality | Implemented research foundation and smoke-tested on Apple M2 Pro |
+| GPU active-ray integrate/scan/scatter compaction with indirect next-dispatch generation | Implemented and Vulkan-tested on Apple M2 Pro |
 | Wave-field direct Vulkan HDR OpenEXR export | Implemented |
 | Schwarzschild CPU reference, Vulkan fixed-step compute check, and interactive Metal 3D orbital-plane visual | Implemented foundation |
 | Schwarzschild thin-disk lensing and 2D buoyant-smoke equation suites | Implemented and tested |
 | Interactive GPU 3D MAC smoke with staggered face velocity, RK2/MacCormack transport, obstacle-aware two-level multigrid projection, curl, temperature, and volume ray marching | Implemented research foundation |
-| Portable Vulkan staggered-MAC projection, RK2/MacCormack scalar transport, source injection, and HDR volume ray march with timestamping and CPU projection-oracle agreement | Implemented foundation |
+| Portable Vulkan MAC projection, GPU CFL, solid obstacles, curl/vorticity, two-level pressure correction, RK2/MacCormack transport, density hierarchy, self-shadowed HDR volume march, timestamps, and persisted pipeline cache | Implemented foundation |
+| Imported-mesh airflow coupling with Metal/Vulkan closed-mesh voxelization, GPU pressure force/torque, rigid-body advancement, editor import, and reflected graph passes | Implemented research path |
+| Linear-HDR EXR MSE, PSNR, global SSIM, maximum error, temporal difference, 1/4/16-sample convergence, and golden-image gates | Implemented |
 | Adaptive preview quality controller with live analytical MSE and raw benchmark | Implemented foundation |
 
 The Interstellar reference is an inspiration for visual rigor, not a claim of parity with DNEG's
@@ -195,22 +223,30 @@ ctest --test-dir build -R 'vulkan_generated_coupled_stencil_compute|vulkan_mac_p
 The checked Schwarzschild thin-disk suite renders a black shadow from captured Schwarzschild null
 rays, maps escaped rays using the RK4 deflection reference, and samples an inclined emissive
 accretion annulus with a documented Doppler-brightness heuristic. Separately, the direct Vulkan
-Kerr mode integrates Carter-separated rays and differential neighbours; neither path claims full
-Jacobi-matrix geodesic deviation or film-production radiative transfer.
+Kerr mode integrates Carter-separated rays and differential neighbours. The CPU event solver uses
+root-refined horizon/equatorial crossings and front-to-back finite-thickness transfer; the GPU
+central ray uses adaptive full-step/two-half-step control while differential rays use a cheaper
+conserved-potential schedule. Separately, the C++ reference transports two screen-basis Jacobi
+fields with the Kerr Riemann tensor and tests its curvature oracle. The interactive filtering
+footprint remains the faster five-ray finite-difference estimator; Vulkax does not claim
+DNGR-equivalent production convergence.
 
 The checked buoyant-smoke suite solves a deterministic 2D stable-fluid chain: semi-Lagrangian
 advection, pressure projection for near-zero divergence, temperature/density buoyancy, and
 vorticity confinement. Separately, the native Metal target contains an interactive 3D staggered
 MAC-grid smoke foundation with private face-velocity, density, temperature, pressure, divergence,
 obstacle, and curl fields plus HDR ray marching. It is not a combustion or film-production solver.
-The portable Vulkan test validates the same staggered face indexing through buoyancy, divergence,
-80 Jacobi pressure iterations, and projection. It then performs midpoint-RK2 scalar backtracing,
-bounded MacCormack density/temperature correction, persistent source injection, and a 96-sample
-HDR volume ray march into a storage buffer. On the checked M2 Pro one-step run, it reduced
-divergence from `0.0193272` to `0.00216895`, matched the independent CPU projection oracle within
-`5.89e-07`, produced finite luminance in `[0.005008, 0.409979]`, and measured `2.45863 ms` for the
-recorded Vulkan command stream. The Vulkan path does not yet include the Metal path's two-level
-multigrid projection, GPU CFL controller, obstacle/curl passes, or direct swapchain volume display.
+The portable Vulkan test validates staggered face indexing, GPU maximum-speed/CFL selection,
+solid boundaries, curl/vorticity, a fine/coarse/fine pressure sequence, midpoint-RK2 backtracing,
+bounded MacCormack transport, and a max-density hierarchy. Its volume marcher uses empty-space
+skipping, light transmittance, self-shadowing, and a bounded multiple-scattering term. On the
+checked 80-step M2 Pro run it selected `dt=0.0091313` at `CFL=0.7`, reduced divergence from
+`0.072966` to `0.0233146`, measured curl `1.90616`, and completed in `923.289 ms`. The native
+Metal viewport provides live presentation; the portable Vulkan suite writes its computed HDR
+radiance to a deterministic validation capture. A separate direct Vulkan `--volume` mode ray
+marches a GPU-resident procedural density field directly into the swapchain with empty-space
+skipping, transmittance, and self-shadowing; the complete Vulkan MAC solver remains its validated
+compute/capture executable rather than sharing that presenter's resource set.
 
 ## Build prerequisites
 

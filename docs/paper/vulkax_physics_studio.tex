@@ -66,6 +66,15 @@ powers, and a bounded function set including sine, exponent, square root, clamp,
 Expression validation reports a source column on parse failure. The GLSL compiler traverses the
 same AST, checks every free variable against the field coordinate and parameter bindings, then
 emits a storage-buffer compute shader contract.
+Before lowering, conservative interval propagation evaluates user-supplied variable and parameter
+ranges. It reports denominator intervals containing zero, invalid square-root/logarithm domains,
+tangent poles, non-real powers, and exponential overflow. Solver-graph reflection then assigns
+stable bindings, extents, formats, access modes, history lengths, and byte estimates. Pipeline
+artifacts are keyed by graph, shader, backend, device, and compiler identity; Metal compiles on a
+background queue with a binary archive while Vulkan supplies a persisted pipeline cache. The
+reflected contract also materializes Vulkan descriptor-set layouts and descriptor pools, including
+history-array descriptor counts, rather than requiring each generated graph to duplicate those
+declarations manually.
 
 The first hardware compute gate dispatches a fixed wave-field storage-buffer shader and reads it
 back for comparison. On the Apple M2 Pro at $64\times36$ samples, the measured MSE was
@@ -171,16 +180,42 @@ accepted step; local truncation error and null drift jointly gate acceptance out
 horizon used to avoid the Boyer--Lindquist coordinate-time singularity. A twelve-band CPU disk
 reference evaluates a Planck spectrum at the redshifted emitted frequency, applies the invariant
 $I_\nu/\nu^3$ as a $g^3$ intensity transfer, and integrates approximate CIE matching functions.
-The Vulkan path uses the same symmetric footprint to select anisotropic celestial filtering and a
-reduced six-band thermal transfer for central disk hits. This is a finite-difference bundle, not
-full Jacobi/geodesic-deviation propagation. A recorded Apple M2 Pro MoltenVK run at a bounded
-$384\times216$ compute extent measured approximately 99.3 ms for the central and four differential
-Kerr traces with spectral disk transfer. The resulting linear
-OpenEXR passed finite-value, dark-capture-region, luminous-radiance, and structural checks.
+The CPU solver records root-refined horizon and equatorial events, retains multiple crossings, and
+applies finite-thickness absorption plus a bounded single-scattering corona contribution in
+front-to-back order. The Vulkan central ray compares a full RK4 step against two half steps, while
+the four differential rays use a lower-cost step schedule driven by the conserved radial and polar
+potentials. Horizon and disk intersections are refined by bisection, and up to six disk crossings
+contribute through opacity and transmittance. Separately, a double-precision C++ reference computes
+the Boyer--Lindquist metric, numerical metric derivatives, Christoffel symbols, and Riemann tensor,
+then transports two screen-basis Jacobi fields using
+$D^2\xi^\mu/d\lambda^2=-R^\mu{}_{\alpha\beta\nu}k^\alpha k^\beta\xi^\nu$.
+It is tested against the analytic Kerr Kretschmann scalar and null-drift bounds. A Vulkan
+integrate/scan/scatter kernel also compacts active ray identifiers and emits the next indirect
+dispatch count entirely on the GPU. The live visual still uses its lower-cost differential-ray
+footprint rather than claiming production Jacobi-bundle presentation. A recorded Apple M2 Pro MoltenVK run at $1280\times720$
+measured 168.7 ms for one adaptive central and four differential Kerr traces. A four-sample linear
+EXR compared with a one-sample capture at MSE $6.70\times10^{-5}$, PSNR 41.74 dB, and global SSIM
+0.9624. In the current checked sequence, error between successive 1/4 and 4/16 sample intervals
+fell from $7.39\times10^{-5}$ to $1.28\times10^{-5}$ while SSIM rose from 0.95785 to 0.99264.
+CTest enforces monotonic convergence, late-frame flicker limits, and a linear-HDR golden image.
 The direct renderer can perform an explicit post-frame transfer of its untouched RGBA16F radiance
 image into a linear OpenEXR. That path is restricted to export and validation: normal presentation
 does not map or copy the image. The capture validator rejects non-finite samples and requires both a
 captured dark region and nontrivial luminous radiance before writing the file.
+
+The portable Vulkan volume reference now performs GPU maximum-speed/CFL selection, solid-mask
+boundary enforcement, curl and vorticity confinement, fine-grid smoothing, coarse residual solve,
+prolongation, and fine-grid post-smoothing. A two-level max-density hierarchy skips empty ray
+segments; secondary light integration supplies self-shadowing and a bounded multiple-scattering
+term. In an 80-step Apple M2 Pro run, CFL reached 0.7, the selected step was 0.0091313 s,
+divergence L2 fell from 0.072966 to 0.0233146, curl L2 was 1.90616, and the complete Vulkan command
+stream measured 923.289 ms. A separate watertight-mesh reference voxelizes imported triangles,
+integrates pressure and quadratic drag into force and torque, and advances a rigid body; the same
+operations appear as reflected solver-graph passes. The Vulkan compute path now executes these
+operations for imported OBJ meshes and skips inactive dilated brick regions. The macOS editor has
+the corresponding import control, Metal solid-angle voxelizer, per-triangle pressure-force pass,
+and GPU body integration. Dense backing allocations are retained; this is adaptive execution, not
+sparse virtual-memory residency.
 
 \section{Reference Simulations}
 
@@ -320,10 +355,11 @@ checked wave, generated diffusion, generated coupled Gray--Scott, handwritten Gr
 seven-body particle, and staggered-MAC volume workloads, and separately validates a
 fixed-step Vulkan Schwarzschild compute kernel against its CPU reference. It additionally checks a
 CPU Kerr/Carter reference and executes the corresponding direct Vulkan preview with differential
-neighbour rays. It does \emph{not}
-establish general numerical convergence for arbitrary equations, shared Qt/Vulkan rendering
-resources, combustion chemistry or an adaptive deep/sparse volume solver, full Jacobi-matrix ray-bundle transport,
-high-resolution spectral line transport, or a controller connected to all live renderer timings. Direct
+neighbour rays. It additionally validates a curvature-driven CPU Jacobi reference and a standalone
+GPU active-ray compactor. The formal validation scope excludes unrestricted symbolic compilation
+of arbitrary tensor PDE solvers, production DNGR image convergence, shared Qt/Vulkan resources,
+combustion chemistry, sparse physical-memory residency, high-resolution spectral line transport,
+and a controller connected to every live renderer timing. Direct
 Vulkan Wave, Schwarzschild, and Kerr EXR export reads the RGBA16F radiance target directly; the
 remaining export paths retain their labelled preview or
 reference behavior. These are scope boundaries, not implicit achievements.

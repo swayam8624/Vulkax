@@ -25,7 +25,7 @@ which parts are real-time approximations and which are offline reference calcula
 | GeoBEACON city demo | Connaught Place plus London, Tokyo, and Midtown data | Preserved legacy application |
 | Atlas globe and navigation | `atlas_*` libraries and tools | Preserved legacy experiment |
 | Equation core | `vulkax_equation`, parser, AST evaluation, deterministic preset catalog | Implemented |
-| Typed physics IR | dimensions, scalar/vector fields, placements, validated operators, explicit solver-pass lowering, and executable scalar register programs | Implemented foundation |
+| Typed physics IR | dimensions, scalar/vector fields, placements, validated operators, explicit user-declared solver-pass lowering, reflected Vulkan descriptor materialization, and executable scalar register programs | Implemented foundation |
 | Portable compute lowering | one canonical scalar IR hash, CPU interpreter, constant folding/CSE, GLSL/SPIR-V and MSL emission, and Vulkan/Metal wave agreement | Implemented for scalar fields |
 | Scalar PDE stencil lowering | Laplacian/directional-gradient expansion, explicit Euler update, open/periodic/fixed boundaries, CPU oracle, generated SPIR-V/MSL, and Vulkan agreement | Implemented for scalar fields |
 | Coupled PDE lowering | simultaneous cross-field scalar updates, per-field boundaries, interleaved GPU ABI, generated SPIR-V/MSL, and CPU/Vulkan Gray-Scott agreement | Implemented foundation |
@@ -34,11 +34,11 @@ which parts are real-time approximations and which are offline reference calcula
 | Simulation references | deterministic wave, Gray-Scott, and softened N-body velocity-Verlet graphs | Implemented foundation |
 | Qt editor | `Vulkax Physics Studio.app`, parameterized dynamic graphs, live preview, project I/O, timeline, PNG/sequence export | Implemented |
 | Physics benchmark | `vulkax-equations`, raw CSV and JSON output | Implemented |
-| Relativity reference | adaptive 3D Schwarzschild CPU reference, CPU Kerr/Carter reference, fixed-step Vulkan agreement check, and 3D orbital-plane Metal viewport trace | Implemented foundation |
+| Relativity reference | adaptive 3D Schwarzschild CPU reference, CPU Kerr/Carter and curvature-driven Jacobi references, Vulkan active-ray compaction, fixed-step Vulkan agreement, and Metal viewport trace | Implemented foundation |
 | Direct macOS GPU viewport | SwiftUI/Metal `CAMetalLayer` application, private RGBA16F radiance, HDR presentation, and temporal accumulation | Implemented |
 | Direct Vulkan presentation | GLFW/MoltenVK compute-to-swapchain presenter: device-local RGBA16F storage image, Wave, Schwarzschild, and Kerr compute modes, progressive accumulation, graphics sampling, timestamp queries, finite-frame smoke mode, and export-only linear EXR capture | Implemented foundation |
 | GPU volume visual | 64 x 96 x 64 staggered MAC velocity, density/temperature, obstacle, pressure/divergence, curl, RK2/MacCormack transport, two-level multigrid projection, GPU CFL substeps, and HDR ray marching | Implemented research foundation |
-| Portable Vulkan MAC volume path | face-staggered buoyancy/projection, RK2/MacCormack scalar transport, source injection, HDR ray march, timestamps, and independent CPU projection agreement | Implemented foundation |
+| Portable Vulkan MAC volume path | face-staggered buoyancy/projection, two-level correction, GPU CFL, adaptive brick execution, imported-mesh voxelization/coupling, RK2/MacCormack transport, HDR ray march, timestamps, and CPU agreement | Implemented foundation |
 | Adaptive preview budget | EWMA timing/error controller connected to editor preview scale | Implemented foundation |
 
 The equation benchmark is an analytical CPU reference. It does not claim GPU timing, numerical PDE
@@ -173,8 +173,15 @@ normalized null-Hamiltonian constraint at accepted steps and includes that resid
 acceptance; tests also bound local error and accepted step sizes. Its thin-disk reference samples
 12 observed wavelength bands, applies the invariant `I_nu/nu^3` through a `g^3` transfer, and
 integrates approximate CIE matching functions. The direct Vulkan path uses a reduced six-band
-version for central disk hits. This remains a finite-difference bundle rather than full
-Jacobi/geodesic-deviation propagation or a film-grade renderer.
+version and now uses conserved-potential step pressure, adaptive full/two-half integration for the
+central ray, root-refined horizon/equatorial events, and front-to-back finite-thickness disk/corona
+transfer across multiple intersections. Linear EXR comparisons report MSE, PSNR, global SSIM,
+maximum error, temporal difference, monotonic 1/4/16-sample convergence, and a checked golden-image
+tolerance. A separate C++ reference integrates two screen-basis Jacobi fields through numerically
+evaluated Kerr Christoffels and Riemann curvature and validates the analytic Kerr curvature scalar.
+The live Metal/Vulkan filtering footprint still uses finite differential rays and is not represented
+as DNGR production parity. A Vulkan integrate/scan/scatter scheduler also compacts active ray IDs
+and writes the next indirect dispatch without a CPU count update.
 
 ### Phase 5B: Buoyant Smoke Example
 
@@ -198,20 +205,25 @@ CFL 0.779541, selected two 0.025-second substeps, and reduced divergence L2 from
 0.008427. Its low-CFL counterpart measured 0.086629, selected one 0.016667-second substep, and
 reduced divergence from 0.243419 to 0.004010. Both cases retain the multigrid-versus-40-Jacobi
 ablation, verify finite scalar/curl/radiance ranges, and reproduce identical half-float output
-signatures in independent dispatch sequences. Combustion chemistry, deeper adaptive multigrid, sparse bricks, and
-film-production validation remain outside this implementation.
+signatures in independent dispatch sequences. The macOS editor imports closed OBJ obstacles,
+voxelizes them on Metal, accumulates per-triangle pressure forces, and advances a GPU body state;
+the corresponding test reports 2,598 occupied cells for the checked cube. Combustion chemistry,
+sparse physical-memory residency, and film-production validation remain outside this implementation.
 
 The portable Vulkan path has a separate validated staggered-MAC volume stage. It stores the three
-velocity components on their corresponding faces, applies cell-centred buoyancy, computes
-divergence, runs 80 Jacobi pressure iterations, and projects velocity. It then performs midpoint-RK2
-backtracing, bounded MacCormack density/temperature correction, persistent source injection, and a
-96-sample HDR volume ray march into a storage buffer. On the checked Apple M2 Pro one-step run it
-reduced divergence L2 from `0.0193272` to `0.00216895`, matched an independent CPU projection oracle
-within `5.89e-07`, produced finite luminance in `[0.005008, 0.409979]`, and measured `2.45863 ms`
-for the recorded Vulkan command stream. A 48-step batch reduced divergence from `0.0241489` to
-`0.000134002` and produced finite density, temperature, and radiance. The Vulkan path still uses
-Jacobi rather than the Metal path's two-level multigrid cycle and does not yet include its GPU CFL
-controller, obstacle/curl passes, or direct swapchain volume display.
+velocity components on their corresponding faces and now executes GPU maximum-speed/CFL control,
+solid-obstacle boundaries, curl/vorticity, and a fine/coarse/fine two-level pressure sequence. It
+then performs midpoint-RK2 backtracing, bounded MacCormack density/temperature correction,
+persistent source injection, and builds a max-density hierarchy. The HDR marcher uses hierarchy
+skipping, light transmittance, self-shadowing, and a bounded multiple-scattering approximation. On
+the checked Apple M2 Pro 80-step run it selected `dt=0.0091313` at `CFL=0.7`, reduced divergence L2
+from `0.072966` to `0.0233146`, measured curl L2 `1.90616`, produced finite luminance in
+`[0.005008, 0.268347]`, and measured `923.289 ms` for the recorded Vulkan command stream. The
+native Metal viewport provides the interactive volume presentation; the portable Vulkan suite
+exports the computed HDR storage-buffer radiance as a deterministic validation capture.
+Its brick mask classifies and dilates active regions so inactive bricks skip simulation work while
+retaining dense backing allocations. The imported-OBJ path performs GPU voxelization, pressure
+force/torque evaluation, and body integration and has a separate native Vulkan regression.
 
 ### Phase 6: Adaptive research controller
 
