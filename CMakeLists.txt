@@ -271,6 +271,12 @@ target_compile_features(VulkaxMacProjectionCompute PRIVATE cxx_std_20)
 target_compile_definitions(VulkaxMacProjectionCompute PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
 target_link_libraries(VulkaxMacProjectionCompute PRIVATE ${Vulkan_LIBRARIES})
 
+add_executable(VulkaxSparseBrickCompute tools/vulkax_sparse_brick_compute.cpp)
+set_target_properties(VulkaxSparseBrickCompute PROPERTIES OUTPUT_NAME vulkax-sparse-bricks)
+target_compile_features(VulkaxSparseBrickCompute PRIVATE cxx_std_20)
+target_compile_definitions(VulkaxSparseBrickCompute PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
+target_link_libraries(VulkaxSparseBrickCompute PRIVATE vulkax_sim ${Vulkan_LIBRARIES})
+
 add_executable(VulkaxParticleComputeBenchmark tools/vulkax_particle_compute.cpp)
 set_target_properties(VulkaxParticleComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-particle-compute)
 target_compile_features(VulkaxParticleComputeBenchmark PRIVATE cxx_std_20)
@@ -623,6 +629,7 @@ add_dependencies(VulkaxSchwarzschildComputeBenchmark Shaders)
 add_dependencies(VulkaxSimulationComputeBenchmark Shaders)
 add_dependencies(VulkaxReactionComputeBenchmark Shaders)
 add_dependencies(VulkaxMacProjectionCompute Shaders)
+add_dependencies(VulkaxSparseBrickCompute Shaders)
 add_dependencies(VulkaxParticleComputeBenchmark Shaders)
 
 # A deliberately small direct Vulkan presentation target. It shares the
@@ -1067,6 +1074,10 @@ if (BUILD_TESTING)
   add_test(NAME vulkan_mac_projection_compute COMMAND VulkaxMacProjectionCompute)
   set_tests_properties(
     vulkan_mac_projection_compute PROPERTIES LABELS "native_gpu;volume_example")
+  add_test(NAME vulkan_sparse_brick_compute COMMAND VulkaxSparseBrickCompute)
+  set_tests_properties(
+    vulkan_sparse_brick_compute PROPERTIES
+    LABELS "native_gpu;volume_example;sparse_storage")
   add_test(
     NAME vulkan_imported_mesh_airflow
     COMMAND VulkaxMacProjectionCompute --steps 4

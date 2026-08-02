@@ -1,0 +1,62 @@
+#version 450
+
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+layout(std430, binding = 0) readonly buffer PageTable { uint values[]; } pageTable;
+layout(std430, binding = 1) readonly buffer SourcePayload { float values[]; } sourcePayload;
+layout(std430, binding = 2) writeonly buffer TargetPayload { float values[]; } targetPayload;
+
+layout(std140, binding = 3) uniform SparseParameters {
+  uvec4 dimensions;
+  uvec4 brickCounts;
+  vec4 diffusionPadding;
+} parameters;
+
+const uint inactiveSlot = 0xffffffffu;
+
+uint pageIndex(uvec3 brick) {
+  return (brick.z * parameters.brickCounts.y + brick.y) *
+      parameters.brickCounts.x + brick.x;
+}
+
+uint sparseIndex(uvec3 cell, uint channel) {
+  const uint brickSize = parameters.dimensions.w;
+  const uvec3 brick = cell / brickSize;
+  const uint slot = pageTable.values[pageIndex(brick)];
+  if (slot == inactiveSlot) return inactiveSlot;
+  const uvec3 local = cell % brickSize;
+  const uint localCell = (local.z * brickSize + local.y) * brickSize + local.x;
+  const uint cellsPerBrick = brickSize * brickSize * brickSize;
+  return (slot * cellsPerBrick + localCell) * parameters.brickCounts.w + channel;
+}
+
+void accumulateNeighbour(
+    ivec3 neighbour,
+    uint channel,
+    float center,
+    inout float result) {
+  if (any(lessThan(neighbour, ivec3(0))) ||
+      any(greaterThanEqual(neighbour, ivec3(parameters.dimensions.xyz)))) return;
+  const uint index = sparseIndex(uvec3(neighbour), channel);
+  if (index != inactiveSlot)
+    result += parameters.diffusionPadding.x * (sourcePayload.values[index] - center);
+}
+
+void main() {
+  const uvec3 cell = gl_GlobalInvocationID.xyz;
+  if (any(greaterThanEqual(cell, parameters.dimensions.xyz))) return;
+  for (uint channel = 0u; channel < parameters.brickCounts.w; ++channel) {
+    const uint index = sparseIndex(cell, channel);
+    if (index == inactiveSlot) continue;
+    const float center = sourcePayload.values[index];
+    float result = center;
+    const ivec3 p = ivec3(cell);
+    accumulateNeighbour(p + ivec3(-1, 0, 0), channel, center, result);
+    accumulateNeighbour(p + ivec3(1, 0, 0), channel, center, result);
+    accumulateNeighbour(p + ivec3(0, -1, 0), channel, center, result);
+    accumulateNeighbour(p + ivec3(0, 1, 0), channel, center, result);
+    accumulateNeighbour(p + ivec3(0, 0, -1), channel, center, result);
+    accumulateNeighbour(p + ivec3(0, 0, 1), channel, center, result);
+    targetPayload.values[index] = result;
+  }
+}
