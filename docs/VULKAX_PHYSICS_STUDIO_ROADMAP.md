@@ -124,10 +124,12 @@ N-body editor ownership remains runtime work.
 
 The reflected Vulkan runtime now allocates storage buffers and 1D/2D/3D storage images, owns their
 memory and views, creates descriptor sets and pipeline layouts, rewrites history arrays per reusable
-frame set, and emits resource-specific compute barriers from reflected pass dependencies. The
-generated diffusion and coupled Gray-Scott executor uses this runtime instead of handwritten
-allocation and descriptor code. A device-level test submits reflected 3D image transitions and a
-write-to-read pass barrier, then verifies two-slot history rotation.
+frame set, imports externally owned resources for cross-pass sharing, and emits resource-specific
+compute barriers from reflected pass dependencies. The generated diffusion and coupled Gray-Scott
+executor and the editor's Vulkan wave/HDR path use this runtime instead of handwritten allocation
+and descriptor code. Device-level tests submit reflected 3D image transitions and a write-to-read
+pass barrier, verify imported-resource ownership and two-slot history rotation, and resize the live
+editor GPU preview from 160x96 to 512x288 in one process.
 
 The editor also ships a deterministic N-body orbit preset using a softened, center-of-mass-frame
 velocity-Verlet reference. Its 4,800-step unit test bounds energy drift below two percent and its

@@ -5,6 +5,7 @@
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 
 namespace vulkax::physics {
 namespace {
@@ -31,12 +32,14 @@ VulkanResourceArena::VulkanResourceArena(
     VkPhysicalDevice physicalDevice,
     VkDevice device,
     VulkanResourcePlan plan,
+    std::span<const VulkanResourceImport> imports,
     std::span<const VkPushConstantRange> pushConstants,
     const VkAllocationCallbacks* allocator)
     : physicalDevice_{physicalDevice},
       device_{device},
       allocator_{allocator},
-      plan_{std::move(plan)} {
+      plan_{std::move(plan)},
+      imports_{imports.begin(), imports.end()} {
   if (physicalDevice_ == VK_NULL_HANDLE || device_ == VK_NULL_HANDLE) {
     throw std::invalid_argument("reflected Vulkan arena requires a physical device and device");
   }
@@ -59,6 +62,27 @@ VulkanResourceArena::VulkanResourceArena(
     }
     descriptorCounts[resource.descriptorType] +=
         resource.historyLength * plan_.descriptorSetCount;
+  }
+  std::sort(imports_.begin(), imports_.end(), [](const auto& left, const auto& right) {
+    return std::tie(left.binding, left.historySlot) <
+           std::tie(right.binding, right.historySlot);
+  });
+  for (uint32_t index = 0; index < imports_.size(); ++index) {
+    const VulkanResourceImport& imported = imports_[index];
+    if (imported.binding >= plan_.bindings.size() ||
+        imported.historySlot >= plan_.bindings[imported.binding].historyLength) {
+      throw std::invalid_argument("imported Vulkan resource slot is out of range");
+    }
+    if (index > 0 && imported.binding == imports_[index - 1].binding &&
+        imported.historySlot == imports_[index - 1].historySlot) {
+      throw std::invalid_argument("duplicate imported Vulkan resource slot");
+    }
+    const VkDescriptorType type = plan_.bindings[imported.binding].descriptorType;
+    if ((isBufferDescriptor(type) && imported.buffer == VK_NULL_HANDLE) ||
+        (isImageDescriptor(type) &&
+         (imported.image == VK_NULL_HANDLE || imported.imageView == VK_NULL_HANDLE))) {
+      throw std::invalid_argument("imported Vulkan resource handle does not match its binding");
+    }
   }
   plan_.poolSizes.clear();
   for (const auto& [type, count] : descriptorCounts) plan_.poolSizes.push_back({type, count});
@@ -147,7 +171,22 @@ void VulkanResourceArena::createResources() {
   for (uint32_t bindingIndex = 0; bindingIndex < plan_.bindings.size(); ++bindingIndex) {
     const VulkanResourceBinding& resource = plan_.bindings[bindingIndex];
     slots_[bindingIndex].resize(resource.historyLength);
-    for (Slot& resourceSlot : slots_[bindingIndex]) {
+    for (uint32_t historySlot = 0; historySlot < slots_[bindingIndex].size(); ++historySlot) {
+      Slot& resourceSlot = slots_[bindingIndex][historySlot];
+      const auto imported = std::lower_bound(
+          imports_.begin(), imports_.end(), std::pair{bindingIndex, historySlot},
+          [](const VulkanResourceImport& candidate, const std::pair<uint32_t, uint32_t>& key) {
+            return std::pair{candidate.binding, candidate.historySlot} < key;
+          });
+      if (imported != imports_.end() && imported->binding == bindingIndex &&
+          imported->historySlot == historySlot) {
+        resourceSlot.buffer = imported->buffer;
+        resourceSlot.image = imported->image;
+        resourceSlot.imageView = imported->imageView;
+        resourceSlot.imageLayout = imported->imageLayout;
+        resourceSlot.owned = false;
+        continue;
+      }
       if (isBufferDescriptor(resource.descriptorType)) {
         if (resource.bufferBytes == 0) {
           throw std::invalid_argument("reflected Vulkan buffer size must be positive");
@@ -291,6 +330,9 @@ void VulkanResourceArena::uploadBuffer(
     throw std::out_of_range("reflected Vulkan upload exceeds buffer capacity");
   }
   Slot& target = slot(bindingIndex, historyAge);
+  if (!target.owned) {
+    throw std::invalid_argument("imported Vulkan buffers must be uploaded by their owner");
+  }
   void* mapped = nullptr;
   require(vkMapMemory(device_, target.memory, 0, VK_WHOLE_SIZE, 0, &mapped),
           "map reflected Vulkan upload buffer");
@@ -318,6 +360,9 @@ void VulkanResourceArena::downloadBuffer(
     throw std::out_of_range("reflected Vulkan download exceeds buffer capacity");
   }
   const Slot& source = slot(bindingIndex, historyAge);
+  if (!source.owned) {
+    throw std::invalid_argument("imported Vulkan buffers must be downloaded by their owner");
+  }
   void* mapped = nullptr;
   require(vkMapMemory(device_, source.memory, 0, VK_WHOLE_SIZE, 0, &mapped),
           "map reflected Vulkan download buffer");
@@ -482,6 +527,10 @@ void VulkanResourceArena::destroy() noexcept {
   }
   for (auto& bindingSlots : slots_) {
     for (Slot& resourceSlot : bindingSlots) {
+      if (!resourceSlot.owned) {
+        resourceSlot = {};
+        continue;
+      }
       if (resourceSlot.imageView != VK_NULL_HANDLE)
         vkDestroyImageView(device_, resourceSlot.imageView, allocator_);
       if (resourceSlot.image != VK_NULL_HANDLE)

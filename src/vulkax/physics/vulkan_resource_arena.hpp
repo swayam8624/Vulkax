@@ -17,6 +17,19 @@ struct VulkanBarrierSummary {
   uint32_t imageBarriers = 0;
 };
 
+// Imports one externally owned history slot into an arena. Imported handles are
+// written into descriptors and synchronized by the arena, but never destroyed
+// or mapped through it. This lets multiple reflected pass layouts share a field
+// without duplicating its Vulkan allocation.
+struct VulkanResourceImport {
+  uint32_t binding = 0;
+  uint32_t historySlot = 0;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VkImage image = VK_NULL_HANDLE;
+  VkImageView imageView = VK_NULL_HANDLE;
+  VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+};
+
 // Owns the Vulkan resources implied by a reflected resource plan. Descriptor
 // array element zero always names the current history slot; later elements walk
 // backward through history. A descriptor set is rewritten only when its frame
@@ -27,6 +40,7 @@ class VulkanResourceArena {
       VkPhysicalDevice physicalDevice,
       VkDevice device,
       VulkanResourcePlan plan,
+      std::span<const VulkanResourceImport> imports = {},
       std::span<const VkPushConstantRange> pushConstants = {},
       const VkAllocationCallbacks* allocator = nullptr);
   ~VulkanResourceArena();
@@ -79,6 +93,7 @@ class VulkanResourceArena {
     VkImageView imageView = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
     VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    bool owned = true;
   };
 
   [[nodiscard]] const VulkanResourceBinding& binding(uint32_t bindingIndex) const;
@@ -95,6 +110,7 @@ class VulkanResourceArena {
   VkDevice device_ = VK_NULL_HANDLE;
   const VkAllocationCallbacks* allocator_ = nullptr;
   VulkanResourcePlan plan_{};
+  std::vector<VulkanResourceImport> imports_;
   std::vector<std::vector<Slot>> slots_;
   std::vector<uint32_t> historyCursor_;
   std::vector<bool> previousWrite_;

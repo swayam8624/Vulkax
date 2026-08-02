@@ -346,7 +346,7 @@ if (VULKAX_BUILD_PHYSICS_STUDIO)
     target_link_libraries(
       VulkaxPhysicsStudio PRIVATE
       vulkax_equation Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
-      vulkax_research vulkax_sim vulkax_relativity ${Vulkan_LIBRARIES}
+      vulkax_research vulkax_sim vulkax_relativity vulkax_physics_ir ${Vulkan_LIBRARIES}
     )
     if (TARGET PkgConfig::OPENEXR)
       target_link_libraries(VulkaxPhysicsStudio PRIVATE PkgConfig::OPENEXR)
@@ -381,7 +381,7 @@ if (VULKAX_BUILD_PHYSICS_STUDIO)
       target_link_libraries(
         VulkaxPhysicsStudioTestRunner PRIVATE
         vulkax_equation Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
-        vulkax_research vulkax_sim vulkax_relativity ${Vulkan_LIBRARIES}
+        vulkax_research vulkax_sim vulkax_relativity vulkax_physics_ir ${Vulkan_LIBRARIES}
       )
       if (TARGET PkgConfig::OPENEXR)
         target_link_libraries(VulkaxPhysicsStudioTestRunner PRIVATE PkgConfig::OPENEXR)
@@ -1230,6 +1230,16 @@ if (BUILD_TESTING)
       physics_studio_gpu_preview_smoke PROPERTIES
       ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_test(
+      NAME physics_studio_gpu_resize_smoke
+      COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --gpu-resize-smoke
+    )
+    set_tests_properties(
+      physics_studio_gpu_resize_smoke PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+      LABELS "native_gpu;runtime_contract"
     )
     add_test(
       NAME physics_studio_gpu_reaction_preview_smoke

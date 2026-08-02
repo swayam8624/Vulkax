@@ -1,4 +1,5 @@
 #include "vulkax/editor/vulkan_field_executor.hpp"
+#include "vulkax/physics/vulkan_resource_arena.hpp"
 #include "vulkax/runtime/runtime_contract.hpp"
 
 #include <vulkan/vulkan.h>
@@ -9,6 +10,8 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <memory>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -66,6 +69,19 @@ bool hasPortabilityEnumeration() {
   });
 }
 
+bool hasDeviceExtension(VkPhysicalDevice physical, const char* name) {
+  uint32_t count = 0;
+  if (vkEnumerateDeviceExtensionProperties(physical, nullptr, &count, nullptr) != VK_SUCCESS)
+    return false;
+  std::vector<VkExtensionProperties> extensions(count);
+  if (vkEnumerateDeviceExtensionProperties(
+          physical, nullptr, &count, extensions.data()) != VK_SUCCESS)
+    return false;
+  return std::any_of(extensions.begin(), extensions.end(), [&](const auto& extension) {
+    return std::string(extension.extensionName) == name;
+  });
+}
+
 uint32_t findMemoryType(VkPhysicalDevice physical, uint32_t typeMask) {
   VkPhysicalDeviceMemoryProperties properties{};
   vkGetPhysicalDeviceMemoryProperties(physical, &properties);
@@ -78,18 +94,6 @@ uint32_t findMemoryType(VkPhysicalDevice physical, uint32_t typeMask) {
     }
   }
   throw std::runtime_error("no coherent host-visible Vulkan memory type");
-}
-
-uint32_t findDeviceLocalMemoryType(VkPhysicalDevice physical, uint32_t typeMask) {
-  VkPhysicalDeviceMemoryProperties properties{};
-  vkGetPhysicalDeviceMemoryProperties(physical, &properties);
-  for (uint32_t index = 0; index < properties.memoryTypeCount; ++index) {
-    const bool compatible = (typeMask & (1u << index)) != 0;
-    if (compatible && (properties.memoryTypes[index].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0) {
-      return index;
-    }
-  }
-  throw std::runtime_error("no device-local Vulkan memory type");
 }
 
 float halfToFloat(uint16_t value) {
@@ -127,29 +131,16 @@ struct VulkanFieldExecutor::Impl {
   VkDevice device = VK_NULL_HANDLE;
   VkQueue queue = VK_NULL_HANDLE;
   uint32_t queueFamily = 0;
-  VkBuffer output = VK_NULL_HANDLE;
-  VkDeviceMemory outputMemory = VK_NULL_HANDLE;
-  VkBuffer uniform = VK_NULL_HANDLE;
-  VkDeviceMemory uniformMemory = VK_NULL_HANDLE;
+  std::unique_ptr<physics::VulkanResourceArena> fieldResources;
+  std::unique_ptr<physics::VulkanResourceArena> hdrResources;
   VkDeviceSize outputCapacity = 0;
-  VkDescriptorSetLayout descriptorLayout = VK_NULL_HANDLE;
-  VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
-  VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-  VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-  VkImage hdrImage = VK_NULL_HANDLE;
-  VkDeviceMemory hdrImageMemory = VK_NULL_HANDLE;
-  VkImageView hdrImageView = VK_NULL_HANDLE;
   VkExtent2D hdrExtent{};
   bool hdrImageInitialized = false;
   VkBuffer hdrReadback = VK_NULL_HANDLE;
   VkDeviceMemory hdrReadbackMemory = VK_NULL_HANDLE;
   VkDeviceSize hdrReadbackCapacity = 0;
-  VkDescriptorSetLayout hdrDescriptorLayout = VK_NULL_HANDLE;
-  VkPipelineLayout hdrPipelineLayout = VK_NULL_HANDLE;
   VkPipeline hdrPipeline = VK_NULL_HANDLE;
-  VkDescriptorPool hdrDescriptorPool = VK_NULL_HANDLE;
-  VkDescriptorSet hdrDescriptorSet = VK_NULL_HANDLE;
   VkCommandPool commandPool = VK_NULL_HANDLE;
   VkCommandBuffer command = VK_NULL_HANDLE;
   VkFence fence = VK_NULL_HANDLE;
@@ -190,30 +181,13 @@ struct VulkanFieldExecutor::Impl {
     memory = VK_NULL_HANDLE;
   }
 
-  void destroyHdrImage() {
-    if (device != VK_NULL_HANDLE && hdrImageView != VK_NULL_HANDLE) vkDestroyImageView(device, hdrImageView, nullptr);
-    if (device != VK_NULL_HANDLE && hdrImage != VK_NULL_HANDLE) vkDestroyImage(device, hdrImage, nullptr);
-    if (device != VK_NULL_HANDLE && hdrImageMemory != VK_NULL_HANDLE) vkFreeMemory(device, hdrImageMemory, nullptr);
-    hdrImage = VK_NULL_HANDLE;
-    hdrImageMemory = VK_NULL_HANDLE;
-    hdrImageView = VK_NULL_HANDLE;
-    hdrExtent = {};
-    hdrImageInitialized = false;
-  }
-
   void destroy() {
     if (device != VK_NULL_HANDLE) vkDeviceWaitIdle(device);
     if (device != VK_NULL_HANDLE && timestampPool != VK_NULL_HANDLE) vkDestroyQueryPool(device, timestampPool, nullptr);
     if (device != VK_NULL_HANDLE && fence != VK_NULL_HANDLE) vkDestroyFence(device, fence, nullptr);
     if (device != VK_NULL_HANDLE && commandPool != VK_NULL_HANDLE) vkDestroyCommandPool(device, commandPool, nullptr);
-    if (device != VK_NULL_HANDLE && descriptorPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(device, descriptorPool, nullptr);
     if (device != VK_NULL_HANDLE && pipeline != VK_NULL_HANDLE) vkDestroyPipeline(device, pipeline, nullptr);
-    if (device != VK_NULL_HANDLE && pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-    if (device != VK_NULL_HANDLE && descriptorLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(device, descriptorLayout, nullptr);
-    if (device != VK_NULL_HANDLE && hdrDescriptorPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(device, hdrDescriptorPool, nullptr);
     if (device != VK_NULL_HANDLE && hdrPipeline != VK_NULL_HANDLE) vkDestroyPipeline(device, hdrPipeline, nullptr);
-    if (device != VK_NULL_HANDLE && hdrPipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(device, hdrPipelineLayout, nullptr);
-    if (device != VK_NULL_HANDLE && hdrDescriptorLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(device, hdrDescriptorLayout, nullptr);
     if (device != VK_NULL_HANDLE && reactionDescriptorPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(device, reactionDescriptorPool, nullptr);
     if (device != VK_NULL_HANDLE && reactionPipeline != VK_NULL_HANDLE) vkDestroyPipeline(device, reactionPipeline, nullptr);
     if (device != VK_NULL_HANDLE && reactionPipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(device, reactionPipelineLayout, nullptr);
@@ -223,11 +197,13 @@ struct VulkanFieldExecutor::Impl {
       destroyBuffer(reactionB[index], reactionBMemory[index]);
     }
     destroyBuffer(reactionUniform, reactionUniformMemory);
-    destroyHdrImage();
+    hdrResources.reset();
+    fieldResources.reset();
+    outputCapacity = 0;
+    hdrExtent = {};
+    hdrImageInitialized = false;
     destroyBuffer(hdrReadback, hdrReadbackMemory);
     hdrReadbackCapacity = 0;
-    destroyBuffer(output, outputMemory);
-    destroyBuffer(uniform, uniformMemory);
     if (device != VK_NULL_HANDLE) vkDestroyDevice(device, nullptr);
     if (instance != VK_NULL_HANDLE) vkDestroyInstance(instance, nullptr);
     instance = VK_NULL_HANDLE;
@@ -249,71 +225,99 @@ struct VulkanFieldExecutor::Impl {
     check(vkBindBufferMemory(device, buffer, memory, 0), "vkBindBufferMemory");
   }
 
-  void updateDescriptors() {
-    VkDescriptorBufferInfo outputInfo{output, 0, outputCapacity};
-    VkDescriptorBufferInfo uniformInfo{uniform, 0, sizeof(WaveParameters)};
-    std::array<VkWriteDescriptorSet, 2> writes{};
-    writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 0, 0, 1,
-                 VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, nullptr, &outputInfo, nullptr};
-    writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 1, 0, 1,
-                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, nullptr, &uniformInfo, nullptr};
-    vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
-  }
+  void ensureFieldResources(uint32_t width, uint32_t height) {
+    const VkDeviceSize bytes = static_cast<VkDeviceSize>(width) * height * sizeof(float);
+    if (fieldResources && hdrResources && outputCapacity == bytes &&
+        hdrExtent.width == width && hdrExtent.height == height) return;
 
-  void ensureOutputCapacity(VkDeviceSize bytes) {
-    if (bytes <= outputCapacity) return;
-    if (output != VK_NULL_HANDLE) destroyBuffer(output, outputMemory);
-    allocateBuffer(bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, output, outputMemory);
+    const bool rebuildPipelines = pipeline != VK_NULL_HANDLE || hdrPipeline != VK_NULL_HANDLE;
+    if (pipeline != VK_NULL_HANDLE) {
+      vkDestroyPipeline(device, pipeline, nullptr);
+      pipeline = VK_NULL_HANDLE;
+    }
+    if (hdrPipeline != VK_NULL_HANDLE) {
+      vkDestroyPipeline(device, hdrPipeline, nullptr);
+      hdrPipeline = VK_NULL_HANDLE;
+    }
+    hdrResources.reset();
+    fieldResources.reset();
+    const VkMemoryPropertyFlags hostVisible =
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    physics::VulkanResourcePlan fieldPlan{};
+    fieldPlan.canonicalHash = 0x4649454c44574156ull;
+    fieldPlan.bindings.resize(2);
+    fieldPlan.bindings[0].binding = 0;
+    fieldPlan.bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    fieldPlan.bindings[0].bufferBytes = bytes;
+    fieldPlan.bindings[0].memoryProperties = hostVisible;
+    fieldPlan.bindings[1].binding = 1;
+    fieldPlan.bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    fieldPlan.bindings[1].bufferBytes = sizeof(WaveParameters);
+    fieldPlan.bindings[1].bufferUsage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    fieldPlan.bindings[1].memoryProperties = hostVisible;
+    fieldResources = std::make_unique<physics::VulkanResourceArena>(
+        physical, device, std::move(fieldPlan));
+
+    physics::VulkanResourcePlan hdrPlan{};
+    hdrPlan.canonicalHash = 0x4844524649454c44ull;
+    hdrPlan.bindings.resize(3);
+    hdrPlan.bindings[0].binding = 0;
+    hdrPlan.bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    hdrPlan.bindings[0].bufferBytes = bytes;
+    hdrPlan.bindings[1].binding = 1;
+    hdrPlan.bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    hdrPlan.bindings[1].imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    hdrPlan.bindings[1].extent = {width, height, 1};
+    hdrPlan.bindings[1].imageUsage =
+        VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    hdrPlan.bindings[2].binding = 2;
+    hdrPlan.bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    hdrPlan.bindings[2].bufferBytes = sizeof(WaveParameters);
+    hdrPlan.bindings[2].bufferUsage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    const std::array imports{
+        physics::VulkanResourceImport{0, 0, fieldResources->buffer(0)},
+        physics::VulkanResourceImport{2, 0, fieldResources->buffer(1)}};
+    hdrResources = std::make_unique<physics::VulkanResourceArena>(
+        physical, device, std::move(hdrPlan), imports);
     outputCapacity = bytes;
-    updateDescriptors();
-  }
-
-  void updateHdrDescriptors() {
-    VkDescriptorBufferInfo outputInfo{output, 0, outputCapacity};
-    VkDescriptorImageInfo imageInfo{VK_NULL_HANDLE, hdrImageView, VK_IMAGE_LAYOUT_GENERAL};
-    VkDescriptorBufferInfo uniformInfo{uniform, 0, sizeof(WaveParameters)};
-    std::array<VkWriteDescriptorSet, 3> writes{};
-    writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, hdrDescriptorSet, 0, 0, 1,
-                 VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, nullptr, &outputInfo, nullptr};
-    writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, hdrDescriptorSet, 1, 0, 1,
-                 VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &imageInfo, nullptr, nullptr};
-    writes[2] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, hdrDescriptorSet, 2, 0, 1,
-                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, nullptr, &uniformInfo, nullptr};
-    vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
-  }
-
-  void ensureHdrImage(uint32_t width, uint32_t height) {
-    if (hdrImage != VK_NULL_HANDLE && hdrExtent.width == width && hdrExtent.height == height) return;
-    destroyHdrImage();
-    VkImageCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-    create.imageType = VK_IMAGE_TYPE_2D;
-    create.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-    create.extent = {width, height, 1};
-    create.mipLevels = 1;
-    create.arrayLayers = 1;
-    create.samples = VK_SAMPLE_COUNT_1_BIT;
-    create.tiling = VK_IMAGE_TILING_OPTIMAL;
-    create.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    create.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    check(vkCreateImage(device, &create, nullptr, &hdrImage), "vkCreateImage HDR preview");
-    VkMemoryRequirements requirements{};
-    vkGetImageMemoryRequirements(device, hdrImage, &requirements);
-    VkMemoryAllocateInfo allocation{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    allocation.allocationSize = requirements.size;
-    allocation.memoryTypeIndex = findDeviceLocalMemoryType(physical, requirements.memoryTypeBits);
-    check(vkAllocateMemory(device, &allocation, nullptr, &hdrImageMemory), "vkAllocateMemory HDR preview");
-    check(vkBindImageMemory(device, hdrImage, hdrImageMemory, 0), "vkBindImageMemory HDR preview");
-    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    view.image = hdrImage;
-    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = create.format;
-    view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    view.subresourceRange.levelCount = 1;
-    view.subresourceRange.layerCount = 1;
-    check(vkCreateImageView(device, &view, nullptr, &hdrImageView), "vkCreateImageView HDR preview");
     hdrExtent = {width, height};
-    updateHdrDescriptors();
+    hdrImageInitialized = false;
+    if (rebuildPipelines) createFieldPipelines();
+  }
+
+  void createFieldPipelines() {
+    const auto shaderBytes =
+        readBinary(std::filesystem::path(ENGINE_DIR) / "shaders/vulkax_wave_field.comp.spv");
+    VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    shaderInfo.codeSize = shaderBytes.size();
+    shaderInfo.pCode = reinterpret_cast<const uint32_t*>(shaderBytes.data());
+    VkShaderModule shader = VK_NULL_HANDLE;
+    check(vkCreateShaderModule(device, &shaderInfo, nullptr, &shader), "vkCreateShaderModule");
+    VkComputePipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    pipelineInfo.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
+                          VK_SHADER_STAGE_COMPUTE_BIT, shader, "main", nullptr};
+    pipelineInfo.layout = fieldResources->pipelineLayout();
+    const VkResult pipelineResult =
+        vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
+    vkDestroyShaderModule(device, shader, nullptr);
+    check(pipelineResult, "vkCreateComputePipelines");
+
+    const auto hdrShaderBytes = readBinary(
+        std::filesystem::path(ENGINE_DIR) / "shaders/vulkax_field_visualize.comp.spv");
+    VkShaderModuleCreateInfo hdrShaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    hdrShaderInfo.codeSize = hdrShaderBytes.size();
+    hdrShaderInfo.pCode = reinterpret_cast<const uint32_t*>(hdrShaderBytes.data());
+    VkShaderModule hdrShader = VK_NULL_HANDLE;
+    check(vkCreateShaderModule(device, &hdrShaderInfo, nullptr, &hdrShader),
+          "vkCreateShaderModule HDR preview");
+    VkComputePipelineCreateInfo hdrPipelineInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    hdrPipelineInfo.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
+                             VK_SHADER_STAGE_COMPUTE_BIT, hdrShader, "main", nullptr};
+    hdrPipelineInfo.layout = hdrResources->pipelineLayout();
+    const VkResult hdrPipelineResult = vkCreateComputePipelines(
+        device, VK_NULL_HANDLE, 1, &hdrPipelineInfo, nullptr, &hdrPipeline);
+    vkDestroyShaderModule(device, hdrShader, nullptr);
+    check(hdrPipelineResult, "vkCreateComputePipelines HDR preview");
   }
 
   void ensureHdrReadbackCapacity(VkDeviceSize bytes) {
@@ -431,91 +435,19 @@ struct VulkanFieldExecutor::Impl {
     VkDeviceCreateInfo deviceInfo{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     deviceInfo.queueCreateInfoCount = 1;
     deviceInfo.pQueueCreateInfos = &queueInfo;
+    std::vector<const char*> deviceExtensions;
+    if (hasDeviceExtension(physical, "VK_KHR_portability_subset")) {
+      deviceExtensions.push_back("VK_KHR_portability_subset");
+    }
+    deviceInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
     check(vkCreateDevice(physical, &deviceInfo, nullptr, &device), "vkCreateDevice");
     vkGetDeviceQueue(device, queueFamily, 0, &queue);
 
-    allocateBuffer(sizeof(WaveParameters), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, uniform, uniformMemory);
-    VkDescriptorSetLayoutBinding bindings[2]{};
-    bindings[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    bindings[1] = {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    VkDescriptorSetLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    layoutInfo.bindingCount = 2;
-    layoutInfo.pBindings = bindings;
-    check(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorLayout), "vkCreateDescriptorSetLayout");
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorLayout;
-    check(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout), "vkCreatePipelineLayout");
-
-    const auto shaderBytes = readBinary(std::filesystem::path(ENGINE_DIR) / "shaders/vulkax_wave_field.comp.spv");
-    VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    shaderInfo.codeSize = shaderBytes.size();
-    shaderInfo.pCode = reinterpret_cast<const uint32_t*>(shaderBytes.data());
-    VkShaderModule shader = VK_NULL_HANDLE;
-    check(vkCreateShaderModule(device, &shaderInfo, nullptr, &shader), "vkCreateShaderModule");
-    VkComputePipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
-    pipelineInfo.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
-                          VK_SHADER_STAGE_COMPUTE_BIT, shader, "main", nullptr};
-    pipelineInfo.layout = pipelineLayout;
-    const VkResult pipelineResult = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
-    vkDestroyShaderModule(device, shader, nullptr);
-    check(pipelineResult, "vkCreateComputePipelines");
-
-    VkDescriptorPoolSize poolSizes[2]{{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}, {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}};
-    VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    poolInfo.maxSets = 1;
-    poolInfo.poolSizeCount = 2;
-    poolInfo.pPoolSizes = poolSizes;
-    check(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool), "vkCreateDescriptorPool");
-    VkDescriptorSetAllocateInfo setInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-    setInfo.descriptorPool = descriptorPool;
-    setInfo.descriptorSetCount = 1;
-    setInfo.pSetLayouts = &descriptorLayout;
-    check(vkAllocateDescriptorSets(device, &setInfo, &descriptorSet), "vkAllocateDescriptorSets");
-
-    VkDescriptorSetLayoutBinding hdrBindings[3]{};
-    hdrBindings[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    hdrBindings[1] = {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    hdrBindings[2] = {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    VkDescriptorSetLayoutCreateInfo hdrLayoutInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    hdrLayoutInfo.bindingCount = 3;
-    hdrLayoutInfo.pBindings = hdrBindings;
-    check(vkCreateDescriptorSetLayout(device, &hdrLayoutInfo, nullptr, &hdrDescriptorLayout),
-          "vkCreateDescriptorSetLayout HDR preview");
-    VkPipelineLayoutCreateInfo hdrPipelineLayoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    hdrPipelineLayoutInfo.setLayoutCount = 1;
-    hdrPipelineLayoutInfo.pSetLayouts = &hdrDescriptorLayout;
-    check(vkCreatePipelineLayout(device, &hdrPipelineLayoutInfo, nullptr, &hdrPipelineLayout),
-          "vkCreatePipelineLayout HDR preview");
-    const auto hdrShaderBytes = readBinary(std::filesystem::path(ENGINE_DIR) / "shaders/vulkax_field_visualize.comp.spv");
-    VkShaderModuleCreateInfo hdrShaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    hdrShaderInfo.codeSize = hdrShaderBytes.size();
-    hdrShaderInfo.pCode = reinterpret_cast<const uint32_t*>(hdrShaderBytes.data());
-    VkShaderModule hdrShader = VK_NULL_HANDLE;
-    check(vkCreateShaderModule(device, &hdrShaderInfo, nullptr, &hdrShader), "vkCreateShaderModule HDR preview");
-    VkComputePipelineCreateInfo hdrPipelineInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
-    hdrPipelineInfo.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
-                             VK_SHADER_STAGE_COMPUTE_BIT, hdrShader, "main", nullptr};
-    hdrPipelineInfo.layout = hdrPipelineLayout;
-    const VkResult hdrPipelineResult = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &hdrPipelineInfo, nullptr, &hdrPipeline);
-    vkDestroyShaderModule(device, hdrShader, nullptr);
-    check(hdrPipelineResult, "vkCreateComputePipelines HDR preview");
-    VkDescriptorPoolSize hdrPoolSizes[3]{{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
-                                         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}};
-    VkDescriptorPoolCreateInfo hdrPoolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    hdrPoolInfo.maxSets = 1;
-    hdrPoolInfo.poolSizeCount = 3;
-    hdrPoolInfo.pPoolSizes = hdrPoolSizes;
-    check(vkCreateDescriptorPool(device, &hdrPoolInfo, nullptr, &hdrDescriptorPool),
-          "vkCreateDescriptorPool HDR preview");
-    VkDescriptorSetAllocateInfo hdrSetInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-    hdrSetInfo.descriptorPool = hdrDescriptorPool;
-    hdrSetInfo.descriptorSetCount = 1;
-    hdrSetInfo.pSetLayouts = &hdrDescriptorLayout;
-    check(vkAllocateDescriptorSets(device, &hdrSetInfo, &hdrDescriptorSet), "vkAllocateDescriptorSets HDR preview");
-
+    ensureFieldResources(1, 1);
+    createFieldPipelines();
     VkCommandPoolCreateInfo commandPoolInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     commandPoolInfo.queueFamilyIndex = queueFamily;
     check(vkCreateCommandPool(device, &commandPoolInfo, nullptr, &commandPool), "vkCreateCommandPool");
     VkCommandBufferAllocateInfo commandInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
@@ -622,14 +554,11 @@ GpuFieldResult VulkanFieldExecutor::evaluateWave(const GpuFieldRequest& request)
   runtime::validateFrameRequest(frame, runtimeParameters);
   const VkDeviceSize bytes = static_cast<VkDeviceSize>(request.width) * request.height * sizeof(float);
   try {
-    impl_->ensureOutputCapacity(bytes);
-    impl_->ensureHdrImage(request.width, request.height);
+    impl_->ensureFieldResources(request.width, request.height);
     const WaveParameters parameters{request.width, request.height, request.time, request.amplitude,
                                     request.wavenumber, request.angularFrequency, {0.0f, 0.0f}};
-    void* mapped = nullptr;
-    check(vkMapMemory(impl_->device, impl_->uniformMemory, 0, sizeof(parameters), 0, &mapped), "vkMapMemory uniform");
-    std::memcpy(mapped, &parameters, sizeof(parameters));
-    vkUnmapMemory(impl_->device, impl_->uniformMemory);
+    impl_->fieldResources->uploadBuffer(
+        1, std::as_bytes(std::span{&parameters, 1u}));
 
     check(vkResetFences(impl_->device, 1, &impl_->fence), "vkResetFences");
     check(vkResetCommandBuffer(impl_->command, 0), "vkResetCommandBuffer");
@@ -640,28 +569,41 @@ GpuFieldResult VulkanFieldExecutor::evaluateWave(const GpuFieldRequest& request)
       vkCmdWriteTimestamp(impl_->command, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, impl_->timestampPool, 0);
     }
     vkCmdBindPipeline(impl_->command, VK_PIPELINE_BIND_POINT_COMPUTE, impl_->pipeline);
-    vkCmdBindDescriptorSets(impl_->command, VK_PIPELINE_BIND_POINT_COMPUTE, impl_->pipelineLayout, 0, 1,
-                            &impl_->descriptorSet, 0, nullptr);
+    const VkDescriptorSet fieldSet = impl_->fieldResources->descriptorSet();
+    vkCmdBindDescriptorSets(
+        impl_->command, VK_PIPELINE_BIND_POINT_COMPUTE,
+        impl_->fieldResources->pipelineLayout(), 0, 1, &fieldSet, 0, nullptr);
     vkCmdDispatch(impl_->command, (request.width + 15) / 16, (request.height + 15) / 16, 1);
+    if (!impl_->hdrImageInitialized) {
+      impl_->hdrResources->recordInitialTransitions(impl_->command);
+    }
     VkBufferMemoryBarrier fieldBarrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
     fieldBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     fieldBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    fieldBarrier.buffer = impl_->output;
+    fieldBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    fieldBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    fieldBarrier.buffer = impl_->fieldResources->buffer(0);
     fieldBarrier.size = bytes;
     VkImageMemoryBarrier imageBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-    imageBarrier.srcAccessMask = impl_->hdrImageInitialized ? VK_ACCESS_SHADER_WRITE_BIT : 0;
+    imageBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     imageBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    imageBarrier.oldLayout = impl_->hdrImageInitialized ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_UNDEFINED;
+    imageBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageBarrier.image = impl_->hdrImage;
+    imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageBarrier.image = impl_->hdrResources->image(1);
     imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     imageBarrier.subresourceRange.levelCount = 1;
     imageBarrier.subresourceRange.layerCount = 1;
     vkCmdPipelineBarrier(impl_->command, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, &fieldBarrier, 1, &imageBarrier);
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, &fieldBarrier,
+                         impl_->hdrImageInitialized ? 1u : 0u,
+                         impl_->hdrImageInitialized ? &imageBarrier : nullptr);
     vkCmdBindPipeline(impl_->command, VK_PIPELINE_BIND_POINT_COMPUTE, impl_->hdrPipeline);
-    vkCmdBindDescriptorSets(impl_->command, VK_PIPELINE_BIND_POINT_COMPUTE, impl_->hdrPipelineLayout, 0, 1,
-                            &impl_->hdrDescriptorSet, 0, nullptr);
+    const VkDescriptorSet hdrSet = impl_->hdrResources->descriptorSet();
+    vkCmdBindDescriptorSets(
+        impl_->command, VK_PIPELINE_BIND_POINT_COMPUTE,
+        impl_->hdrResources->pipelineLayout(), 0, 1, &hdrSet, 0, nullptr);
     vkCmdDispatch(impl_->command, (request.width + 15) / 16, (request.height + 15) / 16, 1);
     impl_->hdrImageInitialized = true;
     if (impl_->timestamps) {
@@ -677,9 +619,8 @@ GpuFieldResult VulkanFieldExecutor::evaluateWave(const GpuFieldRequest& request)
     GpuFieldResult result{};
     result.hdrFrameProduced = true;
     result.values.resize(static_cast<size_t>(request.width) * request.height);
-    check(vkMapMemory(impl_->device, impl_->outputMemory, 0, bytes, 0, &mapped), "vkMapMemory output");
-    std::memcpy(result.values.data(), mapped, static_cast<size_t>(bytes));
-    vkUnmapMemory(impl_->device, impl_->outputMemory);
+    impl_->fieldResources->downloadBuffer(
+        0, std::as_writable_bytes(std::span{result.values}));
     if (impl_->timestamps) {
       std::array<uint64_t, 2> ticks{};
       check(vkGetQueryPoolResults(impl_->device, impl_->timestampPool, 0, 2, sizeof(ticks), ticks.data(),
@@ -718,7 +659,9 @@ GpuHdrFrame VulkanFieldExecutor::readHdrFrame() {
     toCopy.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     toCopy.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     toCopy.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    toCopy.image = impl_->hdrImage;
+    toCopy.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toCopy.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toCopy.image = impl_->hdrResources->image(1);
     toCopy.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     toCopy.subresourceRange.levelCount = 1;
     toCopy.subresourceRange.layerCount = 1;
@@ -728,14 +671,16 @@ GpuHdrFrame VulkanFieldExecutor::readHdrFrame() {
     copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     copy.imageSubresource.layerCount = 1;
     copy.imageExtent = {impl_->hdrExtent.width, impl_->hdrExtent.height, 1};
-    vkCmdCopyImageToBuffer(impl_->command, impl_->hdrImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    vkCmdCopyImageToBuffer(impl_->command, impl_->hdrResources->image(1), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            impl_->hdrReadback, 1, &copy);
     VkImageMemoryBarrier restore{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
     restore.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     restore.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     restore.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     restore.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    restore.image = impl_->hdrImage;
+    restore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    restore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    restore.image = impl_->hdrResources->image(1);
     restore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     restore.subresourceRange.levelCount = 1;
     restore.subresourceRange.layerCount = 1;

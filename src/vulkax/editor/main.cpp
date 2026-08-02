@@ -48,6 +48,7 @@ int main(int argc, char* argv[]) {
   const bool dynamicProjectSmoke = application.arguments().contains("--dynamic-project-smoke");
   const bool unavailableErrorSmoke = application.arguments().contains("--unavailable-error-smoke");
   const bool gpuPreviewSmoke = application.arguments().contains("--gpu-preview-smoke");
+  const bool gpuResizeSmoke = application.arguments().contains("--gpu-resize-smoke");
   const bool gpuReactionPreviewSmoke = application.arguments().contains("--gpu-reaction-preview-smoke");
   const bool allPresetsSmoke = application.arguments().contains("--all-presets-smoke");
   const int sequenceArgument = application.arguments().indexOf("--export-sequence");
@@ -125,6 +126,19 @@ int main(int argc, char* argv[]) {
     qInfo().noquote() << (rendered && gpu ? "Physics Studio persistent GPU preview smoke passed" :
         "Physics Studio persistent GPU preview smoke unavailable: " + controller.previewBackend());
     return rendered && gpu ? 0 : 1;
+  }
+  if (gpuResizeSmoke) {
+    controller.selectPreset("wave-field");
+    controller.setPreviewExtent(160, 96, 1.0);
+    const QImage first = controller.previewImage();
+    controller.setPreviewExtent(512, 288, 1.0);
+    const QImage second = controller.previewImage();
+    const bool resized = first.size() == QSize(160, 96) && second.size() == QSize(512, 288);
+    const bool gpu = controller.previewBackend().startsWith(
+        "Persistent Vulkan compute + RGBA16F frame:");
+    qInfo().noquote() << (resized && gpu ? "Physics Studio GPU resize smoke passed" :
+        "Physics Studio GPU resize smoke failed: " + controller.previewBackend());
+    return resized && gpu ? 0 : 1;
   }
   if (gpuReactionPreviewSmoke) {
     controller.selectPreset("reaction-diffusion-seed");

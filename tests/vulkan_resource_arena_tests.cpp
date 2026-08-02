@@ -5,6 +5,7 @@
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <iostream>
 #include <memory>
@@ -111,6 +112,34 @@ int main() {
     vkGetDeviceQueue(device, queueFamily, 0, &queue);
 
     using namespace vulkax::physics;
+    const VkMemoryPropertyFlags hostVisible =
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    VulkanResourcePlan sharedOwnerPlan{};
+    sharedOwnerPlan.bindings.resize(1);
+    sharedOwnerPlan.bindings[0].binding = 0;
+    sharedOwnerPlan.bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    sharedOwnerPlan.bindings[0].bufferBytes = 64;
+    sharedOwnerPlan.bindings[0].memoryProperties = hostVisible;
+    auto sharedOwner =
+        std::make_unique<VulkanResourceArena>(physical, device, std::move(sharedOwnerPlan));
+    VulkanResourcePlan sharedViewPlan{};
+    sharedViewPlan.bindings.resize(1);
+    sharedViewPlan.bindings[0].binding = 0;
+    sharedViewPlan.bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    sharedViewPlan.bindings[0].bufferBytes = 64;
+    const VulkanResourceImport sharedImport{0, 0, sharedOwner->buffer(0)};
+    auto sharedView = std::make_unique<VulkanResourceArena>(
+        physical, device, std::move(sharedViewPlan), std::span{&sharedImport, 1u});
+    assert(sharedView->buffer(0) == sharedOwner->buffer(0));
+    bool rejectedImportedUpload = false;
+    try {
+      const std::array<std::byte, 4> bytes{};
+      sharedView->uploadBuffer(0, bytes);
+    } catch (const std::invalid_argument&) {
+      rejectedImportedUpload = true;
+    }
+    assert(rejectedImportedUpload);
+
     PhysicsModel model{};
     model.name = "reflected-resource-runtime";
     model.domain.resolution = {8, 6, 4};
@@ -190,6 +219,8 @@ int main() {
     vkDestroyCommandPool(device, commandPool, nullptr);
     vkDeviceWaitIdle(device);
     arena.reset();
+    sharedView.reset();
+    sharedOwner.reset();
     vkDestroyDevice(device, nullptr);
     device = VK_NULL_HANDLE;
     vkDestroyInstance(instance, nullptr);
