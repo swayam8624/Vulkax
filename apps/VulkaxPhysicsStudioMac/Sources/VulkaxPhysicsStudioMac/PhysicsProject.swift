@@ -135,9 +135,19 @@ struct RigidObstacleConfiguration: Codable, Equatable {
         mass: 2)
 }
 
+struct ProjectObstacleRecord: Codable, Equatable {
+    var meshPath: String
+    var body: RigidObstacleConfiguration
+
+    enum CodingKeys: String, CodingKey {
+        case meshPath = "mesh_path"
+        case body
+    }
+}
+
 struct PhysicsProjectFile: Codable {
     var format = "vulkax.physics-project"
-    var version = 6
+    var version = 7
     var name: String
     var preset: String
     var visualization: String
@@ -147,12 +157,14 @@ struct PhysicsProjectFile: Codable {
     var graph: EquationRuntimeGraph
     var obstacleMeshPath: String?
     var obstacleBody: RigidObstacleConfiguration
+    var obstacles: [ProjectObstacleRecord]
 
     enum CodingKeys: String, CodingKey {
         case format, version, name, preset, visualization, expression, parameters, graph
         case timelineSeconds = "timeline_seconds"
         case obstacleMeshPath = "obstacle_mesh_path"
         case obstacleBody = "obstacle_body"
+        case obstacles
     }
 
     init(
@@ -164,7 +176,8 @@ struct PhysicsProjectFile: Codable {
         parameters: [String: Float],
         graph: EquationRuntimeGraph,
         obstacleMeshPath: String? = nil,
-        obstacleBody: RigidObstacleConfiguration = .default
+        obstacleBody: RigidObstacleConfiguration = .default,
+        obstacles: [ProjectObstacleRecord] = []
     ) {
         self.name = name
         self.preset = preset
@@ -175,6 +188,7 @@ struct PhysicsProjectFile: Codable {
         self.graph = graph
         self.obstacleMeshPath = obstacleMeshPath
         self.obstacleBody = obstacleBody
+        self.obstacles = obstacles
     }
 
     init(from decoder: Decoder) throws {
@@ -194,15 +208,26 @@ struct PhysicsProjectFile: Codable {
         obstacleMeshPath = try container.decodeIfPresent(String.self, forKey: .obstacleMeshPath)
         obstacleBody = try container.decodeIfPresent(
             RigidObstacleConfiguration.self, forKey: .obstacleBody) ?? .default
+        if let records = try container.decodeIfPresent([ProjectObstacleRecord].self, forKey: .obstacles) {
+            obstacles = records
+        } else if let obstacleMeshPath {
+            obstacles = [.init(meshPath: obstacleMeshPath, body: obstacleBody)]
+        } else {
+            obstacles = []
+        }
     }
 }
 
 enum PhysicsProjectIO {
-    static func packageObstacle(from source: URL, for projectURL: URL) throws -> String {
+    static func packageObstacle(
+        from source: URL,
+        for projectURL: URL,
+        assetName: String = "obstacle.obj"
+    ) throws -> String {
         let assetDirectory = projectURL.deletingPathExtension().appendingPathExtension("assets")
         try FileManager.default.createDirectory(
             at: assetDirectory, withIntermediateDirectories: true)
-        let destination = assetDirectory.appendingPathComponent("obstacle.obj")
+        let destination = assetDirectory.appendingPathComponent(assetName)
         if source.standardizedFileURL != destination.standardizedFileURL {
             try Data(contentsOf: source).write(to: destination, options: .atomic)
         }
@@ -217,7 +242,7 @@ enum PhysicsProjectIO {
 
     static func load(from url: URL) throws -> PhysicsProjectFile {
         let project = try JSONDecoder().decode(PhysicsProjectFile.self, from: Data(contentsOf: url))
-        guard project.format == "vulkax.physics-project", (1...6).contains(project.version) else {
+        guard project.format == "vulkax.physics-project", (1...7).contains(project.version) else {
             throw CocoaError(.fileReadCorruptFile)
         }
         return project

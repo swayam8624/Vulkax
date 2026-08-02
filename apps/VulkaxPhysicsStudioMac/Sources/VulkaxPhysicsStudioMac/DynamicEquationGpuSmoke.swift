@@ -187,6 +187,11 @@ func runDynamicEquationProjectGpuSmoke() -> Bool {
         var body = RigidObstacleConfiguration.default
         body.rotationDegrees = .init(x: 12, y: 34, z: 56)
         body.angularVelocity = .init(x: 0.5, y: -0.25, z: 1.0)
+        var secondBody = body
+        secondBody.position = .init(x: 0.72, y: 0.31, z: 0.48)
+        let obstacleRecords = [
+            ProjectObstacleRecord(meshPath: "scene.assets/obstacle-0.obj", body: body),
+            ProjectObstacleRecord(meshPath: "scene.assets/obstacle-1.obj", body: secondBody)]
         let project = PhysicsProjectFile(
             name: "Dynamic GPU Equation",
             preset: "custom",
@@ -195,13 +200,15 @@ func runDynamicEquationProjectGpuSmoke() -> Bool {
             timelineSeconds: uniforms.time,
             parameters: Dictionary(uniqueKeysWithValues: zip(compiled.parameterNames, parameters)),
             graph: .builtIn(for: .wave, scalarEquation: expression),
-            obstacleBody: body)
+            obstacleBody: body,
+            obstacles: obstacleRecords)
         try PhysicsProjectIO.save(project, to: temporary)
         let restored = try PhysicsProjectIO.load(from: temporary)
         guard restored.expression == expression,
               restored.parameters == project.parameters,
               restored.timelineSeconds == project.timelineSeconds,
-              restored.obstacleBody == body else {
+              restored.obstacleBody == body,
+              restored.obstacles == obstacleRecords else {
             throw NSError(
                 domain: "VulkaxDynamicEquation", code: 7,
                 userInfo: [NSLocalizedDescriptionKey: "project round trip changed live GPU inputs"])

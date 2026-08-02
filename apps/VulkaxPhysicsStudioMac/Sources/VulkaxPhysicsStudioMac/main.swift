@@ -20,6 +20,13 @@ enum VisualizerMode: Float, CaseIterable, Identifiable {
     }
 }
 
+struct ObstacleSceneItem: Identifiable {
+    let id: UUID
+    var mesh: ImportedObstacleMesh
+    var url: URL
+    var body: RigidObstacleConfiguration
+}
+
 final class PhysicsModel: ObservableObject {
     @Published var projectName = "Untitled Physics"
     @Published var scalarPresetId = "wave-field"
@@ -39,12 +46,24 @@ final class PhysicsModel: ObservableObject {
     @Published var smokeTurbulence: Float = 1.0
     @Published var volumeExtinction: Float = 2.2
     @Published var volumeEmission: Float = 1.0
-    @Published private(set) var obstacleMesh: ImportedObstacleMesh?
-    @Published private(set) var obstacleMeshURL: URL?
+    @Published private(set) var obstacleItems: [ObstacleSceneItem] = []
+    @Published var selectedObstacleID: UUID?
     @Published private(set) var obstacleMeshRevision: UInt64 = 0
-    @Published var obstacleBody = RigidObstacleConfiguration.default {
-        didSet {
-            guard obstacleBody != oldValue else { return }
+    private var defaultObstacleBody = RigidObstacleConfiguration.default
+    var obstacleMesh: ImportedObstacleMesh? {
+        selectedObstacleIndex.map { obstacleItems[$0].mesh }
+    }
+    var obstacleMeshURL: URL? {
+        selectedObstacleIndex.map { obstacleItems[$0].url }
+    }
+    var obstacleBody: RigidObstacleConfiguration {
+        get { selectedObstacleIndex.map { obstacleItems[$0].body } ?? defaultObstacleBody }
+        set {
+            if let index = selectedObstacleIndex {
+                obstacleItems[index].body = newValue
+            } else {
+                defaultObstacleBody = newValue
+            }
             obstacleMeshRevision &+= 1
             accumulationResetToken &+= 1
         }
@@ -68,6 +87,11 @@ final class PhysicsModel: ObservableObject {
             mode = .volumeSmoke
         }
         compileEquation()
+    }
+
+    private var selectedObstacleIndex: Int? {
+        guard let selectedObstacleID else { return nil }
+        return obstacleItems.firstIndex { $0.id == selectedObstacleID }
     }
 
     func scalarParameter(_ name: String, fallback: Float = 0) -> Float {
@@ -137,8 +161,8 @@ final class PhysicsModel: ObservableObject {
         projectURL = nil
         time = 0
         playing = true
-        removeObstacleMesh()
-        obstacleBody = .default
+        removeAllObstacleMeshes()
+        defaultObstacleBody = .default
         selectScalarPreset("wave-field")
     }
 
@@ -166,11 +190,11 @@ final class PhysicsModel: ObservableObject {
             scalarPresetId = project.preset
             mode = Self.mode(for: project.visualization)
             executionGraph = project.graph
-            obstacleBody = project.obstacleBody
-            if let path = project.obstacleMeshPath {
-                let meshURL = URL(fileURLWithPath: path, relativeTo: url.deletingLastPathComponent())
+            removeAllObstacleMeshes()
+            for record in project.obstacles {
+                let meshURL = URL(fileURLWithPath: record.meshPath, relativeTo: url.deletingLastPathComponent())
                     .standardizedFileURL
-                try loadObstacleMesh(from: meshURL)
+                try loadObstacleMesh(from: meshURL, body: record.body)
             }
             equationSource = project.expression
             time = project.timelineSeconds
@@ -212,24 +236,49 @@ final class PhysicsModel: ObservableObject {
     }
 
     func removeObstacleMesh() {
-        obstacleMesh = nil
-        obstacleMeshURL = nil
+        guard let index = selectedObstacleIndex else { return }
+        obstacleItems.remove(at: index)
+        selectedObstacleID = obstacleItems.last?.id
         obstacleMeshRevision &+= 1
         accumulationResetToken &+= 1
         equationStatus = "3D obstacle removed"
     }
 
-    private func loadObstacleMesh(from url: URL) throws {
-        obstacleMesh = try ImportedObstacleMesh.loadOBJ(from: url)
-        obstacleMeshURL = url
+    func selectObstacle(_ id: UUID) {
+        guard obstacleItems.contains(where: { $0.id == id }) else { return }
+        selectedObstacleID = id
+    }
+
+    private func removeAllObstacleMeshes() {
+        obstacleItems.removeAll()
+        selectedObstacleID = nil
+        obstacleMeshRevision &+= 1
+        accumulationResetToken &+= 1
+    }
+
+    private func loadObstacleMesh(
+        from url: URL,
+        body suppliedBody: RigidObstacleConfiguration? = nil
+    ) throws {
+        var body = suppliedBody ?? .default
+        if suppliedBody == nil && !obstacleItems.isEmpty {
+            body.position.x = min(0.86, 0.50 + 0.16 * Float(obstacleItems.count))
+            body.linearVelocity.x = obstacleItems.count.isMultiple(of: 2) ? 0.035 : -0.035
+        }
+        let item = ObstacleSceneItem(
+            id: UUID(), mesh: try ImportedObstacleMesh.loadOBJ(from: url), url: url, body: body)
+        obstacleItems.append(item)
+        selectedObstacleID = item.id
         obstacleMeshRevision &+= 1
         accumulationResetToken &+= 1
     }
 
     private func saveProject(to url: URL) {
         do {
-            let packagedObstaclePath = try obstacleMeshURL.map {
-                try PhysicsProjectIO.packageObstacle(from: $0, for: url)
+            let obstacleRecords = try obstacleItems.enumerated().map { index, item in
+                let path = try PhysicsProjectIO.packageObstacle(
+                    from: item.url, for: url, assetName: "obstacle-\(index).obj")
+                return ProjectObstacleRecord(meshPath: path, body: item.body)
             }
             let project = PhysicsProjectFile(
                 name: projectName,
@@ -239,8 +288,9 @@ final class PhysicsModel: ObservableObject {
                 timelineSeconds: time,
                 parameters: projectParameters(),
                 graph: executionGraph,
-                obstacleMeshPath: packagedObstaclePath,
-                obstacleBody: obstacleBody)
+                obstacleMeshPath: obstacleRecords.first?.meshPath,
+                obstacleBody: obstacleRecords.first?.body ?? .default,
+                obstacles: obstacleRecords)
             try PhysicsProjectIO.save(project, to: url)
             projectURL = url
             equationStatus = "Saved \(url.lastPathComponent)"
@@ -635,6 +685,10 @@ float obstacleKindAt(texture3d<half, access::read> obstacles, int3 cell) {
     return float(obstacles.read(uint3(cell)).r);
 }
 
+uint movingBodyIndex(texture3d<half, access::read> obstacles, int3 first, int3 second) {
+    return uint(max(max(obstacleKindAt(obstacles, first), obstacleKindAt(obstacles, second)) - 2.0, 0.0) + 0.5);
+}
+
 kernel void seedMacFields(
     texture3d<half, access::write> density [[texture(0)]],
     texture3d<half, access::write> temperature [[texture(1)]],
@@ -673,14 +727,19 @@ float3 quaternionRotate(float4 orientation, float3 value) {
     return value + 2.0 * cross(q.xyz, cross(q.xyz, value) + q.w * value);
 }
 
-float3 worldMeshVertex(device const packed_float4* vertices, uint index, device const RigidMeshState* body) {
-    return body[0].positionMass.xyz + quaternionRotate(
-        body[0].orientation, vertices[index].xyz * body[0].scale.xyz);
+uint meshBodyIndex(device const packed_float4* vertices, uint index) {
+    return uint(round(vertices[index].w));
 }
 
-float3 rigidSurfaceVelocity(device const RigidMeshState* body, float3 point) {
-    return body[0].linearVelocity.xyz +
-        cross(body[0].angularVelocity.xyz, point - body[0].positionMass.xyz);
+float3 worldMeshVertex(device const packed_float4* vertices, uint index, device const RigidMeshState* bodies) {
+    const uint bodyIndex = meshBodyIndex(vertices, index);
+    return bodies[bodyIndex].positionMass.xyz + quaternionRotate(
+        bodies[bodyIndex].orientation, vertices[index].xyz * bodies[bodyIndex].scale.xyz);
+}
+
+float3 rigidSurfaceVelocity(device const RigidMeshState* bodies, uint bodyIndex, float3 point) {
+    return bodies[bodyIndex].linearVelocity.xyz +
+        cross(bodies[bodyIndex].angularVelocity.xyz, point - bodies[bodyIndex].positionMass.xyz);
 }
 
 bool rayIntersectsTriangle(float3 origin, float3 a, float3 b, float3 c) {
@@ -717,21 +776,29 @@ kernel void voxelizeObstacleMesh(
     device const RigidMeshState* body [[buffer(2)]],
     constant uint& triangleCount [[buffer(3)]],
     device atomic_uint* occupiedCells [[buffer(4)]],
+    constant uint& bodyCount [[buffer(5)]],
     uint3 cell [[thread_position_in_grid]]) {
     if (cell.x >= obstacles.get_width() || cell.y >= obstacles.get_height() || cell.z >= obstacles.get_depth()) return;
     const float3 point = (float3(cell) + 0.5) /
         float3(obstacles.get_width(), obstacles.get_height(), obstacles.get_depth());
-    float winding = 0.0;
-    for (uint triangle = 0; triangle < triangleCount; ++triangle) {
-        const uint base = triangle * 3;
-        const float3 a = worldMeshVertex(vertices, indices[base], body);
-        const float3 b = worldMeshVertex(vertices, indices[base + 1], body);
-        const float3 c = worldMeshVertex(vertices, indices[base + 2], body);
-        winding += abs(triangleSolidAngle(point, a, b, c));
+    float obstacleKind = cell.y == 0 ? 1.0 : 0.0;
+    for (uint bodyIndex = 0; cell.y != 0 && bodyIndex < bodyCount; ++bodyIndex) {
+        float winding = 0.0;
+        for (uint triangle = 0; triangle < triangleCount; ++triangle) {
+            const uint base = triangle * 3;
+            if (meshBodyIndex(vertices, indices[base]) != bodyIndex) continue;
+            const float3 a = worldMeshVertex(vertices, indices[base], body);
+            const float3 b = worldMeshVertex(vertices, indices[base + 1], body);
+            const float3 c = worldMeshVertex(vertices, indices[base + 2], body);
+            winding += abs(triangleSolidAngle(point, a, b, c));
+        }
+        if (winding > 2.0 * M_PI_F) {
+            obstacleKind = 2.0 + float(bodyIndex);
+            break;
+        }
     }
-    const bool solid = cell.y == 0 || winding > 2.0 * M_PI_F;
+    const bool solid = obstacleKind > 0.5;
     if (solid) atomic_fetch_add_explicit(occupiedCells, 1u, memory_order_relaxed);
-    const float obstacleKind = cell.y == 0 ? 1.0 : (solid ? 2.0 : 0.0);
     obstacles.write(half4(half(obstacleKind), 0.0h, 0.0h, 1.0h), cell);
 }
 
@@ -746,6 +813,7 @@ kernel void computeObstaclePressureForces(
     uint triangle [[thread_position_in_grid]]) {
     if (triangle >= triangleCount) return;
     const uint base = triangle * 3;
+    const uint bodyIndex = meshBodyIndex(vertices, indices[base]);
     const float3 a = worldMeshVertex(vertices, indices[base], body);
     const float3 b = worldMeshVertex(vertices, indices[base + 1], body);
     const float3 c = worldMeshVertex(vertices, indices[base + 2], body);
@@ -755,8 +823,8 @@ kernel void computeObstaclePressureForces(
     const int3 cell = clamp(int3(centroid * float3(dimensions)), int3(0), dimensions - 1);
     const float localPressure = float(pressure.read(uint3(cell)).r);
     const float3 force = -localPressure * areaNormal;
-    forces[triangle] = packed_float4(force, 0.0);
-    torques[triangle] = packed_float4(cross(centroid - body[0].positionMass.xyz, force), 0.0);
+    forces[triangle] = packed_float4(force, float(bodyIndex));
+    torques[triangle] = packed_float4(cross(centroid - body[bodyIndex].positionMass.xyz, force), 0.0);
 }
 
 kernel void integrateObstacleBody(
@@ -765,32 +833,131 @@ kernel void integrateObstacleBody(
     device const packed_float4* torques [[buffer(2)]],
     constant uint& triangleCount [[buffer(3)]],
     constant float& dt [[buffer(4)]],
+    constant uint& bodyCount [[buffer(5)]],
     uint index [[thread_position_in_grid]]) {
-    if (index != 0) return;
+    if (index >= bodyCount) return;
     float3 totalForce = float3(0.0);
     float3 totalTorque = float3(0.0);
     for (uint triangle = 0; triangle < triangleCount; ++triangle) {
+        if (uint(round(forces[triangle].w)) != index) continue;
         totalForce += forces[triangle].xyz;
         totalTorque += torques[triangle].xyz;
     }
     const float step = max(dt, 1e-4);
-    float3 velocity = body[0].linearVelocity.xyz + totalForce * step / max(body[0].positionMass.w, 1e-4);
+    float3 velocity = body[index].linearVelocity.xyz + totalForce * step / max(body[index].positionMass.w, 1e-4);
     velocity *= 0.998;
-    float3 position = body[0].positionMass.xyz + velocity * step;
+    float3 position = body[index].positionMass.xyz + velocity * step;
     position = clamp(position, float3(0.12, 0.08, 0.12), float3(0.88, 0.82, 0.88));
-    float4 orientation = normalize(body[0].orientation);
+    float4 orientation = normalize(body[index].orientation);
     float4 inverseOrientation = float4(-orientation.xyz, orientation.w);
     float3 localTorque = quaternionRotate(inverseOrientation, totalTorque);
-    float3 localAcceleration = localTorque / max(body[0].diagonalInertia.xyz, float3(1e-5));
-    float3 angularVelocity = body[0].angularVelocity.xyz +
+    float3 localAcceleration = localTorque / max(body[index].diagonalInertia.xyz, float3(1e-5));
+    float3 angularVelocity = body[index].angularVelocity.xyz +
         quaternionRotate(orientation, localAcceleration) * step;
     angularVelocity *= 0.998;
     float4 derivative = quaternionMultiply(float4(angularVelocity, 0.0), orientation);
     orientation = normalize(orientation + 0.5 * step * derivative);
-    body[0].linearVelocity = float4(velocity, 0.0);
-    body[0].angularVelocity = float4(angularVelocity, 0.0);
-    body[0].orientation = orientation;
-    body[0].positionMass.xyz = position;
+    body[index].linearVelocity = float4(velocity, 0.0);
+    body[index].angularVelocity = float4(angularVelocity, 0.0);
+    body[index].orientation = orientation;
+    body[index].positionMass.xyz = position;
+}
+
+void obstacleBodyBounds(
+    device const packed_float4* vertices,
+    uint vertexCount,
+    device const RigidMeshState* bodies,
+    uint bodyIndex,
+    thread float3& minimum,
+    thread float3& maximum) {
+    minimum = float3(1e20);
+    maximum = float3(-1e20);
+    for (uint vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+        if (meshBodyIndex(vertices, vertexIndex) != bodyIndex) continue;
+        const float3 point = worldMeshVertex(vertices, vertexIndex, bodies);
+        minimum = min(minimum, point);
+        maximum = max(maximum, point);
+    }
+}
+
+float3 obstacleInverseInertia(RigidMeshState body, float3 worldValue) {
+    const float4 orientation = normalize(body.orientation);
+    const float3 local = quaternionRotate(float4(-orientation.xyz, orientation.w), worldValue);
+    return quaternionRotate(orientation, local / max(body.diagonalInertia.xyz, float3(1e-5)));
+}
+
+void obstacleContactImpulse(
+    thread RigidMeshState& a,
+    thread RigidMeshState& b,
+    float3 contact,
+    float3 direction,
+    float magnitude) {
+    const float3 impulse = direction * magnitude;
+    const float3 radiusA = contact - a.positionMass.xyz;
+    const float3 radiusB = contact - b.positionMass.xyz;
+    a.linearVelocity.xyz -= impulse / max(a.positionMass.w, 1e-4);
+    b.linearVelocity.xyz += impulse / max(b.positionMass.w, 1e-4);
+    a.angularVelocity.xyz -= obstacleInverseInertia(a, cross(radiusA, impulse));
+    b.angularVelocity.xyz += obstacleInverseInertia(b, cross(radiusB, impulse));
+}
+
+kernel void resolveObstacleContacts(
+    device const packed_float4* vertices [[buffer(0)]],
+    device RigidMeshState* bodies [[buffer(1)]],
+    constant uint& vertexCount [[buffer(2)]],
+    constant uint& bodyCount [[buffer(3)]],
+    uint index [[thread_position_in_grid]]) {
+    if (index != 0) return;
+    for (uint first = 0; first < bodyCount; ++first) {
+        for (uint second = first + 1; second < bodyCount; ++second) {
+            RigidMeshState a = bodies[first];
+            RigidMeshState b = bodies[second];
+            float3 minimumA, maximumA, minimumB, maximumB;
+            obstacleBodyBounds(vertices, vertexCount, bodies, first, minimumA, maximumA);
+            obstacleBodyBounds(vertices, vertexCount, bodies, second, minimumB, maximumB);
+            const float3 overlap = min(maximumA, maximumB) - max(minimumA, minimumB);
+            if (any(overlap <= float3(0.0))) continue;
+            uint axis = overlap.y < overlap.x ? 1u : 0u;
+            if (overlap.z < overlap[axis]) axis = 2u;
+            float3 normal = float3(0.0);
+            normal[axis] = b.positionMass[axis] >= a.positionMass[axis] ? 1.0 : -1.0;
+            const float inverseMassA = 1.0 / max(a.positionMass.w, 1e-4);
+            const float inverseMassB = 1.0 / max(b.positionMass.w, 1e-4);
+            const float inverseMass = inverseMassA + inverseMassB;
+            const float3 correction = normal * overlap[axis] / inverseMass;
+            a.positionMass.xyz -= correction * inverseMassA;
+            b.positionMass.xyz += correction * inverseMassB;
+            const float3 contact = 0.5 * (max(minimumA, minimumB) + min(maximumA, maximumB));
+            const float3 radiusA = contact - a.positionMass.xyz;
+            const float3 radiusB = contact - b.positionMass.xyz;
+            float3 relativeVelocity = b.linearVelocity.xyz + cross(b.angularVelocity.xyz, radiusB) -
+                a.linearVelocity.xyz - cross(a.angularVelocity.xyz, radiusA);
+            const float closingSpeed = dot(relativeVelocity, normal);
+            if (closingSpeed < 0.0) {
+                const float3 angularA = cross(obstacleInverseInertia(a, cross(radiusA, normal)), radiusA);
+                const float3 angularB = cross(obstacleInverseInertia(b, cross(radiusB, normal)), radiusB);
+                const float normalMagnitude = -1.1 * closingSpeed /
+                    max(inverseMass + dot(normal, angularA + angularB), 1e-5);
+                obstacleContactImpulse(a, b, contact, normal, normalMagnitude);
+                relativeVelocity = b.linearVelocity.xyz + cross(b.angularVelocity.xyz, radiusB) -
+                    a.linearVelocity.xyz - cross(a.angularVelocity.xyz, radiusA);
+                const float3 tangentVelocity = relativeVelocity - normal * dot(relativeVelocity, normal);
+                const float tangentSpeed = length(tangentVelocity);
+                if (tangentSpeed > 1e-5) {
+                    const float3 tangent = tangentVelocity / tangentSpeed;
+                    const float3 tangentA = cross(obstacleInverseInertia(a, cross(radiusA, tangent)), radiusA);
+                    const float3 tangentB = cross(obstacleInverseInertia(b, cross(radiusB, tangent)), radiusB);
+                    const float tangentMagnitude = clamp(
+                        -dot(relativeVelocity, tangent) /
+                            max(inverseMass + dot(tangent, tangentA + tangentB), 1e-5),
+                        -0.4 * normalMagnitude, 0.4 * normalMagnitude);
+                    obstacleContactImpulse(a, b, contact, tangent, tangentMagnitude);
+                }
+            }
+            bodies[first] = a;
+            bodies[second] = b;
+        }
+    }
 }
 
 kernel void advectMacVelocity(
@@ -1058,7 +1225,7 @@ kernel void projectMacVelocity(
                 const float3 point = float3(float(face.x) / nx, (float(face.y) + 0.5) / ny,
                                             (float(face.z) + 0.5) / nz);
                 value = max(obstacleKindAt(obstacles, left), obstacleKindAt(obstacles, right)) > 1.5
-                    ? rigidSurfaceVelocity(body, point).x : 0.0;
+                    ? rigidSurfaceVelocity(body, movingBodyIndex(obstacles, left, right), point).x : 0.0;
             }
             else value -= dt * float(nx) * (scalarAt(pressure, right) - scalarAt(pressure, left));
         }
@@ -1073,7 +1240,7 @@ kernel void projectMacVelocity(
                 const float3 point = float3((float(face.x) + 0.5) / nx, float(face.y) / ny,
                                             (float(face.z) + 0.5) / nz);
                 value = max(obstacleKindAt(obstacles, bottom), obstacleKindAt(obstacles, top)) > 1.5
-                    ? rigidSurfaceVelocity(body, point).y : 0.0;
+                    ? rigidSurfaceVelocity(body, movingBodyIndex(obstacles, bottom, top), point).y : 0.0;
             }
             else value -= dt * float(ny) * (scalarAt(pressure, top) - scalarAt(pressure, bottom));
         }
@@ -1088,7 +1255,7 @@ kernel void projectMacVelocity(
                 const float3 point = float3((float(face.x) + 0.5) / nx, (float(face.y) + 0.5) / ny,
                                             float(face.z) / nz);
                 value = max(obstacleKindAt(obstacles, back), obstacleKindAt(obstacles, front)) > 1.5
-                    ? rigidSurfaceVelocity(body, point).z : 0.0;
+                    ? rigidSurfaceVelocity(body, movingBodyIndex(obstacles, back, front), point).z : 0.0;
             }
             else value -= dt * float(nz) * (scalarAt(pressure, front) - scalarAt(pressure, back));
         }
@@ -1910,10 +2077,12 @@ private func runImportedMeshGpuSmoke(path: String) -> Bool {
         guard let voxelFunction = library.makeFunction(name: "voxelizeObstacleMesh"),
               let forceFunction = library.makeFunction(name: "computeObstaclePressureForces"),
               let integrateFunction = library.makeFunction(name: "integrateObstacleBody"),
+              let contactFunction = library.makeFunction(name: "resolveObstacleContacts"),
               let clearFunction = library.makeFunction(name: "clearScalarVolume") else { return false }
         let voxelPipeline = try device.makeComputePipelineState(function: voxelFunction)
         let forcePipeline = try device.makeComputePipelineState(function: forceFunction)
         let integratePipeline = try device.makeComputePipelineState(function: integrateFunction)
+        let contactPipeline = try device.makeComputePipelineState(function: contactFunction)
         let clearPipeline = try device.makeComputePipelineState(function: clearFunction)
         let descriptor = MTLTextureDescriptor()
         descriptor.textureType = .type3D
@@ -1925,20 +2094,37 @@ private func runImportedMeshGpuSmoke(path: String) -> Bool {
         descriptor.storageMode = .private
         guard let obstacles = device.makeTexture(descriptor: descriptor),
               let pressure = device.makeTexture(descriptor: descriptor) else { return false }
-        let vertices = mesh.vertices.withUnsafeBytes { bytes in
+        var combinedVertices: [SIMD4<Float>] = []
+        var combinedIndices: [UInt32] = []
+        for bodyIndex in 0..<2 {
+            let vertexOffset = UInt32(combinedVertices.count)
+            combinedVertices.append(contentsOf: mesh.vertices.map { source in
+                var vertex = source
+                vertex.w = Float(bodyIndex)
+                return vertex
+            })
+            combinedIndices.append(contentsOf: mesh.indices.map { vertexOffset + $0 })
+        }
+        let vertices = combinedVertices.withUnsafeBytes { bytes in
             device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
         }
-        let indices = mesh.indices.withUnsafeBytes { bytes in
+        let indices = combinedIndices.withUnsafeBytes { bytes in
             device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
         }
-        var bodyConfiguration = RigidObstacleConfiguration.default
-        bodyConfiguration.linearVelocity = .init(x: 0.04, y: 0, z: 0)
-        bodyConfiguration.angularVelocity = .init(x: 0, y: 1.5, z: 0)
-        let bodyValues = rigidBodyGpuState(bodyConfiguration)
+        var bodyA = RigidObstacleConfiguration.default
+        bodyA.position = .init(x: 0.42, y: 0.30, z: 0.50)
+        bodyA.linearVelocity = .init(x: 0.05, y: 0.02, z: 0)
+        bodyA.angularVelocity = .init(x: 0, y: 0.35, z: 0)
+        var bodyB = RigidObstacleConfiguration.default
+        bodyB.position = .init(x: 0.58, y: 0.315, z: 0.50)
+        bodyB.linearVelocity = .init(x: -0.05, y: -0.01, z: 0)
+        bodyB.angularVelocity = .init(x: 0, y: 0.70, z: 0)
+        let bodyValues = rigidBodyGpuState(bodyA) + rigidBodyGpuState(bodyB)
         let body = bodyValues.withUnsafeBytes { bytes in
             device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
         }
-        var triangleCount = UInt32(mesh.indices.count / 3)
+        var triangleCount = UInt32(combinedIndices.count / 3)
+        var bodyCount: UInt32 = 2
         let forceBytes = Int(triangleCount) * MemoryLayout<SIMD4<Float>>.stride
         guard let vertices, let indices, let body,
               let forces = device.makeBuffer(length: forceBytes, options: .storageModePrivate),
@@ -1964,6 +2150,7 @@ private func runImportedMeshGpuSmoke(path: String) -> Bool {
         voxel.setBuffer(body, offset: 0, index: 2)
         voxel.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 3)
         voxel.setBuffer(occupied, offset: 0, index: 4)
+        voxel.setBytes(&bodyCount, length: MemoryLayout<UInt32>.stride, index: 5)
         dispatch3D(voxel, voxelPipeline)
         voxel.endEncoding()
         guard let pressureForces = command.makeComputeCommandEncoder() else { return false }
@@ -1986,9 +2173,20 @@ private func runImportedMeshGpuSmoke(path: String) -> Bool {
         integrate.setBuffer(torques, offset: 0, index: 2)
         integrate.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 3)
         integrate.setBytes(&timestep, length: MemoryLayout<Float>.stride, index: 4)
-        integrate.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1),
-                                  threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+        integrate.setBytes(&bodyCount, length: MemoryLayout<UInt32>.stride, index: 5)
+        integrate.dispatchThreads(MTLSize(width: Int(bodyCount), height: 1, depth: 1),
+                                  threadsPerThreadgroup: MTLSize(width: Int(bodyCount), height: 1, depth: 1))
         integrate.endEncoding()
+        guard let contacts = command.makeComputeCommandEncoder() else { return false }
+        var vertexCount = UInt32(combinedVertices.count)
+        contacts.setComputePipelineState(contactPipeline)
+        contacts.setBuffer(vertices, offset: 0, index: 0)
+        contacts.setBuffer(body, offset: 0, index: 1)
+        contacts.setBytes(&vertexCount, length: MemoryLayout<UInt32>.stride, index: 2)
+        contacts.setBytes(&bodyCount, length: MemoryLayout<UInt32>.stride, index: 3)
+        contacts.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1),
+                                 threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+        contacts.endEncoding()
         command.commit()
         command.waitUntilCompleted()
         guard command.status == .completed else { return false }
@@ -2000,18 +2198,20 @@ private func runImportedMeshGpuSmoke(path: String) -> Bool {
         }
         let textureSolidCells = occupancy.reduce(0) { $0 + (Float16(bitPattern: $1) > 0.5 ? 1 : 0) }
         let solidCells = Int(occupied.contents().bindMemory(to: UInt32.self, capacity: 1)[0])
-        let state = body.contents().bindMemory(to: SIMD4<Float>.self, capacity: 6)
-        let initialPosition = SIMD3<Float>(bodyConfiguration.position.x, bodyConfiguration.position.y,
-                                          bodyConfiguration.position.z)
+        let state = body.contents().bindMemory(to: SIMD4<Float>.self, capacity: 12)
+        let initialPosition = SIMD3<Float>(bodyA.position.x, bodyA.position.y, bodyA.position.z)
         let displacement = simd_length(SIMD3<Float>(state[0].x, state[0].y, state[0].z) - initialPosition)
         let orientationDelta = simd_length(state[1] - bodyValues[1])
+        let separation = state[6].x - state[0].x
+        let relativeNormalVelocity = state[8].x - state[2].x
         guard solidCells > 0, solidCells < occupancy.count, displacement > 0,
-              orientationDelta > 0, abs(simd_length(state[1]) - 1) < 1e-4 else {
+              orientationDelta > 0, abs(simd_length(state[1]) - 1) < 1e-4,
+              separation >= 0.27, relativeNormalVelocity > 0 else {
             FileHandle.standardError.write(Data(
-                "Vulkax imported-mesh Metal validation failed: triangles=\(triangleCount) gpu_solid_cells=\(solidCells) texture_solid_cells=\(textureSolidCells) displacement=\(displacement) orientation_delta=\(orientationDelta)\n".utf8))
+                "Vulkax imported-mesh Metal validation failed: triangles=\(triangleCount) gpu_solid_cells=\(solidCells) texture_solid_cells=\(textureSolidCells) displacement=\(displacement) orientation_delta=\(orientationDelta) separation=\(separation) relative_velocity=\(relativeNormalVelocity)\n".utf8))
             return false
         }
-        print("Vulkax imported-mesh Metal GPU smoke passed: \(device.name) triangles=\(triangleCount) solid_cells=\(solidCells) displacement=\(displacement)")
+        print("Vulkax imported-mesh Metal GPU smoke passed: \(device.name) bodies=\(bodyCount) triangles=\(triangleCount) solid_cells=\(solidCells) displacement=\(displacement) separation=\(separation)")
         return true
     } catch {
         FileHandle.standardError.write(Data("Vulkax imported-mesh Metal GPU smoke failed: \(error)\n".utf8))
@@ -2101,6 +2301,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
     private let voxelizeObstaclePipeline: MTLComputePipelineState
     private let obstaclePressurePipeline: MTLComputePipelineState
     private let integrateObstaclePipeline: MTLComputePipelineState
+    private let obstacleContactPipeline: MTLComputePipelineState
     private let reduceMacMaximumSpeedPipeline: MTLComputePipelineState
     private let finalizeMacCflPipeline: MTLComputePipelineState
     private let velocitySimulationPipeline: MTLComputePipelineState
@@ -2153,6 +2354,8 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
     private var obstacleBody: MTLBuffer?
     private var obstacleOccupancy: MTLBuffer?
     private var obstacleTriangleCount: UInt32 = 0
+    private var obstacleVertexCount: UInt32 = 0
+    private var obstacleBodyCount: UInt32 = 0
     private var activeObstacleRevision: UInt64 = .max
     private var volumeInitialized = false
     private var lastTime = CACurrentMediaTime()
@@ -2189,6 +2392,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
                   let voxelizeObstacle = library.makeFunction(name: "voxelizeObstacleMesh"),
                   let obstaclePressure = library.makeFunction(name: "computeObstaclePressureForces"),
                   let integrateObstacle = library.makeFunction(name: "integrateObstacleBody"),
+                  let obstacleContact = library.makeFunction(name: "resolveObstacleContacts"),
                   let reduceMacMaximumSpeed = library.makeFunction(name: "reduceMacMaximumSpeed"),
                   let finalizeMacCfl = library.makeFunction(name: "finalizeMacCfl"),
                   let velocitySimulation = library.makeFunction(name: "advectMacVelocity"),
@@ -2212,6 +2416,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
             self.voxelizeObstaclePipeline = try device.makeComputePipelineState(function: voxelizeObstacle)
             self.obstaclePressurePipeline = try device.makeComputePipelineState(function: obstaclePressure)
             self.integrateObstaclePipeline = try device.makeComputePipelineState(function: integrateObstacle)
+            self.obstacleContactPipeline = try device.makeComputePipelineState(function: obstacleContact)
             self.reduceMacMaximumSpeedPipeline = try device.makeComputePipelineState(function: reduceMacMaximumSpeed)
             self.finalizeMacCflPipeline = try device.makeComputePipelineState(function: finalizeMacCfl)
             self.velocitySimulationPipeline = try device.makeComputePipelineState(function: velocitySimulation)
@@ -2404,22 +2609,43 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         obstacleBody = nil
         obstacleOccupancy = nil
         obstacleTriangleCount = 0
+        obstacleVertexCount = 0
+        obstacleBodyCount = 0
         volumeInitialized = false
-        let body = rigidBodyGpuState(model.obstacleBody)
-        obstacleBody = body.withUnsafeBytes { bytes in
+        var combinedVertices: [SIMD4<Float>] = []
+        var combinedIndices: [UInt32] = []
+        var bodyStates: [SIMD4<Float>] = []
+        for (bodyIndex, item) in model.obstacleItems.enumerated() {
+            let vertexOffset = UInt32(combinedVertices.count)
+            combinedVertices.append(contentsOf: item.mesh.vertices.map { source in
+                var vertex = source
+                vertex.w = Float(bodyIndex)
+                return vertex
+            })
+            combinedIndices.append(contentsOf: item.mesh.indices.map { vertexOffset + $0 })
+            bodyStates.append(contentsOf: rigidBodyGpuState(item.body))
+        }
+        if bodyStates.isEmpty {
+            bodyStates = rigidBodyGpuState(.default)
+            obstacleBodyCount = 1
+        } else {
+            obstacleBodyCount = UInt32(model.obstacleItems.count)
+        }
+        obstacleBody = bodyStates.withUnsafeBytes { bytes in
             guard let address = bytes.baseAddress else { return nil }
             return device.makeBuffer(bytes: address, length: bytes.count, options: .storageModeShared)
         }
-        guard let mesh = model.obstacleMesh else { return obstacleBody != nil }
-        obstacleVertices = mesh.vertices.withUnsafeBytes { bytes in
+        guard !combinedVertices.isEmpty else { return obstacleBody != nil }
+        obstacleVertices = combinedVertices.withUnsafeBytes { bytes in
             guard let address = bytes.baseAddress else { return nil }
             return device.makeBuffer(bytes: address, length: bytes.count, options: .storageModeShared)
         }
-        obstacleIndices = mesh.indices.withUnsafeBytes { bytes in
+        obstacleIndices = combinedIndices.withUnsafeBytes { bytes in
             guard let address = bytes.baseAddress else { return nil }
             return device.makeBuffer(bytes: address, length: bytes.count, options: .storageModeShared)
         }
-        obstacleTriangleCount = UInt32(mesh.indices.count / 3)
+        obstacleVertexCount = UInt32(combinedVertices.count)
+        obstacleTriangleCount = UInt32(combinedIndices.count / 3)
         let vectorBytes = max(1, Int(obstacleTriangleCount)) * MemoryLayout<SIMD4<Float>>.stride
         obstacleForces = device.makeBuffer(length: vectorBytes, options: .storageModePrivate)
         obstacleTorques = device.makeBuffer(length: vectorBytes, options: .storageModePrivate)
@@ -2437,12 +2663,14 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
               let encoder = command.makeComputeCommandEncoder() else { return obstacleTriangleCount == 0 }
         occupied.contents().bindMemory(to: UInt32.self, capacity: 1)[0] = 0
         var triangleCount = obstacleTriangleCount
+        var bodyCount = obstacleBodyCount
         encoder.setTexture(obstacles, index: 0)
         encoder.setBuffer(vertices, offset: 0, index: 0)
         encoder.setBuffer(indices, offset: 0, index: 1)
         encoder.setBuffer(body, offset: 0, index: 2)
         encoder.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 3)
         encoder.setBuffer(occupied, offset: 0, index: 4)
+        encoder.setBytes(&bodyCount, length: MemoryLayout<UInt32>.stride, index: 5)
         dispatch3D(encoder, pipeline: voxelizeObstaclePipeline, texture: obstacles)
         encoder.endEncoding()
         return true
@@ -2456,6 +2684,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
               let body = obstacleBody, let forces = obstacleForces, let torques = obstacleTorques,
               let forceEncoder = command.makeComputeCommandEncoder() else { return false }
         var triangleCount = obstacleTriangleCount
+        var bodyCount = obstacleBodyCount
         forceEncoder.setComputePipelineState(obstaclePressurePipeline)
         forceEncoder.setTexture(pressure, index: 0)
         forceEncoder.setBuffer(vertices, offset: 0, index: 0)
@@ -2476,9 +2705,22 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         integrate.setBuffer(torques, offset: 0, index: 2)
         integrate.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 3)
         integrate.setBytes(&timestep, length: MemoryLayout<Float>.stride, index: 4)
-        integrate.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1),
-                                  threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+        integrate.setBytes(&bodyCount, length: MemoryLayout<UInt32>.stride, index: 5)
+        integrate.dispatchThreads(MTLSize(width: Int(bodyCount), height: 1, depth: 1),
+                                  threadsPerThreadgroup: MTLSize(width: min(32, Int(bodyCount)), height: 1, depth: 1))
         integrate.endEncoding()
+        if bodyCount > 1 {
+            guard let contacts = command.makeComputeCommandEncoder() else { return false }
+            var vertexCount = obstacleVertexCount
+            contacts.setComputePipelineState(obstacleContactPipeline)
+            contacts.setBuffer(vertices, offset: 0, index: 0)
+            contacts.setBuffer(body, offset: 0, index: 1)
+            contacts.setBytes(&vertexCount, length: MemoryLayout<UInt32>.stride, index: 2)
+            contacts.setBytes(&bodyCount, length: MemoryLayout<UInt32>.stride, index: 3)
+            contacts.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1),
+                                     threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+            contacts.endEncoding()
+        }
         return true
     }
 
@@ -2947,20 +3189,27 @@ struct ContentView: View {
                     Divider()
                     Text("OBJECTS").font(.caption.bold()).foregroundStyle(.secondary)
                     Button { model.importObstacleMesh() } label: {
-                        Label(model.obstacleMeshURL == nil ? "Add 3D object" : "Replace object",
-                              systemImage: "cube.transparent")
+                        Label("Add 3D object", systemImage: "cube.transparent")
                     }
                     .help("Import a closed OBJ mesh into the GPU fluid domain")
-                    if let object = model.obstacleMeshURL {
-                        HStack {
-                            Text(object.lastPathComponent)
-                                .font(.caption.monospaced())
-                                .lineLimit(1)
-                            Spacer()
-                            Button { model.removeObstacleMesh() } label: {
-                                Image(systemName: "trash")
+                    if !model.obstacleItems.isEmpty {
+                        ForEach(model.obstacleItems) { item in
+                            HStack {
+                                Button { model.selectObstacle(item.id) } label: {
+                                    Label(
+                                        item.url.lastPathComponent,
+                                        systemImage: model.selectedObstacleID == item.id
+                                            ? "checkmark.circle.fill" : "cube")
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                if model.selectedObstacleID == item.id {
+                                    Button { model.removeObstacleMesh() } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .help("Remove selected object")
+                                }
                             }
-                            .help("Remove object")
                         }
                     } else {
                         Text("Drop an OBJ onto the viewport")
@@ -3059,8 +3308,7 @@ struct ContentView: View {
                 } else {
                     HStack {
                         Button { model.importObstacleMesh() } label: {
-                            Label(model.obstacleMeshURL == nil ? "Add object" : "Replace object",
-                                  systemImage: "cube.transparent")
+                            Label("Add object", systemImage: "cube.transparent")
                         }
                         if model.obstacleMeshURL != nil {
                             Button { model.removeObstacleMesh() } label: {

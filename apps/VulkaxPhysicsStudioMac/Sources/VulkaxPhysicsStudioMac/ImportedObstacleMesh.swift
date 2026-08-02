@@ -107,7 +107,7 @@ struct ImportedObstacleMesh {
         let extent = upper - lower
         let scale = 0.28 / max(extent.x, max(extent.y, extent.z), 1e-6)
         let centre = 0.5 * (lower + upper)
-        let normalized = positions.map { SIMD4<Float>(($0 - centre) * scale, 1) }
+        let normalized = positions.map { SIMD4<Float>(($0 - centre) * scale, 0) }
         return ImportedObstacleMesh(vertices: normalized, indices: triangles, diagnostics: diagnostics)
     }
 }

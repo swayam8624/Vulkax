@@ -146,9 +146,10 @@ pressure field on its triangles, and advances its rigid-body state on the GPU. T
 position, Euler rotation, nonuniform scale, mass, linear/angular velocity, and diagonal inertia.
 Metal and Vulkan transform vertices with the same quaternion convention, integrate force and torque,
 and impose `linear velocity + angular velocity cross radius` on fluid faces touching the moving mesh.
-Static floor cells remain zero-velocity boundaries. Version 6 project files persist the complete body
-configuration and package the OBJ beside the project. Versions 1 through 5 still load with default
-body values. Before upload, the importer rejects invalid indices, degenerate triangles, open boundaries,
+Static floor cells remain zero-velocity boundaries. The scene list accepts multiple independently
+selectable objects. Version 7 project files persist every body configuration and package each OBJ
+beside the project; versions 1 through 6 load through the single-object compatibility record. Before
+upload, the importer rejects invalid indices, degenerate triangles, open boundaries,
 non-manifold edges, and inconsistent winding with explicit defect counts. The checked cube test reports
 12 triangles, 2,598 occupied cells, nonzero GPU-computed
 translation, and normalized rotational integration. The portable Vulkan MAC test provides the
@@ -223,7 +224,7 @@ See [the legacy operating guide](docs/RUNNING_VULKAX.md) for those commands and
 | Schwarzschild thin-disk lensing and 2D buoyant-smoke equation suites | Implemented and tested |
 | Interactive GPU 3D MAC smoke with staggered face velocity, RK2/MacCormack transport, obstacle-aware two-level multigrid projection, curl, temperature, and volume ray marching | Implemented research foundation |
 | Portable Vulkan MAC projection, GPU CFL, solid obstacles, curl/vorticity, two-level pressure correction, RK2/MacCormack transport, density hierarchy, self-shadowed HDR volume march, timestamps, and persisted pipeline cache | Implemented foundation |
-| Imported-mesh airflow coupling with persisted transforms, quaternion rotation, Metal/Vulkan voxelization, GPU pressure force/torque, angular integration, moving boundary velocities, editor controls, and reflected graph passes | Implemented single-body research path |
+| Imported-mesh airflow coupling with multi-object project records, persisted transforms, quaternion rotation, Metal/Vulkan voxelization, GPU pressure force/torque, angular integration, moving boundaries, restitution/friction contacts, editor controls, and reflected graph passes | Implemented research path |
 | Linear-HDR EXR MSE, PSNR, global SSIM, maximum error, temporal difference, 1/4/16-sample convergence, and golden-image gates | Implemented |
 | Adaptive preview quality controller with live analytical MSE and raw benchmark | Implemented foundation |
 
