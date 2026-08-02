@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "vulkax/relativity/kerr_geodesic.hpp"
+#include "vulkax/relativity/kerr_jacobi.hpp"
 
 namespace {
 
@@ -19,11 +20,19 @@ constexpr uint32_t kRayCount = 16384;
 constexpr uint32_t kMaximumIterations = 96;
 constexpr uint32_t kWorkgroupSize = 256;
 constexpr uint32_t kGroupCount = (kRayCount + kWorkgroupSize - 1) / kWorkgroupSize;
+constexpr uint32_t kJacobiRayCount = 256;
 
 struct alignas(16) RayState {
   std::array<float, 4> position{};
   std::array<float, 4> conservedSigns{};
   std::array<float, 4> integration{};
+  std::array<float, 4> jacobiPosition{};
+  std::array<float, 4> jacobiWave{};
+  std::array<float, 4> horizontal{};
+  std::array<float, 4> horizontalDerivative{};
+  std::array<float, 4> vertical{};
+  std::array<float, 4> verticalDerivative{};
+  std::array<float, 4> jacobiDiagnostics{};
   std::array<uint32_t, 4> counters{};
 };
 struct Control {
@@ -46,8 +55,60 @@ struct Push {
   float minimumStep;
   float maximumStep;
   float errorTolerance;
+  uint32_t jacobiRayCount;
+  uint32_t padding[3];
 };
-static_assert(sizeof(RayState) == 64 && sizeof(Control) == 16 && sizeof(Push) == 32);
+static_assert(sizeof(RayState) == 176 && sizeof(Control) == 16 && sizeof(Push) == 48);
+
+std::array<float, 4> launchWave(
+    const vulkax::relativity::KerrGeodesicConfig& config, float alpha, float beta) {
+  const auto constants = vulkax::relativity::kerrConstantsFromImagePlane(config, alpha, beta);
+  const double radius = config.observerRadius;
+  const double polar = config.observerInclinationRadians;
+  const double radius2 = radius * radius;
+  const double sine = std::sin(polar);
+  const double cosine = std::cos(polar);
+  const double sine2 = std::max(sine * sine, 1e-12);
+  const double sigma = radius2 + config.spin * config.spin * cosine * cosine;
+  const double delta = radius2 - 2.0 * config.mass * radius + config.spin * config.spin;
+  const double p = constants.energy * (radius2 + config.spin * config.spin) -
+                   config.spin * constants.axialAngularMomentum;
+  const double shifted = constants.axialAngularMomentum - config.spin * constants.energy;
+  const double radialPotential =
+      p * p - delta * (shifted * shifted + constants.carterConstant);
+  const double polarPotential =
+      constants.carterConstant + config.spin * config.spin * cosine * cosine -
+      constants.axialAngularMomentum * constants.axialAngularMomentum * cosine * cosine / sine2;
+  return {
+      static_cast<float>((
+          -config.spin * (config.spin * sine2 - constants.axialAngularMomentum) +
+          (radius2 + config.spin * config.spin) * p / delta) / sigma),
+      static_cast<float>(-std::sqrt(std::max(0.0, radialPotential)) / sigma),
+      static_cast<float>((beta >= 0.0f ? 1.0 : -1.0) *
+                         std::sqrt(std::max(0.0, polarPotential)) / sigma),
+      static_cast<float>((constants.axialAngularMomentum / sine2 - config.spin +
+                          config.spin * p / delta) / sigma)};
+}
+
+std::array<float, 4> launchDerivative(
+    const vulkax::relativity::KerrGeodesicConfig& config,
+    float alpha,
+    float beta,
+    bool horizontal) {
+  constexpr float differential = 1e-4f;
+  const auto positive = launchWave(
+      config,
+      alpha + (horizontal ? differential : 0.0f),
+      beta + (horizontal ? 0.0f : differential));
+  const auto negative = launchWave(
+      config,
+      alpha - (horizontal ? differential : 0.0f),
+      beta - (horizontal ? 0.0f : differential));
+  std::array<float, 4> result{};
+  for (size_t component = 0; component < result.size(); ++component)
+    result[component] = (positive[component] - negative[component]) / (2.0f * differential);
+  return result;
+}
 
 void check(VkResult result, const char* operation) {
   if (result != VK_SUCCESS)
@@ -207,6 +268,11 @@ int main() {
     constexpr float observerPolar = 1.2f;
     const float sineObserver = std::sin(observerPolar);
     const float cosineObserver = std::cos(observerPolar);
+    vulkax::relativity::KerrGeodesicConfig jacobiConfig{};
+    jacobiConfig.mass = mass;
+    jacobiConfig.spin = spin;
+    jacobiConfig.observerRadius = observerRadius;
+    jacobiConfig.observerInclinationRadians = observerPolar;
     for (uint32_t index = 0; index < kRayCount; ++index) {
       const uint32_t x = index % 128u;
       const uint32_t y = index / 128u;
@@ -223,6 +289,14 @@ int main() {
           0.55f + 0.05f * static_cast<float>(index % 17u),
           0.04f,
           0.0f};
+      if (index < kJacobiRayCount) {
+        initialRays[index].jacobiPosition = {0.0f, observerRadius, observerPolar, 0.0f};
+        initialRays[index].jacobiWave = launchWave(jacobiConfig, alpha, beta);
+        initialRays[index].horizontalDerivative =
+            launchDerivative(jacobiConfig, alpha, beta, true);
+        initialRays[index].verticalDerivative =
+            launchDerivative(jacobiConfig, alpha, beta, false);
+      }
       active[index] = index;
     }
     const Control control{kRayCount, 0, kRayCount, 0};
@@ -345,7 +419,9 @@ int main() {
           mass + std::sqrt(mass * mass - spin * spin) + 1e-4f,
           0.0025f,
           0.065f,
-          2e-5f};
+          2e-5f,
+          kJacobiRayCount,
+          {0, 0, 0}};
       vkCmdPushConstants(
           command,
           pipelineLayout,
@@ -477,6 +553,47 @@ int main() {
           return finite && terminated && ray.counters[1] > 0u &&
                  (!std::isfinite(nullConstraint) || nullConstraint < 1e-5);
         });
+    bool jacobiValid = true;
+    double maximumJacobiAreaRelativeError = 0.0;
+    float maximumTidalAcceleration = 0.0f;
+    for (uint32_t index = 0; index < kJacobiRayCount; ++index) {
+      const RayState& ray = finalRays[index];
+      maximumTidalAcceleration =
+          std::max(maximumTidalAcceleration, ray.jacobiDiagnostics[0]);
+      const auto finiteVector = [](const std::array<float, 4>& value) {
+        return std::all_of(value.begin(), value.end(), [](float component) {
+          return std::isfinite(component);
+        });
+      };
+      jacobiValid = jacobiValid && ray.counters[3] == 1u &&
+                    finiteVector(ray.jacobiPosition) && finiteVector(ray.jacobiWave) &&
+                    finiteVector(ray.horizontal) && finiteVector(ray.horizontalDerivative) &&
+                    finiteVector(ray.vertical) && finiteVector(ray.verticalDerivative) &&
+                    ray.jacobiDiagnostics[0] > 0.0f;
+      if (index % 85u != 0u) continue;
+      const uint32_t x = index % 128u;
+      const uint32_t y = index / 128u;
+      const double alpha = (static_cast<double>(x) + 0.5) / 128.0 * 14.0 - 7.0;
+      const double beta = (static_cast<double>(y) + 0.5) / 128.0 * 8.0 - 4.0;
+      vulkax::relativity::KerrJacobiConfig cpuConfig{};
+      cpuConfig.affineStep = 0.005;
+      cpuConfig.affineDistance = ray.integration[1];
+      cpuConfig.launchDifferential = 1e-4;
+      cpuConfig.maximumSteps = 512;
+      const auto reference = vulkax::relativity::integrateKerrJacobiBundle(
+          referenceConfig, alpha, beta, cpuConfig);
+      const double sine = std::max(std::sin(static_cast<double>(ray.jacobiPosition[2])), 1e-8);
+      const double a = ray.horizontal[3] * sine;
+      const double b = ray.horizontal[2];
+      const double c = ray.vertical[3] * sine;
+      const double d = ray.vertical[2];
+      const double gpuArea = std::abs(a * d - b * c);
+      const double relativeError = std::abs(gpuArea - reference.sourceAreaScale) /
+                                   std::max(reference.sourceAreaScale, 1e-10);
+      maximumJacobiAreaRelativeError =
+          std::max(maximumJacobiAreaRelativeError, relativeError);
+      jacobiValid = jacobiValid && reference.valid && std::isfinite(gpuArea);
+    }
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(physical, &properties);
     std::cout << "Vulkax active-ray GPU compaction passed on " << properties.deviceName
@@ -486,11 +603,15 @@ int main() {
               << " turning_points=" << turningPoints << " maximum_local_error=" << maximumError
               << " maximum_null_constraint=" << maximumNullConstraint
               << " turning_boundary_constraints=" << turningBoundaryConstraints
+              << " jacobi_rays=" << kJacobiRayCount
+              << " maximum_tidal_acceleration=" << maximumTidalAcceleration
+              << " jacobi_area_relative_error=" << maximumJacobiAreaRelativeError
               << '\n';
     const bool valid = allFinished && finalControl.activeCount == 0 &&
                        finalControl.iterations == kMaximumIterations && completedSteps > kRayCount &&
                        std::isfinite(maximumError) && maximumNullConstraint < 1e-5 &&
-                       turningBoundaryConstraints <= 1u;
+                       turningBoundaryConstraints <= 1u && jacobiValid &&
+                       maximumJacobiAreaRelativeError < 0.01;
 
     vkDestroyFence(device, fence, nullptr);
     vkDestroyCommandPool(device, commandPool, nullptr);
