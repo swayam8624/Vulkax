@@ -25,6 +25,8 @@ layout(set = 0, binding = 6, std430) buffer IndirectCommand {
     uint y;
     uint z;
 } indirectCommand;
+layout(set = 0, binding = 7, std430) buffer BlockSums { uint values[]; } blockSums;
+layout(set = 0, binding = 8, std430) buffer BlockOffsets { uint values[]; } blockOffsets;
 
 layout(push_constant) uniform Push {
     uint phase;
@@ -61,18 +63,42 @@ void integrateActiveRay() {
     flags.values[slot] = ray.status == 0 ? 1 : 0;
 }
 
-void exclusiveScan() {
+void scanActiveBlock() {
+    const uint slot = gl_GlobalInvocationID.x;
     const uint lane = gl_LocalInvocationID.x;
-    for (uint index = lane; index < 1024; index += 256) {
-        scanA[index] = index < control.activeCount ? flags.values[index] : 0;
-    }
+    const uint value = slot < control.activeCount ? flags.values[slot] : 0u;
+    scanA[lane] = value;
     barrier();
     bool sourceA = true;
-    for (uint stride = 1; stride < 1024; stride <<= 1) {
-        for (uint index = lane; index < 1024; index += 256) {
+    for (uint stride = 1u; stride < 256u; stride <<= 1u) {
+        const uint own = sourceA ? scanA[lane] : scanB[lane];
+        const uint preceding = lane >= stride ?
+            (sourceA ? scanA[lane - stride] : scanB[lane - stride]) : 0u;
+        if (sourceA)
+            scanB[lane] = own + preceding;
+        else
+            scanA[lane] = own + preceding;
+        barrier();
+        sourceA = !sourceA;
+    }
+    const uint inclusive = sourceA ? scanA[lane] : scanB[lane];
+    if (slot < control.activeCount) offsets.values[slot] = inclusive - value;
+    barrier();
+    if (lane == 255u) blockSums.values[gl_WorkGroupID.x] = inclusive;
+}
+
+void scanBlockSums() {
+    const uint lane = gl_LocalInvocationID.x;
+    const uint blockCount = (control.activeCount + 255u) / 256u;
+    for (uint index = lane; index < 1024u; index += 256u)
+        scanA[index] = index < blockCount ? blockSums.values[index] : 0u;
+    barrier();
+    bool sourceA = true;
+    for (uint stride = 1u; stride < 1024u; stride <<= 1u) {
+        for (uint index = lane; index < 1024u; index += 256u) {
             const uint own = sourceA ? scanA[index] : scanB[index];
             const uint preceding = index >= stride ?
-                (sourceA ? scanA[index - stride] : scanB[index - stride]) : 0;
+                (sourceA ? scanA[index - stride] : scanB[index - stride]) : 0u;
             if (sourceA)
                 scanB[index] = own + preceding;
             else
@@ -81,13 +107,14 @@ void exclusiveScan() {
         barrier();
         sourceA = !sourceA;
     }
-    for (uint index = lane; index < 1024; index += 256) {
+    for (uint index = lane; index < blockCount; index += 256u) {
         const uint inclusive = sourceA ? scanA[index] : scanB[index];
-        offsets.values[index] = inclusive - (index < control.activeCount ? flags.values[index] : 0);
+        blockOffsets.values[index] = inclusive - blockSums.values[index];
     }
     barrier();
-    if (lane == 0) {
-        const uint nextCount = sourceA ? scanA[1023] : scanB[1023];
+    if (lane == 0u) {
+        const uint nextCount = blockCount == 0u ? 0u :
+            (sourceA ? scanA[blockCount - 1u] : scanB[blockCount - 1u]);
         control.previousCount = control.activeCount;
         control.activeCount = nextCount;
         ++control.iterations;
@@ -100,14 +127,17 @@ void exclusiveScan() {
 void scatterActiveRays() {
     const uint slot = gl_GlobalInvocationID.x;
     if (slot >= control.previousCount || flags.values[slot] == 0) return;
-    writeNext(offsets.values[slot], activeRay(slot));
+    const uint outputSlot = blockOffsets.values[slot / 256u] + offsets.values[slot];
+    writeNext(outputSlot, activeRay(slot));
 }
 
 void main() {
     if (pushData.phase == 0)
         integrateActiveRay();
     else if (pushData.phase == 1)
-        exclusiveScan();
+        scanActiveBlock();
+    else if (pushData.phase == 2)
+        scanBlockSums();
     else
         scatterActiveRays();
 }

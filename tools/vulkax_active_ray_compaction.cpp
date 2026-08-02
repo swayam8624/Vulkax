@@ -13,8 +13,10 @@
 
 namespace {
 
-constexpr uint32_t kRayCount = 1024;
+constexpr uint32_t kRayCount = 16384;
 constexpr uint32_t kMaximumLifetime = 17;
+constexpr uint32_t kWorkgroupSize = 256;
+constexpr uint32_t kGroupCount = (kRayCount + kWorkgroupSize - 1) / kWorkgroupSize;
 
 struct RayState {
   uint32_t remainingSteps;
@@ -188,6 +190,8 @@ int main() {
     buffers.push_back(makeBuffer(physical, device, sizeof(Control), 0));
     buffers.push_back(
         makeBuffer(physical, device, sizeof(IndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT));
+    buffers.push_back(makeBuffer(physical, device, sizeof(uint32_t) * kGroupCount, 0));
+    buffers.push_back(makeBuffer(physical, device, sizeof(uint32_t) * kGroupCount, 0));
     std::vector<RayState> initialRays(kRayCount);
     std::vector<uint32_t> active(kRayCount);
     uint64_t expectedSteps = 0;
@@ -197,13 +201,13 @@ int main() {
       expectedSteps += initialRays[index].remainingSteps;
     }
     const Control control{kRayCount, 0, kRayCount, 0};
-    const IndirectCommand indirect{4, 1, 1};
+    const IndirectCommand indirect{kGroupCount, 1, 1};
     upload(device, buffers[0], initialRays.data(), initialRays.size());
     upload(device, buffers[1], active.data(), active.size());
     upload(device, buffers[5], &control, 1);
     upload(device, buffers[6], &indirect, 1);
 
-    std::array<VkDescriptorSetLayoutBinding, 7> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 9> bindings{};
     for (uint32_t index = 0; index < bindings.size(); ++index)
       bindings[index] =
           {index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
@@ -247,7 +251,7 @@ int main() {
         vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline),
         "vkCreateComputePipelines");
 
-    VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 7};
+    VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 9};
     VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     poolInfo.maxSets = 1;
     poolInfo.poolSizeCount = 1;
@@ -260,8 +264,8 @@ int main() {
     allocate.pSetLayouts = &descriptorLayout;
     VkDescriptorSet set = VK_NULL_HANDLE;
     check(vkAllocateDescriptorSets(device, &allocate, &set), "vkAllocateDescriptorSets");
-    std::array<VkDescriptorBufferInfo, 7> bufferInfo{};
-    std::array<VkWriteDescriptorSet, 7> writes{};
+    std::array<VkDescriptorBufferInfo, 9> bufferInfo{};
+    std::array<VkWriteDescriptorSet, 9> writes{};
     for (uint32_t index = 0; index < buffers.size(); ++index) {
       bufferInfo[index] = {buffers[index].handle, 0, buffers[index].bytes};
       writes[index] = {
@@ -336,7 +340,7 @@ int main() {
           0,
           sizeof(push),
           &push);
-      vkCmdDispatch(command, 1, 1, 1);
+      vkCmdDispatchIndirect(command, buffers[6].handle, 0);
       vkCmdPipelineBarrier(
           command,
           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -356,7 +360,27 @@ int main() {
           0,
           sizeof(push),
           &push);
-      vkCmdDispatch(command, 4, 1, 1);
+      vkCmdDispatch(command, 1, 1, 1);
+      vkCmdPipelineBarrier(
+          command,
+          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+          0,
+          1,
+          &barrier,
+          0,
+          nullptr,
+          0,
+          nullptr);
+      push.phase = 3;
+      vkCmdPushConstants(
+          command,
+          pipelineLayout,
+          VK_SHADER_STAGE_COMPUTE_BIT,
+          0,
+          sizeof(push),
+          &push);
+      vkCmdDispatch(command, kGroupCount, 1, 1);
       vkCmdPipelineBarrier(
           command,
           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -390,7 +414,8 @@ int main() {
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(physical, &properties);
     std::cout << "Vulkax active-ray GPU compaction passed on " << properties.deviceName
-              << ": rays=" << kRayCount << " iterations=" << finalControl.iterations
+              << ": rays=" << kRayCount << " groups=" << kGroupCount
+              << " iterations=" << finalControl.iterations
               << " active=" << finalControl.activeCount << " integrated_steps=" << completedSteps
               << '\n';
     const bool valid = allFinished && finalControl.activeCount == 0 &&
