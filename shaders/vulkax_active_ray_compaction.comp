@@ -13,6 +13,7 @@ struct RayState {
     vec4 vertical;
     vec4 verticalDerivative;
     vec4 jacobiDiagnostics; // maximum tidal acceleration, reserved
+    vec4 transfer;          // nearest disk radius, intersections, previous polar, transmittance
     uvec4 counters;         // status, accepted steps, turning points, Jacobi active
 };
 
@@ -351,6 +352,16 @@ void integrateActiveRay() {
                 ++ray.counters.z;
                 ray.integration.z = max(pushData.minimumStep, 0.5 * step);
             } else {
+                const bool equatorCrossing =
+                    (ray.transfer.z - 1.57079632679) * (refined.y - 1.57079632679) <= 0.0 &&
+                    abs(refined.y - ray.transfer.z) > 1e-7;
+                if (equatorCrossing && refined.x >= 2.5 * pushData.mass &&
+                    refined.x <= 13.5 * pushData.mass) {
+                    if (ray.transfer.x <= 0.0 || refined.x < ray.transfer.x)
+                        ray.transfer.x = refined.x;
+                    ray.transfer.y += 1.0;
+                }
+                ray.transfer.z = refined.y;
                 if (rayIndex < pushData.jacobiRayCount) {
                     BundleState bundle = BundleState(
                         ray.jacobiPosition,

@@ -34,6 +34,7 @@ struct alignas(16) RayState {
   std::array<float, 4> vertical{};
   std::array<float, 4> verticalDerivative{};
   std::array<float, 4> jacobiDiagnostics{};
+  std::array<float, 4> transfer{};
   std::array<uint32_t, 4> counters{};
 };
 struct Control {
@@ -61,7 +62,7 @@ struct Push {
   float observerRadius;
   uint32_t terminateAtObserver;
 };
-static_assert(sizeof(RayState) == 176 && sizeof(Control) == 16 && sizeof(Push) == 48);
+static_assert(sizeof(RayState) == 192 && sizeof(Control) == 16 && sizeof(Push) == 48);
 
 std::array<float, 4> launchWave(
     const vulkax::relativity::KerrGeodesicConfig& config, float alpha, float beta) {
@@ -292,6 +293,7 @@ int main() {
           0.55f + 0.05f * static_cast<float>(index % 17u),
           0.04f,
           0.0f};
+      initialRays[index].transfer = {0.0f, 0.0f, observerPolar, 1.0f};
       if (index < kJacobiRayCount) {
         initialRays[index].jacobiPosition = {0.0f, observerRadius, observerPolar, 0.0f};
         initialRays[index].jacobiWave = launchWave(jacobiConfig, alpha, beta);
