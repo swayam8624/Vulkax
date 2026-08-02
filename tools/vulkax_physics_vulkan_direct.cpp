@@ -23,6 +23,7 @@
 #include "lve_window.hpp"
 #include "vulkax/relativity/kerr_live_queue.hpp"
 #include "vulkax/runtime/runtime_contract.hpp"
+#include "vulkax/sim/mac_live_volume.hpp"
 
 #if defined(VULKAX_HAS_OPENEXR)
 #include <OpenEXR/ImfRgbaFile.h>
@@ -120,6 +121,7 @@ class DirectPhysicsPresenter final {
   ~DirectPhysicsPresenter() {
     if (device_.device() != VK_NULL_HANDLE) vkDeviceWaitIdle(device_.device());
     kerrQueue_.reset();
+    macVolume_.reset();
     destroyWaveImage();
     if (computePipeline_ != VK_NULL_HANDLE)
       vkDestroyPipeline(device_.device(), computePipeline_, nullptr);
@@ -359,7 +361,7 @@ class DirectPhysicsPresenter final {
     // reconstructs through the graphics sampler while the compacted queue
     // advances across frames.
     const uint32_t maximumWidth =
-        kerr_ ? (frameLimit_ == 0 ? 256u : 384u) : (volume_ ? 640u : 512u);
+        kerr_ ? (frameLimit_ == 0 ? 256u : 384u) : (volume_ ? 320u : 512u);
     if (drawableExtent.width <= maximumWidth) return drawableExtent;
     const float scale = static_cast<float>(maximumWidth) / static_cast<float>(drawableExtent.width);
     return {
@@ -486,6 +488,11 @@ class DirectPhysicsPresenter final {
       std::cout << "Vulkax live Kerr queue: " << kerrQueue_->rayCount() << " Jacobi bundles ("
                 << kerrQueue_->queueWidth() << 'x' << kerrQueue_->queueHeight() << ")\n";
     }
+    if (volume_) {
+      macVolume_ = std::make_unique<vulkax::sim::MacLiveVolume>(
+          device_, waveImageView_, waveExtent_);
+      std::cout << "Vulkax live Vulkan MAC volume: 24x32x24 staggered grid\n";
+    }
     waveImageInitialized_ = false;
     accumulatedSamples_ = 0;
   }
@@ -549,25 +556,30 @@ class DirectPhysicsPresenter final {
           1,
           &footprintReady);
     }
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline_);
-    vkCmdBindDescriptorSets(
-        commandBuffer,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        computePipelineLayout_,
-        0,
-        1,
-        &computeDescriptorSet_,
-        0,
-        nullptr);
-    vkCmdPushConstants(
-        commandBuffer,
-        computePipelineLayout_,
-        VK_SHADER_STAGE_COMPUTE_BIT,
-        0,
-        sizeof(constants),
-        &constants);
-    vkCmdDispatch(
-        commandBuffer, (waveExtent_.width + 15) / 16, (waveExtent_.height + 15) / 16, 1);
+    if (volume_) {
+      if (!macVolume_) throw std::runtime_error("live Vulkan MAC volume was not initialized");
+      macVolume_->record(commandBuffer, 1.0f / 60.0f);
+    } else {
+      vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline_);
+      vkCmdBindDescriptorSets(
+          commandBuffer,
+          VK_PIPELINE_BIND_POINT_COMPUTE,
+          computePipelineLayout_,
+          0,
+          1,
+          &computeDescriptorSet_,
+          0,
+          nullptr);
+      vkCmdPushConstants(
+          commandBuffer,
+          computePipelineLayout_,
+          VK_SHADER_STAGE_COMPUTE_BIT,
+          0,
+          sizeof(constants),
+          &constants);
+      vkCmdDispatch(
+          commandBuffer, (waveExtent_.width + 15) / 16, (waveExtent_.height + 15) / 16, 1);
+    }
     if (timestampPool_ != VK_NULL_HANDLE) {
       vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, timestampPool_, 1);
     }
@@ -727,9 +739,13 @@ class DirectPhysicsPresenter final {
       }
       vkUnmapMemory(device_.device(), readbackMemory);
       mapped = nullptr;
-      if (minimumLuminance > 1e-4f || maximumLuminance < 1e-3f ||
-          maximumLuminance <= minimumLuminance + 1e-3f) {
-        throw std::runtime_error("direct Vulkan HDR capture lacks expected shadow/radiance range");
+      const bool lacksRange = maximumLuminance <= minimumLuminance + 1e-3f;
+      const bool lacksBlackHoleShadow = !volume_ && minimumLuminance > 1e-4f;
+      const bool lacksRadiance = maximumLuminance < (volume_ ? 1e-2f : 1e-3f);
+      if (lacksRange || lacksBlackHoleShadow || lacksRadiance) {
+        throw std::runtime_error(
+            "direct Vulkan HDR capture lacks expected shadow/radiance range: [" +
+            std::to_string(minimumLuminance) + ", " + std::to_string(maximumLuminance) + "]");
       }
       if (!outputPath.parent_path().empty())
         std::filesystem::create_directories(outputPath.parent_path());
@@ -758,6 +774,7 @@ class DirectPhysicsPresenter final {
 
   void destroyWaveImage() {
     kerrQueue_.reset();
+    macVolume_.reset();
     if (waveSampler_ != VK_NULL_HANDLE) vkDestroySampler(device_.device(), waveSampler_, nullptr);
     if (waveImageView_ != VK_NULL_HANDLE)
       vkDestroyImageView(device_.device(), waveImageView_, nullptr);
@@ -802,6 +819,7 @@ class DirectPhysicsPresenter final {
   VkPipeline computePipeline_ = VK_NULL_HANDLE;
   std::unique_ptr<lve::LvePipeline> pipeline_;
   std::unique_ptr<vulkax::relativity::KerrLiveQueue> kerrQueue_;
+  std::unique_ptr<vulkax::sim::MacLiveVolume> macVolume_;
   VkImage waveImage_ = VK_NULL_HANDLE;
   VkDeviceMemory waveImageMemory_ = VK_NULL_HANDLE;
   VkImageView waveImageView_ = VK_NULL_HANDLE;

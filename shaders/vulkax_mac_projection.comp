@@ -581,7 +581,7 @@ void rayMarchVolume(uvec3 id) {
   const vec2 uv = (vec2(id.xy) + 0.5) / vec2(pushData.outputWidth, pushData.outputHeight);
   const float aspect = float(pushData.outputWidth) / float(pushData.outputHeight);
   const vec3 origin = vec3(0.5, 0.48, -0.92);
-  const vec3 direction = normalize(vec3((uv.x - 0.5) * 0.95 * aspect, (uv.y - 0.5) * 0.95, 1.0));
+  const vec3 direction = normalize(vec3((uv.x - 0.5) * 0.62 * aspect, (uv.y - 0.5) * 0.62, 1.0));
   const vec2 intersection = intersectUnitBox(origin, direction);
   vec3 radiance = vec3(0.003, 0.005, 0.011);
   float transmittance = 1.0;

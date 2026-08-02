@@ -69,6 +69,12 @@ that image in the graphics pass, tone maps it, and presents the result to the Vu
 When timestamp queries are supported, it also prints measured Vulkan compute and compute-to-render
 GPU durations for the final presented frame.
 
+`--volume` now advances the same persistent Vulkan staggered-MAC resources used by the numerical
+validation runner. Each presented frame executes GPU CFL selection, buoyancy, curl/vorticity,
+two-level pressure correction, obstacle-aware projection, RK2/MacCormack transport, density
+hierarchy construction, self-shadowed volume marching, and a direct radiance-buffer-to-HDR-image
+pass. The swapchain path no longer renders the separate procedural density field.
+
 `--black-hole` selects the direct Vulkan Schwarzschild mode. It uses an orbital-plane RK4 trace,
 capture/escape classification, equatorial disk crossings, and the same direct HDR compute-to-present
 path. Its bounded 512-pixel-wide compute extent keeps this research preview interactive.

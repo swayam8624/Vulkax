@@ -632,6 +632,7 @@ add_executable(
   VulkaxPhysicsVulkanDirect
   tools/vulkax_physics_vulkan_direct.cpp
   src/vulkax/relativity/kerr_live_queue.cpp
+  src/vulkax/sim/mac_live_volume.cpp
   src/lve_window.cpp
   src/lve_device.cpp
   src/lve_swap_chain.cpp
