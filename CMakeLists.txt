@@ -194,6 +194,7 @@ add_library(
   src/vulkax/physics/physics_ir.cpp
   src/vulkax/physics/pipeline_cache.cpp
   src/vulkax/physics/vulkan_resource_layout.cpp
+  src/vulkax/physics/vulkan_resource_arena.cpp
   src/vulkax/physics/compute_ir.cpp
   src/vulkax/physics/stencil_ir.cpp
 )
@@ -974,6 +975,19 @@ if (BUILD_TESTING)
   target_link_libraries(PhysicsIrTests PRIVATE vulkax_physics_ir)
   add_dependencies(PhysicsIrTests VulkaxGeneratedStencilShaders)
   add_test(NAME physics_ir COMMAND PhysicsIrTests)
+
+  add_executable(
+    VulkanResourceArenaTests
+    tests/vulkan_resource_arena_tests.cpp
+  )
+  target_compile_features(VulkanResourceArenaTests PRIVATE cxx_std_20)
+  target_link_libraries(VulkanResourceArenaTests PRIVATE vulkax_physics_ir ${Vulkan_LIBRARIES})
+  add_test(NAME vulkan_reflected_resource_runtime COMMAND VulkanResourceArenaTests)
+  set_tests_properties(
+    vulkan_reflected_resource_runtime PROPERTIES
+    SKIP_RETURN_CODE 77
+    LABELS "native_gpu;physics_ir"
+  )
 
   add_executable(
     SimulationGraphTests

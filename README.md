@@ -212,7 +212,7 @@ See [the legacy operating guide](docs/RUNNING_VULKAX.md) for those commands and
 | Coupled scalar evolution IR with cross-field stencils, simultaneous old/new state semantics, per-field boundaries, generated SPIR-V/MSL, and CPU/Vulkan Gray-Scott agreement | Implemented foundation |
 | Persistent editor Wave Field and Gray-Scott Vulkan compute, plus headless wave/N-body CPU/GPU agreement | Implemented |
 | Linear OpenEXR preview export | Implemented |
-| Typed physics IR, explicit equation-defined pass graphs, reflected resource layouts, automatic Vulkan layout/pool materialization, persistent pipeline artifacts, and executable scalar-field programs | Implemented foundation |
+| Typed physics IR, explicit equation-defined pass graphs, reflected resource layouts, automatic Vulkan buffer/image allocation, descriptor writes, pipeline layouts, history rotation and pass barriers, persistent pipeline artifacts, and executable scalar-field programs | Implemented foundation; generated stencil executor migrated |
 | Direct macOS Metal viewport with GPU-resident HDR radiance and presentation | Implemented |
 | Direct Vulkan/MoltenVK compute-to-swapchain field presenter with no CPU image bridge | Implemented and smoke-tested on Apple M2 Pro |
 | Direct Vulkan/MoltenVK Schwarzschild GPU preview with timestamped compute-to-present path | Implemented foundation and smoke-tested on Apple M2 Pro |

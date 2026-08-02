@@ -15,6 +15,11 @@ struct VulkanResourceBinding {
   VkFormat imageFormat = VK_FORMAT_UNDEFINED;
   VkExtent3D extent{1, 1, 1};
   VkDeviceSize bufferBytes = 0;
+  VkBufferUsageFlags bufferUsage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+      VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  VkMemoryPropertyFlags memoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_STORAGE_BIT |
+      VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   uint32_t historyLength = 1;
   VkShaderStageFlags stages = VK_SHADER_STAGE_COMPUTE_BIT;
 };

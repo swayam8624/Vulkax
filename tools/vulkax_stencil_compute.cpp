@@ -1,4 +1,5 @@
 #include "vulkax/physics/stencil_ir.hpp"
+#include "vulkax/physics/vulkan_resource_arena.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -10,7 +11,9 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <numbers>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -31,44 +34,10 @@ struct alignas(16) Parameters {
 };
 static_assert(sizeof(Parameters) == 48);
 
-struct Buffer {
-  VkBuffer handle = VK_NULL_HANDLE;
-  VkDeviceMemory memory = VK_NULL_HANDLE;
-};
-
 void check(VkResult result, const char* operation) {
   if (result != VK_SUCCESS) {
     throw std::runtime_error(std::string{operation} + " failed: " + std::to_string(result));
   }
-}
-
-uint32_t memoryType(VkPhysicalDevice physical, uint32_t mask, VkMemoryPropertyFlags flags) {
-  VkPhysicalDeviceMemoryProperties properties{};
-  vkGetPhysicalDeviceMemoryProperties(physical, &properties);
-  for (uint32_t index = 0; index < properties.memoryTypeCount; ++index) {
-    if ((mask & (1u << index)) != 0 &&
-        (properties.memoryTypes[index].propertyFlags & flags) == flags) return index;
-  }
-  throw std::runtime_error("no compatible Vulkan memory type");
-}
-
-Buffer makeBuffer(VkPhysicalDevice physical, VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage) {
-  VkBufferCreateInfo create{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  create.size = size;
-  create.usage = usage;
-  create.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  Buffer buffer{};
-  check(vkCreateBuffer(device, &create, nullptr, &buffer.handle), "vkCreateBuffer");
-  VkMemoryRequirements requirements{};
-  vkGetBufferMemoryRequirements(device, buffer.handle, &requirements);
-  VkMemoryAllocateInfo allocate{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  allocate.allocationSize = requirements.size;
-  allocate.memoryTypeIndex = memoryType(
-      physical, requirements.memoryTypeBits,
-      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  check(vkAllocateMemory(device, &allocate, nullptr, &buffer.memory), "vkAllocateMemory");
-  check(vkBindBufferMemory(device, buffer.handle, buffer.memory, 0), "vkBindBufferMemory");
-  return buffer;
 }
 
 std::vector<char> readFile(const std::filesystem::path& path) {
@@ -88,6 +57,16 @@ bool hasPortabilityEnumeration() {
   vkEnumerateInstanceExtensionProperties(nullptr, &count, extensions.data());
   return std::any_of(extensions.begin(), extensions.end(), [](const auto& extension) {
     return std::string{extension.extensionName} == VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
+  });
+}
+
+bool hasDeviceExtension(VkPhysicalDevice physical, const char* name) {
+  uint32_t count = 0;
+  vkEnumerateDeviceExtensionProperties(physical, nullptr, &count, nullptr);
+  std::vector<VkExtensionProperties> extensions(count);
+  vkEnumerateDeviceExtensionProperties(physical, nullptr, &count, extensions.data());
+  return std::any_of(extensions.begin(), extensions.end(), [&](const auto& extension) {
+    return std::string{extension.extensionName} == name;
   });
 }
 
@@ -192,6 +171,12 @@ int main(int argc, char** argv) {
     VkDeviceCreateInfo deviceInfo{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     deviceInfo.queueCreateInfoCount = 1;
     deviceInfo.pQueueCreateInfos = &queueInfo;
+    std::vector<const char*> deviceExtensions;
+    if (hasDeviceExtension(physical, "VK_KHR_portability_subset")) {
+      deviceExtensions.push_back("VK_KHR_portability_subset");
+    }
+    deviceInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
     check(vkCreateDevice(physical, &deviceInfo, nullptr, &device), "vkCreateDevice");
     VkQueue queue = VK_NULL_HANDLE;
     vkGetDeviceQueue(device, queueFamily, 0, &queue);
@@ -200,9 +185,6 @@ int main(int argc, char** argv) {
     const size_t cellCount = static_cast<size_t>(parameters.width) * parameters.height * parameters.depth;
     const size_t valueCount = cellCount * (coupled ? 2u : 1u);
     const VkDeviceSize valueBytes = valueCount * sizeof(float);
-    Buffer input = makeBuffer(physical, device, valueBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    Buffer output = makeBuffer(physical, device, valueBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    Buffer uniform = makeBuffer(physical, device, sizeof(parameters), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     std::vector<float> initial(valueCount, coupled ? 1.0f : 0.0f);
     for (uint32_t z = 0; z < parameters.depth; ++z) {
       for (uint32_t y = 0; y < parameters.height; ++y) {
@@ -224,29 +206,31 @@ int main(int argc, char** argv) {
         }
       }
     }
-    void* mapped = nullptr;
-    check(vkMapMemory(device, input.memory, 0, valueBytes, 0, &mapped), "vkMapMemory input");
-    std::memcpy(mapped, initial.data(), static_cast<size_t>(valueBytes));
-    vkUnmapMemory(device, input.memory);
-    check(vkMapMemory(device, uniform.memory, 0, sizeof(parameters), 0, &mapped), "vkMapMemory parameters");
-    std::memcpy(mapped, &parameters, sizeof(parameters));
-    vkUnmapMemory(device, uniform.memory);
-
-    VkDescriptorSetLayoutBinding bindings[3]{};
-    bindings[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    bindings[1] = {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    bindings[2] = {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    descriptorLayoutInfo.bindingCount = 3;
-    descriptorLayoutInfo.pBindings = bindings;
-    VkDescriptorSetLayout descriptorLayout = VK_NULL_HANDLE;
-    check(vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &descriptorLayout),
-          "vkCreateDescriptorSetLayout");
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorLayout;
-    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-    check(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout), "vkCreatePipelineLayout");
+    using vulkax::physics::VulkanResourceArena;
+    using vulkax::physics::VulkanResourceBinding;
+    using vulkax::physics::VulkanResourcePlan;
+    const VkMemoryPropertyFlags hostVisible =
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    VulkanResourcePlan resourcePlan{};
+    resourcePlan.canonicalHash = coupled ? 0x4752415953434f54ull : 0x444946465553494full;
+    resourcePlan.bindings.resize(3);
+    for (uint32_t index = 0; index < 2; ++index) {
+      VulkanResourceBinding& binding = resourcePlan.bindings[index];
+      binding.binding = index;
+      binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      binding.bufferBytes = valueBytes;
+      binding.memoryProperties = hostVisible;
+    }
+    VulkanResourceBinding& parameterBinding = resourcePlan.bindings[2];
+    parameterBinding.binding = 2;
+    parameterBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    parameterBinding.bufferBytes = sizeof(parameters);
+    parameterBinding.bufferUsage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    parameterBinding.memoryProperties = hostVisible;
+    auto resources =
+        std::make_unique<VulkanResourceArena>(physical, device, std::move(resourcePlan));
+    resources->uploadBuffer(0, std::as_bytes(std::span{initial}));
+    resources->uploadBuffer(2, std::as_bytes(std::span{&parameters, 1u}));
     const auto shaderCode = readFile(
         coupled ? VULKAX_GENERATED_GRAY_SCOTT_SPIRV : VULKAX_GENERATED_DIFFUSION_SPIRV);
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
@@ -257,37 +241,10 @@ int main(int argc, char** argv) {
     VkComputePipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
     pipelineInfo.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
                           VK_SHADER_STAGE_COMPUTE_BIT, shader, "main", nullptr};
-    pipelineInfo.layout = pipelineLayout;
+    pipelineInfo.layout = resources->pipelineLayout();
     VkPipeline pipeline = VK_NULL_HANDLE;
     check(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline),
           "vkCreateComputePipelines");
-
-    VkDescriptorPoolSize poolSizes[2]{{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2},
-                                      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}};
-    VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    poolInfo.maxSets = 1;
-    poolInfo.poolSizeCount = 2;
-    poolInfo.pPoolSizes = poolSizes;
-    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-    check(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool), "vkCreateDescriptorPool");
-    VkDescriptorSetAllocateInfo descriptorSetInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-    descriptorSetInfo.descriptorPool = descriptorPool;
-    descriptorSetInfo.descriptorSetCount = 1;
-    descriptorSetInfo.pSetLayouts = &descriptorLayout;
-    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-    check(vkAllocateDescriptorSets(device, &descriptorSetInfo, &descriptorSet), "vkAllocateDescriptorSets");
-    VkDescriptorBufferInfo bufferInfos[3]{{input.handle, 0, valueBytes}, {output.handle, 0, valueBytes},
-                                          {uniform.handle, 0, sizeof(parameters)}};
-    VkWriteDescriptorSet writes[3]{};
-    for (uint32_t index = 0; index < 3; ++index) {
-      writes[index].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      writes[index].dstSet = descriptorSet;
-      writes[index].dstBinding = index;
-      writes[index].descriptorCount = 1;
-      writes[index].descriptorType = index < 2 ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      writes[index].pBufferInfo = &bufferInfos[index];
-    }
-    vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
 
     VkCommandPoolCreateInfo commandPoolInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     commandPoolInfo.queueFamilyIndex = queueFamily;
@@ -302,8 +259,10 @@ int main(int argc, char** argv) {
     VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     check(vkBeginCommandBuffer(command, &begin), "vkBeginCommandBuffer");
     vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1,
-                            &descriptorSet, 0, nullptr);
+    const VkDescriptorSet descriptorSet = resources->descriptorSet();
+    vkCmdBindDescriptorSets(
+        command, VK_PIPELINE_BIND_POINT_COMPUTE, resources->pipelineLayout(), 0, 1,
+        &descriptorSet, 0, nullptr);
     vkCmdDispatch(command, 2, 2, 4);
     check(vkEndCommandBuffer(command), "vkEndCommandBuffer");
     VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
@@ -316,9 +275,7 @@ int main(int argc, char** argv) {
     check(vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX), "vkWaitForFences");
 
     std::vector<float> gpu(valueCount);
-    check(vkMapMemory(device, output.memory, 0, valueBytes, 0, &mapped), "vkMapMemory output");
-    std::memcpy(gpu.data(), mapped, static_cast<size_t>(valueBytes));
-    vkUnmapMemory(device, output.memory);
+    resources->downloadBuffer(1, std::as_writable_bytes(std::span{gpu}));
     std::vector<float> reference;
     if (coupled) {
       const std::map<std::string, std::vector<float>> coupledInput{
@@ -355,15 +312,9 @@ int main(int argc, char** argv) {
 
     vkDestroyFence(device, fence, nullptr);
     vkDestroyCommandPool(device, commandPool, nullptr);
-    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
     vkDestroyPipeline(device, pipeline, nullptr);
     vkDestroyShaderModule(device, shader, nullptr);
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-    vkDestroyDescriptorSetLayout(device, descriptorLayout, nullptr);
-    for (const Buffer buffer : {input, output, uniform}) {
-      vkDestroyBuffer(device, buffer.handle, nullptr);
-      vkFreeMemory(device, buffer.memory, nullptr);
-    }
+    resources.reset();
     vkDestroyDevice(device, nullptr);
     vkDestroyInstance(instance, nullptr);
     return maximumError < 2e-6 ? 0 : 3;

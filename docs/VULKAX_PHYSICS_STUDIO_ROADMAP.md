@@ -25,7 +25,7 @@ which parts are real-time approximations and which are offline reference calcula
 | GeoBEACON city demo | Connaught Place plus London, Tokyo, and Midtown data | Preserved legacy application |
 | Atlas globe and navigation | `atlas_*` libraries and tools | Preserved legacy experiment |
 | Equation core | `vulkax_equation`, parser, AST evaluation, deterministic preset catalog | Implemented |
-| Typed physics IR | dimensions, scalar/vector fields, placements, validated operators, explicit user-declared solver-pass lowering, reflected Vulkan descriptor materialization, and executable scalar register programs | Implemented foundation |
+| Typed physics IR | dimensions, scalar/vector fields, placements, validated operators, explicit user-declared solver-pass lowering, reflected Vulkan resource ownership, history rotation and pass barriers, and executable scalar register programs | Implemented foundation |
 | Portable compute lowering | one canonical scalar IR hash, CPU interpreter, constant folding/CSE, GLSL/SPIR-V and MSL emission, and Vulkan/Metal wave agreement | Implemented for scalar fields |
 | Scalar PDE stencil lowering | Laplacian/directional-gradient expansion, explicit Euler update, open/periodic/fixed boundaries, CPU oracle, generated SPIR-V/MSL, and Vulkan agreement | Implemented for scalar fields |
 | Coupled PDE lowering | simultaneous cross-field scalar updates, per-field boundaries, interleaved GPU ABI, generated SPIR-V/MSL, and CPU/Vulkan Gray-Scott agreement | Implemented foundation |
@@ -122,6 +122,13 @@ Gray-Scott graph has a separate 64x64 Vulkan dispatch/readback comparison for 64
 are headless correctness checks. Wave Field and Gray-Scott now have persistent editor GPU paths;
 N-body editor ownership remains runtime work.
 
+The reflected Vulkan runtime now allocates storage buffers and 1D/2D/3D storage images, owns their
+memory and views, creates descriptor sets and pipeline layouts, rewrites history arrays per reusable
+frame set, and emits resource-specific compute barriers from reflected pass dependencies. The
+generated diffusion and coupled Gray-Scott executor uses this runtime instead of handwritten
+allocation and descriptor code. A device-level test submits reflected 3D image transitions and a
+write-to-read pass barrier, then verifies two-slot history rotation.
+
 The editor also ships a deterministic N-body orbit preset using a softened, center-of-mass-frame
 velocity-Verlet reference. Its 4,800-step unit test bounds energy drift below two percent and its
 24-frame PNG export is verified to contain changing frames. GPU particle integration and rendering
@@ -210,7 +217,8 @@ voxelizes them on Metal, accumulates per-triangle pressure forces, and advances 
 the corresponding test reports 2,598 occupied cells for the checked cube. Combustion chemistry,
 sparse physical-memory residency, and film-production validation remain outside this implementation.
 
-The portable Vulkan path has a separate validated staggered-MAC volume stage. It stores the three
+The portable Vulkan path has a validated staggered-MAC volume stage shared by the direct Vulkan
+presenter. It stores the three
 velocity components on their corresponding faces and now executes GPU maximum-speed/CFL control,
 solid-obstacle boundaries, curl/vorticity, and a fine/coarse/fine two-level pressure sequence. It
 then performs midpoint-RK2 backtracing, bounded MacCormack density/temperature correction,
@@ -218,12 +226,14 @@ persistent source injection, and builds a max-density hierarchy. The HDR marcher
 skipping, light transmittance, self-shadowing, and a bounded multiple-scattering approximation. On
 the checked Apple M2 Pro 80-step run it selected `dt=0.0091313` at `CFL=0.7`, reduced divergence L2
 from `0.072966` to `0.0233146`, measured curl L2 `1.90616`, produced finite luminance in
-`[0.005008, 0.268347]`, and measured `923.289 ms` for the recorded Vulkan command stream. The
-native Metal viewport provides the interactive volume presentation; the portable Vulkan suite
-exports the computed HDR storage-buffer radiance as a deterministic validation capture.
-Its brick mask classifies and dilates active regions so inactive bricks skip simulation work while
-retaining dense backing allocations. The imported-OBJ path performs GPU voxelization, pressure
-force/torque evaluation, and body integration and has a separate native Vulkan regression.
+`[0.005008, 0.268347]`, and measured `923.289 ms` for the recorded Vulkan command stream. Vulkan
+and Metal both provide live GPU volume presentation, while the portable suite also exports the
+computed HDR storage-buffer radiance as a deterministic validation capture. Density, temperature,
+and their MacCormack history fields use a bounded compact brick pool with a GPU page table,
+race-safe free list, allocation overflow reporting, and inactive-brick deallocation; pressure and
+velocity remain dense. The imported-OBJ path performs GPU voxelization, pressure force/torque
+evaluation, moving-boundary integration, and multi-body contact handling with native Vulkan and
+Metal regressions.
 
 ### Phase 6: Adaptive research controller
 
