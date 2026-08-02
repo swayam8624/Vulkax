@@ -442,8 +442,9 @@ int main(int argc, char** argv) {
             "[--output volume.ppm]");
       }
     }
+    const uint32_t runtimeBodyCount = std::max(bodyCount, 2u);
     const ImportedMesh importedMesh = instantiateBodies(
-        meshPath ? loadObstacleObj(*meshPath) : defaultObstacleMesh(), bodyCount);
+        meshPath ? loadObstacleObj(*meshPath) : defaultObstacleMesh(), runtimeBodyCount);
     VkApplicationInfo application{VK_STRUCTURE_TYPE_APPLICATION_INFO};
     application.pApplicationName = "Vulkax Vulkan MAC Projection";
     application.apiVersion = VK_API_VERSION_1_1;
@@ -536,7 +537,7 @@ int main(int argc, char** argv) {
         meshVertexCount * 4u,
         triangleCount * 3u,
         triangleCount * 8u,
-        24u * std::max(bodyCount, 2u)};
+        24u * runtimeBodyCount};
     std::array<Buffer, 32> buffers{};
     for (size_t index = 0; index < buffers.size(); ++index) {
       buffers[index] = makeBuffer(physical, device, counts[index]);
@@ -575,21 +576,22 @@ int main(int argc, char** argv) {
         importedMesh.indices.size() * sizeof(uint32_t));
     upload(device, buffers[28], meshVertices);
     upload(device, buffers[29], encodedIndices);
-    const uint32_t allocatedBodyCount = std::max(bodyCount, 2u);
-    std::vector<float> bodyState(24u * allocatedBodyCount, 0.0f);
-    for (uint32_t body = 0; body < allocatedBodyCount; ++body) {
+    std::vector<float> bodyState(24u * runtimeBodyCount, 0.0f);
+    for (uint32_t body = 0; body < runtimeBodyCount; ++body) {
       const size_t offset = static_cast<size_t>(body) * 24u;
-      bodyState[offset + 0] = bodyCount == 1 ? 0.66f : 0.58f + 0.16f * body;
-      bodyState[offset + 1] = 0.30f + 0.015f * body;
-      bodyState[offset + 2] = 0.50f;
-      bodyState[offset + 3] = 2.0f;
+      const bool sentinel = body >= bodyCount;
+      bodyState[offset + 0] = sentinel ? 0.95f : (bodyCount == 1 ? 0.66f : 0.58f + 0.16f * body);
+      bodyState[offset + 1] = sentinel ? 0.95f : 0.30f + 0.015f * body;
+      bodyState[offset + 2] = sentinel ? 0.95f : 0.50f;
+      bodyState[offset + 3] = sentinel ? 1e6f : 2.0f;
       bodyState[offset + 7] = 1.0f;
-      bodyState[offset + 8] = body >= bodyCount ? 0.0f :
+      bodyState[offset + 8] = sentinel ? 0.0f :
           (bodyCount == 1 ? 0.02f : (body == 0 ? 0.05f : -0.05f));
-      bodyState[offset + 13] = body >= bodyCount ? 0.0f :
+      bodyState[offset + 13] = sentinel ? 0.0f :
           (bodyCount == 1 ? 1.25f : 0.35f * (body + 1u));
       bodyState[offset + 16] = bodyState[offset + 17] = bodyState[offset + 18] = 0.012f;
-      bodyState[offset + 20] = bodyState[offset + 21] = bodyState[offset + 22] = 1.0f;
+      const float scale = sentinel ? 0.0f : 1.0f;
+      bodyState[offset + 20] = bodyState[offset + 21] = bodyState[offset + 22] = scale;
     }
     upload(device, buffers[31], bodyState);
 
@@ -620,19 +622,21 @@ int main(int argc, char** argv) {
         "vkCreatePipelineLayout");
     const auto shaderCode =
         readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_mac_projection.comp.spv");
-    const auto contactShaderCode =
-        readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_rigid_contacts.comp.spv");
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = shaderCode.size();
     shaderInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
     VkShaderModule shader = VK_NULL_HANDLE;
     check(vkCreateShaderModule(device, &shaderInfo, nullptr, &shader), "vkCreateShaderModule");
-    shaderInfo.codeSize = contactShaderCode.size();
-    shaderInfo.pCode = reinterpret_cast<const uint32_t*>(contactShaderCode.data());
     VkShaderModule contactShader = VK_NULL_HANDLE;
-    check(
-        vkCreateShaderModule(device, &shaderInfo, nullptr, &contactShader),
-        "vkCreateShaderModule contacts");
+    if (runtimeBodyCount > 1u) {
+      const auto contactShaderCode =
+          readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_rigid_contacts.comp.spv");
+      shaderInfo.codeSize = contactShaderCode.size();
+      shaderInfo.pCode = reinterpret_cast<const uint32_t*>(contactShaderCode.data());
+      check(
+          vkCreateShaderModule(device, &shaderInfo, nullptr, &contactShader),
+          "vkCreateShaderModule contacts");
+    }
     const std::filesystem::path pipelineCachePath =
         std::filesystem::temp_directory_path() /
         ("vulkax-mac-pipeline-" + std::to_string(properties.vendorID) + "-" +
@@ -668,13 +672,15 @@ int main(int argc, char** argv) {
     check(
         vkCreateComputePipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline),
         "vkCreateComputePipelines");
-    pipelineInfo.stage.module = contactShader;
     VkPipeline contactPipeline = VK_NULL_HANDLE;
-    std::cerr << "vulkax-mac-projection: compiling rigid contact pipeline\n";
-    check(
-        vkCreateComputePipelines(
-            device, pipelineCache, 1, &pipelineInfo, nullptr, &contactPipeline),
-        "vkCreateComputePipelines contacts");
+    if (contactShader != VK_NULL_HANDLE) {
+      pipelineInfo.stage.module = contactShader;
+      std::cerr << "vulkax-mac-projection: compiling rigid contact pipeline\n";
+      check(
+          vkCreateComputePipelines(
+              device, pipelineCache, 1, &pipelineInfo, nullptr, &contactPipeline),
+          "vkCreateComputePipelines contacts");
+    }
     size_t pipelineCacheBytes = 0;
     if (vkGetPipelineCacheData(device, pipelineCache, &pipelineCacheBytes, nullptr) == VK_SUCCESS &&
         pipelineCacheBytes > 0) {
@@ -754,7 +760,7 @@ int main(int argc, char** argv) {
         nullptr);
     MacPass push{};
     push.triangleCount = static_cast<uint32_t>(triangleCount);
-    push.padding[0] = bodyCount;
+    push.padding[0] = runtimeBodyCount;
     const uint32_t groupsX = (kNx + 4u) / 4u;
     const uint32_t groupsY = (kNy + 4u) / 4u;
     const uint32_t groupsZ = (kNz + 4u) / 4u;
@@ -808,12 +814,14 @@ int main(int argc, char** argv) {
       dispatch(17, 0.0f);
       dispatch(21, 0.0f);
       dispatch(22, 0.0f);
-      vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, contactPipeline);
-      vkCmdPushConstants(
-          command, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push), &push);
-      vkCmdDispatch(command, 1, 1, 1);
-      storageBarrier(command);
-      vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+      if (runtimeBodyCount > 1u) {
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, contactPipeline);
+        vkCmdPushConstants(
+            command, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push), &push);
+        vkCmdDispatch(command, 1, 1, 1);
+        storageBarrier(command);
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+      }
       dispatch(20, 0.0f);
     }
     push.pass = 8;
@@ -966,11 +974,13 @@ int main(int argc, char** argv) {
     if (queryPool != VK_NULL_HANDLE) vkDestroyQueryPool(device, queryPool, nullptr);
     vkDestroyCommandPool(device, commandPool, nullptr);
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-    vkDestroyPipeline(device, contactPipeline, nullptr);
+    if (contactPipeline != VK_NULL_HANDLE)
+      vkDestroyPipeline(device, contactPipeline, nullptr);
     vkDestroyPipeline(device, pipeline, nullptr);
     vkDestroyPipelineCache(device, pipelineCache, nullptr);
     vkDestroyShaderModule(device, shader, nullptr);
-    vkDestroyShaderModule(device, contactShader, nullptr);
+    if (contactShader != VK_NULL_HANDLE)
+      vkDestroyShaderModule(device, contactShader, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyDescriptorSetLayout(device, descriptorLayout, nullptr);
     for (const Buffer& buffer : buffers) {
