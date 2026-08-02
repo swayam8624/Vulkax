@@ -69,6 +69,44 @@ Vec3d componentMultiply(Vec3d a, Vec3d b) {
   return {a.x * b.x, a.y * b.y, a.z * b.z};
 }
 
+struct Bounds3d {
+  Vec3d minimum;
+  Vec3d maximum;
+};
+
+Bounds3d worldBounds(const RigidBodyObject& object) {
+  if (object.mesh.vertices.empty()) throw std::invalid_argument("contact mesh has no vertices");
+  Vec3d minimum = transformRigidPoint(object.body, object.mesh.vertices.front());
+  Vec3d maximum = minimum;
+  for (const Vec3d local : object.mesh.vertices) {
+    const Vec3d point = transformRigidPoint(object.body, local);
+    minimum = {std::min(minimum.x, point.x), std::min(minimum.y, point.y),
+               std::min(minimum.z, point.z)};
+    maximum = {std::max(maximum.x, point.x), std::max(maximum.y, point.y),
+               std::max(maximum.z, point.z)};
+  }
+  return {minimum, maximum};
+}
+
+Vec3d applyWorldInverseInertia(const RigidBodyState& body, Vec3d worldValue) {
+  const Quaterniond orientation = normalize(body.orientation);
+  const Vec3d local = rotate(conjugate(orientation), worldValue);
+  return rotate(orientation, {
+      local.x / body.diagonalInertia.x,
+      local.y / body.diagonalInertia.y,
+      local.z / body.diagonalInertia.z});
+}
+
+double component(Vec3d value, size_t axis) {
+  return axis == 0 ? value.x : (axis == 1 ? value.y : value.z);
+}
+
+void addComponent(Vec3d& value, size_t axis, double amount) {
+  if (axis == 0) value.x += amount;
+  else if (axis == 1) value.y += amount;
+  else value.z += amount;
+}
+
 Vec3d worldVertex(const TriangleMesh& mesh, const RigidBodyState& body, uint32_t index) {
   if (index >= mesh.vertices.size()) throw std::out_of_range("mesh index is out of range");
   return transformRigidPoint(body, mesh.vertices[index]);
@@ -235,6 +273,103 @@ void advanceRigidBody(RigidBodyState& body, const FluidForce& force, double time
       orientation.y + 0.5 * derivative.y * timestepSeconds,
       orientation.z + 0.5 * derivative.z * timestepSeconds,
       orientation.w + 0.5 * derivative.w * timestepSeconds});
+}
+
+ContactStats resolveRigidBodyContacts(
+    std::span<RigidBodyObject> objects, double restitution, double friction) {
+  if (restitution < 0.0 || restitution > 1.0 || friction < 0.0) {
+    throw std::invalid_argument("contact restitution and friction are out of range");
+  }
+  ContactStats stats{};
+  for (size_t first = 0; first < objects.size(); ++first) {
+    for (size_t second = first + 1; second < objects.size(); ++second) {
+      ++stats.testedPairs;
+      auto& a = objects[first];
+      auto& b = objects[second];
+      if (a.body.mass <= 0.0 || b.body.mass <= 0.0) {
+        throw std::invalid_argument("contact body mass must be positive");
+      }
+      const Bounds3d aBounds = worldBounds(a);
+      const Bounds3d bBounds = worldBounds(b);
+      const Vec3d overlap{
+          std::min(aBounds.maximum.x, bBounds.maximum.x) -
+              std::max(aBounds.minimum.x, bBounds.minimum.x),
+          std::min(aBounds.maximum.y, bBounds.maximum.y) -
+              std::max(aBounds.minimum.y, bBounds.minimum.y),
+          std::min(aBounds.maximum.z, bBounds.maximum.z) -
+              std::max(aBounds.minimum.z, bBounds.minimum.z)};
+      if (overlap.x <= 0.0 || overlap.y <= 0.0 || overlap.z <= 0.0) continue;
+      size_t axis = 0;
+      if (overlap.y < overlap.x) axis = 1;
+      if (overlap.z < component(overlap, axis)) axis = 2;
+      Vec3d normal{};
+      addComponent(
+          normal, axis,
+          component(b.body.position, axis) >= component(a.body.position, axis) ? 1.0 : -1.0);
+      const double penetration = component(overlap, axis);
+      stats.maximumPenetration = std::max(stats.maximumPenetration, penetration);
+      ++stats.resolvedContacts;
+
+      const double inverseMassA = 1.0 / a.body.mass;
+      const double inverseMassB = 1.0 / b.body.mass;
+      const double inverseMassSum = inverseMassA + inverseMassB;
+      const Vec3d correction = normal * (penetration / inverseMassSum);
+      a.body.position = a.body.position - correction * inverseMassA;
+      b.body.position = b.body.position + correction * inverseMassB;
+
+      const Vec3d contact{
+          0.5 * (std::max(aBounds.minimum.x, bBounds.minimum.x) +
+                 std::min(aBounds.maximum.x, bBounds.maximum.x)),
+          0.5 * (std::max(aBounds.minimum.y, bBounds.minimum.y) +
+                 std::min(aBounds.maximum.y, bBounds.maximum.y)),
+          0.5 * (std::max(aBounds.minimum.z, bBounds.minimum.z) +
+                 std::min(aBounds.maximum.z, bBounds.maximum.z))};
+      const Vec3d radiusA = contact - a.body.position;
+      const Vec3d radiusB = contact - b.body.position;
+      Vec3d relativeVelocity =
+          rigidPointVelocity(b.body, contact) - rigidPointVelocity(a.body, contact);
+      const double closingSpeed = dot(relativeVelocity, normal);
+      if (closingSpeed >= 0.0) continue;
+      const Vec3d angularA = cross(applyWorldInverseInertia(
+          a.body, cross(radiusA, normal)), radiusA);
+      const Vec3d angularB = cross(applyWorldInverseInertia(
+          b.body, cross(radiusB, normal)), radiusB);
+      const double normalDenominator = inverseMassSum + dot(normal, angularA + angularB);
+      const double normalImpulseMagnitude =
+          -(1.0 + restitution) * closingSpeed / std::max(normalDenominator, 1e-12);
+      const Vec3d normalImpulse = normal * normalImpulseMagnitude;
+      a.body.linearVelocity = a.body.linearVelocity - normalImpulse * inverseMassA;
+      b.body.linearVelocity = b.body.linearVelocity + normalImpulse * inverseMassB;
+      a.body.angularVelocity = a.body.angularVelocity -
+          applyWorldInverseInertia(a.body, cross(radiusA, normalImpulse));
+      b.body.angularVelocity = b.body.angularVelocity +
+          applyWorldInverseInertia(b.body, cross(radiusB, normalImpulse));
+
+      relativeVelocity =
+          rigidPointVelocity(b.body, contact) - rigidPointVelocity(a.body, contact);
+      const Vec3d tangentVelocity = relativeVelocity - normal * dot(relativeVelocity, normal);
+      const double tangentLength = length(tangentVelocity);
+      if (tangentLength <= 1e-12) continue;
+      const Vec3d tangent = tangentVelocity / tangentLength;
+      const Vec3d tangentAngularA = cross(applyWorldInverseInertia(
+          a.body, cross(radiusA, tangent)), radiusA);
+      const Vec3d tangentAngularB = cross(applyWorldInverseInertia(
+          b.body, cross(radiusB, tangent)), radiusB);
+      const double tangentDenominator = inverseMassSum + dot(tangent, tangentAngularA + tangentAngularB);
+      const double unconstrained = -dot(relativeVelocity, tangent) /
+                                   std::max(tangentDenominator, 1e-12);
+      const double tangentImpulseMagnitude = std::clamp(
+          unconstrained, -friction * normalImpulseMagnitude, friction * normalImpulseMagnitude);
+      const Vec3d tangentImpulse = tangent * tangentImpulseMagnitude;
+      a.body.linearVelocity = a.body.linearVelocity - tangentImpulse * inverseMassA;
+      b.body.linearVelocity = b.body.linearVelocity + tangentImpulse * inverseMassB;
+      a.body.angularVelocity = a.body.angularVelocity -
+          applyWorldInverseInertia(a.body, cross(radiusA, tangentImpulse));
+      b.body.angularVelocity = b.body.angularVelocity +
+          applyWorldInverseInertia(b.body, cross(radiusB, tangentImpulse));
+    }
+  }
+  return stats;
 }
 
 TriangleMesh makeBoxMesh(Vec3d h) {

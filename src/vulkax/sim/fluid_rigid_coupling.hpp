@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <vector>
 
 namespace vulkax::sim {
@@ -53,6 +54,17 @@ struct FluidForce {
   Vec3d torque{};
 };
 
+struct RigidBodyObject {
+  TriangleMesh mesh;
+  RigidBodyState body;
+};
+
+struct ContactStats {
+  uint32_t testedPairs = 0;
+  uint32_t resolvedContacts = 0;
+  double maximumPenetration = 0.0;
+};
+
 struct VoxelDomain {
   Vec3d minimum{-1.0, -1.0, -1.0};
   Vec3d maximum{1.0, 1.0, 1.0};
@@ -91,6 +103,16 @@ using VectorSampler = std::function<Vec3d(Vec3d)>;
     double dragCoefficient);
 
 void advanceRigidBody(RigidBodyState& body, const FluidForce& force, double timestepSeconds);
+
+// Resolves pairwise contacts between transformed mesh AABBs. Contact impulses
+// include angular velocity, world-space inverse inertia, restitution, and
+// Coulomb friction. The deterministic CPU path is the oracle for GPU multi-body
+// coupling; narrow-phase triangle contacts can replace the AABB proxy later
+// without changing body integration semantics.
+[[nodiscard]] ContactStats resolveRigidBodyContacts(
+    std::span<RigidBodyObject> objects,
+    double restitution = 0.1,
+    double friction = 0.4);
 
 [[nodiscard]] TriangleMesh makeBoxMesh(Vec3d halfExtent);
 

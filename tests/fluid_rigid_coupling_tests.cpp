@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 #include <numeric>
+#include <vector>
 
 #include "vulkax/sim/fluid_rigid_coupling.hpp"
 
@@ -83,6 +84,24 @@ int main() {
   assert(body.orientation.x != oldOrientation.x || body.orientation.y != oldOrientation.y ||
          body.orientation.z != oldOrientation.z || body.orientation.w != oldOrientation.w);
   assert(body.angularVelocity.y > 0.0);
+
+  std::vector<RigidBodyObject> objects(2);
+  objects[0].mesh = makeBoxMesh({0.25, 0.20, 0.20});
+  objects[1].mesh = objects[0].mesh;
+  objects[0].body.position = {-0.18, 0.0, 0.0};
+  objects[1].body.position = {0.18, 0.08, 0.0};
+  objects[0].body.linearVelocity = {1.0, 0.5, 0.0};
+  objects[1].body.linearVelocity = {-1.0, -0.2, 0.0};
+  const ContactStats contacts = resolveRigidBodyContacts(objects, 0.25, 0.5);
+  assert(contacts.testedPairs == 1);
+  assert(contacts.resolvedContacts == 1);
+  assert(contacts.maximumPenetration > 0.0);
+  assert(objects[0].body.position.x < -0.18);
+  assert(objects[1].body.position.x > 0.18);
+  assert(objects[0].body.linearVelocity.x < 1.0);
+  assert(objects[1].body.linearVelocity.x > -1.0);
+  assert(std::abs(objects[0].body.angularVelocity.z) > 1e-6 ||
+         std::abs(objects[1].body.angularVelocity.z) > 1e-6);
 
   std::cout << "Vulkax fluid-rigid coupling tests passed: occupied=" << occupied
             << " drag=" << airflow.force.x << '\n';
