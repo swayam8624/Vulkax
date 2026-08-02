@@ -197,6 +197,14 @@ final class PhysicsModel: ObservableObject {
         }
     }
 
+    func removeObstacleMesh() {
+        obstacleMesh = nil
+        obstacleMeshURL = nil
+        obstacleMeshRevision &+= 1
+        accumulationResetToken &+= 1
+        equationStatus = "3D obstacle removed"
+    }
+
     private func loadObstacleMesh(from url: URL) throws {
         obstacleMesh = try ImportedObstacleMesh.loadOBJ(from: url)
         obstacleMeshURL = url
@@ -2780,6 +2788,10 @@ struct ContentView: View {
                 Button { model.newProject() } label: { Label("New", systemImage: "doc.badge.plus") }
                 Button { model.openProject() } label: { Label("Open", systemImage: "folder") }
                 Button { model.saveProject() } label: { Label("Save", systemImage: "square.and.arrow.down") }
+                Button { model.importObstacleMesh() } label: {
+                    Label("Add 3D Object", systemImage: "cube.transparent")
+                }
+                .help("Import an OBJ mesh and switch to GPU-coupled volume smoke")
                 Spacer()
                 Text(model.runtimeStatus).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
@@ -2871,11 +2883,21 @@ struct ContentView: View {
                     parameter("Disk gain", value: $model.diskGain, range: 0...4)
                     parameter("Camera scale", value: $model.cameraScale, range: 0.5...2.0)
                 } else {
-                    Button { model.importObstacleMesh() } label: {
-                        Label("Import obstacle", systemImage: "cube.transparent")
+                    HStack {
+                        Button { model.importObstacleMesh() } label: {
+                            Label(model.obstacleMeshURL == nil ? "Add object" : "Replace object",
+                                  systemImage: "cube.transparent")
+                        }
+                        if model.obstacleMeshURL != nil {
+                            Button { model.removeObstacleMesh() } label: {
+                                Image(systemName: "trash")
+                            }
+                            .help("Remove the fluid obstacle")
+                        }
                     }
                     .help("Import an OBJ mesh for GPU voxelization and fluid coupling")
-                    Text(model.obstacleMeshURL?.lastPathComponent ?? "No mesh obstacle")
+                    Text(model.obstacleMeshURL.map { "GPU coupled: \($0.lastPathComponent)" } ??
+                         "No 3D object in the fluid domain")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                     parameter("Buoyancy", value: $model.smokeBuoyancy, range: 0...3)
