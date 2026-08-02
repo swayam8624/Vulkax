@@ -45,9 +45,9 @@ layout(push_constant) uniform Push {
     float maximumStep;
     float errorTolerance;
     uint jacobiRayCount;
-    uint padding0;
-    uint padding1;
-    uint padding2;
+    uint stepsPerDispatch;
+    float observerRadius;
+    uint terminateAtObserver;
 } pushData;
 
 shared uint scanA[1024];
@@ -303,11 +303,21 @@ void integrateActiveRay() {
     if (slot >= control.activeCount) return;
     const uint rayIndex = activeRay(slot);
     RayState ray = rays.values[rayIndex];
-    if (ray.position.x <= pushData.horizon) {
-        ray.counters.x = 1u;
-    } else if (ray.integration.x >= ray.integration.y) {
-        ray.counters.x = 2u;
-    } else {
+    for (uint substep = 0u; substep < min(pushData.stepsPerDispatch, 8u) &&
+         ray.counters.x == 0u; ++substep) {
+        if (ray.position.x <= pushData.horizon) {
+            ray.counters.x = 1u;
+            break;
+        }
+        if (pushData.terminateAtObserver != 0u && ray.counters.y > 3u &&
+            ray.conservedSigns.z > 0.0 && ray.position.x >= pushData.observerRadius) {
+            ray.counters.x = 2u;
+            break;
+        }
+        if (ray.integration.x >= ray.integration.y) {
+            ray.counters.x = pushData.terminateAtObserver != 0u ? 3u : 2u;
+            break;
+        }
         const vec2 conserved = ray.conservedSigns.xy;
         vec2 signs = ray.conservedSigns.zw;
         const vec2 potential = kerrPotentials(ray.position, conserved);
@@ -368,8 +378,11 @@ void integrateActiveRay() {
                     ray.integration.z = min(pushData.maximumStep, step * 1.35);
                 if (ray.position.x <= pushData.horizon)
                     ray.counters.x = 1u;
-                else if (ray.integration.x >= ray.integration.y - 1e-6)
+                else if (pushData.terminateAtObserver != 0u && ray.counters.y > 3u &&
+                         signs.x > 0.0 && ray.position.x >= pushData.observerRadius)
                     ray.counters.x = 2u;
+                else if (ray.integration.x >= ray.integration.y - 1e-6)
+                    ray.counters.x = pushData.terminateAtObserver != 0u ? 3u : 2u;
             }
         }
         ray.conservedSigns.zw = signs;

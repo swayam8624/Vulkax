@@ -57,7 +57,9 @@ struct Push {
   float maximumStep;
   float errorTolerance;
   uint32_t jacobiRayCount;
-  uint32_t padding[3];
+  uint32_t stepsPerDispatch;
+  float observerRadius;
+  uint32_t terminateAtObserver;
 };
 static_assert(sizeof(RayState) == 176 && sizeof(Control) == 16 && sizeof(Push) == 48);
 
@@ -422,7 +424,9 @@ int main() {
           0.065f,
           2e-5f,
           kJacobiRayCount,
-          {0, 0, 0}};
+          1,
+          observerRadius,
+          0};
       vkCmdPushConstants(
           command,
           pipelineLayout,
