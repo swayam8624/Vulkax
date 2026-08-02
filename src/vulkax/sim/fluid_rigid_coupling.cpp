@@ -17,9 +17,42 @@ Vec3d cross(Vec3d a, Vec3d b) {
 }
 double length(Vec3d value) { return std::sqrt(dot(value, value)); }
 
+Quaterniond operator*(Quaterniond a, Quaterniond b) {
+  return {
+      a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+      a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+      a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+      a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z};
+}
+
+Quaterniond normalize(Quaterniond value) {
+  const double magnitude = std::sqrt(
+      value.x * value.x + value.y * value.y + value.z * value.z + value.w * value.w);
+  if (!(magnitude > 1e-15) || !std::isfinite(magnitude)) {
+    throw std::invalid_argument("rigid body orientation must be finite and non-zero");
+  }
+  return {
+      value.x / magnitude, value.y / magnitude, value.z / magnitude, value.w / magnitude};
+}
+
+Quaterniond conjugate(Quaterniond value) {
+  return {-value.x, -value.y, -value.z, value.w};
+}
+
+Vec3d rotate(Quaterniond orientation, Vec3d value) {
+  orientation = normalize(orientation);
+  const Quaterniond vector{value.x, value.y, value.z, 0.0};
+  const Quaterniond rotated = orientation * vector * conjugate(orientation);
+  return {rotated.x, rotated.y, rotated.z};
+}
+
+Vec3d componentMultiply(Vec3d a, Vec3d b) {
+  return {a.x * b.x, a.y * b.y, a.z * b.z};
+}
+
 Vec3d worldVertex(const TriangleMesh& mesh, const RigidBodyState& body, uint32_t index) {
   if (index >= mesh.vertices.size()) throw std::out_of_range("mesh index is out of range");
-  return mesh.vertices[index] + body.position;
+  return transformRigidPoint(body, mesh.vertices[index]);
 }
 
 bool rayHitsPositiveX(Vec3d origin, Vec3d a, Vec3d b, Vec3d c) {
@@ -40,6 +73,17 @@ bool rayHitsPositiveX(Vec3d origin, Vec3d a, Vec3d b, Vec3d c) {
 }
 
 }  // namespace
+
+Vec3d transformRigidPoint(const RigidBodyState& body, Vec3d localPoint) {
+  if (body.scale.x <= 0.0 || body.scale.y <= 0.0 || body.scale.z <= 0.0) {
+    throw std::invalid_argument("rigid body scale must be positive");
+  }
+  return body.position + rotate(body.orientation, componentMultiply(localPoint, body.scale));
+}
+
+Vec3d rigidPointVelocity(const RigidBodyState& body, Vec3d worldPoint) {
+  return body.linearVelocity + cross(body.angularVelocity, worldPoint - body.position);
+}
 
 std::vector<uint8_t> voxelizeClosedMesh(
     const TriangleMesh& mesh, const RigidBodyState& body, const VoxelDomain& domain) {
@@ -95,7 +139,7 @@ FluidForce integrateFluidForce(
     if (area <= 1e-14) continue;
     const Vec3d normal = areaNormal / area;
     const Vec3d centroid = (a + b + c) / 3.0;
-    const Vec3d relativeVelocity = velocity(centroid) - body.linearVelocity;
+    const Vec3d relativeVelocity = velocity(centroid) - rigidPointVelocity(body, centroid);
     const double incidentSpeed = std::max(0.0, -dot(relativeVelocity, normal));
     const Vec3d pressureForce = normal * (-pressure(centroid) * area);
     const Vec3d dragForce =
@@ -114,9 +158,22 @@ void advanceRigidBody(RigidBodyState& body, const FluidForce& force, double time
   }
   body.linearVelocity = body.linearVelocity + force.force * (timestepSeconds / body.mass);
   body.position = body.position + body.linearVelocity * timestepSeconds;
-  body.angularVelocity.x += force.torque.x * timestepSeconds / body.diagonalInertia.x;
-  body.angularVelocity.y += force.torque.y * timestepSeconds / body.diagonalInertia.y;
-  body.angularVelocity.z += force.torque.z * timestepSeconds / body.diagonalInertia.z;
+  const Quaterniond orientation = normalize(body.orientation);
+  const Vec3d bodyTorque = rotate(conjugate(orientation), force.torque);
+  const Vec3d bodyAngularAcceleration{
+      bodyTorque.x / body.diagonalInertia.x,
+      bodyTorque.y / body.diagonalInertia.y,
+      bodyTorque.z / body.diagonalInertia.z};
+  body.angularVelocity =
+      body.angularVelocity + rotate(orientation, bodyAngularAcceleration) * timestepSeconds;
+  const Quaterniond spin{
+      body.angularVelocity.x, body.angularVelocity.y, body.angularVelocity.z, 0.0};
+  const Quaterniond derivative = spin * orientation;
+  body.orientation = normalize({
+      orientation.x + 0.5 * derivative.x * timestepSeconds,
+      orientation.y + 0.5 * derivative.y * timestepSeconds,
+      orientation.z + 0.5 * derivative.z * timestepSeconds,
+      orientation.w + 0.5 * derivative.w * timestepSeconds});
 }
 
 TriangleMesh makeBoxMesh(Vec3d h) {

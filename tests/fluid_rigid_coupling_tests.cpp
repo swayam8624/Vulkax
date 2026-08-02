@@ -17,6 +17,19 @@ int main() {
   assert(occupied > 100);
   assert(occupied < mask.size() / 4);
 
+  constexpr double kPi = 3.14159265358979323846;
+  body.orientation = {0.0, std::sin(kPi / 8.0), 0.0, std::cos(kPi / 8.0)};
+  body.scale = {1.0, 1.4, 0.7};
+  const Vec3d transformed = transformRigidPoint(body, {0.3, 0.0, 0.0});
+  assert(std::abs(transformed.x - 0.3 / std::sqrt(2.0)) < 1e-12);
+  assert(std::abs(transformed.z + 0.3 / std::sqrt(2.0)) < 1e-12);
+  const auto transformedMask = voxelizeClosedMesh(box, body, domain);
+  const auto transformedOccupied =
+      std::accumulate(transformedMask.begin(), transformedMask.end(), uint64_t{0});
+  assert(transformedOccupied > 50);
+  body.orientation = {};
+  body.scale = {1.0, 1.0, 1.0};
+
   const auto still = integrateFluidForce(
       box,
       body,
@@ -42,6 +55,20 @@ int main() {
   advanceRigidBody(body, airflow, 1.0 / 60.0);
   assert(body.linearVelocity.x > 0.0);
   assert(body.position.x > oldX);
+
+  body.angularVelocity = {0.0, 0.0, 2.0};
+  const Vec3d surfacePoint{body.position.x, body.position.y + 0.5, body.position.z};
+  const Vec3d surfaceVelocity = rigidPointVelocity(body, surfacePoint);
+  assert(std::abs(surfaceVelocity.x - (body.linearVelocity.x - 1.0)) < 1e-12);
+  const Quaterniond oldOrientation = body.orientation;
+  advanceRigidBody(body, FluidForce{{}, {0.0, 3.0, 0.0}}, 1.0 / 60.0);
+  const double orientationNorm = std::sqrt(
+      body.orientation.x * body.orientation.x + body.orientation.y * body.orientation.y +
+      body.orientation.z * body.orientation.z + body.orientation.w * body.orientation.w);
+  assert(std::abs(orientationNorm - 1.0) < 1e-12);
+  assert(body.orientation.x != oldOrientation.x || body.orientation.y != oldOrientation.y ||
+         body.orientation.z != oldOrientation.z || body.orientation.w != oldOrientation.w);
+  assert(body.angularVelocity.y > 0.0);
 
   std::cout << "Vulkax fluid-rigid coupling tests passed: occupied=" << occupied
             << " drag=" << airflow.force.x << '\n';
