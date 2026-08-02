@@ -152,7 +152,9 @@ body values. Before upload, the importer rejects invalid indices, degenerate tri
 non-manifold edges, and inconsistent winding with explicit defect counts. The checked cube test reports
 12 triangles, 2,598 occupied cells, nonzero GPU-computed
 translation, and normalized rotational integration. The portable Vulkan MAC test provides the
-corresponding OBJ, voxelization, moving-boundary, force/torque, and body-advance path.
+corresponding OBJ, voxelization, moving-boundary, force/torque, and body-advance path. A separate
+two-body Vulkan gate stores body IDs in mesh/obstacle records, integrates both bodies, resolves an
+off-centre restitution/friction contact on GPU, and re-voxelizes the separated transforms.
 
 ## Equation Reference Runner
 

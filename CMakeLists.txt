@@ -1069,6 +1069,15 @@ if (BUILD_TESTING)
     LABELS "native_gpu;volume_example;airflow_object_example"
   )
   add_test(
+    NAME vulkan_multiple_obstacle_contacts
+    COMMAND VulkaxMacProjectionCompute --steps 4 --bodies 2
+            --mesh ${PROJECT_SOURCE_DIR}/tests/fixtures/airflow_cube.obj
+  )
+  set_tests_properties(
+    vulkan_multiple_obstacle_contacts PROPERTIES
+    LABELS "native_gpu;volume_example;airflow_object_example"
+  )
+  add_test(
     NAME vulkan_schwarzschild_compute
     COMMAND VulkaxSchwarzschildComputeBenchmark --rays 16 --steps 30000
             --output ${CMAKE_BINARY_DIR}/vulkan-schwarzschild-compute

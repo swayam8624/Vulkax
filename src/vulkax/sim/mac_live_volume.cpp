@@ -271,6 +271,7 @@ void MacLiveVolume::record(VkCommandBuffer commandBuffer, float deltaSeconds) {
   push.dt = std::clamp(deltaSeconds, 1.0f / 240.0f, 1.0f / 30.0f);
   push.outputWidth = outputExtent_.width;
   push.outputHeight = outputExtent_.height;
+  push.padding[0] = 1u;
   const uint32_t groupsX = (kNx + 3u) / 4u;
   const uint32_t groupsY = (kNy + 3u) / 4u;
   const uint32_t groupsZ = (kNz + 3u) / 4u;

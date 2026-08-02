@@ -327,14 +327,14 @@ struct ImportedMesh {
 
 ImportedMesh defaultObstacleMesh() {
   return {
-      {{{-0.10f, -0.08f, -0.08f, 1.0f},
-        {0.10f, -0.08f, -0.08f, 1.0f},
-        {0.10f, 0.08f, -0.08f, 1.0f},
-        {-0.10f, 0.08f, -0.08f, 1.0f},
-        {-0.10f, -0.08f, 0.08f, 1.0f},
-        {0.10f, -0.08f, 0.08f, 1.0f},
-        {0.10f, 0.08f, 0.08f, 1.0f},
-        {-0.10f, 0.08f, 0.08f, 1.0f}}},
+      {{{-0.10f, -0.08f, -0.08f, 0.0f},
+        {0.10f, -0.08f, -0.08f, 0.0f},
+        {0.10f, 0.08f, -0.08f, 0.0f},
+        {-0.10f, 0.08f, -0.08f, 0.0f},
+        {-0.10f, -0.08f, 0.08f, 0.0f},
+        {0.10f, -0.08f, 0.08f, 0.0f},
+        {0.10f, 0.08f, 0.08f, 0.0f},
+        {-0.10f, 0.08f, 0.08f, 0.0f}}},
       {0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 4, 7, 0, 7, 3,
        1, 2, 6, 1, 6, 5, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2}};
 }
@@ -390,9 +390,24 @@ ImportedMesh loadObstacleObj(const std::filesystem::path& path) {
         {0.20f * ((position[0] - 0.5f * (minimum[0] + maximum[0])) / span),
          0.20f * ((position[1] - 0.5f * (minimum[1] + maximum[1])) / span),
          0.20f * ((position[2] - 0.5f * (minimum[2] + maximum[2])) / span),
-         1.0f});
+         0.0f});
   }
   return mesh;
+}
+
+ImportedMesh instantiateBodies(const ImportedMesh& source, uint32_t bodyCount) {
+  ImportedMesh result{};
+  result.vertices.reserve(source.vertices.size() * bodyCount);
+  result.indices.reserve(source.indices.size() * bodyCount);
+  for (uint32_t body = 0; body < bodyCount; ++body) {
+    const uint32_t vertexOffset = static_cast<uint32_t>(result.vertices.size());
+    for (auto vertex : source.vertices) {
+      vertex[3] = static_cast<float>(body);
+      result.vertices.push_back(vertex);
+    }
+    for (const uint32_t index : source.indices) result.indices.push_back(vertexOffset + index);
+  }
+  return result;
 }
 
 }  // namespace
@@ -404,6 +419,7 @@ int main(int argc, char** argv) {
     std::optional<std::filesystem::path> outputPath;
     std::optional<std::filesystem::path> meshPath;
     uint32_t simulationSteps = 1;
+    uint32_t bodyCount = 1;
     for (int index = 1; index < argc; ++index) {
       const std::string argument{argv[index]};
       if (argument == "--output" && index + 1 < argc)
@@ -415,13 +431,19 @@ int main(int argc, char** argv) {
         if (simulationSteps == 0 || simulationSteps > 240) {
           throw std::invalid_argument("--steps must be in [1, 240]");
         }
+      } else if (argument == "--bodies" && index + 1 < argc) {
+        bodyCount = static_cast<uint32_t>(std::stoul(argv[++index]));
+        if (bodyCount == 0 || bodyCount > 8) {
+          throw std::invalid_argument("--bodies must be in [1, 8]");
+        }
       } else {
         throw std::invalid_argument(
-            "usage: vulkax-mac-projection [--steps N] [--mesh obstacle.obj] "
+            "usage: vulkax-mac-projection [--steps N] [--bodies N] [--mesh obstacle.obj] "
             "[--output volume.ppm]");
       }
     }
-    const ImportedMesh importedMesh = meshPath ? loadObstacleObj(*meshPath) : defaultObstacleMesh();
+    const ImportedMesh importedMesh = instantiateBodies(
+        meshPath ? loadObstacleObj(*meshPath) : defaultObstacleMesh(), bodyCount);
     VkApplicationInfo application{VK_STRUCTURE_TYPE_APPLICATION_INFO};
     application.pApplicationName = "Vulkax Vulkan MAC Projection";
     application.apiVersion = VK_API_VERSION_1_1;
@@ -514,7 +536,7 @@ int main(int argc, char** argv) {
         meshVertexCount * 4u,
         triangleCount * 3u,
         triangleCount * 8u,
-        24u};
+        24u * bodyCount};
     std::array<Buffer, 32> buffers{};
     for (size_t index = 0; index < buffers.size(); ++index) {
       buffers[index] = makeBuffer(physical, device, counts[index]);
@@ -553,16 +575,19 @@ int main(int argc, char** argv) {
         importedMesh.indices.size() * sizeof(uint32_t));
     upload(device, buffers[28], meshVertices);
     upload(device, buffers[29], encodedIndices);
-    std::vector<float> bodyState(24, 0.0f);
-    bodyState[0] = 0.66f;
-    bodyState[1] = 0.30f;
-    bodyState[2] = 0.50f;
-    bodyState[3] = 2.0f;
-    bodyState[7] = 1.0f;
-    bodyState[8] = 0.02f;
-    bodyState[13] = 1.25f;
-    bodyState[16] = bodyState[17] = bodyState[18] = 0.012f;
-    bodyState[20] = bodyState[21] = bodyState[22] = 1.0f;
+    std::vector<float> bodyState(24u * bodyCount, 0.0f);
+    for (uint32_t body = 0; body < bodyCount; ++body) {
+      const size_t offset = static_cast<size_t>(body) * 24u;
+      bodyState[offset + 0] = bodyCount == 1 ? 0.66f : 0.58f + 0.16f * body;
+      bodyState[offset + 1] = 0.30f + 0.015f * body;
+      bodyState[offset + 2] = 0.50f;
+      bodyState[offset + 3] = 2.0f;
+      bodyState[offset + 7] = 1.0f;
+      bodyState[offset + 8] = bodyCount == 1 ? 0.02f : (body == 0 ? 0.05f : -0.05f);
+      bodyState[offset + 13] = bodyCount == 1 ? 1.25f : 0.35f * (body + 1u);
+      bodyState[offset + 16] = bodyState[offset + 17] = bodyState[offset + 18] = 0.012f;
+      bodyState[offset + 20] = bodyState[offset + 21] = bodyState[offset + 22] = 1.0f;
+    }
     upload(device, buffers[31], bodyState);
 
     std::array<VkDescriptorSetLayoutBinding, 32> bindings{};
@@ -710,6 +735,7 @@ int main(int argc, char** argv) {
         nullptr);
     MacPass push{};
     push.triangleCount = static_cast<uint32_t>(triangleCount);
+    push.padding[0] = bodyCount;
     const uint32_t groupsX = (kNx + 4u) / 4u;
     const uint32_t groupsY = (kNy + 4u) / 4u;
     const uint32_t groupsZ = (kNz + 4u) / 4u;
@@ -763,6 +789,8 @@ int main(int argc, char** argv) {
       dispatch(17, 0.0f);
       dispatch(21, 0.0f);
       dispatch(22, 0.0f);
+      dispatch(23, 0.0f);
+      dispatch(20, 0.0f);
     }
     push.pass = 8;
     push.parity = 0.0f;
@@ -837,6 +865,12 @@ int main(int argc, char** argv) {
         finalBodyState[4] * finalBodyState[4] + finalBodyState[5] * finalBodyState[5] +
         finalBodyState[6] * finalBodyState[6] +
         (finalBodyState[7] - 1.0f) * (finalBodyState[7] - 1.0f));
+    const float bodySeparation = bodyCount > 1
+        ? std::abs(finalBodyState[24] - finalBodyState[0])
+        : 0.0f;
+    const float relativeNormalVelocity = bodyCount > 1
+        ? finalBodyState[32] - finalBodyState[8]
+        : 0.0f;
     float minimumLuminance = std::numeric_limits<float>::max();
     float maximumLuminance = 0.0f;
     bool finiteRadiance = true;
@@ -878,6 +912,9 @@ int main(int argc, char** argv) {
               << " active_bricks=" << activeBrickCount << '/' << brickCount
               << " body_displacement=" << bodyDisplacement
               << " orientation_delta=" << orientationDelta
+              << " body_count=" << bodyCount
+              << " body_separation=" << bodySeparation
+              << " relative_normal_velocity=" << relativeNormalVelocity
               << " cpu_gpu_max_error=" << std::max(beforeMaximumError, afterMaximumError)
               << " density_mass=" << densityMass << " temperature_mass=" << temperatureMass
               << " luminance=[" << minimumLuminance << ',' << maximumLuminance << ']';
@@ -898,6 +935,7 @@ int main(int argc, char** argv) {
         activeBrickCount > 0 && activeBrickCount < brickCount && std::isfinite(bodyDisplacement) &&
         bodyDisplacement > 0.0f && std::isfinite(orientationNorm) &&
         std::abs(orientationNorm - 1.0f) < 1e-4f && orientationDelta > 0.0f &&
+        (bodyCount == 1 || (bodySeparation >= 0.19f && relativeNormalVelocity > 0.0f)) &&
         densityMass > 1.0 && temperatureMass > 1.0 && finiteRadiance &&
         minimumLuminance >= 0.0f && maximumLuminance > minimumLuminance + 1e-3f;
     vkDestroyFence(device, fence, nullptr);
