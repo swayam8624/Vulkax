@@ -239,96 +239,6 @@ void advanceRigidBody(uvec3 id) {
   rigidBodies.values[bodyIndex] = body;
 }
 
-void bodyBounds(uint bodyIndex, out vec3 minimum, out vec3 maximum) {
-  minimum = vec3(1e20);
-  maximum = vec3(-1e20);
-  for (uint vertex = 0u; vertex < meshVertices.values.length(); ++vertex) {
-    if (meshBodyIndex(vertex) != bodyIndex) continue;
-    const vec3 point = worldMeshVertex(vertex);
-    minimum = min(minimum, point);
-    maximum = max(maximum, point);
-  }
-}
-
-vec3 applyWorldInverseInertia(RigidBodyState body, vec3 worldValue) {
-  const vec4 orientation = normalize(body.orientation);
-  const vec3 local = quaternionRotate(vec4(-orientation.xyz, orientation.w), worldValue);
-  return quaternionRotate(
-      orientation, local / max(body.diagonalInertia.xyz, vec3(1e-5)));
-}
-
-void applyContactImpulse(
-    inout RigidBodyState a,
-    inout RigidBodyState b,
-    vec3 contact,
-    vec3 direction,
-    float magnitude) {
-  const vec3 impulse = direction * magnitude;
-  const vec3 radiusA = contact - a.positionMass.xyz;
-  const vec3 radiusB = contact - b.positionMass.xyz;
-  a.linearVelocity.xyz -= impulse / max(a.positionMass.w, 1e-4);
-  b.linearVelocity.xyz += impulse / max(b.positionMass.w, 1e-4);
-  a.angularVelocity.xyz -= applyWorldInverseInertia(a, cross(radiusA, impulse));
-  b.angularVelocity.xyz += applyWorldInverseInertia(b, cross(radiusB, impulse));
-}
-
-void resolveRigidContacts(uvec3 id) {
-  if (any(notEqual(id, uvec3(0)))) return;
-  const uint bodyCount = max(pushData.padding0, 1u);
-  for (uint first = 0u; first < bodyCount; ++first) {
-    for (uint second = first + 1u; second < bodyCount; ++second) {
-      RigidBodyState a = rigidBodies.values[first];
-      RigidBodyState b = rigidBodies.values[second];
-      vec3 minimumA, maximumA, minimumB, maximumB;
-      bodyBounds(first, minimumA, maximumA);
-      bodyBounds(second, minimumB, maximumB);
-      const vec3 overlap = min(maximumA, maximumB) - max(minimumA, minimumB);
-      if (any(lessThanEqual(overlap, vec3(0.0)))) continue;
-      uint axis = overlap.y < overlap.x ? 1u : 0u;
-      if (overlap.z < overlap[axis]) axis = 2u;
-      vec3 normal = vec3(0.0);
-      normal[axis] = b.positionMass[axis] >= a.positionMass[axis] ? 1.0 : -1.0;
-      const float inverseMassA = 1.0 / max(a.positionMass.w, 1e-4);
-      const float inverseMassB = 1.0 / max(b.positionMass.w, 1e-4);
-      const float inverseMass = inverseMassA + inverseMassB;
-      const vec3 correction = normal * overlap[axis] / inverseMass;
-      a.positionMass.xyz -= correction * inverseMassA;
-      b.positionMass.xyz += correction * inverseMassB;
-      const vec3 contact = 0.5 * (max(minimumA, minimumB) + min(maximumA, maximumB));
-      const vec3 radiusA = contact - a.positionMass.xyz;
-      const vec3 radiusB = contact - b.positionMass.xyz;
-      vec3 relativeVelocity =
-          b.linearVelocity.xyz + cross(b.angularVelocity.xyz, radiusB) -
-          a.linearVelocity.xyz - cross(a.angularVelocity.xyz, radiusA);
-      const float closingSpeed = dot(relativeVelocity, normal);
-      if (closingSpeed < 0.0) {
-        const vec3 angularA = cross(applyWorldInverseInertia(a, cross(radiusA, normal)), radiusA);
-        const vec3 angularB = cross(applyWorldInverseInertia(b, cross(radiusB, normal)), radiusB);
-        const float denominator = inverseMass + dot(normal, angularA + angularB);
-        const float normalMagnitude = -1.1 * closingSpeed / max(denominator, 1e-5);
-        applyContactImpulse(a, b, contact, normal, normalMagnitude);
-        relativeVelocity =
-            b.linearVelocity.xyz + cross(b.angularVelocity.xyz, radiusB) -
-            a.linearVelocity.xyz - cross(a.angularVelocity.xyz, radiusA);
-        const vec3 tangentVelocity = relativeVelocity - normal * dot(relativeVelocity, normal);
-        const float tangentSpeed = length(tangentVelocity);
-        if (tangentSpeed > 1e-5) {
-          const vec3 tangent = tangentVelocity / tangentSpeed;
-          const vec3 tangentA = cross(applyWorldInverseInertia(a, cross(radiusA, tangent)), radiusA);
-          const vec3 tangentB = cross(applyWorldInverseInertia(b, cross(radiusB, tangent)), radiusB);
-          const float tangentDenominator = inverseMass + dot(tangent, tangentA + tangentB);
-          const float tangentMagnitude = clamp(
-              -dot(relativeVelocity, tangent) / max(tangentDenominator, 1e-5),
-              -0.4 * normalMagnitude, 0.4 * normalMagnitude);
-          applyContactImpulse(a, b, contact, tangent, tangentMagnitude);
-        }
-      }
-      rigidBodies.values[first] = a;
-      rigidBodies.values[second] = b;
-    }
-  }
-}
-
 bool solid(ivec3 cell) {
   if (any(lessThan(cell, ivec3(0))) ||
       any(greaterThanEqual(cell, ivec3(pushData.nx, pushData.ny, pushData.nz)))) return true;
@@ -839,10 +749,6 @@ void main() {
   }
   if (pushData.pass == 22u) {
     advanceRigidBody(id);
-    return;
-  }
-  if (pushData.pass == 23u) {
-    resolveRigidContacts(id);
     return;
   }
   const bool sparseSimulationPass =

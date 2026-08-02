@@ -620,11 +620,19 @@ int main(int argc, char** argv) {
         "vkCreatePipelineLayout");
     const auto shaderCode =
         readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_mac_projection.comp.spv");
+    const auto contactShaderCode =
+        readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_rigid_contacts.comp.spv");
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = shaderCode.size();
     shaderInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
     VkShaderModule shader = VK_NULL_HANDLE;
     check(vkCreateShaderModule(device, &shaderInfo, nullptr, &shader), "vkCreateShaderModule");
+    shaderInfo.codeSize = contactShaderCode.size();
+    shaderInfo.pCode = reinterpret_cast<const uint32_t*>(contactShaderCode.data());
+    VkShaderModule contactShader = VK_NULL_HANDLE;
+    check(
+        vkCreateShaderModule(device, &shaderInfo, nullptr, &contactShader),
+        "vkCreateShaderModule contacts");
     const std::filesystem::path pipelineCachePath =
         std::filesystem::temp_directory_path() /
         ("vulkax-mac-pipeline-" + std::to_string(properties.vendorID) + "-" +
@@ -656,9 +664,17 @@ int main(int argc, char** argv) {
         nullptr};
     pipelineInfo.layout = pipelineLayout;
     VkPipeline pipeline = VK_NULL_HANDLE;
+    std::cerr << "vulkax-mac-projection: compiling MAC solver pipeline\n";
     check(
         vkCreateComputePipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline),
         "vkCreateComputePipelines");
+    pipelineInfo.stage.module = contactShader;
+    VkPipeline contactPipeline = VK_NULL_HANDLE;
+    std::cerr << "vulkax-mac-projection: compiling rigid contact pipeline\n";
+    check(
+        vkCreateComputePipelines(
+            device, pipelineCache, 1, &pipelineInfo, nullptr, &contactPipeline),
+        "vkCreateComputePipelines contacts");
     size_t pipelineCacheBytes = 0;
     if (vkGetPipelineCacheData(device, pipelineCache, &pipelineCacheBytes, nullptr) == VK_SUCCESS &&
         pipelineCacheBytes > 0) {
@@ -792,7 +808,12 @@ int main(int argc, char** argv) {
       dispatch(17, 0.0f);
       dispatch(21, 0.0f);
       dispatch(22, 0.0f);
-      dispatch(23, 0.0f);
+      vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, contactPipeline);
+      vkCmdPushConstants(
+          command, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push), &push);
+      vkCmdDispatch(command, 1, 1, 1);
+      storageBarrier(command);
+      vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
       dispatch(20, 0.0f);
     }
     push.pass = 8;
@@ -945,9 +966,11 @@ int main(int argc, char** argv) {
     if (queryPool != VK_NULL_HANDLE) vkDestroyQueryPool(device, queryPool, nullptr);
     vkDestroyCommandPool(device, commandPool, nullptr);
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    vkDestroyPipeline(device, contactPipeline, nullptr);
     vkDestroyPipeline(device, pipeline, nullptr);
     vkDestroyPipelineCache(device, pipelineCache, nullptr);
     vkDestroyShaderModule(device, shader, nullptr);
+    vkDestroyShaderModule(device, contactShader, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyDescriptorSetLayout(device, descriptorLayout, nullptr);
     for (const Buffer& buffer : buffers) {
