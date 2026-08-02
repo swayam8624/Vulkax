@@ -536,7 +536,7 @@ int main(int argc, char** argv) {
         meshVertexCount * 4u,
         triangleCount * 3u,
         triangleCount * 8u,
-        24u * bodyCount};
+        24u * std::max(bodyCount, 2u)};
     std::array<Buffer, 32> buffers{};
     for (size_t index = 0; index < buffers.size(); ++index) {
       buffers[index] = makeBuffer(physical, device, counts[index]);
@@ -575,16 +575,19 @@ int main(int argc, char** argv) {
         importedMesh.indices.size() * sizeof(uint32_t));
     upload(device, buffers[28], meshVertices);
     upload(device, buffers[29], encodedIndices);
-    std::vector<float> bodyState(24u * bodyCount, 0.0f);
-    for (uint32_t body = 0; body < bodyCount; ++body) {
+    const uint32_t allocatedBodyCount = std::max(bodyCount, 2u);
+    std::vector<float> bodyState(24u * allocatedBodyCount, 0.0f);
+    for (uint32_t body = 0; body < allocatedBodyCount; ++body) {
       const size_t offset = static_cast<size_t>(body) * 24u;
       bodyState[offset + 0] = bodyCount == 1 ? 0.66f : 0.58f + 0.16f * body;
       bodyState[offset + 1] = 0.30f + 0.015f * body;
       bodyState[offset + 2] = 0.50f;
       bodyState[offset + 3] = 2.0f;
       bodyState[offset + 7] = 1.0f;
-      bodyState[offset + 8] = bodyCount == 1 ? 0.02f : (body == 0 ? 0.05f : -0.05f);
-      bodyState[offset + 13] = bodyCount == 1 ? 1.25f : 0.35f * (body + 1u);
+      bodyState[offset + 8] = body >= bodyCount ? 0.0f :
+          (bodyCount == 1 ? 0.02f : (body == 0 ? 0.05f : -0.05f));
+      bodyState[offset + 13] = body >= bodyCount ? 0.0f :
+          (bodyCount == 1 ? 1.25f : 0.35f * (body + 1u));
       bodyState[offset + 16] = bodyState[offset + 17] = bodyState[offset + 18] = 0.012f;
       bodyState[offset + 20] = bodyState[offset + 21] = bodyState[offset + 22] = 1.0f;
     }
