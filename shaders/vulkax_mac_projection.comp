@@ -33,7 +33,14 @@ layout(std430, binding = 27) buffer ActiveBricksNext { uint values[]; } activeBr
 layout(std430, binding = 28) readonly buffer MeshVertices { vec4 values[]; } meshVertices;
 layout(std430, binding = 29) readonly buffer MeshIndices { uint values[]; } meshIndices;
 layout(std430, binding = 30) buffer TriangleForces { vec4 values[]; } triangleForces;
-layout(std430, binding = 31) buffer RigidBody { vec4 position; vec4 velocity; } rigidBody;
+layout(std430, binding = 31) buffer RigidBody {
+  vec4 positionMass;
+  vec4 orientation;
+  vec4 linearVelocity;
+  vec4 angularVelocity;
+  vec4 diagonalInertia;
+  vec4 scale;
+} rigidBody;
 
 layout(push_constant) uniform MacPass {
   uint nx;
@@ -112,8 +119,24 @@ void dilateActiveBricks(uvec3 brick) {
       }
 }
 
+vec4 quaternionMultiply(vec4 a, vec4 b) {
+  return vec4(a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz),
+              a.w * b.w - dot(a.xyz, b.xyz));
+}
+
+vec3 quaternionRotate(vec4 orientation, vec3 value) {
+  const vec4 q = normalize(orientation);
+  return value + 2.0 * cross(q.xyz, cross(q.xyz, value) + q.w * value);
+}
+
 vec3 worldMeshVertex(uint index) {
-  return meshVertices.values[index].xyz + rigidBody.position.xyz;
+  return rigidBody.positionMass.xyz + quaternionRotate(
+      rigidBody.orientation, meshVertices.values[index].xyz * rigidBody.scale.xyz);
+}
+
+vec3 rigidSurfaceVelocity(vec3 point) {
+  return rigidBody.linearVelocity.xyz +
+      cross(rigidBody.angularVelocity.xyz, point - rigidBody.positionMass.xyz);
 }
 
 bool rayHitsPositiveX(vec3 origin, vec3 a, vec3 b, vec3 c) {
@@ -148,7 +171,7 @@ void voxelizeTriangleMesh(uvec3 id) {
       ++intersections;
   }
   const bool floorCell = id.y == 0u;
-  obstacles.values[cellIndex(id)] = floorCell || (intersections & 1u) != 0u ? 1.0 : 0.0;
+  obstacles.values[cellIndex(id)] = floorCell ? 1.0 : ((intersections & 1u) != 0u ? 2.0 : 0.0);
 }
 
 void integrateTriangleForce(uvec3 id) {
@@ -169,22 +192,43 @@ void integrateTriangleForce(uvec3 id) {
   const vec3 force = -pressure * area * normal;
   triangleForces.values[id.x * 2u] = vec4(force, 0.0);
   triangleForces.values[id.x * 2u + 1u] =
-      vec4(cross(triangleCenter - rigidBody.position.xyz, force), 0.0);
+      vec4(cross(triangleCenter - rigidBody.positionMass.xyz, force), 0.0);
 }
 
 void advanceRigidBody(uvec3 id) {
   if (any(notEqual(id, uvec3(0)))) return;
   vec3 force = vec3(0.0);
-  for (uint triangle = 0u; triangle < pushData.triangleCount; ++triangle)
+  vec3 torque = vec3(0.0);
+  for (uint triangle = 0u; triangle < pushData.triangleCount; ++triangle) {
     force += triangleForces.values[triangle * 2u].xyz;
-  rigidBody.velocity.xyz += force * effectiveDt() / max(pushData.bodyMass, 1e-4);
-  rigidBody.position.xyz += rigidBody.velocity.xyz * effectiveDt();
+    torque += triangleForces.values[triangle * 2u + 1u].xyz;
+  }
+  const float dt = effectiveDt();
+  rigidBody.linearVelocity.xyz += force * dt / max(rigidBody.positionMass.w, 1e-4);
+  rigidBody.linearVelocity.xyz *= 0.998;
+  rigidBody.positionMass.xyz = clamp(
+      rigidBody.positionMass.xyz + rigidBody.linearVelocity.xyz * dt,
+      vec3(0.12, 0.08, 0.12), vec3(0.88, 0.82, 0.88));
+  const vec4 orientation = normalize(rigidBody.orientation);
+  const vec4 inverseOrientation = vec4(-orientation.xyz, orientation.w);
+  const vec3 localTorque = quaternionRotate(inverseOrientation, torque);
+  const vec3 localAcceleration = localTorque / max(rigidBody.diagonalInertia.xyz, vec3(1e-5));
+  rigidBody.angularVelocity.xyz += quaternionRotate(orientation, localAcceleration) * dt;
+  rigidBody.angularVelocity.xyz *= 0.998;
+  const vec4 derivative = quaternionMultiply(vec4(rigidBody.angularVelocity.xyz, 0.0), orientation);
+  rigidBody.orientation = normalize(orientation + 0.5 * dt * derivative);
 }
 
 bool solid(ivec3 cell) {
   if (any(lessThan(cell, ivec3(0))) ||
       any(greaterThanEqual(cell, ivec3(pushData.nx, pushData.ny, pushData.nz)))) return true;
   return obstacles.values[cellIndex(uvec3(cell))] > 0.5;
+}
+
+float obstacleKind(ivec3 cell) {
+  if (any(lessThan(cell, ivec3(0))) ||
+      any(greaterThanEqual(cell, ivec3(pushData.nx, pushData.ny, pushData.nz)))) return 1.0;
+  return obstacles.values[cellIndex(uvec3(cell))];
 }
 
 float effectiveDt() {
@@ -204,14 +248,27 @@ void applyForces(uvec3 id) {
   const float dt = effectiveDt();
   if (id.x <= pushData.nx && id.y < pushData.ny && id.z < pushData.nz) {
     const uint index = uIndex(id);
-    faceU1.values[index] = (id.x == 0u || id.x == pushData.nx ||
-        solid(ivec3(id) - ivec3(1, 0, 0)) || solid(ivec3(id))) ? 0.0 : faceU0.values[index];
+    const ivec3 left = ivec3(id) - ivec3(1, 0, 0);
+    const ivec3 right = ivec3(id);
+    if (id.x == 0u || id.x == pushData.nx) faceU1.values[index] = 0.0;
+    else if (solid(left) || solid(right)) {
+      const vec3 point = vec3(float(id.x) / pushData.nx,
+          (float(id.y) + 0.5) / pushData.ny, (float(id.z) + 0.5) / pushData.nz);
+      faceU1.values[index] = max(obstacleKind(left), obstacleKind(right)) > 1.5
+          ? rigidSurfaceVelocity(point).x : 0.0;
+    } else faceU1.values[index] = faceU0.values[index];
   }
   if (id.x < pushData.nx && id.y <= pushData.ny && id.z < pushData.nz) {
     const uint index = vIndex(id);
     if (id.y == 0u || id.y == pushData.ny ||
         solid(ivec3(id) - ivec3(0, 1, 0)) || solid(ivec3(id))) {
-      faceV1.values[index] = 0.0;
+      const ivec3 bottom = ivec3(id) - ivec3(0, 1, 0);
+      const ivec3 top = ivec3(id);
+      const vec3 point = vec3((float(id.x) + 0.5) / pushData.nx,
+          float(id.y) / pushData.ny, (float(id.z) + 0.5) / pushData.nz);
+      faceV1.values[index] = id.y != 0u && id.y != pushData.ny &&
+          max(obstacleKind(bottom), obstacleKind(top)) > 1.5
+          ? rigidSurfaceVelocity(point).y : 0.0;
     } else {
       const uint below = cellIndex(uvec3(id.x, id.y - 1u, id.z));
       const uint above = cellIndex(uvec3(id.x, id.y, id.z));
@@ -223,8 +280,15 @@ void applyForces(uvec3 id) {
   }
   if (id.x < pushData.nx && id.y < pushData.ny && id.z <= pushData.nz) {
     const uint index = wIndex(id);
-    faceW1.values[index] = (id.z == 0u || id.z == pushData.nz ||
-        solid(ivec3(id) - ivec3(0, 0, 1)) || solid(ivec3(id))) ? 0.0 : faceW0.values[index];
+    const ivec3 back = ivec3(id) - ivec3(0, 0, 1);
+    const ivec3 front = ivec3(id);
+    if (id.z == 0u || id.z == pushData.nz) faceW1.values[index] = 0.0;
+    else if (solid(back) || solid(front)) {
+      const vec3 point = vec3((float(id.x) + 0.5) / pushData.nx,
+          (float(id.y) + 0.5) / pushData.ny, float(id.z) / pushData.nz);
+      faceW1.values[index] = max(obstacleKind(back), obstacleKind(front)) > 1.5
+          ? rigidSurfaceVelocity(point).z : 0.0;
+    } else faceW1.values[index] = faceW0.values[index];
   }
 }
 
@@ -284,21 +348,45 @@ void projectVelocity(uvec3 id) {
   const float hz = 1.0 / float(pushData.nz);
   if (id.x <= pushData.nx && id.y < pushData.ny && id.z < pushData.nz) {
     const uint index = uIndex(id);
-    if (id.x == 0u || id.x == pushData.nx || solid(ivec3(id) - ivec3(1, 0, 0)) || solid(ivec3(id))) faceU0.values[index] = 0.0;
+    const ivec3 left = ivec3(id) - ivec3(1, 0, 0);
+    const ivec3 right = ivec3(id);
+    if (id.x == 0u || id.x == pushData.nx) faceU0.values[index] = 0.0;
+    else if (solid(left) || solid(right)) {
+      const vec3 point = vec3(float(id.x) / pushData.nx,
+          (float(id.y) + 0.5) / pushData.ny, (float(id.z) + 0.5) / pushData.nz);
+      faceU0.values[index] = max(obstacleKind(left), obstacleKind(right)) > 1.5
+          ? rigidSurfaceVelocity(point).x : 0.0;
+    }
     else faceU0.values[index] = faceU1.values[index] - effectiveDt() *
-        (pressureAt(ivec3(id) , readSecond) - pressureAt(ivec3(id) - ivec3(1, 0, 0), readSecond)) / hx;
+        (pressureAt(right, readSecond) - pressureAt(left, readSecond)) / hx;
   }
   if (id.x < pushData.nx && id.y <= pushData.ny && id.z < pushData.nz) {
     const uint index = vIndex(id);
-    if (id.y == 0u || id.y == pushData.ny || solid(ivec3(id) - ivec3(0, 1, 0)) || solid(ivec3(id))) faceV0.values[index] = 0.0;
+    const ivec3 bottom = ivec3(id) - ivec3(0, 1, 0);
+    const ivec3 top = ivec3(id);
+    if (id.y == 0u || id.y == pushData.ny) faceV0.values[index] = 0.0;
+    else if (solid(bottom) || solid(top)) {
+      const vec3 point = vec3((float(id.x) + 0.5) / pushData.nx,
+          float(id.y) / pushData.ny, (float(id.z) + 0.5) / pushData.nz);
+      faceV0.values[index] = max(obstacleKind(bottom), obstacleKind(top)) > 1.5
+          ? rigidSurfaceVelocity(point).y : 0.0;
+    }
     else faceV0.values[index] = faceV1.values[index] - effectiveDt() *
-        (pressureAt(ivec3(id), readSecond) - pressureAt(ivec3(id) - ivec3(0, 1, 0), readSecond)) / hy;
+        (pressureAt(top, readSecond) - pressureAt(bottom, readSecond)) / hy;
   }
   if (id.x < pushData.nx && id.y < pushData.ny && id.z <= pushData.nz) {
     const uint index = wIndex(id);
-    if (id.z == 0u || id.z == pushData.nz || solid(ivec3(id) - ivec3(0, 0, 1)) || solid(ivec3(id))) faceW0.values[index] = 0.0;
+    const ivec3 back = ivec3(id) - ivec3(0, 0, 1);
+    const ivec3 front = ivec3(id);
+    if (id.z == 0u || id.z == pushData.nz) faceW0.values[index] = 0.0;
+    else if (solid(back) || solid(front)) {
+      const vec3 point = vec3((float(id.x) + 0.5) / pushData.nx,
+          (float(id.y) + 0.5) / pushData.ny, float(id.z) / pushData.nz);
+      faceW0.values[index] = max(obstacleKind(back), obstacleKind(front)) > 1.5
+          ? rigidSurfaceVelocity(point).z : 0.0;
+    }
     else faceW0.values[index] = faceW1.values[index] - effectiveDt() *
-        (pressureAt(ivec3(id), readSecond) - pressureAt(ivec3(id) - ivec3(0, 0, 1), readSecond)) / hz;
+        (pressureAt(front, readSecond) - pressureAt(back, readSecond)) / hz;
   }
 }
 

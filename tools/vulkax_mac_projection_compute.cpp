@@ -327,14 +327,14 @@ struct ImportedMesh {
 
 ImportedMesh defaultObstacleMesh() {
   return {
-      {{{0.56f, 0.22f, 0.42f, 1.0f},
-        {0.76f, 0.22f, 0.42f, 1.0f},
-        {0.76f, 0.38f, 0.42f, 1.0f},
-        {0.56f, 0.38f, 0.42f, 1.0f},
-        {0.56f, 0.22f, 0.58f, 1.0f},
-        {0.76f, 0.22f, 0.58f, 1.0f},
-        {0.76f, 0.38f, 0.58f, 1.0f},
-        {0.56f, 0.38f, 0.58f, 1.0f}}},
+      {{{-0.10f, -0.08f, -0.08f, 1.0f},
+        {0.10f, -0.08f, -0.08f, 1.0f},
+        {0.10f, 0.08f, -0.08f, 1.0f},
+        {-0.10f, 0.08f, -0.08f, 1.0f},
+        {-0.10f, -0.08f, 0.08f, 1.0f},
+        {0.10f, -0.08f, 0.08f, 1.0f},
+        {0.10f, 0.08f, 0.08f, 1.0f},
+        {-0.10f, 0.08f, 0.08f, 1.0f}}},
       {0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 4, 7, 0, 7, 3,
        1, 2, 6, 1, 6, 5, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2}};
 }
@@ -387,9 +387,9 @@ ImportedMesh loadObstacleObj(const std::filesystem::path& path) {
   if (!(span > 1e-8f)) throw std::runtime_error("OBJ bounds are degenerate");
   for (const auto& position : positions) {
     mesh.vertices.push_back(
-        {0.66f + 0.20f * ((position[0] - 0.5f * (minimum[0] + maximum[0])) / span),
-         0.30f + 0.20f * ((position[1] - 0.5f * (minimum[1] + maximum[1])) / span),
-         0.50f + 0.20f * ((position[2] - 0.5f * (minimum[2] + maximum[2])) / span),
+        {0.20f * ((position[0] - 0.5f * (minimum[0] + maximum[0])) / span),
+         0.20f * ((position[1] - 0.5f * (minimum[1] + maximum[1])) / span),
+         0.20f * ((position[2] - 0.5f * (minimum[2] + maximum[2])) / span),
          1.0f});
   }
   return mesh;
@@ -514,7 +514,7 @@ int main(int argc, char** argv) {
         meshVertexCount * 4u,
         triangleCount * 3u,
         triangleCount * 8u,
-        8u};
+        24u};
     std::array<Buffer, 32> buffers{};
     for (size_t index = 0; index < buffers.size(); ++index) {
       buffers[index] = makeBuffer(physical, device, counts[index]);
@@ -553,8 +553,16 @@ int main(int argc, char** argv) {
         importedMesh.indices.size() * sizeof(uint32_t));
     upload(device, buffers[28], meshVertices);
     upload(device, buffers[29], encodedIndices);
-    std::vector<float> bodyState(8, 0.0f);
-    bodyState[4] = 0.02f;
+    std::vector<float> bodyState(24, 0.0f);
+    bodyState[0] = 0.66f;
+    bodyState[1] = 0.30f;
+    bodyState[2] = 0.50f;
+    bodyState[3] = 2.0f;
+    bodyState[7] = 1.0f;
+    bodyState[8] = 0.02f;
+    bodyState[13] = 1.25f;
+    bodyState[16] = bodyState[17] = bodyState[18] = 0.012f;
+    bodyState[20] = bodyState[21] = bodyState[22] = 1.0f;
     upload(device, buffers[31], bodyState);
 
     std::array<VkDescriptorSetLayoutBinding, 32> bindings{};
@@ -819,8 +827,16 @@ int main(int argc, char** argv) {
           return value > 0.5f;
         }));
     const float bodyDisplacement = std::sqrt(
-        finalBodyState[0] * finalBodyState[0] + finalBodyState[1] * finalBodyState[1] +
-        finalBodyState[2] * finalBodyState[2]);
+        (finalBodyState[0] - bodyState[0]) * (finalBodyState[0] - bodyState[0]) +
+        (finalBodyState[1] - bodyState[1]) * (finalBodyState[1] - bodyState[1]) +
+        (finalBodyState[2] - bodyState[2]) * (finalBodyState[2] - bodyState[2]));
+    const float orientationNorm = std::sqrt(
+        finalBodyState[4] * finalBodyState[4] + finalBodyState[5] * finalBodyState[5] +
+        finalBodyState[6] * finalBodyState[6] + finalBodyState[7] * finalBodyState[7]);
+    const float orientationDelta = std::sqrt(
+        finalBodyState[4] * finalBodyState[4] + finalBodyState[5] * finalBodyState[5] +
+        finalBodyState[6] * finalBodyState[6] +
+        (finalBodyState[7] - 1.0f) * (finalBodyState[7] - 1.0f));
     float minimumLuminance = std::numeric_limits<float>::max();
     float maximumLuminance = 0.0f;
     bool finiteRadiance = true;
@@ -861,6 +877,7 @@ int main(int argc, char** argv) {
               << " curl_l2=" << curlL2 << " obstacle_cells=" << obstacleCells
               << " active_bricks=" << activeBrickCount << '/' << brickCount
               << " body_displacement=" << bodyDisplacement
+              << " orientation_delta=" << orientationDelta
               << " cpu_gpu_max_error=" << std::max(beforeMaximumError, afterMaximumError)
               << " density_mass=" << densityMass << " temperature_mass=" << temperatureMass
               << " luminance=[" << minimumLuminance << ',' << maximumLuminance << ']';
@@ -879,7 +896,9 @@ int main(int argc, char** argv) {
         afterL2 < beforeL2 * 0.90 && measuredCourant <= 0.701f && selectedTimestep > 0.0f &&
         std::isfinite(curlL2) && (simulationSteps == 1 || curlL2 > 1e-6) && obstacleCells > 0 &&
         activeBrickCount > 0 && activeBrickCount < brickCount && std::isfinite(bodyDisplacement) &&
-        bodyDisplacement > 0.0f && densityMass > 1.0 && temperatureMass > 1.0 && finiteRadiance &&
+        bodyDisplacement > 0.0f && std::isfinite(orientationNorm) &&
+        std::abs(orientationNorm - 1.0f) < 1e-4f && orientationDelta > 0.0f &&
+        densityMass > 1.0 && temperatureMass > 1.0 && finiteRadiance &&
         minimumLuminance >= 0.0f && maximumLuminance > minimumLuminance + 1e-3f;
     vkDestroyFence(device, fence, nullptr);
     if (queryPool != VK_NULL_HANDLE) vkDestroyQueryPool(device, queryPool, nullptr);

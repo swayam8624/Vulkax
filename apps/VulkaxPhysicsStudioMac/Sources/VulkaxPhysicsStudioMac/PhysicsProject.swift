@@ -110,9 +110,34 @@ struct RuntimeGraphPass: Codable, Equatable {
     }
 }
 
+struct CodableVector3: Codable, Equatable {
+    var x: Float
+    var y: Float
+    var z: Float
+}
+
+struct RigidObstacleConfiguration: Codable, Equatable {
+    var position: CodableVector3
+    var rotationDegrees: CodableVector3
+    var scale: CodableVector3
+    var linearVelocity: CodableVector3
+    var angularVelocity: CodableVector3
+    var diagonalInertia: CodableVector3
+    var mass: Float
+
+    static let `default` = RigidObstacleConfiguration(
+        position: .init(x: 0.66, y: 0.30, z: 0.50),
+        rotationDegrees: .init(x: 0, y: 0, z: 0),
+        scale: .init(x: 1, y: 1, z: 1),
+        linearVelocity: .init(x: 0.035, y: 0, z: 0),
+        angularVelocity: .init(x: 0, y: 0, z: 0),
+        diagonalInertia: .init(x: 0.012, y: 0.012, z: 0.012),
+        mass: 2)
+}
+
 struct PhysicsProjectFile: Codable {
     var format = "vulkax.physics-project"
-    var version = 5
+    var version = 6
     var name: String
     var preset: String
     var visualization: String
@@ -121,11 +146,13 @@ struct PhysicsProjectFile: Codable {
     var parameters: [String: Float]
     var graph: EquationRuntimeGraph
     var obstacleMeshPath: String?
+    var obstacleBody: RigidObstacleConfiguration
 
     enum CodingKeys: String, CodingKey {
         case format, version, name, preset, visualization, expression, parameters, graph
         case timelineSeconds = "timeline_seconds"
         case obstacleMeshPath = "obstacle_mesh_path"
+        case obstacleBody = "obstacle_body"
     }
 
     init(
@@ -136,7 +163,8 @@ struct PhysicsProjectFile: Codable {
         timelineSeconds: Float,
         parameters: [String: Float],
         graph: EquationRuntimeGraph,
-        obstacleMeshPath: String? = nil
+        obstacleMeshPath: String? = nil,
+        obstacleBody: RigidObstacleConfiguration = .default
     ) {
         self.name = name
         self.preset = preset
@@ -146,6 +174,7 @@ struct PhysicsProjectFile: Codable {
         self.parameters = parameters
         self.graph = graph
         self.obstacleMeshPath = obstacleMeshPath
+        self.obstacleBody = obstacleBody
     }
 
     init(from decoder: Decoder) throws {
@@ -163,6 +192,8 @@ struct PhysicsProjectFile: Codable {
         graph = try container.decodeIfPresent(EquationRuntimeGraph.self, forKey: .graph) ??
             .builtIn(for: fallbackMode, scalarEquation: expression)
         obstacleMeshPath = try container.decodeIfPresent(String.self, forKey: .obstacleMeshPath)
+        obstacleBody = try container.decodeIfPresent(
+            RigidObstacleConfiguration.self, forKey: .obstacleBody) ?? .default
     }
 }
 
@@ -186,7 +217,7 @@ enum PhysicsProjectIO {
 
     static func load(from url: URL) throws -> PhysicsProjectFile {
         let project = try JSONDecoder().decode(PhysicsProjectFile.self, from: Data(contentsOf: url))
-        guard project.format == "vulkax.physics-project", (1...5).contains(project.version) else {
+        guard project.format == "vulkax.physics-project", (1...6).contains(project.version) else {
             throw CocoaError(.fileReadCorruptFile)
         }
         return project

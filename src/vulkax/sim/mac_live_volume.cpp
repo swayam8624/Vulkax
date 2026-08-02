@@ -114,7 +114,7 @@ void MacLiveVolume::createBuffers() {
       cells, cells, cells, cells, cells, cells, cells, cells, cells, cells,
       static_cast<size_t>(outputExtent_.width) * outputExtent_.height * 4u,
       cells, cells * 3u, coarseCells, 4u, coarseCells, coarseCells, coarseCells,
-      bricks, bricks, 4u, 3u, 8u, 8u};
+      bricks, bricks, 4u, 3u, 8u, 24u};
   for (size_t index = 0; index < buffers_.size(); ++index) {
     buffers_[index] = std::make_unique<lve::LveBuffer>(
         device_,
@@ -147,6 +147,14 @@ void MacLiveVolume::initializeFields() {
   }
   buffers_[0]->writeToBuffer(density.data(), density.size() * sizeof(float));
   buffers_[1]->writeToBuffer(temperature.data(), temperature.size() * sizeof(float));
+  std::array<float, 24> body{
+      0.66f, 0.30f, 0.50f, 2.0f,
+      0.0f, 0.0f, 0.0f, 1.0f,
+      0.0f, 0.0f, 0.0f, 0.0f,
+      0.0f, 0.0f, 0.0f, 0.0f,
+      0.012f, 0.012f, 0.012f, 0.0f,
+      1.0f, 1.0f, 1.0f, 0.0f};
+  buffers_[31]->writeToBuffer(body.data(), sizeof(body));
   const size_t bricks = buffers_[27]->getBufferSize() / sizeof(float);
   std::vector<uint32_t> active(bricks, 1u);
   buffers_[27]->writeToBuffer(active.data(), active.size() * sizeof(uint32_t));

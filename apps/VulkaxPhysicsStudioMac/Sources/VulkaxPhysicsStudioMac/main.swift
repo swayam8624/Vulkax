@@ -42,6 +42,13 @@ final class PhysicsModel: ObservableObject {
     @Published private(set) var obstacleMesh: ImportedObstacleMesh?
     @Published private(set) var obstacleMeshURL: URL?
     @Published private(set) var obstacleMeshRevision: UInt64 = 0
+    @Published var obstacleBody = RigidObstacleConfiguration.default {
+        didSet {
+            guard obstacleBody != oldValue else { return }
+            obstacleMeshRevision &+= 1
+            accumulationResetToken &+= 1
+        }
+    }
     @Published var accumulationResetToken: UInt32 = 0
     @Published var playing = true
     @Published var time: Float = 0.0
@@ -130,6 +137,8 @@ final class PhysicsModel: ObservableObject {
         projectURL = nil
         time = 0
         playing = true
+        removeObstacleMesh()
+        obstacleBody = .default
         selectScalarPreset("wave-field")
     }
 
@@ -157,6 +166,7 @@ final class PhysicsModel: ObservableObject {
             scalarPresetId = project.preset
             mode = Self.mode(for: project.visualization)
             executionGraph = project.graph
+            obstacleBody = project.obstacleBody
             if let path = project.obstacleMeshPath {
                 let meshURL = URL(fileURLWithPath: path, relativeTo: url.deletingLastPathComponent())
                     .standardizedFileURL
@@ -229,7 +239,8 @@ final class PhysicsModel: ObservableObject {
                 timelineSeconds: time,
                 parameters: projectParameters(),
                 graph: executionGraph,
-                obstacleMeshPath: packagedObstaclePath)
+                obstacleMeshPath: packagedObstaclePath,
+                obstacleBody: obstacleBody)
             try PhysicsProjectIO.save(project, to: url)
             projectURL = url
             equationStatus = "Saved \(url.lastPathComponent)"
@@ -287,6 +298,30 @@ struct GeneratedFieldParameters {
     var wavenumber: Float
     var angularFrequency: Float
     var padding: SIMD2<Float> = .zero
+}
+
+private func rigidBodyGpuState(_ configuration: RigidObstacleConfiguration) -> [SIMD4<Float>] {
+    let radians = SIMD3<Float>(
+        configuration.rotationDegrees.x,
+        configuration.rotationDegrees.y,
+        configuration.rotationDegrees.z) * (.pi / 180)
+    let qx = simd_quatf(angle: radians.x, axis: SIMD3<Float>(1, 0, 0))
+    let qy = simd_quatf(angle: radians.y, axis: SIMD3<Float>(0, 1, 0))
+    let qz = simd_quatf(angle: radians.z, axis: SIMD3<Float>(0, 0, 1))
+    let orientation = simd_normalize(qz * qy * qx)
+    return [
+        SIMD4(configuration.position.x, configuration.position.y, configuration.position.z,
+              max(configuration.mass, 0.001)),
+        SIMD4(orientation.imag, orientation.real),
+        SIMD4(configuration.linearVelocity.x, configuration.linearVelocity.y,
+              configuration.linearVelocity.z, 0),
+        SIMD4(configuration.angularVelocity.x, configuration.angularVelocity.y,
+              configuration.angularVelocity.z, 0),
+        SIMD4(max(configuration.diagonalInertia.x, 0.00001),
+              max(configuration.diagonalInertia.y, 0.00001),
+              max(configuration.diagonalInertia.z, 0.00001), 0),
+        SIMD4(max(configuration.scale.x, 0.01), max(configuration.scale.y, 0.01),
+              max(configuration.scale.z, 0.01), 0)]
 }
 
 private var rendererAssociationKey: UInt8 = 0
@@ -594,6 +629,12 @@ bool solidAt(texture3d<half, access::read> obstacles, int3 cell) {
     return float(obstacles.read(uint3(cell)).r) > 0.5;
 }
 
+float obstacleKindAt(texture3d<half, access::read> obstacles, int3 cell) {
+    int3 dimensions = int3(obstacles.get_width(), obstacles.get_height(), obstacles.get_depth());
+    if (any(cell < int3(0)) || any(cell >= dimensions)) return 1.0;
+    return float(obstacles.read(uint3(cell)).r);
+}
+
 kernel void seedMacFields(
     texture3d<half, access::write> density [[texture(0)]],
     texture3d<half, access::write> temperature [[texture(1)]],
@@ -613,9 +654,34 @@ kernel void seedMacFields(
 }
 
 struct RigidMeshState {
-    float4 position;
-    float4 velocity;
+    float4 positionMass;
+    float4 orientation;
+    float4 linearVelocity;
+    float4 angularVelocity;
+    float4 diagonalInertia;
+    float4 scale;
 };
+
+float4 quaternionMultiply(float4 a, float4 b) {
+    return float4(
+        a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz),
+        a.w * b.w - dot(a.xyz, b.xyz));
+}
+
+float3 quaternionRotate(float4 orientation, float3 value) {
+    float4 q = normalize(orientation);
+    return value + 2.0 * cross(q.xyz, cross(q.xyz, value) + q.w * value);
+}
+
+float3 worldMeshVertex(device const packed_float4* vertices, uint index, device const RigidMeshState* body) {
+    return body[0].positionMass.xyz + quaternionRotate(
+        body[0].orientation, vertices[index].xyz * body[0].scale.xyz);
+}
+
+float3 rigidSurfaceVelocity(device const RigidMeshState* body, float3 point) {
+    return body[0].linearVelocity.xyz +
+        cross(body[0].angularVelocity.xyz, point - body[0].positionMass.xyz);
+}
 
 bool rayIntersectsTriangle(float3 origin, float3 a, float3 b, float3 c) {
     const float3 direction = float3(1.0, 0.0, 0.0);
@@ -658,14 +724,15 @@ kernel void voxelizeObstacleMesh(
     float winding = 0.0;
     for (uint triangle = 0; triangle < triangleCount; ++triangle) {
         const uint base = triangle * 3;
-        const float3 a = vertices[indices[base]].xyz + body[0].position.xyz;
-        const float3 b = vertices[indices[base + 1]].xyz + body[0].position.xyz;
-        const float3 c = vertices[indices[base + 2]].xyz + body[0].position.xyz;
+        const float3 a = worldMeshVertex(vertices, indices[base], body);
+        const float3 b = worldMeshVertex(vertices, indices[base + 1], body);
+        const float3 c = worldMeshVertex(vertices, indices[base + 2], body);
         winding += abs(triangleSolidAngle(point, a, b, c));
     }
     const bool solid = cell.y == 0 || winding > 2.0 * M_PI_F;
     if (solid) atomic_fetch_add_explicit(occupiedCells, 1u, memory_order_relaxed);
-    obstacles.write(half4(half(solid ? 1.0 : 0.0), 0.0h, 0.0h, 1.0h), cell);
+    const float obstacleKind = cell.y == 0 ? 1.0 : (solid ? 2.0 : 0.0);
+    obstacles.write(half4(half(obstacleKind), 0.0h, 0.0h, 1.0h), cell);
 }
 
 kernel void computeObstaclePressureForces(
@@ -679,10 +746,9 @@ kernel void computeObstaclePressureForces(
     uint triangle [[thread_position_in_grid]]) {
     if (triangle >= triangleCount) return;
     const uint base = triangle * 3;
-    const float3 offset = body[0].position.xyz;
-    const float3 a = vertices[indices[base]].xyz + offset;
-    const float3 b = vertices[indices[base + 1]].xyz + offset;
-    const float3 c = vertices[indices[base + 2]].xyz + offset;
+    const float3 a = worldMeshVertex(vertices, indices[base], body);
+    const float3 b = worldMeshVertex(vertices, indices[base + 1], body);
+    const float3 c = worldMeshVertex(vertices, indices[base + 2], body);
     const float3 areaNormal = 0.5 * cross(b - a, c - a);
     const float3 centroid = (a + b + c) / 3.0;
     const int3 dimensions = int3(pressure.get_width(), pressure.get_height(), pressure.get_depth());
@@ -690,24 +756,41 @@ kernel void computeObstaclePressureForces(
     const float localPressure = float(pressure.read(uint3(cell)).r);
     const float3 force = -localPressure * areaNormal;
     forces[triangle] = packed_float4(force, 0.0);
-    torques[triangle] = packed_float4(cross(centroid - (float3(0.66, 0.30, 0.50) + offset), force), 0.0);
+    torques[triangle] = packed_float4(cross(centroid - body[0].positionMass.xyz, force), 0.0);
 }
 
 kernel void integrateObstacleBody(
     device RigidMeshState* body [[buffer(0)]],
     device const packed_float4* forces [[buffer(1)]],
-    constant uint& triangleCount [[buffer(2)]],
-    constant float& dt [[buffer(3)]],
+    device const packed_float4* torques [[buffer(2)]],
+    constant uint& triangleCount [[buffer(3)]],
+    constant float& dt [[buffer(4)]],
     uint index [[thread_position_in_grid]]) {
     if (index != 0) return;
     float3 totalForce = float3(0.0);
-    for (uint triangle = 0; triangle < triangleCount; ++triangle) totalForce += forces[triangle].xyz;
-    float3 velocity = body[0].velocity.xyz + totalForce * max(dt, 1e-4) / 2.0;
+    float3 totalTorque = float3(0.0);
+    for (uint triangle = 0; triangle < triangleCount; ++triangle) {
+        totalForce += forces[triangle].xyz;
+        totalTorque += torques[triangle].xyz;
+    }
+    const float step = max(dt, 1e-4);
+    float3 velocity = body[0].linearVelocity.xyz + totalForce * step / max(body[0].positionMass.w, 1e-4);
     velocity *= 0.998;
-    float3 position = body[0].position.xyz + velocity * max(dt, 1e-4);
-    position = clamp(position, float3(-0.20, -0.20, -0.20), float3(0.20, 0.35, 0.20));
-    body[0].velocity = float4(velocity, 0.0);
-    body[0].position = float4(position, 0.0);
+    float3 position = body[0].positionMass.xyz + velocity * step;
+    position = clamp(position, float3(0.12, 0.08, 0.12), float3(0.88, 0.82, 0.88));
+    float4 orientation = normalize(body[0].orientation);
+    float4 inverseOrientation = float4(-orientation.xyz, orientation.w);
+    float3 localTorque = quaternionRotate(inverseOrientation, totalTorque);
+    float3 localAcceleration = localTorque / max(body[0].diagonalInertia.xyz, float3(1e-5));
+    float3 angularVelocity = body[0].angularVelocity.xyz +
+        quaternionRotate(orientation, localAcceleration) * step;
+    angularVelocity *= 0.998;
+    float4 derivative = quaternionMultiply(float4(angularVelocity, 0.0), orientation);
+    orientation = normalize(orientation + 0.5 * step * derivative);
+    body[0].linearVelocity = float4(velocity, 0.0);
+    body[0].angularVelocity = float4(angularVelocity, 0.0);
+    body[0].orientation = orientation;
+    body[0].positionMass.xyz = position;
 }
 
 kernel void advectMacVelocity(
@@ -959,6 +1042,7 @@ kernel void projectMacVelocity(
     texture3d<half, access::write> targetW [[texture(7)]],
     constant Uniforms& uniforms [[buffer(0)]],
     device atomic_uint* cflControl [[buffer(1)]],
+    device const RigidMeshState* body [[buffer(2)]],
     uint3 face [[thread_position_in_grid]]) {
     int nx = int(pressure.get_width());
     int ny = int(pressure.get_height());
@@ -970,7 +1054,12 @@ kernel void projectMacVelocity(
         int3 left = right - int3(1, 0, 0);
         float value = faceAt(sourceU, int3(face));
         if (active) {
-            if (face.x == 0 || face.x == uint(nx) || solidAt(obstacles, left) || solidAt(obstacles, right)) value = 0.0;
+            if (face.x == 0 || face.x == uint(nx) || solidAt(obstacles, left) || solidAt(obstacles, right)) {
+                const float3 point = float3(float(face.x) / nx, (float(face.y) + 0.5) / ny,
+                                            (float(face.z) + 0.5) / nz);
+                value = max(obstacleKindAt(obstacles, left), obstacleKindAt(obstacles, right)) > 1.5
+                    ? rigidSurfaceVelocity(body, point).x : 0.0;
+            }
             else value -= dt * float(nx) * (scalarAt(pressure, right) - scalarAt(pressure, left));
         }
         targetU.write(half4(half(value), 0.0h, 0.0h, 1.0h), face);
@@ -980,7 +1069,12 @@ kernel void projectMacVelocity(
         int3 bottom = top - int3(0, 1, 0);
         float value = faceAt(sourceV, int3(face));
         if (active) {
-            if (face.y == 0 || face.y == uint(ny) || solidAt(obstacles, bottom) || solidAt(obstacles, top)) value = 0.0;
+            if (face.y == 0 || face.y == uint(ny) || solidAt(obstacles, bottom) || solidAt(obstacles, top)) {
+                const float3 point = float3((float(face.x) + 0.5) / nx, float(face.y) / ny,
+                                            (float(face.z) + 0.5) / nz);
+                value = max(obstacleKindAt(obstacles, bottom), obstacleKindAt(obstacles, top)) > 1.5
+                    ? rigidSurfaceVelocity(body, point).y : 0.0;
+            }
             else value -= dt * float(ny) * (scalarAt(pressure, top) - scalarAt(pressure, bottom));
         }
         targetV.write(half4(half(value), 0.0h, 0.0h, 1.0h), face);
@@ -990,7 +1084,12 @@ kernel void projectMacVelocity(
         int3 back = front - int3(0, 0, 1);
         float value = faceAt(sourceW, int3(face));
         if (active) {
-            if (face.z == 0 || face.z == uint(nz) || solidAt(obstacles, back) || solidAt(obstacles, front)) value = 0.0;
+            if (face.z == 0 || face.z == uint(nz) || solidAt(obstacles, back) || solidAt(obstacles, front)) {
+                const float3 point = float3((float(face.x) + 0.5) / nx, (float(face.y) + 0.5) / ny,
+                                            float(face.z) / nz);
+                value = max(obstacleKindAt(obstacles, back), obstacleKindAt(obstacles, front)) > 1.5
+                    ? rigidSurfaceVelocity(body, point).z : 0.0;
+            }
             else value -= dt * float(nz) * (scalarAt(pressure, front) - scalarAt(pressure, back));
         }
         targetW.write(half4(half(value), 0.0h, 0.0h, 1.0h), face);
@@ -1285,6 +1384,10 @@ private func runNativeGpuSmoke(
                 pixelFormat: .rgba16Float, width: 32, height: 32, mipmapped: false)
             radianceDescriptor.usage = [.shaderRead, .shaderWrite]
             radianceDescriptor.storageMode = .shared
+            let staticBodyValues = rigidBodyGpuState(.default)
+            let staticBody = staticBodyValues.withUnsafeBytes { bytes in
+                device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+            }
             guard let sourceDensity = makeVolume(.r16Float, nx, ny, nz),
                   let targetDensity = makeVolume(.r16Float, nx, ny, nz),
                   let sourceTemperature = makeVolume(.r16Float, nx, ny, nz),
@@ -1317,6 +1420,7 @@ private func runNativeGpuSmoke(
                   let curlField = makeVolume(.rgba16Float, nx, ny, nz),
                   let radiance = device.makeTexture(descriptor: radianceDescriptor),
                   let cflControl = device.makeBuffer(length: 4 * MemoryLayout<UInt32>.stride, options: .storageModeShared),
+                  let staticBody,
                   let command = queue.makeCommandBuffer() else {
                 FileHandle.standardError.write(Data("Vulkax Metal volume smoke failed: could not allocate GPU resources\n".utf8))
                 return false
@@ -1535,6 +1639,7 @@ private func runNativeGpuSmoke(
             projectionPass.setTexture(projectedTargetW, index: 7)
             projectionPass.setBytes(&uniforms, length: MemoryLayout<WaveUniforms>.stride, index: 0)
             projectionPass.setBuffer(cflControl, offset: 0, index: 1)
+            projectionPass.setBuffer(staticBody, offset: 0, index: 2)
             dispatch3D(projectionPass, projection, nx + 1, ny + 1, nz + 1)
             projectionPass.endEncoding()
             guard let postDivergencePass = command.makeComputeCommandEncoder() else { return false }
@@ -1813,7 +1918,10 @@ private func runImportedMeshGpuSmoke(path: String) -> Bool {
         let indices = mesh.indices.withUnsafeBytes { bytes in
             device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
         }
-        let bodyValues = [SIMD4<Float>(0, 0, 0, 0), SIMD4<Float>(0.04, 0, 0, 0)]
+        var bodyConfiguration = RigidObstacleConfiguration.default
+        bodyConfiguration.linearVelocity = .init(x: 0.04, y: 0, z: 0)
+        bodyConfiguration.angularVelocity = .init(x: 0, y: 1.5, z: 0)
+        let bodyValues = rigidBodyGpuState(bodyConfiguration)
         let body = bodyValues.withUnsafeBytes { bytes in
             device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
         }
@@ -1862,8 +1970,9 @@ private func runImportedMeshGpuSmoke(path: String) -> Bool {
         integrate.setComputePipelineState(integratePipeline)
         integrate.setBuffer(body, offset: 0, index: 0)
         integrate.setBuffer(forces, offset: 0, index: 1)
-        integrate.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 2)
-        integrate.setBytes(&timestep, length: MemoryLayout<Float>.stride, index: 3)
+        integrate.setBuffer(torques, offset: 0, index: 2)
+        integrate.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 3)
+        integrate.setBytes(&timestep, length: MemoryLayout<Float>.stride, index: 4)
         integrate.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1),
                                   threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
         integrate.endEncoding()
@@ -1878,11 +1987,15 @@ private func runImportedMeshGpuSmoke(path: String) -> Bool {
         }
         let textureSolidCells = occupancy.reduce(0) { $0 + (Float16(bitPattern: $1) > 0.5 ? 1 : 0) }
         let solidCells = Int(occupied.contents().bindMemory(to: UInt32.self, capacity: 1)[0])
-        let state = body.contents().bindMemory(to: SIMD4<Float>.self, capacity: 2)
-        let displacement = simd_length(SIMD3<Float>(state[0].x, state[0].y, state[0].z))
-        guard solidCells > 0, solidCells < occupancy.count, displacement > 0 else {
+        let state = body.contents().bindMemory(to: SIMD4<Float>.self, capacity: 6)
+        let initialPosition = SIMD3<Float>(bodyConfiguration.position.x, bodyConfiguration.position.y,
+                                          bodyConfiguration.position.z)
+        let displacement = simd_length(SIMD3<Float>(state[0].x, state[0].y, state[0].z) - initialPosition)
+        let orientationDelta = simd_length(state[1] - bodyValues[1])
+        guard solidCells > 0, solidCells < occupancy.count, displacement > 0,
+              orientationDelta > 0, abs(simd_length(state[1]) - 1) < 1e-4 else {
             FileHandle.standardError.write(Data(
-                "Vulkax imported-mesh Metal validation failed: triangles=\(triangleCount) gpu_solid_cells=\(solidCells) texture_solid_cells=\(textureSolidCells) displacement=\(displacement)\n".utf8))
+                "Vulkax imported-mesh Metal validation failed: triangles=\(triangleCount) gpu_solid_cells=\(solidCells) texture_solid_cells=\(textureSolidCells) displacement=\(displacement) orientation_delta=\(orientationDelta)\n".utf8))
             return false
         }
         print("Vulkax imported-mesh Metal GPU smoke passed: \(device.name) triangles=\(triangleCount) solid_cells=\(solidCells) displacement=\(displacement)")
@@ -2279,7 +2392,12 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         obstacleOccupancy = nil
         obstacleTriangleCount = 0
         volumeInitialized = false
-        guard let mesh = model.obstacleMesh else { return true }
+        let body = rigidBodyGpuState(model.obstacleBody)
+        obstacleBody = body.withUnsafeBytes { bytes in
+            guard let address = bytes.baseAddress else { return nil }
+            return device.makeBuffer(bytes: address, length: bytes.count, options: .storageModeShared)
+        }
+        guard let mesh = model.obstacleMesh else { return obstacleBody != nil }
         obstacleVertices = mesh.vertices.withUnsafeBytes { bytes in
             guard let address = bytes.baseAddress else { return nil }
             return device.makeBuffer(bytes: address, length: bytes.count, options: .storageModeShared)
@@ -2292,11 +2410,6 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         let vectorBytes = max(1, Int(obstacleTriangleCount)) * MemoryLayout<SIMD4<Float>>.stride
         obstacleForces = device.makeBuffer(length: vectorBytes, options: .storageModePrivate)
         obstacleTorques = device.makeBuffer(length: vectorBytes, options: .storageModePrivate)
-        let body = [SIMD4<Float>(0, 0, 0, 0), SIMD4<Float>(0.035, 0, 0, 0)]
-        obstacleBody = body.withUnsafeBytes { bytes in
-            guard let address = bytes.baseAddress else { return nil }
-            return device.makeBuffer(bytes: address, length: bytes.count, options: .storageModeShared)
-        }
         obstacleOccupancy = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared)
         return obstacleVertices != nil && obstacleIndices != nil && obstacleForces != nil &&
             obstacleTorques != nil && obstacleBody != nil && obstacleOccupancy != nil
@@ -2347,8 +2460,9 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         integrate.setComputePipelineState(integrateObstaclePipeline)
         integrate.setBuffer(body, offset: 0, index: 0)
         integrate.setBuffer(forces, offset: 0, index: 1)
-        integrate.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 2)
-        integrate.setBytes(&timestep, length: MemoryLayout<Float>.stride, index: 3)
+        integrate.setBuffer(torques, offset: 0, index: 2)
+        integrate.setBytes(&triangleCount, length: MemoryLayout<UInt32>.stride, index: 3)
+        integrate.setBytes(&timestep, length: MemoryLayout<Float>.stride, index: 4)
         integrate.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1),
                                   threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
         integrate.endEncoding()
@@ -2618,6 +2732,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
             projectionEncoder.setTexture(volumeFaceW[activeVolumeVelocity], index: 7)
             projectionEncoder.setBytes(&copy, length: MemoryLayout<WaveUniforms>.stride, index: 0)
             projectionEncoder.setBuffer(cflControl, offset: 0, index: 1)
+            if let obstacleBody { projectionEncoder.setBuffer(obstacleBody, offset: 0, index: 2) }
             dispatch3D(projectionEncoder, pipeline: projectionPipeline, width: 65, height: 97, depth: 65)
             projectionEncoder.endEncoding()
 
@@ -2946,6 +3061,41 @@ struct ContentView: View {
                          "No 3D object in the fluid domain")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
+                    if model.obstacleMeshURL != nil {
+                        HStack {
+                            Text("OBJECT TRANSFORM").font(.caption.bold()).foregroundStyle(.secondary)
+                            Spacer()
+                            Button { model.obstacleBody = .default } label: {
+                                Image(systemName: "arrow.counterclockwise")
+                            }
+                            .help("Reset object transform and dynamics")
+                        }
+                        axisParameters(
+                            "Position", x: obstacleBinding(\.position.x),
+                            y: obstacleBinding(\.position.y), z: obstacleBinding(\.position.z),
+                            range: 0.05...0.95)
+                        axisParameters(
+                            "Rotation", x: obstacleBinding(\.rotationDegrees.x),
+                            y: obstacleBinding(\.rotationDegrees.y), z: obstacleBinding(\.rotationDegrees.z),
+                            range: -180...180, suffix: "°")
+                        axisParameters(
+                            "Scale", x: obstacleBinding(\.scale.x),
+                            y: obstacleBinding(\.scale.y), z: obstacleBinding(\.scale.z),
+                            range: 0.25...2.0)
+                        parameter("Mass", value: obstacleBinding(\.mass), range: 0.1...20)
+                        axisParameters(
+                            "Linear velocity", x: obstacleBinding(\.linearVelocity.x),
+                            y: obstacleBinding(\.linearVelocity.y), z: obstacleBinding(\.linearVelocity.z),
+                            range: -1...1)
+                        axisParameters(
+                            "Angular velocity", x: obstacleBinding(\.angularVelocity.x),
+                            y: obstacleBinding(\.angularVelocity.y), z: obstacleBinding(\.angularVelocity.z),
+                            range: -8...8, suffix: " rad/s")
+                        axisParameters(
+                            "Diagonal inertia", x: obstacleBinding(\.diagonalInertia.x),
+                            y: obstacleBinding(\.diagonalInertia.y), z: obstacleBinding(\.diagonalInertia.z),
+                            range: 0.0001...1.0, suffix: " kg m2")
+                    }
                     parameter("Buoyancy", value: $model.smokeBuoyancy, range: 0...3)
                     parameter("Turbulence", value: $model.smokeTurbulence, range: 0...3)
                     parameter("Extinction", value: $model.volumeExtinction, range: 0.1...5)
@@ -2966,6 +3116,49 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack { Text(label).font(.subheadline.weight(.medium)); Spacer(); Text(String(format: "%.2f", value.wrappedValue)).monospacedDigit().foregroundStyle(.secondary) }
             Slider(value: value, in: range)
+        }
+    }
+
+    private func obstacleBinding(
+        _ keyPath: WritableKeyPath<RigidObstacleConfiguration, Float>
+    ) -> Binding<Float> {
+        Binding(
+            get: { model.obstacleBody[keyPath: keyPath] },
+            set: { model.obstacleBody[keyPath: keyPath] = $0 })
+    }
+
+    @ViewBuilder private func axisParameters(
+        _ label: String,
+        x: Binding<Float>,
+        y: Binding<Float>,
+        z: Binding<Float>,
+        range: ClosedRange<Float>,
+        suffix: String = ""
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label).font(.subheadline.weight(.medium))
+            HStack(spacing: 8) {
+                axisField("X", value: x, range: range, suffix: suffix)
+                axisField("Y", value: y, range: range, suffix: suffix)
+                axisField("Z", value: z, range: range, suffix: suffix)
+            }
+        }
+    }
+
+    @ViewBuilder private func axisField(
+        _ axis: String,
+        value: Binding<Float>,
+        range: ClosedRange<Float>,
+        suffix: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(axis).font(.caption2.bold()).foregroundStyle(.secondary)
+            TextField(axis, value: value, format: .number.precision(.fractionLength(2)))
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { value.wrappedValue = min(max(value.wrappedValue, range.lowerBound), range.upperBound) }
+            if !suffix.isEmpty {
+                Text(suffix).font(.caption2).foregroundStyle(.tertiary)
+            }
         }
     }
 

@@ -142,10 +142,15 @@ interactive frames remain GPU-resident until presentation.
 
 In Volume Smoke mode, **Import obstacle** accepts a closed OBJ mesh. The editor normalizes and
 uploads its triangles, voxelizes the moving mesh into the obstacle texture on Metal, samples the
-pressure field on its triangles, and advances its rigid-body state on the GPU. The project file
-persists the mesh path. The checked cube test reports 12 triangles, 2,598 occupied cells, and
-nonzero GPU-computed displacement. The portable Vulkan MAC test provides the corresponding OBJ,
-voxelization, force/torque, and body-advance path.
+pressure field on its triangles, and advances its rigid-body state on the GPU. The inspector exposes
+position, Euler rotation, nonuniform scale, mass, linear/angular velocity, and diagonal inertia.
+Metal and Vulkan transform vertices with the same quaternion convention, integrate force and torque,
+and impose `linear velocity + angular velocity cross radius` on fluid faces touching the moving mesh.
+Static floor cells remain zero-velocity boundaries. Version 6 project files persist the complete body
+configuration and package the OBJ beside the project. Versions 1 through 5 still load with default
+body values. The checked cube test reports 12 triangles, 2,598 occupied cells, nonzero GPU-computed
+translation, and normalized rotational integration. The portable Vulkan MAC test provides the
+corresponding OBJ, voxelization, moving-boundary, force/torque, and body-advance path.
 
 ## Equation Reference Runner
 
@@ -214,7 +219,7 @@ See [the legacy operating guide](docs/RUNNING_VULKAX.md) for those commands and
 | Schwarzschild thin-disk lensing and 2D buoyant-smoke equation suites | Implemented and tested |
 | Interactive GPU 3D MAC smoke with staggered face velocity, RK2/MacCormack transport, obstacle-aware two-level multigrid projection, curl, temperature, and volume ray marching | Implemented research foundation |
 | Portable Vulkan MAC projection, GPU CFL, solid obstacles, curl/vorticity, two-level pressure correction, RK2/MacCormack transport, density hierarchy, self-shadowed HDR volume march, timestamps, and persisted pipeline cache | Implemented foundation |
-| Imported-mesh airflow coupling with Metal/Vulkan closed-mesh voxelization, GPU pressure force/torque, rigid-body advancement, editor import, and reflected graph passes | Implemented research path |
+| Imported-mesh airflow coupling with persisted transforms, quaternion rotation, Metal/Vulkan voxelization, GPU pressure force/torque, angular integration, moving boundary velocities, editor controls, and reflected graph passes | Implemented single-body research path |
 | Linear-HDR EXR MSE, PSNR, global SSIM, maximum error, temporal difference, 1/4/16-sample convergence, and golden-image gates | Implemented |
 | Adaptive preview quality controller with live analytical MSE and raw benchmark | Implemented foundation |
 
