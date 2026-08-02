@@ -201,6 +201,27 @@ func runDynamicEquationProjectGpuSmoke() -> Bool {
                 domain: "VulkaxDynamicEquation", code: 7,
                 userInfo: [NSLocalizedDescriptionKey: "project round trip changed live GPU inputs"])
         }
+        let obstacleSource = temporary.deletingLastPathComponent()
+            .appendingPathComponent("vulkax-obstacle-\(UUID().uuidString).obj")
+        let assetDirectory = temporary.deletingPathExtension().appendingPathExtension("assets")
+        defer {
+            try? FileManager.default.removeItem(at: obstacleSource)
+            try? FileManager.default.removeItem(at: assetDirectory)
+        }
+        try "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n".write(
+            to: obstacleSource, atomically: true, encoding: .utf8)
+        let packaged = try PhysicsProjectIO.packageObstacle(from: obstacleSource, for: temporary)
+        let packagedURL = URL(
+            fileURLWithPath: packaged, relativeTo: temporary.deletingLastPathComponent())
+            .standardizedFileURL
+        guard !packaged.hasPrefix("/"),
+              FileManager.default.fileExists(atPath: packagedURL.path),
+              try String(contentsOf: packagedURL, encoding: .utf8) ==
+                  String(contentsOf: obstacleSource, encoding: .utf8) else {
+            throw NSError(
+                domain: "VulkaxDynamicEquation", code: 8,
+                userInfo: [NSLocalizedDescriptionKey: "project obstacle was not packaged portably"])
+        }
         print("Vulkax dynamic equation project GPU smoke passed: \(device.name) parameters=\(compiled.parameterNames.joined(separator: ",")) radiance=[\(minimum), \(maximum)]")
         return true
     } catch {

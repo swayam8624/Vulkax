@@ -26,6 +26,11 @@ analysis. Native compilation creates or restores a device-keyed Metal compute pi
 asynchronously while the previous valid pipeline remains active. Project open/save, parameter changes, playback,
 reset, and timeline scrubbing all feed that GPU viewport directly.
 
+Preset changes are revision-gated: a newly extracted parameter block is never submitted to an older
+asynchronously compiled pipeline. The scene sidebar and top toolbar both expose **Add 3D Object**, and
+OBJ files can be dropped directly onto the viewport. Saving a project copies the active obstacle into
+a sibling `.assets` directory and stores a relative path, so the `.vxp` can be moved with its assets.
+
 ```bash
 scripts/vulkax_macos.sh physics
 ```

@@ -167,6 +167,17 @@ struct PhysicsProjectFile: Codable {
 }
 
 enum PhysicsProjectIO {
+    static func packageObstacle(from source: URL, for projectURL: URL) throws -> String {
+        let assetDirectory = projectURL.deletingPathExtension().appendingPathExtension("assets")
+        try FileManager.default.createDirectory(
+            at: assetDirectory, withIntermediateDirectories: true)
+        let destination = assetDirectory.appendingPathComponent("obstacle.obj")
+        if source.standardizedFileURL != destination.standardizedFileURL {
+            try Data(contentsOf: source).write(to: destination, options: .atomic)
+        }
+        return assetDirectory.lastPathComponent + "/" + destination.lastPathComponent
+    }
+
     static func save(_ project: PhysicsProjectFile, to url: URL) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

@@ -188,6 +188,10 @@ final class PhysicsModel: ObservableObject {
         panel.allowedContentTypes = [UTType(filenameExtension: "obj") ?? .data]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        importObstacleMesh(from: url)
+    }
+
+    func importObstacleMesh(from url: URL) {
         do {
             try loadObstacleMesh(from: url)
             mode = .volumeSmoke
@@ -214,6 +218,9 @@ final class PhysicsModel: ObservableObject {
 
     private func saveProject(to url: URL) {
         do {
+            let packagedObstaclePath = try obstacleMeshURL.map {
+                try PhysicsProjectIO.packageObstacle(from: $0, for: url)
+            }
             let project = PhysicsProjectFile(
                 name: projectName,
                 preset: scalarPresetId,
@@ -222,7 +229,7 @@ final class PhysicsModel: ObservableObject {
                 timelineSeconds: time,
                 parameters: projectParameters(),
                 graph: executionGraph,
-                obstacleMeshPath: obstacleMeshURL?.path)
+                obstacleMeshPath: packagedObstaclePath)
             try PhysicsProjectIO.save(project, to: url)
             projectURL = url
             equationStatus = "Saved \(url.lastPathComponent)"
@@ -2135,6 +2142,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
                 if self?.pendingEquationRevision == revision {
                     self?.compiledEquationPipeline = pipeline
                     self?.activeEquationRevision = revision
+                    self?.pendingEquationRevision = 0
                 }
                 self?.pipelineLock.unlock()
                 DispatchQueue.main.async { model?.reportPipelineResult(revision: revision, error: nil) }
@@ -2147,10 +2155,10 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         }
     }
 
-    private func activeScalarPipeline() -> MTLComputePipelineState? {
+    private func activeScalarPipeline(for revision: UInt64) -> MTLComputePipelineState? {
         pipelineLock.lock()
         defer { pipelineLock.unlock() }
-        return compiledEquationPipeline
+        return activeEquationRevision == revision ? compiledEquationPipeline : nil
     }
 
     private func ensureHdrRadiance(_ size: CGSize, scale: CGFloat, device: MTLDevice) -> MTLTexture? {
@@ -2684,7 +2692,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
             volumeRender.endEncoding()
         } else {
             guard let compute = command.makeComputeCommandEncoder() else { return }
-            let scalarPipeline = isScalar ? activeScalarPipeline() : nil
+            let scalarPipeline = isScalar ? activeScalarPipeline(for: model.compileRevision) : nil
             compute.setComputePipelineState(scalarPipeline ?? simulationPipeline)
             compute.setTexture(radiance, index: 0)
             compute.setBytes(&copy, length: MemoryLayout<WaveUniforms>.stride, index: 0)
@@ -2809,6 +2817,29 @@ struct ContentView: View {
                     .labelsHidden()
                     .pickerStyle(.radioGroup)
                     Divider()
+                    Text("OBJECTS").font(.caption.bold()).foregroundStyle(.secondary)
+                    Button { model.importObstacleMesh() } label: {
+                        Label(model.obstacleMeshURL == nil ? "Add 3D object" : "Replace object",
+                              systemImage: "cube.transparent")
+                    }
+                    .help("Import a closed OBJ mesh into the GPU fluid domain")
+                    if let object = model.obstacleMeshURL {
+                        HStack {
+                            Text(object.lastPathComponent)
+                                .font(.caption.monospaced())
+                                .lineLimit(1)
+                            Spacer()
+                            Button { model.removeObstacleMesh() } label: {
+                                Image(systemName: "trash")
+                            }
+                            .help("Remove object")
+                        }
+                    } else {
+                        Text("Drop an OBJ onto the viewport")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Divider()
                     Text("TIMELINE").font(.caption.bold()).foregroundStyle(.secondary)
                     HStack {
                         Button {
@@ -2838,6 +2869,21 @@ struct ContentView: View {
 
                 VStack(spacing: 0) {
                 MetalWaveView(model: model)
+                    .onDrop(of: [UTType.fileURL.identifier], isTargeted: nil) { providers in
+                        guard let provider = providers.first else { return false }
+                        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) {
+                            item, _ in
+                            let url: URL?
+                            if let data = item as? Data {
+                                url = URL(dataRepresentation: data, relativeTo: nil)
+                            } else {
+                                url = item as? URL
+                            }
+                            guard let url, url.pathExtension.lowercased() == "obj" else { return }
+                            DispatchQueue.main.async { model.importObstacleMesh(from: url) }
+                        }
+                        return true
+                    }
                     .overlay(alignment: .topLeading) {
                         Text(model.playing ? "LIVE GPU" : "PAUSED")
                             .font(.caption.bold()).foregroundStyle(model.playing ? .mint : .orange)
