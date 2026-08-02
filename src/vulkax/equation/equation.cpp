@@ -1,5 +1,6 @@
 #include "vulkax/equation/equation.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cctype>
 #include <cmath>

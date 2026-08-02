@@ -1168,6 +1168,12 @@ if (BUILD_TESTING)
       ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
+    add_test(NAME physics_studio_all_presets_smoke COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --all-presets-smoke)
+    set_tests_properties(
+      physics_studio_all_presets_smoke PROPERTIES
+      ENVIRONMENT "${VULKAX_QT_TEST_ENV}"
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
     add_test(NAME physics_studio_unavailable_error_smoke COMMAND ${VULKAX_PHYSICS_STUDIO_TEST_EXECUTABLE} --unavailable-error-smoke)
     set_tests_properties(
       physics_studio_unavailable_error_smoke PROPERTIES
@@ -1352,6 +1358,16 @@ if (BUILD_TESTING)
       physics_studio_native_dynamic_equation_project_gpu PROPERTIES
       WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
       LABELS "native_gpu;runtime_contract;project_io"
+    )
+    add_test(
+      NAME physics_studio_native_all_formulas_gpu
+      COMMAND ${PROJECT_SOURCE_DIR}/scripts/vulkax_physics_metal.sh
+              --native-all-formulas-gpu-smoke
+    )
+    set_tests_properties(
+      physics_studio_native_all_formulas_gpu PROPERTIES
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      LABELS "native_gpu;equation_presets"
     )
   endif()
 

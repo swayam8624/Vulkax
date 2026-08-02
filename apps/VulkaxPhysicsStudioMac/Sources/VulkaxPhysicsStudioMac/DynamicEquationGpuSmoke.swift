@@ -2,6 +2,95 @@ import Foundation
 import Metal
 import VulkaxRuntimeContract
 
+private func renderScalarPresetGpu(
+    _ preset: ScalarPreset, device: MTLDevice, queue: MTLCommandQueue
+) throws -> (minimum: Float, maximum: Float) {
+    let compiled = try ScalarEquationCompiler.compile(preset.equation)
+    let valuesByName = Dictionary(uniqueKeysWithValues: preset.parameters.map { ($0.name, $0.value) })
+    let parameters = try compiled.parameterNames.map { name -> Float in
+        guard let value = valuesByName[name] else {
+            throw NSError(
+                domain: "VulkaxFormulaPresets", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "preset \(preset.id) does not define \(name)"])
+        }
+        return value
+    }
+    let library = try device.makeLibrary(source: compiled.metalSource, options: nil)
+    guard let function = library.makeFunction(name: "renderCompiledEquation") else {
+        throw NSError(
+            domain: "VulkaxFormulaPresets", code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "preset \(preset.id) has no GPU entry point"])
+    }
+    let pipeline = try device.makeComputePipelineState(function: function)
+    let width = 96
+    let height = 64
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .rgba16Float, width: width, height: height, mipmapped: false)
+    descriptor.usage = [.shaderRead, .shaderWrite]
+    descriptor.storageMode = .shared
+    guard let output = device.makeTexture(descriptor: descriptor),
+          let command = queue.makeCommandBuffer(),
+          let encoder = command.makeComputeCommandEncoder() else {
+        throw NSError(
+            domain: "VulkaxFormulaPresets", code: 3,
+            userInfo: [NSLocalizedDescriptionKey: "could not allocate GPU resources for \(preset.id)"])
+    }
+    var uniforms = WaveUniforms(
+        time: 0.75, amplitude: 0, wavenumber: 0, angularFrequency: 0,
+        width: Float(width), height: Float(height))
+    encoder.setComputePipelineState(pipeline)
+    encoder.setTexture(output, index: 0)
+    encoder.setBytes(&uniforms, length: MemoryLayout<WaveUniforms>.stride, index: 0)
+    parameters.withUnsafeBytes { bytes in
+        encoder.setBytes(bytes.baseAddress!, length: bytes.count, index: 1)
+    }
+    encoder.dispatchThreadgroups(
+        MTLSize(width: (width + 15) / 16, height: (height + 15) / 16, depth: 1),
+        threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+    encoder.endEncoding()
+    command.commit()
+    command.waitUntilCompleted()
+    guard command.status == .completed else {
+        throw command.error ?? NSError(
+            domain: "VulkaxFormulaPresets", code: 4,
+            userInfo: [NSLocalizedDescriptionKey: "GPU dispatch failed for \(preset.id)"])
+    }
+    var halfPixels = [UInt16](repeating: 0, count: width * height * 4)
+    halfPixels.withUnsafeMutableBytes {
+        output.getBytes(
+            $0.baseAddress!, bytesPerRow: width * 4 * MemoryLayout<UInt16>.stride,
+            from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+    }
+    let red = stride(from: 0, to: halfPixels.count, by: 4).map {
+        Float(Float16(bitPattern: halfPixels[$0]))
+    }
+    guard red.allSatisfy(\.isFinite), let minimum = red.min(), let maximum = red.max(),
+          maximum > minimum + 0.01 else {
+        throw NSError(
+            domain: "VulkaxFormulaPresets", code: 5,
+            userInfo: [NSLocalizedDescriptionKey: "preset \(preset.id) produced invalid or flat output"])
+    }
+    return (minimum, maximum)
+}
+
+func runAllFormulaPresetsGpuSmoke() -> Bool {
+    guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
+        FileHandle.standardError.write(Data("Vulkax formula preset smoke failed: no Metal device\n".utf8))
+        return false
+    }
+    do {
+        for preset in ScalarPreset.builtins {
+            let range = try renderScalarPresetGpu(preset, device: device, queue: queue)
+            print("\(preset.id): passed, radiance=[\(range.minimum), \(range.maximum)]")
+        }
+        print("Vulkax all formula presets GPU smoke passed: \(device.name)")
+        return true
+    } catch {
+        FileHandle.standardError.write(Data("Vulkax formula preset smoke failed: \(error)\n".utf8))
+        return false
+    }
+}
+
 func runDynamicEquationProjectGpuSmoke() -> Bool {
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
         FileHandle.standardError.write(Data("Vulkax dynamic equation smoke failed: no Metal device\n".utf8))

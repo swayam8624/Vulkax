@@ -49,6 +49,7 @@ int main(int argc, char* argv[]) {
   const bool unavailableErrorSmoke = application.arguments().contains("--unavailable-error-smoke");
   const bool gpuPreviewSmoke = application.arguments().contains("--gpu-preview-smoke");
   const bool gpuReactionPreviewSmoke = application.arguments().contains("--gpu-reaction-preview-smoke");
+  const bool allPresetsSmoke = application.arguments().contains("--all-presets-smoke");
   const int sequenceArgument = application.arguments().indexOf("--export-sequence");
   const int exrArgument = application.arguments().indexOf("--export-exr");
 
@@ -135,6 +136,37 @@ int main(int argc, char* argv[]) {
     qInfo().noquote() << (rendered && gpu && agrees ? "Physics Studio persistent GPU reaction preview smoke passed" :
         "Physics Studio persistent GPU reaction preview smoke failed: " + controller.previewBackend());
     return rendered && gpu && agrees ? 0 : 1;
+  }
+  if (allPresetsSmoke) {
+    controller.setPreviewExtent(320, 180, 1.0);
+    bool passed = true;
+    for (const auto& entry : controller.presets()) {
+      const QString preset = entry.toMap().value("id").toString();
+      controller.selectPreset(preset);
+      controller.seek(0.5);
+      const bool compiled = controller.compileExpression();
+      const QImage image = controller.previewImage();
+      int minimumLuminance = 255;
+      int maximumLuminance = 0;
+      for (int row = 0; row < image.height(); ++row) {
+        const auto* pixels = reinterpret_cast<const QRgb*>(image.constScanLine(row));
+        for (int column = 0; column < image.width(); ++column) {
+          const int luminance = qGray(pixels[column]);
+          minimumLuminance = std::min(minimumLuminance, luminance);
+          maximumLuminance = std::max(maximumLuminance, luminance);
+        }
+      }
+      const bool valid = compiled && !image.isNull() && maximumLuminance > minimumLuminance;
+      qInfo().noquote() << QString("%1: %2, luminance=[%3, %4], backend=%5")
+                               .arg(preset, valid ? "passed" : "failed")
+                               .arg(minimumLuminance)
+                               .arg(maximumLuminance)
+                               .arg(controller.previewBackend());
+      passed = passed && valid;
+    }
+    qInfo().noquote() << (passed ? "Physics Studio all-presets smoke passed" :
+        "Physics Studio all-presets smoke failed");
+    return passed ? 0 : 1;
   }
   if (sequenceArgument >= 0) {
     if (sequenceArgument + 1 >= application.arguments().size()) {

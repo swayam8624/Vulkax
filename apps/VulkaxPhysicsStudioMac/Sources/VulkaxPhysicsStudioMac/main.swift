@@ -2944,6 +2944,9 @@ struct ContentView: View {
         if CommandLine.arguments.contains("--native-dynamic-equation-project-gpu-smoke") {
             exit(runDynamicEquationProjectGpuSmoke() ? EXIT_SUCCESS : EXIT_FAILURE)
         }
+        if CommandLine.arguments.contains("--native-all-formulas-gpu-smoke") {
+            exit(runAllFormulaPresetsGpuSmoke() ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
     }
 
     var body: some Scene { WindowGroup("Vulkax Physics Studio") { ContentView() } }
