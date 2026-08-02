@@ -3,9 +3,28 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace vulkax::sim {
 namespace {
+
+struct EdgeKey {
+  uint32_t lower;
+  uint32_t upper;
+
+  bool operator==(const EdgeKey&) const = default;
+};
+
+struct EdgeHash {
+  size_t operator()(EdgeKey edge) const {
+    return (static_cast<size_t>(edge.lower) << 32u) ^ static_cast<size_t>(edge.upper);
+  }
+};
+
+struct EdgeUse {
+  uint32_t count = 0;
+  int32_t orientation = 0;
+};
 
 Vec3d operator+(Vec3d a, Vec3d b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
 Vec3d operator-(Vec3d a, Vec3d b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
@@ -74,6 +93,46 @@ bool rayHitsPositiveX(Vec3d origin, Vec3d a, Vec3d b, Vec3d c) {
 
 }  // namespace
 
+MeshDiagnostics analyzeTriangleMesh(const TriangleMesh& mesh) {
+  MeshDiagnostics diagnostics{};
+  if (mesh.indices.size() % 3 != 0) {
+    diagnostics.invalidIndices = static_cast<uint32_t>(mesh.indices.size() % 3);
+  }
+  std::unordered_map<EdgeKey, EdgeUse, EdgeHash> edges;
+  const size_t completeIndexCount = mesh.indices.size() - mesh.indices.size() % 3;
+  for (size_t triangle = 0; triangle < completeIndexCount; triangle += 3) {
+    const uint32_t indices[3]{
+        mesh.indices[triangle], mesh.indices[triangle + 1], mesh.indices[triangle + 2]};
+    if (indices[0] >= mesh.vertices.size() || indices[1] >= mesh.vertices.size() ||
+        indices[2] >= mesh.vertices.size()) {
+      ++diagnostics.invalidIndices;
+      continue;
+    }
+    const Vec3d edge0 = mesh.vertices[indices[1]] - mesh.vertices[indices[0]];
+    const Vec3d edge1 = mesh.vertices[indices[2]] - mesh.vertices[indices[0]];
+    if (indices[0] == indices[1] || indices[1] == indices[2] || indices[2] == indices[0] ||
+        length(cross(edge0, edge1)) <= 1e-14) {
+      ++diagnostics.degenerateTriangles;
+      continue;
+    }
+    for (size_t edge = 0; edge < 3; ++edge) {
+      const uint32_t from = indices[edge];
+      const uint32_t to = indices[(edge + 1) % 3];
+      const EdgeKey key{std::min(from, to), std::max(from, to)};
+      auto& use = edges[key];
+      ++use.count;
+      use.orientation += from < to ? 1 : -1;
+    }
+  }
+  for (const auto& [edge, use] : edges) {
+    (void)edge;
+    if (use.count == 1) ++diagnostics.boundaryEdges;
+    else if (use.count != 2) ++diagnostics.nonManifoldEdges;
+    else if (use.orientation != 0) ++diagnostics.inconsistentWindingEdges;
+  }
+  return diagnostics;
+}
+
 Vec3d transformRigidPoint(const RigidBodyState& body, Vec3d localPoint) {
   if (body.scale.x <= 0.0 || body.scale.y <= 0.0 || body.scale.z <= 0.0) {
     throw std::invalid_argument("rigid body scale must be positive");
@@ -87,7 +146,9 @@ Vec3d rigidPointVelocity(const RigidBodyState& body, Vec3d worldPoint) {
 
 std::vector<uint8_t> voxelizeClosedMesh(
     const TriangleMesh& mesh, const RigidBodyState& body, const VoxelDomain& domain) {
-  if (mesh.indices.size() % 3 != 0) throw std::invalid_argument("mesh indices must form triangles");
+  if (!analyzeTriangleMesh(mesh).watertight()) {
+    throw std::invalid_argument("mesh must be watertight, non-degenerate, and consistently wound");
+  }
   const auto resolution = domain.resolution;
   const size_t cellCount = static_cast<size_t>(resolution[0]) * resolution[1] * resolution[2];
   std::vector<uint8_t> mask(cellCount, 0);

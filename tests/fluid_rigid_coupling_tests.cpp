@@ -9,6 +9,20 @@
 int main() {
   using namespace vulkax::sim;
   const TriangleMesh box = makeBoxMesh({0.3, 0.2, 0.25});
+  const MeshDiagnostics boxDiagnostics = analyzeTriangleMesh(box);
+  assert(boxDiagnostics.watertight());
+  TriangleMesh openTriangle{{{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}},
+                            {0, 1, 2}};
+  const MeshDiagnostics openDiagnostics = analyzeTriangleMesh(openTriangle);
+  assert(!openDiagnostics.watertight());
+  assert(openDiagnostics.boundaryEdges == 3);
+  bool rejectedOpenMesh = false;
+  try {
+    (void)voxelizeClosedMesh(openTriangle, RigidBodyState{}, VoxelDomain{});
+  } catch (const std::invalid_argument&) {
+    rejectedOpenMesh = true;
+  }
+  assert(rejectedOpenMesh);
   RigidBodyState body{};
   body.mass = 2.0;
   const VoxelDomain domain{{-1.0, -1.0, -1.0}, {1.0, 1.0, 1.0}, {32, 32, 32}};

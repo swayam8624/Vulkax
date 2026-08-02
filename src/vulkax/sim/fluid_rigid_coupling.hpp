@@ -25,6 +25,19 @@ struct TriangleMesh {
   std::vector<uint32_t> indices;
 };
 
+struct MeshDiagnostics {
+  uint32_t invalidIndices = 0;
+  uint32_t degenerateTriangles = 0;
+  uint32_t boundaryEdges = 0;
+  uint32_t nonManifoldEdges = 0;
+  uint32_t inconsistentWindingEdges = 0;
+
+  [[nodiscard]] bool watertight() const {
+    return invalidIndices == 0 && degenerateTriangles == 0 && boundaryEdges == 0 &&
+           nonManifoldEdges == 0 && inconsistentWindingEdges == 0;
+  }
+};
+
 struct RigidBodyState {
   Vec3d position{};
   Quaterniond orientation{};
@@ -48,6 +61,11 @@ struct VoxelDomain {
 
 using ScalarSampler = std::function<double(Vec3d)>;
 using VectorSampler = std::function<Vec3d(Vec3d)>;
+
+// Reports topology defects that make closed-volume voxelization ambiguous.
+// Multiple disconnected closed shells are valid; every undirected edge must
+// have exactly two oppositely oriented incident triangles.
+[[nodiscard]] MeshDiagnostics analyzeTriangleMesh(const TriangleMesh& mesh);
 
 // Transforms a body-local point into world space using scale, orientation, and
 // translation in that order.

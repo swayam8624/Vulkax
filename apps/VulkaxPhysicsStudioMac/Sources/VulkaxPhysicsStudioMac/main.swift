@@ -1892,6 +1892,19 @@ private func runNativeGpuSmoke(
 private func runImportedMeshGpuSmoke(path: String) -> Bool {
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return false }
     do {
+        let openMesh = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vulkax-open-mesh-\(UUID().uuidString).obj")
+        defer { try? FileManager.default.removeItem(at: openMesh) }
+        try "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n".write(
+            to: openMesh, atomically: true, encoding: .utf8)
+        do {
+            _ = try ImportedObstacleMesh.loadOBJ(from: openMesh)
+            FileHandle.standardError.write(Data(
+                "Vulkax imported-mesh validation failed: open triangle was accepted\n".utf8))
+            return false
+        } catch {
+            guard error.localizedDescription.contains("closed manifold") else { throw error }
+        }
         let mesh = try ImportedObstacleMesh.loadOBJ(from: URL(fileURLWithPath: path))
         let library = try device.makeLibrary(source: waveShader, options: nil)
         guard let voxelFunction = library.makeFunction(name: "voxelizeObstacleMesh"),
@@ -3061,6 +3074,11 @@ struct ContentView: View {
                          "No 3D object in the fluid domain")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
+                    if let diagnostics = model.obstacleMesh?.diagnostics {
+                        Text("\(diagnostics.triangleCount) triangles · closed manifold")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     if model.obstacleMeshURL != nil {
                         HStack {
                             Text("OBJECT TRANSFORM").font(.caption.bold()).foregroundStyle(.secondary)

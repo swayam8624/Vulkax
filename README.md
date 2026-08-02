@@ -148,7 +148,9 @@ Metal and Vulkan transform vertices with the same quaternion convention, integra
 and impose `linear velocity + angular velocity cross radius` on fluid faces touching the moving mesh.
 Static floor cells remain zero-velocity boundaries. Version 6 project files persist the complete body
 configuration and package the OBJ beside the project. Versions 1 through 5 still load with default
-body values. The checked cube test reports 12 triangles, 2,598 occupied cells, nonzero GPU-computed
+body values. Before upload, the importer rejects invalid indices, degenerate triangles, open boundaries,
+non-manifold edges, and inconsistent winding with explicit defect counts. The checked cube test reports
+12 triangles, 2,598 occupied cells, nonzero GPU-computed
 translation, and normalized rotational integration. The portable Vulkan MAC test provides the
 corresponding OBJ, voxelization, moving-boundary, force/torque, and body-advance path.
 
