@@ -184,6 +184,7 @@ add_library(
   src/vulkax/sim/particle_system.cpp
   src/vulkax/sim/buoyant_smoke.cpp
   src/vulkax/sim/fluid_rigid_coupling.cpp
+  src/vulkax/sim/sparse_brick_storage.cpp
 )
 target_compile_features(vulkax_sim PUBLIC cxx_std_20)
 target_include_directories(vulkax_sim PUBLIC ${PROJECT_SOURCE_DIR}/src)
@@ -997,6 +998,13 @@ if (BUILD_TESTING)
   target_link_libraries(FluidRigidCouplingTests PRIVATE vulkax_sim)
   add_test(NAME fluid_rigid_coupling COMMAND FluidRigidCouplingTests)
   set_tests_properties(fluid_rigid_coupling PROPERTIES LABELS "airflow_object_example")
+
+  add_executable(SparseBrickStorageTests tests/sparse_brick_storage_tests.cpp)
+  target_compile_features(SparseBrickStorageTests PRIVATE cxx_std_20)
+  target_link_libraries(SparseBrickStorageTests PRIVATE vulkax_sim)
+  vulkax_enable_test_assertions(SparseBrickStorageTests)
+  add_test(NAME sparse_brick_storage COMMAND SparseBrickStorageTests)
+  set_tests_properties(sparse_brick_storage PROPERTIES LABELS "volume_example;sparse_storage")
 
   add_executable(
     SchwarzschildLensingTests
