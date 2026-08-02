@@ -1,5 +1,7 @@
 #include <vulkan/vulkan.h>
 
+#include "vulkax/sim/sparse_brick_storage.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -22,6 +24,7 @@ constexpr uint32_t kNy = 32;
 constexpr uint32_t kNz = 24;
 constexpr uint32_t kOutputWidth = 160;
 constexpr uint32_t kOutputHeight = 96;
+constexpr uint32_t kScalarBrickCapacity = 224;
 
 struct Buffer {
   VkBuffer handle = VK_NULL_HANDLE;
@@ -505,44 +508,6 @@ int main(int argc, char** argv) {
         static_cast<size_t>((kNx + 3) / 4) * ((kNy + 3) / 4) * ((kNz + 3) / 4);
     const size_t triangleCount = importedMesh.indices.size() / 3u;
     const size_t meshVertexCount = importedMesh.vertices.size();
-    const std::array<size_t, 32> counts{
-        cells,
-        cells,
-        static_cast<size_t>(kNx + 1) * kNy * kNz,
-        static_cast<size_t>(kNx) * (kNy + 1) * kNz,
-        static_cast<size_t>(kNx) * kNy * (kNz + 1),
-        static_cast<size_t>(kNx + 1) * kNy * kNz,
-        static_cast<size_t>(kNx) * (kNy + 1) * kNz,
-        static_cast<size_t>(kNx) * kNy * (kNz + 1),
-        cells,
-        cells,
-        cells,
-        cells,
-        cells,
-        cells,
-        cells,
-        cells,
-        cells,
-        cells,
-        static_cast<size_t>(kOutputWidth) * kOutputHeight * 4u,
-        cells,
-        cells * 3u,
-        coarseCells,
-        4u,
-        coarseCells,
-        coarseCells,
-        coarseCells,
-        brickCount,
-        brickCount,
-        meshVertexCount * 4u,
-        triangleCount * 3u,
-        triangleCount * 8u,
-        24u * runtimeBodyCount};
-    std::array<Buffer, 32> buffers{};
-    for (size_t index = 0; index < buffers.size(); ++index) {
-      buffers[index] = makeBuffer(physical, device, counts[index]);
-      upload(device, buffers[index], std::vector<float>(counts[index], 0.0f));
-    }
     std::vector<float> density(cells);
     std::vector<float> temperature(cells);
     for (uint32_t z = 0; z < kNz; ++z) {
@@ -558,11 +523,93 @@ int main(int argc, char** argv) {
         }
       }
     }
-    upload(device, buffers[0], density);
-    upload(device, buffers[1], temperature);
+    vulkax::sim::SparseBrickStorage scalarStorage({kNx, kNy, kNz, 4, 2});
+    for (uint32_t z = 0; z < kNz; ++z) {
+      for (uint32_t y = 0; y < kNy; ++y) {
+        for (uint32_t x = 0; x < kNx; ++x) {
+          const size_t index = (static_cast<size_t>(z) * kNy + y) * kNx + x;
+          if (density[index] > 0.002f || temperature[index] > 0.002f) {
+            scalarStorage.setCell(x, y, z, 0, density[index]);
+            scalarStorage.setCell(x, y, z, 1, temperature[index]);
+          }
+        }
+      }
+    }
+    scalarStorage.refineHalo(1);
+    if (scalarStorage.stats().residentBricks >= kScalarBrickCapacity) {
+      throw std::runtime_error("initial sparse smoke domain exceeds brick capacity");
+    }
+    const size_t sparseCells = static_cast<size_t>(kScalarBrickCapacity) * 64u;
+    const std::array<size_t, 34> counts{
+        sparseCells,
+        sparseCells,
+        static_cast<size_t>(kNx + 1) * kNy * kNz,
+        static_cast<size_t>(kNx) * (kNy + 1) * kNz,
+        static_cast<size_t>(kNx) * kNy * (kNz + 1),
+        static_cast<size_t>(kNx + 1) * kNy * kNz,
+        static_cast<size_t>(kNx) * (kNy + 1) * kNz,
+        static_cast<size_t>(kNx) * kNy * (kNz + 1),
+        cells,
+        cells,
+        cells,
+        cells,
+        sparseCells,
+        sparseCells,
+        sparseCells,
+        sparseCells,
+        sparseCells,
+        sparseCells,
+        static_cast<size_t>(kOutputWidth) * kOutputHeight * 4u,
+        cells,
+        cells * 3u,
+        coarseCells,
+        4u,
+        coarseCells,
+        coarseCells,
+        coarseCells,
+        brickCount,
+        brickCount,
+        meshVertexCount * 4u,
+        triangleCount * 3u,
+        triangleCount * 8u,
+        24u * runtimeBodyCount,
+        brickCount,
+        4u + kScalarBrickCapacity};
+    std::array<Buffer, 34> buffers{};
+    for (size_t index = 0; index < buffers.size(); ++index) {
+      buffers[index] = makeBuffer(physical, device, counts[index]);
+      upload(device, buffers[index], std::vector<float>(counts[index], 0.0f));
+    }
+    std::vector<float> sparseDensity(sparseCells, 0.0f);
+    std::vector<float> sparseTemperature(sparseCells, 0.0f);
+    for (uint32_t slot = 0; slot < scalarStorage.stats().residentBricks; ++slot) {
+      for (uint32_t local = 0; local < 64u; ++local) {
+        const size_t packed = (static_cast<size_t>(slot) * 64u + local) * 2u;
+        sparseDensity[static_cast<size_t>(slot) * 64u + local] =
+            scalarStorage.payload()[packed];
+        sparseTemperature[static_cast<size_t>(slot) * 64u + local] =
+            scalarStorage.payload()[packed + 1u];
+      }
+    }
+    upload(device, buffers[0], sparseDensity);
+    upload(device, buffers[1], sparseTemperature);
     std::vector<float> obstacles(cells, 0.0f);
     upload(device, buffers[19], obstacles);
     upload(device, buffers[27], std::vector<float>(brickCount, 1.0f));
+    std::vector<uint32_t> pageTable(brickCount, 0u);
+    for (size_t page = 0; page < pageTable.size(); ++page) {
+      const uint32_t slot = scalarStorage.pageTable()[page];
+      if (slot != vulkax::sim::SparseBrickStorage::kInactiveSlot) pageTable[page] = slot + 1u;
+    }
+    std::vector<float> encodedPageTable(brickCount);
+    std::memcpy(encodedPageTable.data(), pageTable.data(), pageTable.size() * sizeof(uint32_t));
+    upload(device, buffers[32], encodedPageTable);
+    std::vector<uint32_t> allocator(4u + kScalarBrickCapacity, 0u);
+    allocator[0] = scalarStorage.stats().residentBricks;
+    allocator[3] = kScalarBrickCapacity;
+    std::vector<float> encodedAllocator(allocator.size());
+    std::memcpy(encodedAllocator.data(), allocator.data(), allocator.size() * sizeof(uint32_t));
+    upload(device, buffers[33], encodedAllocator);
 
     std::vector<float> meshVertices(meshVertexCount * 4u);
     std::memcpy(
@@ -595,7 +642,7 @@ int main(int argc, char** argv) {
     }
     upload(device, buffers[31], bodyState);
 
-    std::array<VkDescriptorSetLayoutBinding, 32> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 34> bindings{};
     for (uint32_t binding = 0; binding < bindings.size(); ++binding) {
       bindings[binding] =
           {binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
@@ -622,6 +669,8 @@ int main(int argc, char** argv) {
         "vkCreatePipelineLayout");
     const auto shaderCode =
         readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_mac_projection.comp.spv");
+    const auto residencyShaderCode =
+        readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_sparse_residency.comp.spv");
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = shaderCode.size();
     shaderInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
@@ -637,6 +686,12 @@ int main(int argc, char** argv) {
           vkCreateShaderModule(device, &shaderInfo, nullptr, &contactShader),
           "vkCreateShaderModule contacts");
     }
+    shaderInfo.codeSize = residencyShaderCode.size();
+    shaderInfo.pCode = reinterpret_cast<const uint32_t*>(residencyShaderCode.data());
+    VkShaderModule residencyShader = VK_NULL_HANDLE;
+    check(
+        vkCreateShaderModule(device, &shaderInfo, nullptr, &residencyShader),
+        "vkCreateShaderModule sparse residency");
     const std::filesystem::path pipelineCachePath =
         std::filesystem::temp_directory_path() /
         ("vulkax-mac-pipeline-" + std::to_string(properties.vendorID) + "-" +
@@ -681,6 +736,13 @@ int main(int argc, char** argv) {
               device, pipelineCache, 1, &pipelineInfo, nullptr, &contactPipeline),
           "vkCreateComputePipelines contacts");
     }
+    pipelineInfo.stage.module = residencyShader;
+    VkPipeline residencyPipeline = VK_NULL_HANDLE;
+    std::cerr << "vulkax-mac-projection: compiling sparse residency pipeline\n";
+    check(
+        vkCreateComputePipelines(
+            device, pipelineCache, 1, &pipelineInfo, nullptr, &residencyPipeline),
+        "vkCreateComputePipelines sparse residency");
     size_t pipelineCacheBytes = 0;
     if (vkGetPipelineCacheData(device, pipelineCache, &pipelineCacheBytes, nullptr) == VK_SUCCESS &&
         pipelineCacheBytes > 0) {
@@ -709,8 +771,8 @@ int main(int argc, char** argv) {
     setInfo.pSetLayouts = &descriptorLayout;
     VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
     check(vkAllocateDescriptorSets(device, &setInfo, &descriptorSet), "vkAllocateDescriptorSets");
-    std::array<VkDescriptorBufferInfo, 32> infos{};
-    std::array<VkWriteDescriptorSet, 32> writes{};
+    std::array<VkDescriptorBufferInfo, 34> infos{};
+    std::array<VkWriteDescriptorSet, 34> writes{};
     for (uint32_t binding = 0; binding < buffers.size(); ++binding) {
       infos[binding] = {buffers[binding].handle, 0, buffers[binding].bytes};
       writes[binding].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -787,6 +849,12 @@ int main(int argc, char** argv) {
       dispatch(20, 0.0f);
       dispatch(18, 0.0f);
       dispatch(19, 0.0f);
+      vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, residencyPipeline);
+      vkCmdPushConstants(
+          command, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push), &push);
+      vkCmdDispatch(command, groupsX, groupsY, groupsZ);
+      storageBarrier(command);
+      vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
       dispatch(10, 0.0f);
       dispatch(11, 0.0f);
       dispatch(0, 0.0f);
@@ -856,6 +924,8 @@ int main(int argc, char** argv) {
     const auto curl = download(device, buffers[20]);
     const auto cfl = download(device, buffers[22]);
     const auto activeBricks = download(device, buffers[27]);
+    const auto finalPageTable = download(device, buffers[32]);
+    const auto finalAllocator = download(device, buffers[33]);
     const auto gpuObstacles = download(device, buffers[19]);
     const auto finalBodyState = download(device, buffers[31]);
     const size_t activeBrickCount =
@@ -864,6 +934,26 @@ int main(int argc, char** argv) {
           std::memcpy(&bits, &value, sizeof(bits));
           return bits != 0;
         });
+    const auto uintBits = [](float value) {
+      uint32_t bits = 0;
+      std::memcpy(&bits, &value, sizeof(bits));
+      return bits;
+    };
+    std::vector<uint8_t> residentSlots(kScalarBrickCapacity, 0u);
+    size_t residentBrickCount = 0;
+    bool validPageTable = true;
+    for (const float encodedValue : finalPageTable) {
+      const uint32_t encoded = uintBits(encodedValue);
+      if (encoded == 0u) continue;
+      const uint32_t slot = encoded - 1u;
+      if (slot >= kScalarBrickCapacity || residentSlots[slot] != 0u) {
+        validPageTable = false;
+        continue;
+      }
+      residentSlots[slot] = 1u;
+      ++residentBrickCount;
+    }
+    const uint32_t allocatorOverflow = uintBits(finalAllocator[2]);
     double beforeMaximumError = 0.0;
     double afterMaximumError = 0.0;
     if (false && simulationSteps == 1) {
@@ -875,9 +965,13 @@ int main(int argc, char** argv) {
     const double afterL2 = l2(after);
     double densityMass = 0.0;
     double temperatureMass = 0.0;
-    for (size_t index = 0; index < cells; ++index) {
-      densityMass += transportedDensity[index];
-      temperatureMass += transportedTemperature[index];
+    for (uint32_t slot = 0; slot < kScalarBrickCapacity; ++slot) {
+      if (residentSlots[slot] == 0u) continue;
+      for (uint32_t local = 0; local < 64u; ++local) {
+        const size_t index = static_cast<size_t>(slot) * 64u + local;
+        densityMass += transportedDensity[index];
+        temperatureMass += transportedTemperature[index];
+      }
     }
     const double curlL2 = l2(curl);
     const float selectedTimestep = cfl.size() > 1 ? cfl[1] : 0.0f;
@@ -942,6 +1036,10 @@ int main(int argc, char** argv) {
               << " cfl=" << measuredCourant << " selected_dt=" << selectedTimestep
               << " curl_l2=" << curlL2 << " obstacle_cells=" << obstacleCells
               << " active_bricks=" << activeBrickCount << '/' << brickCount
+              << " resident_bricks=" << residentBrickCount << '/' << kScalarBrickCapacity
+              << " scalar_payload_bytes=" << sparseCells * sizeof(float) * 8u
+              << " dense_scalar_bytes=" << cells * sizeof(float) * 8u
+              << " scalar_overflow=" << allocatorOverflow
               << " body_displacement=" << bodyDisplacement
               << " orientation_delta=" << orientationDelta
               << " body_count=" << bodyCount
@@ -964,7 +1062,9 @@ int main(int argc, char** argv) {
         std::isfinite(beforeL2) && std::isfinite(afterL2) && beforeL2 > 1e-5 &&
         afterL2 < beforeL2 * 0.90 && measuredCourant <= 0.701f && selectedTimestep > 0.0f &&
         std::isfinite(curlL2) && (simulationSteps == 1 || curlL2 > 1e-6) && obstacleCells > 0 &&
-        activeBrickCount > 0 && activeBrickCount < brickCount && std::isfinite(bodyDisplacement) &&
+        activeBrickCount > 0 && activeBrickCount < brickCount && residentBrickCount > 0 &&
+        residentBrickCount <= kScalarBrickCapacity && validPageTable && allocatorOverflow == 0u &&
+        sparseCells < cells && std::isfinite(bodyDisplacement) &&
         bodyDisplacement > 0.0f && std::isfinite(orientationNorm) &&
         std::abs(orientationNorm - 1.0f) < 1e-4f && orientationDelta > 0.0f &&
         (bodyCount == 1 || (bodySeparation >= 0.19f && relativeNormalVelocity > 0.0f)) &&
@@ -974,6 +1074,7 @@ int main(int argc, char** argv) {
     if (queryPool != VK_NULL_HANDLE) vkDestroyQueryPool(device, queryPool, nullptr);
     vkDestroyCommandPool(device, commandPool, nullptr);
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    vkDestroyPipeline(device, residencyPipeline, nullptr);
     if (contactPipeline != VK_NULL_HANDLE)
       vkDestroyPipeline(device, contactPipeline, nullptr);
     vkDestroyPipeline(device, pipeline, nullptr);
@@ -981,6 +1082,7 @@ int main(int argc, char** argv) {
     vkDestroyShaderModule(device, shader, nullptr);
     if (contactShader != VK_NULL_HANDLE)
       vkDestroyShaderModule(device, contactShader, nullptr);
+    vkDestroyShaderModule(device, residencyShader, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyDescriptorSetLayout(device, descriptorLayout, nullptr);
     for (const Buffer& buffer : buffers) {

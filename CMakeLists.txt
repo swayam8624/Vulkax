@@ -269,7 +269,7 @@ add_executable(VulkaxMacProjectionCompute tools/vulkax_mac_projection_compute.cp
 set_target_properties(VulkaxMacProjectionCompute PROPERTIES OUTPUT_NAME vulkax-mac-projection)
 target_compile_features(VulkaxMacProjectionCompute PRIVATE cxx_std_20)
 target_compile_definitions(VulkaxMacProjectionCompute PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
-target_link_libraries(VulkaxMacProjectionCompute PRIVATE ${Vulkan_LIBRARIES})
+target_link_libraries(VulkaxMacProjectionCompute PRIVATE vulkax_sim ${Vulkan_LIBRARIES})
 
 add_executable(VulkaxSparseBrickCompute tools/vulkax_sparse_brick_compute.cpp)
 set_target_properties(VulkaxSparseBrickCompute PROPERTIES OUTPUT_NAME vulkax-sparse-bricks)
@@ -657,7 +657,7 @@ target_include_directories(
   VulkaxPhysicsVulkanDirect PRIVATE
   ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/include ${TINYOBJ_PATH})
 target_link_libraries(
-  VulkaxPhysicsVulkanDirect PRIVATE glfw vulkax_relativity ${Vulkan_LIBRARIES})
+  VulkaxPhysicsVulkanDirect PRIVATE glfw vulkax_relativity vulkax_sim ${Vulkan_LIBRARIES})
 if (TARGET PkgConfig::OPENEXR)
   target_link_libraries(VulkaxPhysicsVulkanDirect PRIVATE PkgConfig::OPENEXR)
   target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE VULKAX_HAS_OPENEXR=1)

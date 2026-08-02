@@ -33,7 +33,7 @@ class MacLiveVolume {
   lve::LveDevice& device_;
   VkImageView outputImage_ = VK_NULL_HANDLE;
   VkExtent2D outputExtent_{};
-  std::array<std::unique_ptr<lve::LveBuffer>, 32> buffers_{};
+  std::array<std::unique_ptr<lve::LveBuffer>, 34> buffers_{};
   VkDescriptorSetLayout solverDescriptorLayout_ = VK_NULL_HANDLE;
   VkDescriptorSetLayout presentDescriptorLayout_ = VK_NULL_HANDLE;
   VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
@@ -42,6 +42,7 @@ class MacLiveVolume {
   VkPipelineLayout solverPipelineLayout_ = VK_NULL_HANDLE;
   VkPipelineLayout presentPipelineLayout_ = VK_NULL_HANDLE;
   VkPipeline solverPipeline_ = VK_NULL_HANDLE;
+  VkPipeline residencyPipeline_ = VK_NULL_HANDLE;
   VkPipeline presentPipeline_ = VK_NULL_HANDLE;
 };
 

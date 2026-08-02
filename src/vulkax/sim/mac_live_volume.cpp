@@ -2,6 +2,7 @@
 
 #include "lve_buffer.hpp"
 #include "lve_device.hpp"
+#include "vulkax/sim/sparse_brick_storage.hpp"
 
 #include <algorithm>
 #include <array>
@@ -18,6 +19,7 @@ namespace {
 constexpr uint32_t kNx = 24;
 constexpr uint32_t kNy = 32;
 constexpr uint32_t kNz = 24;
+constexpr uint32_t kScalarBrickCapacity = 224;
 
 struct alignas(16) MacPass {
   uint32_t nx = kNx;
@@ -103,18 +105,20 @@ void MacLiveVolume::createBuffers() {
       static_cast<size_t>((kNx + 1u) / 2u) * ((kNy + 1u) / 2u) * ((kNz + 1u) / 2u);
   const size_t bricks =
       static_cast<size_t>((kNx + 3u) / 4u) * ((kNy + 3u) / 4u) * ((kNz + 3u) / 4u);
-  const std::array<size_t, 32> counts{
-      cells, cells,
+  const size_t sparseCells = static_cast<size_t>(kScalarBrickCapacity) * 64u;
+  const std::array<size_t, 34> counts{
+      sparseCells, sparseCells,
       static_cast<size_t>(kNx + 1u) * kNy * kNz,
       static_cast<size_t>(kNx) * (kNy + 1u) * kNz,
       static_cast<size_t>(kNx) * kNy * (kNz + 1u),
       static_cast<size_t>(kNx + 1u) * kNy * kNz,
       static_cast<size_t>(kNx) * (kNy + 1u) * kNz,
       static_cast<size_t>(kNx) * kNy * (kNz + 1u),
-      cells, cells, cells, cells, cells, cells, cells, cells, cells, cells,
+      cells, cells, cells, cells,
+      sparseCells, sparseCells, sparseCells, sparseCells, sparseCells, sparseCells,
       static_cast<size_t>(outputExtent_.width) * outputExtent_.height * 4u,
       cells, cells * 3u, coarseCells, 4u, coarseCells, coarseCells, coarseCells,
-      bricks, bricks, 4u, 3u, 8u, 48u};
+      bricks, bricks, 4u, 3u, 8u, 48u, bricks, 4u + kScalarBrickCapacity};
   for (size_t index = 0; index < buffers_.size(); ++index) {
     buffers_[index] = std::make_unique<lve::LveBuffer>(
         device_,
@@ -145,8 +149,36 @@ void MacLiveVolume::initializeFields() {
       }
     }
   }
-  buffers_[0]->writeToBuffer(density.data(), density.size() * sizeof(float));
-  buffers_[1]->writeToBuffer(temperature.data(), temperature.size() * sizeof(float));
+  SparseBrickStorage scalarStorage({kNx, kNy, kNz, 4, 2});
+  for (uint32_t z = 0; z < kNz; ++z) {
+    for (uint32_t y = 0; y < kNy; ++y) {
+      for (uint32_t x = 0; x < kNx; ++x) {
+        const size_t index = (static_cast<size_t>(z) * kNy + y) * kNx + x;
+        if (density[index] > 0.002f || temperature[index] > 0.002f) {
+          scalarStorage.setCell(x, y, z, 0, density[index]);
+          scalarStorage.setCell(x, y, z, 1, temperature[index]);
+        }
+      }
+    }
+  }
+  scalarStorage.refineHalo(1);
+  if (scalarStorage.stats().residentBricks >= kScalarBrickCapacity)
+    throw std::runtime_error("initial live sparse smoke domain exceeds brick capacity");
+  const size_t sparseCells = static_cast<size_t>(kScalarBrickCapacity) * 64u;
+  std::vector<float> sparseDensity(sparseCells, 0.0f);
+  std::vector<float> sparseTemperature(sparseCells, 0.0f);
+  for (uint32_t slot = 0; slot < scalarStorage.stats().residentBricks; ++slot) {
+    for (uint32_t local = 0; local < 64u; ++local) {
+      const size_t packed = (static_cast<size_t>(slot) * 64u + local) * 2u;
+      sparseDensity[static_cast<size_t>(slot) * 64u + local] =
+          scalarStorage.payload()[packed];
+      sparseTemperature[static_cast<size_t>(slot) * 64u + local] =
+          scalarStorage.payload()[packed + 1u];
+    }
+  }
+  buffers_[0]->writeToBuffer(sparseDensity.data(), sparseDensity.size() * sizeof(float));
+  buffers_[1]->writeToBuffer(
+      sparseTemperature.data(), sparseTemperature.size() * sizeof(float));
   std::array<float, 48> body{
       0.66f, 0.30f, 0.50f, 2.0f,
       0.0f, 0.0f, 0.0f, 1.0f,
@@ -161,13 +193,24 @@ void MacLiveVolume::initializeFields() {
       0.012f, 0.012f, 0.012f, 0.0f,
       1.0f, 1.0f, 1.0f, 0.0f};
   buffers_[31]->writeToBuffer(body.data(), sizeof(body));
+  const size_t pageCount = buffers_[32]->getBufferSize() / sizeof(uint32_t);
+  std::vector<uint32_t> pageTable(pageCount, 0u);
+  for (size_t page = 0; page < pageTable.size(); ++page) {
+    const uint32_t slot = scalarStorage.pageTable()[page];
+    if (slot != SparseBrickStorage::kInactiveSlot) pageTable[page] = slot + 1u;
+  }
+  buffers_[32]->writeToBuffer(pageTable.data(), pageTable.size() * sizeof(uint32_t));
+  std::vector<uint32_t> allocator(4u + kScalarBrickCapacity, 0u);
+  allocator[0] = scalarStorage.stats().residentBricks;
+  allocator[3] = kScalarBrickCapacity;
+  buffers_[33]->writeToBuffer(allocator.data(), allocator.size() * sizeof(uint32_t));
   const size_t bricks = buffers_[27]->getBufferSize() / sizeof(float);
   std::vector<uint32_t> active(bricks, 1u);
   buffers_[27]->writeToBuffer(active.data(), active.size() * sizeof(uint32_t));
 }
 
 void MacLiveVolume::createDescriptors() {
-  std::array<VkDescriptorSetLayoutBinding, 32> solverBindings{};
+  std::array<VkDescriptorSetLayoutBinding, 34> solverBindings{};
   for (uint32_t index = 0; index < solverBindings.size(); ++index)
     solverBindings[index] =
         {index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
@@ -186,7 +229,7 @@ void MacLiveVolume::createDescriptors() {
             device_.device(), &layoutInfo, nullptr, &presentDescriptorLayout_),
         "vkCreateDescriptorSetLayout MAC present");
   const std::array<VkDescriptorPoolSize, 2> sizes{{
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 33},
+      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 35},
       {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}}};
   VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
   poolInfo.maxSets = 2;
@@ -204,8 +247,8 @@ void MacLiveVolume::createDescriptors() {
         "vkAllocateDescriptorSets MAC live");
   solverDescriptorSet_ = sets[0];
   presentDescriptorSet_ = sets[1];
-  std::array<VkDescriptorBufferInfo, 33> infos{};
-  std::array<VkWriteDescriptorSet, 34> writes{};
+  std::array<VkDescriptorBufferInfo, 35> infos{};
+  std::array<VkWriteDescriptorSet, 36> writes{};
   for (uint32_t index = 0; index < buffers_.size(); ++index) {
     infos[index] = buffers_[index]->descriptorInfo();
     writes[index] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
@@ -215,22 +258,22 @@ void MacLiveVolume::createDescriptors() {
     writes[index].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     writes[index].pBufferInfo = &infos[index];
   }
-  infos[32] = buffers_[18]->descriptorInfo();
-  writes[32] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  writes[32].dstSet = presentDescriptorSet_;
-  writes[32].dstBinding = 0;
-  writes[32].descriptorCount = 1;
-  writes[32].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  writes[32].pBufferInfo = &infos[32];
+  infos[34] = buffers_[18]->descriptorInfo();
+  writes[34] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  writes[34].dstSet = presentDescriptorSet_;
+  writes[34].dstBinding = 0;
+  writes[34].descriptorCount = 1;
+  writes[34].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  writes[34].pBufferInfo = &infos[34];
   VkDescriptorImageInfo imageInfo{};
   imageInfo.imageView = outputImage_;
   imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-  writes[33] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  writes[33].dstSet = presentDescriptorSet_;
-  writes[33].dstBinding = 1;
-  writes[33].descriptorCount = 1;
-  writes[33].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-  writes[33].pImageInfo = &imageInfo;
+  writes[35] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  writes[35].dstSet = presentDescriptorSet_;
+  writes[35].dstBinding = 1;
+  writes[35].descriptorCount = 1;
+  writes[35].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  writes[35].pImageInfo = &imageInfo;
   vkUpdateDescriptorSets(
       device_.device(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 }
@@ -252,6 +295,9 @@ void MacLiveVolume::createPipelines() {
   solverPipeline_ = createComputePipeline(
       device_.device(), solverPipelineLayout_,
       std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_mac_projection.comp.spv");
+  residencyPipeline_ = createComputePipeline(
+      device_.device(), solverPipelineLayout_,
+      std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_sparse_residency.comp.spv");
   presentPipeline_ = createComputePipeline(
       device_.device(), presentPipelineLayout_,
       std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_mac_present.comp.spv");
@@ -300,6 +346,15 @@ void MacLiveVolume::record(VkCommandBuffer commandBuffer, float deltaSeconds) {
   dispatch(20, 0.0f);
   dispatch(18, 0.0f);
   dispatch(19, 0.0f);
+  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, residencyPipeline_);
+  vkCmdPushConstants(
+      commandBuffer, solverPipelineLayout_, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+      sizeof(push), &push);
+  vkCmdDispatch(commandBuffer, groupsX, groupsY, groupsZ);
+  vkCmdPipelineBarrier(
+      commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &storageBarrier, 0, nullptr, 0, nullptr);
+  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, solverPipeline_);
   dispatch(10, 0.0f);
   dispatch(11, 0.0f);
   dispatch(0, 0.0f);
@@ -353,6 +408,8 @@ void MacLiveVolume::destroyVulkanObjects() {
     vkDestroyPipeline(device_.device(), presentPipeline_, nullptr);
   if (solverPipeline_ != VK_NULL_HANDLE)
     vkDestroyPipeline(device_.device(), solverPipeline_, nullptr);
+  if (residencyPipeline_ != VK_NULL_HANDLE)
+    vkDestroyPipeline(device_.device(), residencyPipeline_, nullptr);
   if (presentPipelineLayout_ != VK_NULL_HANDLE)
     vkDestroyPipelineLayout(device_.device(), presentPipelineLayout_, nullptr);
   if (solverPipelineLayout_ != VK_NULL_HANDLE)

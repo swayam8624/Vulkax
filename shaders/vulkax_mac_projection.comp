@@ -42,6 +42,7 @@ struct RigidBodyState {
   vec4 scale;
 };
 layout(std430, binding = 31) buffer RigidBodies { RigidBodyState values[]; } rigidBodies;
+layout(std430, binding = 32) readonly buffer ScalarPageTable { uint values[]; } scalarPageTable;
 
 layout(push_constant) uniform MacPass {
   uint nx;
@@ -94,16 +95,35 @@ uint brickIndex(uvec3 brick) {
   return (brick.z * extent.y + brick.y) * extent.x + brick.x;
 }
 
+uint sparseCellIndex(uvec3 cell) {
+  const uvec3 brick = min(cell / 4u, brickExtent() - 1u);
+  const uint encodedSlot = scalarPageTable.values[brickIndex(brick)];
+  if (encodedSlot == 0u) return 0xffffffffu;
+  const uvec3 local = cell % 4u;
+  const uint localCell = (local.z * 4u + local.y) * 4u + local.x;
+  return (encodedSlot - 1u) * 64u + localCell;
+}
+
+float sparseDensityValue(uint field, uvec3 cell) {
+  const uint index = sparseCellIndex(cell);
+  if (index == 0xffffffffu) return 0.0;
+  return field == 0u ? density.values[index] : temperature.values[index];
+}
+
 bool activeCell(uvec3 cell) {
   const uvec3 brick = min(cell / 4u, brickExtent() - 1u);
-  return activeBricksNext.values[brickIndex(brick)] != 0u;
+  return scalarPageTable.values[brickIndex(brick)] != 0u;
 }
 
 void classifyActiveBrick(uvec3 id) {
   if (any(greaterThanEqual(id, uvec3(pushData.nx, pushData.ny, pushData.nz)))) return;
-  const uint cell = cellIndex(id);
-  if (density.values[cell] > 0.002 || temperature.values[cell] > 0.002 ||
-      obstacles.values[cell] > 0.5)
+  const vec3 position = (vec3(id) + 0.5) /
+      vec3(pushData.nx, pushData.ny, pushData.nz);
+  const vec3 sourceDelta = position - vec3(0.5, 0.11, 0.5);
+  const float source = exp(-dot(sourceDelta * vec3(1.0, 1.8, 1.0),
+                                sourceDelta * vec3(1.0, 1.8, 1.0)) / 0.008);
+  if (sparseDensityValue(0u, id) > 0.002 || sparseDensityValue(1u, id) > 0.002 ||
+      obstacles.values[cellIndex(id)] > 0.5 || source > 0.002)
     atomicOr(activeBricks.values[brickIndex(id / 4u)], 1u);
 }
 
@@ -294,10 +314,12 @@ void applyForces(uvec3 id) {
           max(obstacleKind(bottom), obstacleKind(top)) > 1.5
           ? rigidSurfaceVelocity(movingBodyIndex(bottom, top), point).y : 0.0;
     } else {
-      const uint below = cellIndex(uvec3(id.x, id.y - 1u, id.z));
-      const uint above = cellIndex(uvec3(id.x, id.y, id.z));
-      const float heat = 0.5 * (temperature.values[below] + temperature.values[above]);
-      const float smoke = 0.5 * (density.values[below] + density.values[above]);
+      const uvec3 below = uvec3(id.x, id.y - 1u, id.z);
+      const uvec3 above = uvec3(id.x, id.y, id.z);
+      const float heat = 0.5 *
+          (sparseDensityValue(1u, below) + sparseDensityValue(1u, above));
+      const float smoke = 0.5 *
+          (sparseDensityValue(0u, below) + sparseDensityValue(0u, above));
       faceV1.values[index] = faceV0.values[index] +
           dt * (pushData.buoyancy * heat - pushData.smokeWeight * smoke);
     }
@@ -416,7 +438,8 @@ void projectVelocity(uvec3 id) {
 
 float scalarValue(uint field, ivec3 cell) {
   const ivec3 maximum = ivec3(pushData.nx, pushData.ny, pushData.nz) - 1;
-  const uint index = cellIndex(uvec3(clamp(cell, ivec3(0), maximum)));
+  const uint index = sparseCellIndex(uvec3(clamp(cell, ivec3(0), maximum)));
+  if (index == 0xffffffffu) return 0.0;
   if (field == 0u) return density.values[index];
   if (field == 1u) return temperature.values[index];
   if (field == 2u) return densityForward.values[index];
@@ -486,7 +509,8 @@ void advectScalars(uvec3 id, bool backward) {
   const vec3 departure = position - signedDt * sampleVelocity(midpoint);
   const uint densityField = backward ? 2u : 0u;
   const uint temperatureField = backward ? 3u : 1u;
-  const uint index = cellIndex(id);
+  const uint index = sparseCellIndex(id);
+  if (index == 0xffffffffu) return;
   if (backward) {
     densityBackward.values[index] = sampleScalar(densityField, departure);
     temperatureBackward.values[index] = sampleScalar(temperatureField, departure);
@@ -515,7 +539,8 @@ void correctScalars(uvec3 id) {
       }
     }
   }
-  const uint index = cellIndex(id);
+  const uint index = sparseCellIndex(id);
+  if (index == 0xffffffffu) return;
   densityOutput.values[index] = 0.998 * clamp(
       densityForward.values[index] + 0.5 *
           (density.values[index] - densityBackward.values[index]),
@@ -534,7 +559,8 @@ void commitAndInject(uvec3 id) {
   const vec3 sourceDelta = position - sourcePosition;
   const float source = exp(-dot(sourceDelta * vec3(1.0, 1.8, 1.0),
                                 sourceDelta * vec3(1.0, 1.8, 1.0)) / 0.008);
-  const uint index = cellIndex(id);
+  const uint index = sparseCellIndex(id);
+  if (index == 0xffffffffu) return;
   if (solid(ivec3(id))) {
     density.values[index] = 0.0;
     temperature.values[index] = 0.0;
@@ -655,7 +681,7 @@ void buildDensityHierarchy(uvec3 id) {
   for (uint z = 0u; z < 2u; ++z) for (uint y = 0u; y < 2u; ++y) for (uint x = 0u; x < 2u; ++x) {
     const uvec3 fine = id * 2u + uvec3(x, y, z);
     if (all(lessThan(fine, uvec3(pushData.nx, pushData.ny, pushData.nz))))
-      maximumDensity = max(maximumDensity, density.values[cellIndex(fine)]);
+      maximumDensity = max(maximumDensity, sparseDensityValue(0u, fine));
   }
   densityHierarchy.values[coarseIndex(id)] = maximumDensity;
 }
