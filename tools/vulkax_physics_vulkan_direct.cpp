@@ -1,5 +1,6 @@
 #include <GLFW/glfw3.h>
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
