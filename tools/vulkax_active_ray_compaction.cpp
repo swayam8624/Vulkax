@@ -11,18 +11,20 @@
 #include <string>
 #include <vector>
 
+#include "vulkax/relativity/kerr_geodesic.hpp"
+
 namespace {
 
 constexpr uint32_t kRayCount = 16384;
-constexpr uint32_t kMaximumLifetime = 17;
+constexpr uint32_t kMaximumIterations = 96;
 constexpr uint32_t kWorkgroupSize = 256;
 constexpr uint32_t kGroupCount = (kRayCount + kWorkgroupSize - 1) / kWorkgroupSize;
 
-struct RayState {
-  uint32_t remainingSteps;
-  uint32_t completedSteps;
-  uint32_t status;
-  uint32_t padding;
+struct alignas(16) RayState {
+  std::array<float, 4> position{};
+  std::array<float, 4> conservedSigns{};
+  std::array<float, 4> integration{};
+  std::array<uint32_t, 4> counters{};
 };
 struct Control {
   uint32_t activeCount;
@@ -38,9 +40,14 @@ struct IndirectCommand {
 struct Push {
   uint32_t phase;
   uint32_t sourceQueue;
-  uint32_t padding[2];
+  float mass;
+  float spin;
+  float horizon;
+  float minimumStep;
+  float maximumStep;
+  float errorTolerance;
 };
-static_assert(sizeof(RayState) == 16 && sizeof(Control) == 16 && sizeof(Push) == 16);
+static_assert(sizeof(RayState) == 64 && sizeof(Control) == 16 && sizeof(Push) == 32);
 
 void check(VkResult result, const char* operation) {
   if (result != VK_SUCCESS)
@@ -194,11 +201,29 @@ int main() {
     buffers.push_back(makeBuffer(physical, device, sizeof(uint32_t) * kGroupCount, 0));
     std::vector<RayState> initialRays(kRayCount);
     std::vector<uint32_t> active(kRayCount);
-    uint64_t expectedSteps = 0;
+    constexpr float mass = 1.0f;
+    constexpr float spin = 0.8f;
+    constexpr float observerRadius = 12.0f;
+    constexpr float observerPolar = 1.2f;
+    const float sineObserver = std::sin(observerPolar);
+    const float cosineObserver = std::cos(observerPolar);
     for (uint32_t index = 0; index < kRayCount; ++index) {
-      initialRays[index].remainingSteps = 1 + index % kMaximumLifetime;
+      const uint32_t x = index % 128u;
+      const uint32_t y = index / 128u;
+      const float alpha = (static_cast<float>(x) + 0.5f) / 128.0f * 14.0f - 7.0f;
+      const float beta = (static_cast<float>(y) + 0.5f) / 128.0f * 8.0f - 4.0f;
+      initialRays[index].position = {observerRadius, observerPolar, 0.0f, 0.0f};
+      initialRays[index].conservedSigns = {
+          -alpha * sineObserver,
+          beta * beta + cosineObserver * cosineObserver * (alpha * alpha - spin * spin),
+          -1.0f,
+          beta >= 0.0f ? 1.0f : -1.0f};
+      initialRays[index].integration = {
+          0.0f,
+          0.55f + 0.05f * static_cast<float>(index % 17u),
+          0.04f,
+          0.0f};
       active[index] = index;
-      expectedSteps += initialRays[index].remainingSteps;
     }
     const Control control{kRayCount, 0, kRayCount, 0};
     const IndirectCommand indirect{kGroupCount, 1, 1};
@@ -311,8 +336,16 @@ int main() {
         nullptr,
         VK_ACCESS_SHADER_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT};
-    for (uint32_t iteration = 0; iteration < kMaximumLifetime; ++iteration) {
-      Push push{0, iteration % 2, {0, 0}};
+    for (uint32_t iteration = 0; iteration < kMaximumIterations; ++iteration) {
+      Push push{
+          0,
+          iteration % 2,
+          mass,
+          spin,
+          mass + std::sqrt(mass * mass - spin * spin) + 1e-4f,
+          0.0025f,
+          0.065f,
+          2e-5f};
       vkCmdPushConstants(
           command,
           pipelineLayout,
@@ -406,10 +439,43 @@ int main() {
     const auto finalRays = download<RayState>(device, buffers[0], kRayCount);
     const auto finalControl = download<Control>(device, buffers[5], 1).front();
     uint64_t completedSteps = 0;
+    uint64_t turningPoints = 0;
+    float maximumError = 0.0f;
+    double maximumNullConstraint = 0.0;
+    uint64_t turningBoundaryConstraints = 0;
+    vulkax::relativity::KerrGeodesicConfig referenceConfig{};
+    referenceConfig.mass = mass;
+    referenceConfig.spin = spin;
+    referenceConfig.observerRadius = observerRadius;
+    referenceConfig.observerInclinationRadians = observerPolar;
     const bool allFinished =
         std::all_of(finalRays.begin(), finalRays.end(), [&](const RayState& ray) {
-          completedSteps += ray.completedSteps;
-          return ray.remainingSteps == 0 && ray.status == 1;
+          completedSteps += ray.counters[1];
+          turningPoints += ray.counters[2];
+          maximumError = std::max(maximumError, ray.integration[3]);
+          const bool finite = std::all_of(
+              ray.position.begin(), ray.position.end(), [](float value) {
+                return std::isfinite(value);
+              });
+          const bool terminated = ray.counters[0] == 1u ||
+              (ray.counters[0] == 2u && ray.integration[0] >= ray.integration[1] - 1e-5f);
+          vulkax::relativity::KerrConstants constants{};
+          constants.axialAngularMomentum = ray.conservedSigns[0];
+          constants.carterConstant = ray.conservedSigns[1];
+          const double nullConstraint = vulkax::relativity::kerrNormalizedNullConstraint(
+              referenceConfig,
+              constants,
+              ray.position[0],
+              ray.position[1],
+              ray.conservedSigns[2],
+              ray.conservedSigns[3]);
+          if (std::isfinite(nullConstraint)) {
+            maximumNullConstraint = std::max(maximumNullConstraint, nullConstraint);
+          } else {
+            ++turningBoundaryConstraints;
+          }
+          return finite && terminated && ray.counters[1] > 0u &&
+                 (!std::isfinite(nullConstraint) || nullConstraint < 1e-5);
         });
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(physical, &properties);
@@ -417,10 +483,14 @@ int main() {
               << ": rays=" << kRayCount << " groups=" << kGroupCount
               << " iterations=" << finalControl.iterations
               << " active=" << finalControl.activeCount << " integrated_steps=" << completedSteps
+              << " turning_points=" << turningPoints << " maximum_local_error=" << maximumError
+              << " maximum_null_constraint=" << maximumNullConstraint
+              << " turning_boundary_constraints=" << turningBoundaryConstraints
               << '\n';
     const bool valid = allFinished && finalControl.activeCount == 0 &&
-                       finalControl.iterations == kMaximumLifetime &&
-                       completedSteps == expectedSteps;
+                       finalControl.iterations == kMaximumIterations && completedSteps > kRayCount &&
+                       std::isfinite(maximumError) && maximumNullConstraint < 1e-5 &&
+                       turningBoundaryConstraints <= 1u;
 
     vkDestroyFence(device, fence, nullptr);
     vkDestroyCommandPool(device, commandPool, nullptr);

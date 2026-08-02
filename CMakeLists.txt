@@ -234,7 +234,7 @@ set_target_properties(VulkaxActiveRayCompaction PROPERTIES OUTPUT_NAME vulkax-ac
 target_compile_features(VulkaxActiveRayCompaction PRIVATE cxx_std_20)
 target_compile_definitions(VulkaxActiveRayCompaction PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
 target_include_directories(VulkaxActiveRayCompaction PRIVATE ${Vulkan_INCLUDE_DIRS})
-target_link_libraries(VulkaxActiveRayCompaction PRIVATE ${Vulkan_LIBRARIES})
+target_link_libraries(VulkaxActiveRayCompaction PRIVATE vulkax_relativity ${Vulkan_LIBRARIES})
 
 add_executable(VulkaxSchwarzschildComputeBenchmark tools/vulkax_schwarzschild_compute.cpp)
 set_target_properties(VulkaxSchwarzschildComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-schwarzschild-compute)
