@@ -310,13 +310,14 @@ void integrateActiveRay() {
             ray.counters.x = 1u;
             break;
         }
-        if (pushData.terminateAtObserver != 0u && ray.counters.y > 3u &&
+        const bool terminateAtObserver = (pushData.terminateAtObserver & 1u) != 0u;
+        if (terminateAtObserver && ray.counters.y > 3u &&
             ray.conservedSigns.z > 0.0 && ray.position.x >= pushData.observerRadius) {
             ray.counters.x = 2u;
             break;
         }
         if (ray.integration.x >= ray.integration.y) {
-            ray.counters.x = pushData.terminateAtObserver != 0u ? 3u : 2u;
+            ray.counters.x = terminateAtObserver ? 3u : 2u;
             break;
         }
         const vec2 conserved = ray.conservedSigns.xy;
@@ -363,24 +364,29 @@ void integrateActiveRay() {
                 }
                 ray.transfer.z = refined.y;
                 if (rayIndex < pushData.jacobiRayCount) {
-                    BundleState bundle = BundleState(
-                        ray.jacobiPosition,
-                        ray.jacobiWave,
-                        ray.horizontal,
-                        ray.horizontalDerivative,
-                        ray.vertical,
-                        ray.verticalDerivative);
-                    float maximumTidal = ray.jacobiDiagnostics.x;
-                    bundle = integrateJacobi(bundle, step, maximumTidal);
-                    ray.jacobiPosition = bundle.position;
-                    ray.jacobiWave = bundle.wave;
-                    ray.horizontal = bundle.horizontal;
-                    ray.horizontalDerivative = bundle.horizontalDerivative;
-                    ray.vertical = bundle.vertical;
-                    ray.verticalDerivative = bundle.verticalDerivative;
-                    ray.jacobiDiagnostics.x = maximumTidal;
-                    ray.counters.w = finiteBundle(bundle) ? 1u : 0u;
-                    if (ray.counters.w == 0u) ray.counters.x = 3u;
+                    const uint jacobiStride = max(pushData.terminateAtObserver >> 8u, 1u);
+                    ray.jacobiDiagnostics.y += step;
+                    if ((ray.counters.y + 1u) % jacobiStride == 0u) {
+                        BundleState bundle = BundleState(
+                            ray.jacobiPosition,
+                            ray.jacobiWave,
+                            ray.horizontal,
+                            ray.horizontalDerivative,
+                            ray.vertical,
+                            ray.verticalDerivative);
+                        float maximumTidal = ray.jacobiDiagnostics.x;
+                        bundle = integrateJacobi(bundle, ray.jacobiDiagnostics.y, maximumTidal);
+                        ray.jacobiPosition = bundle.position;
+                        ray.jacobiWave = bundle.wave;
+                        ray.horizontal = bundle.horizontal;
+                        ray.horizontalDerivative = bundle.horizontalDerivative;
+                        ray.vertical = bundle.vertical;
+                        ray.verticalDerivative = bundle.verticalDerivative;
+                        ray.jacobiDiagnostics.x = maximumTidal;
+                        ray.jacobiDiagnostics.y = 0.0;
+                        ray.counters.w = finiteBundle(bundle) ? 1u : 0u;
+                        if (ray.counters.w == 0u) ray.counters.x = 3u;
+                    }
                 }
                 ray.position = refined;
                 ray.integration.x += step;
@@ -389,11 +395,11 @@ void integrateActiveRay() {
                     ray.integration.z = min(pushData.maximumStep, step * 1.35);
                 if (ray.position.x <= pushData.horizon)
                     ray.counters.x = 1u;
-                else if (pushData.terminateAtObserver != 0u && ray.counters.y > 3u &&
+                else if (terminateAtObserver && ray.counters.y > 3u &&
                          signs.x > 0.0 && ray.position.x >= pushData.observerRadius)
                     ray.counters.x = 2u;
                 else if (ray.integration.x >= ray.integration.y - 1e-6)
-                    ray.counters.x = pushData.terminateAtObserver != 0u ? 3u : 2u;
+                    ray.counters.x = terminateAtObserver ? 3u : 2u;
             }
         }
         ray.conservedSigns.zw = signs;
@@ -429,12 +435,14 @@ void scanActiveBlock() {
 void scanBlockSums() {
     const uint lane = gl_LocalInvocationID.x;
     const uint blockCount = (control.activeCount + 255u) / 256u;
-    for (uint index = lane; index < 1024u; index += 256u)
+    uint scanCount = 1u;
+    while (scanCount < max(blockCount, 1u)) scanCount <<= 1u;
+    for (uint index = lane; index < scanCount; index += 256u)
         scanA[index] = index < blockCount ? blockSums.values[index] : 0u;
     barrier();
     bool sourceA = true;
-    for (uint stride = 1u; stride < 1024u; stride <<= 1u) {
-        for (uint index = lane; index < 1024u; index += 256u) {
+    for (uint stride = 1u; stride < scanCount; stride <<= 1u) {
+        for (uint index = lane; index < scanCount; index += 256u) {
             const uint own = sourceA ? scanA[index] : scanB[index];
             const uint preceding = index >= stride ?
                 (sourceA ? scanA[index - stride] : scanB[index - stride]) : 0u;

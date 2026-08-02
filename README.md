@@ -73,11 +73,12 @@ GPU durations for the final presented frame.
 capture/escape classification, equatorial disk crossings, and the same direct HDR compute-to-present
 path. Its bounded 512-pixel-wide compute extent keeps this research preview interactive.
 `--kerr` selects the Carter-separated Kerr null-geodesic mode. `--spin` accepts a dimensionless
-spin strictly between -1 and 1. The shader traces a central ray plus symmetric `+/-x` and `+/-y`
-differential rays, uses their escaped source coordinates as a first-order filtering footprint, and
-progressively accumulates jittered samples in the same device-local HDR image. Disk crossings use a
-six-band redshifted thermal model with Kerr orbital frequency rather than the Schwarzschild mode's
-image-space beaming term.
+spin strictly between -1 and 1. A persistent GPU queue adaptively integrates central geodesics and
+curvature-driven Jacobi bundles, compacts active rays with indirect count/scan/scatter dispatches,
+and writes a source-footprint field consumed by the direct HDR Kerr shader. This replaces the four
+finite-difference neighbor traces while preserving root-refined disk intersections, six-band
+redshifted thermal transfer, opacity, corona scattering, and progressive accumulation. Interactive
+sessions use a 256-pixel-wide preview; deterministic and offline runs retain the 384-pixel profile.
 `--output` performs an export-only transfer after the final frame and writes the untouched linear
 half-float radiance to OpenEXR. The exporter rejects non-finite frames or captures lacking both
 shadow and luminous radiance; interactive frames still perform no readback.

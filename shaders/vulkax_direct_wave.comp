@@ -3,6 +3,7 @@
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(set = 0, binding = 0, rgba16f) uniform image2D outputRadiance;
+layout(set = 0, binding = 1, rgba16f) uniform readonly image2D kerrBundleFootprint;
 
 layout(push_constant) uniform DirectFrameConstants {
   float timeSeconds;
@@ -412,25 +413,13 @@ vec3 kerrRadiance(vec2 uv) {
   if (central.status < 1.5) return central.diskRadiance;
   if (central.status > 2.5) return vec3(0.0);
 
-  // Differential neighbour rays form a first-order source-space footprint.
-  // This is a finite-difference ray bundle, not merely duplicate samples.
-  const vec2 pixelFootprint = vec2(
-      34.0 * aspect * max(frame.mass, 0.2) / max(frame.width, 1.0),
-      34.0 * max(frame.mass, 0.2) / max(frame.height, 1.0)) * max(frame.bundleScale, 0.0);
-  const KerrTrace neighbourX = traceKerr(imagePlane + vec2(pixelFootprint.x, 0.0), false);
-  const KerrTrace neighbourY = traceKerr(imagePlane + vec2(0.0, pixelFootprint.y), false);
-  const KerrTrace neighbourNegativeX = traceKerr(imagePlane - vec2(pixelFootprint.x, 0.0), false);
-  const KerrTrace neighbourNegativeY = traceKerr(imagePlane - vec2(0.0, pixelFootprint.y), false);
-  vec2 sourceDx = vec2(0.0);
-  vec2 sourceDy = vec2(0.0);
-  if (neighbourX.status > 1.5 && neighbourX.status < 2.5 &&
-      neighbourNegativeX.status > 1.5 && neighbourNegativeX.status < 2.5) {
-    sourceDx = 0.5 * wrappedSourceDelta(neighbourX.source, neighbourNegativeX.source);
-  }
-  if (neighbourY.status > 1.5 && neighbourY.status < 2.5 &&
-      neighbourNegativeY.status > 1.5 && neighbourNegativeY.status < 2.5) {
-    sourceDy = 0.5 * wrappedSourceDelta(neighbourY.source, neighbourNegativeY.source);
-  }
+  const ivec2 footprintPixel = clamp(
+      ivec2(uv * vec2(frame.width, frame.height)),
+      ivec2(0),
+      ivec2(int(frame.width) - 1, int(frame.height) - 1));
+  const vec4 transportedFootprint = imageLoad(kerrBundleFootprint, footprintPixel);
+  const vec2 sourceDx = transportedFootprint.xy * max(frame.bundleScale, 0.0);
+  const vec2 sourceDy = transportedFootprint.zw * max(frame.bundleScale, 0.0);
   const float sourceAreaScale = abs(sourceDx.x * sourceDy.y - sourceDx.y * sourceDy.x);
   const float trace = dot(sourceDx, sourceDx) + dot(sourceDy, sourceDy);
   const float discriminant = sqrt(max(0.0, trace * trace - 4.0 * sourceAreaScale * sourceAreaScale));

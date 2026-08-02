@@ -631,6 +631,7 @@ add_dependencies(VulkaxParticleComputeBenchmark Shaders)
 add_executable(
   VulkaxPhysicsVulkanDirect
   tools/vulkax_physics_vulkan_direct.cpp
+  src/vulkax/relativity/kerr_live_queue.cpp
   src/lve_window.cpp
   src/lve_device.cpp
   src/lve_swap_chain.cpp
@@ -646,7 +647,8 @@ target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE ENGINE_DIR="${PROJE
 target_include_directories(
   VulkaxPhysicsVulkanDirect PRIVATE
   ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/include ${TINYOBJ_PATH})
-target_link_libraries(VulkaxPhysicsVulkanDirect PRIVATE glfw ${Vulkan_LIBRARIES})
+target_link_libraries(
+  VulkaxPhysicsVulkanDirect PRIVATE glfw vulkax_relativity ${Vulkan_LIBRARIES})
 if (TARGET PkgConfig::OPENEXR)
   target_link_libraries(VulkaxPhysicsVulkanDirect PRIVATE PkgConfig::OPENEXR)
   target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE VULKAX_HAS_OPENEXR=1)

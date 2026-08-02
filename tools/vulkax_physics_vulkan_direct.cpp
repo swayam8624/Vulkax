@@ -21,6 +21,7 @@
 #include "lve_pipeline.hpp"
 #include "lve_renderer.hpp"
 #include "lve_window.hpp"
+#include "vulkax/relativity/kerr_live_queue.hpp"
 #include "vulkax/runtime/runtime_contract.hpp"
 
 #if defined(VULKAX_HAS_OPENEXR)
@@ -118,6 +119,7 @@ class DirectPhysicsPresenter final {
 
   ~DirectPhysicsPresenter() {
     if (device_.device() != VK_NULL_HANDLE) vkDeviceWaitIdle(device_.device());
+    kerrQueue_.reset();
     destroyWaveImage();
     if (computePipeline_ != VK_NULL_HANDLE)
       vkDestroyPipeline(device_.device(), computePipeline_, nullptr);
@@ -222,15 +224,17 @@ class DirectPhysicsPresenter final {
 
  private:
   void createDescriptorsAndPipelines() {
-    VkDescriptorSetLayoutBinding computeBinding{};
-    computeBinding.binding = 0;
-    computeBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    computeBinding.descriptorCount = 1;
-    computeBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    std::array<VkDescriptorSetLayoutBinding, 2> computeBindings{};
+    for (uint32_t index = 0; index < computeBindings.size(); ++index) {
+      computeBindings[index].binding = index;
+      computeBindings[index].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+      computeBindings[index].descriptorCount = 1;
+      computeBindings[index].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    }
     VkDescriptorSetLayoutCreateInfo computeLayoutInfo{
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    computeLayoutInfo.bindingCount = 1;
-    computeLayoutInfo.pBindings = &computeBinding;
+    computeLayoutInfo.bindingCount = static_cast<uint32_t>(computeBindings.size());
+    computeLayoutInfo.pBindings = computeBindings.data();
     check(
         vkCreateDescriptorSetLayout(
             device_.device(),
@@ -257,7 +261,7 @@ class DirectPhysicsPresenter final {
         "vkCreateDescriptorSetLayout graphics");
 
     VkDescriptorPoolSize poolSizes[2]{
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2},
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1}};
     VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     poolInfo.maxSets = 2;
@@ -351,11 +355,11 @@ class DirectPhysicsPresenter final {
 
   [[nodiscard]] VkExtent2D renderExtent(VkExtent2D drawableExtent) const {
     if (!schwarzschild_ && !kerr_ && !volume_) return drawableExtent;
-    // Five Kerr rays plus spectral transfer are substantially more expensive
-    // than the single Schwarzschild trace. Keep each Metal command buffer
-    // below the macOS interactivity watchdog and reconstruct through the
-    // graphics sampler while progressive samples converge.
-    const uint32_t maximumWidth = kerr_ ? 384u : (volume_ ? 640u : 512u);
+    // Kerr executes one curvature-driven bundle per 4x4 output block and
+    // reconstructs through the graphics sampler while the compacted queue
+    // advances across frames.
+    const uint32_t maximumWidth =
+        kerr_ ? (frameLimit_ == 0 ? 256u : 384u) : (volume_ ? 640u : 512u);
     if (drawableExtent.width <= maximumWidth) return drawableExtent;
     const float scale = static_cast<float>(maximumWidth) / static_cast<float>(drawableExtent.width);
     return {
@@ -409,6 +413,17 @@ class DirectPhysicsPresenter final {
     check(
         vkCreateImageView(device_.device(), &viewInfo, nullptr, &waveImageView_),
         "vkCreateImageView");
+    if (kerr_) {
+      device_.createImageWithInfo(
+          imageInfo,
+          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+          kerrBundleImage_,
+          kerrBundleImageMemory_);
+      viewInfo.image = kerrBundleImage_;
+      check(
+          vkCreateImageView(device_.device(), &viewInfo, nullptr, &kerrBundleImageView_),
+          "vkCreateImageView Kerr bundle");
+    }
     VkSamplerCreateInfo samplerInfo{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
@@ -427,7 +442,10 @@ class DirectPhysicsPresenter final {
     sampledInfo.sampler = waveSampler_;
     sampledInfo.imageView = waveImageView_;
     sampledInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    VkWriteDescriptorSet writes[2]{};
+    VkDescriptorImageInfo bundleInfo{};
+    bundleInfo.imageView = kerr_ ? kerrBundleImageView_ : waveImageView_;
+    bundleInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    VkWriteDescriptorSet writes[3]{};
     writes[0] = {
         VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         nullptr,
@@ -442,6 +460,17 @@ class DirectPhysicsPresenter final {
     writes[1] = {
         VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         nullptr,
+        computeDescriptorSet_,
+        1,
+        0,
+        1,
+        VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+        &bundleInfo,
+        nullptr,
+        nullptr};
+    writes[2] = {
+        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        nullptr,
         graphicsDescriptorSet_,
         0,
         0,
@@ -450,7 +479,13 @@ class DirectPhysicsPresenter final {
         &sampledInfo,
         nullptr,
         nullptr};
-    vkUpdateDescriptorSets(device_.device(), 2, writes, 0, nullptr);
+    vkUpdateDescriptorSets(device_.device(), 3, writes, 0, nullptr);
+    if (kerr_) {
+      kerrQueue_ = std::make_unique<vulkax::relativity::KerrLiveQueue>(
+          device_, kerrBundleImageView_, waveExtent_, spin_);
+      std::cout << "Vulkax live Kerr queue: " << kerrQueue_->rayCount() << " Jacobi bundles ("
+                << kerrQueue_->queueWidth() << 'x' << kerrQueue_->queueHeight() << ")\n";
+    }
     waveImageInitialized_ = false;
     accumulatedSamples_ = 0;
   }
@@ -471,6 +506,10 @@ class DirectPhysicsPresenter final {
     toCompute.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     toCompute.subresourceRange.levelCount = 1;
     toCompute.subresourceRange.layerCount = 1;
+    VkImageMemoryBarrier imageBarriers[2]{toCompute, toCompute};
+    if (kerr_) {
+      imageBarriers[1].image = kerrBundleImage_;
+    }
     vkCmdPipelineBarrier(
         commandBuffer,
         waveImageInitialized_
@@ -482,8 +521,34 @@ class DirectPhysicsPresenter final {
         nullptr,
         0,
         nullptr,
-        1,
-        &toCompute);
+        kerr_ ? 2u : 1u,
+        imageBarriers);
+    if (kerr_) {
+      if (!kerrQueue_) throw std::runtime_error("live Kerr queue was not initialized");
+      const uint32_t integrationDispatches = frameLimit_ == 0 ? 1u : 96u;
+      kerrQueue_->record(
+          commandBuffer, integrationDispatches, static_cast<uint32_t>(constants.sampleIndex));
+      VkImageMemoryBarrier footprintReady{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+      footprintReady.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+      footprintReady.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      footprintReady.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+      footprintReady.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+      footprintReady.image = kerrBundleImage_;
+      footprintReady.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      footprintReady.subresourceRange.levelCount = 1;
+      footprintReady.subresourceRange.layerCount = 1;
+      vkCmdPipelineBarrier(
+          commandBuffer,
+          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+          0,
+          0,
+          nullptr,
+          0,
+          nullptr,
+          1,
+          &footprintReady);
+    }
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline_);
     vkCmdBindDescriptorSets(
         commandBuffer,
@@ -501,7 +566,8 @@ class DirectPhysicsPresenter final {
         0,
         sizeof(constants),
         &constants);
-    vkCmdDispatch(commandBuffer, (waveExtent_.width + 15) / 16, (waveExtent_.height + 15) / 16, 1);
+    vkCmdDispatch(
+        commandBuffer, (waveExtent_.width + 15) / 16, (waveExtent_.height + 15) / 16, 1);
     if (timestampPool_ != VK_NULL_HANDLE) {
       vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, timestampPool_, 1);
     }
@@ -691,16 +757,26 @@ class DirectPhysicsPresenter final {
   }
 
   void destroyWaveImage() {
+    kerrQueue_.reset();
     if (waveSampler_ != VK_NULL_HANDLE) vkDestroySampler(device_.device(), waveSampler_, nullptr);
     if (waveImageView_ != VK_NULL_HANDLE)
       vkDestroyImageView(device_.device(), waveImageView_, nullptr);
     if (waveImage_ != VK_NULL_HANDLE) vkDestroyImage(device_.device(), waveImage_, nullptr);
     if (waveImageMemory_ != VK_NULL_HANDLE)
       vkFreeMemory(device_.device(), waveImageMemory_, nullptr);
+    if (kerrBundleImageView_ != VK_NULL_HANDLE)
+      vkDestroyImageView(device_.device(), kerrBundleImageView_, nullptr);
+    if (kerrBundleImage_ != VK_NULL_HANDLE)
+      vkDestroyImage(device_.device(), kerrBundleImage_, nullptr);
+    if (kerrBundleImageMemory_ != VK_NULL_HANDLE)
+      vkFreeMemory(device_.device(), kerrBundleImageMemory_, nullptr);
     waveSampler_ = VK_NULL_HANDLE;
     waveImageView_ = VK_NULL_HANDLE;
     waveImage_ = VK_NULL_HANDLE;
     waveImageMemory_ = VK_NULL_HANDLE;
+    kerrBundleImageView_ = VK_NULL_HANDLE;
+    kerrBundleImage_ = VK_NULL_HANDLE;
+    kerrBundleImageMemory_ = VK_NULL_HANDLE;
     waveExtent_ = {};
     waveImageInitialized_ = false;
     accumulatedSamples_ = 0;
@@ -725,10 +801,14 @@ class DirectPhysicsPresenter final {
   VkPipelineLayout graphicsPipelineLayout_ = VK_NULL_HANDLE;
   VkPipeline computePipeline_ = VK_NULL_HANDLE;
   std::unique_ptr<lve::LvePipeline> pipeline_;
+  std::unique_ptr<vulkax::relativity::KerrLiveQueue> kerrQueue_;
   VkImage waveImage_ = VK_NULL_HANDLE;
   VkDeviceMemory waveImageMemory_ = VK_NULL_HANDLE;
   VkImageView waveImageView_ = VK_NULL_HANDLE;
   VkSampler waveSampler_ = VK_NULL_HANDLE;
+  VkImage kerrBundleImage_ = VK_NULL_HANDLE;
+  VkDeviceMemory kerrBundleImageMemory_ = VK_NULL_HANDLE;
+  VkImageView kerrBundleImageView_ = VK_NULL_HANDLE;
   VkExtent2D waveExtent_{};
   bool waveImageInitialized_ = false;
   uint32_t accumulatedSamples_ = 0;
