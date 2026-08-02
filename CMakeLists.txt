@@ -1344,7 +1344,7 @@ if (BUILD_TESTING)
       NAME physics_studio_native_metal_imported_mesh_gpu
       COMMAND ${PROJECT_SOURCE_DIR}/scripts/vulkax_physics_metal.sh
               --native-imported-mesh-gpu-smoke
-              ${PROJECT_SOURCE_DIR}/tests/fixtures/airflow_cube.obj
+              tests/fixtures/airflow_cube.obj
     )
     set_tests_properties(
       physics_studio_native_metal_imported_mesh_gpu PROPERTIES
