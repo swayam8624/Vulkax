@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Vulkax VERSION 0.15.0 LANGUAGES CXX)
+project(Vulkax VERSION 0.16.0 LANGUAGES CXX)
 option(VULKAX_BUILD_TESTS "Build Vulkax tests" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,7 +13,7 @@ add_library(vulkax_core STATIC
     src/render/camera.cpp src/render/capture.cpp src/render/headless.cpp
     src/research/operator_influence.cpp src/research/local_operator_influence.cpp
     src/solvers/dem.cpp src/solvers/dem_broadphase.cpp src/solvers/diffusion.cpp src/solvers/fem.cpp
-    src/solvers/hyperelastic_fem.cpp src/solvers/incompressible2d.cpp src/solvers/rotating_drum.cpp
+    src/solvers/hyperelastic_fem.cpp src/solvers/incompressible2d.cpp src/solvers/mac3d.cpp src/solvers/rotating_drum.cpp
     src/verify/convergence.cpp src/verify/result_certificate.cpp src/visualization/scientific.cpp)
 target_include_directories(vulkax_core PUBLIC include)
 target_compile_features(vulkax_core PUBLIC cxx_std_20)
@@ -65,7 +65,7 @@ target_link_libraries(vulkax PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render geometry camera_capture)
+    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render geometry camera_capture mac3d)
         add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
         target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
         if(MSVC)
