@@ -17,6 +17,8 @@ jobs:
         shell: msys2 {0}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -37,8 +39,23 @@ jobs:
             mingw-w64-ucrt-x86_64-openexr
             mingw-w64-ucrt-x86_64-qt6-base
             mingw-w64-ucrt-x86_64-qt6-declarative
-      - name: Apply portable target cleanup
-        run: python scripts/phase12_windows.py
+      - name: Apply portable build and filesystem fixes
+        run: |
+          python scripts/phase12_windows.py
+          git show origin/main:src/atlas/streaming/tile_source.cpp > src/atlas/streaming/tile_source.cpp
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/atlas/streaming/tile_source.cpp')
+          text = path.read_text()
+          old = 'if (relativeToRoot.empty() || relativeToRoot.native().starts_with("..")) {'
+          new = '''const auto firstComponent = relativeToRoot.begin();
+        if (relativeToRoot.empty() ||
+            (firstComponent != relativeToRoot.end() &&
+             *firstComponent == std::filesystem::path{".."})) {'''
+          if old not in text:
+              raise SystemExit('Atlas root-containment marker missing')
+          path.write_text(text.replace(old, new, 1))
+          PY
       - name: Configure Windows UCRT64
         run: >-
           cmake -S . -B build-windows -G Ninja
@@ -56,11 +73,11 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
         run: './build-windows/Vulkax\ Physics\ Studio.exe --smoke'
-      - name: Commit validated CMake cleanup
+      - name: Commit validated portability fixes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CMakeLists.txt cmake/VulkaxDependencies.cmake cmake/VulkaxApplications.cmake
+          git add CMakeLists.txt cmake/VulkaxDependencies.cmake cmake/VulkaxApplications.cmake src/atlas/streaming/tile_source.cpp
           git diff --cached --check
           git commit -m "Make Vulkax build cleanly on Windows UCRT64"
           git push origin HEAD:agent/phase12-windows-ci
