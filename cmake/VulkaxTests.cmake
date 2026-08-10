@@ -219,6 +219,14 @@ if (BUILD_TESTING)
   add_test(NAME physics_ir COMMAND PhysicsIrTests)
 
   add_executable(
+    MediumInferenceTests
+    tests/medium_inference_tests.cpp
+  )
+  target_compile_features(MediumInferenceTests PRIVATE cxx_std_20)
+  target_link_libraries(MediumInferenceTests PRIVATE vulkax_physics_ir)
+  add_test(NAME medium_inference COMMAND MediumInferenceTests)
+
+  add_executable(
     VulkanResourceArenaTests
     tests/vulkan_resource_arena_tests.cpp
   )
