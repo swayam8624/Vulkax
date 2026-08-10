@@ -58,7 +58,6 @@ final class PhysicsModel: ObservableObject {
     @Published var capturePanelPresented = false
     @Published private(set) var isCapturing = false
     @Published private(set) var captureRequestRevision: UInt64 = 0
-    @Published private(set) var pendingCaptureRequest: CinematicCaptureRequest?
     @Published private(set) var obstacleItems: [ObstacleSceneItem] = []
     @Published var selectedObstacleID: UUID?
     @Published private(set) var obstacleMeshRevision: UInt64 = 0
@@ -399,22 +398,8 @@ final class PhysicsModel: ObservableObject {
 
     func requestCinematicCapture() {
         capturePanelPresented = false
-        if isCapturing {
-            equationStatus = "A cinematic capture is already in progress"
-            return
-        }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.quickTimeMovie]
-        panel.nameFieldStringValue = projectName.replacingOccurrences(of: " ", with: "-") + "-simulation.mov"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
         captureRequestRevision &+= 1
-        pendingCaptureRequest = CinematicCaptureRequest(
-            revision: captureRequestRevision,
-            outputURL: url,
-            settings: captureSettings,
-            camera: camera,
-            timelineSeconds: time)
-        equationStatus = "Preparing \(captureSettings.resolution.title) capture · \(captureSettings.frameRate.title)"
+        equationStatus = "Cinematic capture requested · \(captureSettings.resolution.title) · \(captureSettings.frameRate.title)"
     }
 
     func reportCaptureState(active: Bool, message: String) {
@@ -2992,9 +2977,9 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
                                                   Float(accumulationSamples), 0),
                                    renderParameters: renderParameters)
         var copy = uniforms
-        copy.cameraPositionExposure = SIMD4(effectiveCamera.position, effectiveCamera.exposure)
-        copy.cameraTarget = SIMD4(effectiveCamera.target, 0)
-        copy.cameraUpFov = SIMD4(effectiveCamera.up, effectiveCamera.verticalFovDegrees)
+        copy.cameraPositionExposure = SIMD4(model.camera.position, model.camera.exposure)
+        copy.cameraTarget = SIMD4(model.camera.target, 0)
+        copy.cameraUpFov = SIMD4(model.camera.up, model.camera.verticalFovDegrees)
         if isVolume {
             guard ensureVolumeSolver(device: device), prepareObstacleMesh(device: device, model: model),
                   let divergence = volumeDivergence,
