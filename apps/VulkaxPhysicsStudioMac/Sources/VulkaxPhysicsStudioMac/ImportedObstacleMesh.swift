@@ -28,6 +28,11 @@ struct ImportedMeshMaterial {
     var emissiveFactor = SIMD3<Float>(repeating: 0)
     var baseColorTextureData: Data?
     var baseColorTextureMimeType: String?
+    var metallicRoughnessTextureData: Data?
+    var metallicRoughnessTextureMimeType: String?
+    var normalTextureData: Data?
+    var normalTextureMimeType: String?
+    var normalScale: Float = 1
 
     static let `default` = ImportedMeshMaterial()
 }

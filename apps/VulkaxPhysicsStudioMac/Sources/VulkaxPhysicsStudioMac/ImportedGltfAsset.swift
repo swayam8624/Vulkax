@@ -235,6 +235,19 @@ private final class GltfReader {
                     result.baseColorTextureData = image.0
                     result.baseColorTextureMimeType = image.1
                 }
+                if let textureInfo = pbr["metallicRoughnessTexture"] as? [String: Any], let textureIndex = textureInfo["index"] as? Int,
+                   textures.indices.contains(textureIndex), let imageIndex = textures[textureIndex]["source"] as? Int,
+                   let image = try imageData(index: imageIndex) {
+                    result.metallicRoughnessTextureData = image.0
+                    result.metallicRoughnessTextureMimeType = image.1
+                }
+            }
+            if let normalInfo = source["normalTexture"] as? [String: Any], let textureIndex = normalInfo["index"] as? Int,
+               textures.indices.contains(textureIndex), let imageIndex = textures[textureIndex]["source"] as? Int,
+               let image = try imageData(index: imageIndex) {
+                result.normalTextureData = image.0
+                result.normalTextureMimeType = image.1
+                if let scale = normalInfo["scale"] as? NSNumber { result.normalScale = scale.floatValue }
             }
             if let emissive = source["emissiveFactor"] as? [NSNumber], emissive.count == 3 {
                 result.emissiveFactor = SIMD3(emissive[0].floatValue, emissive[1].floatValue, emissive[2].floatValue)

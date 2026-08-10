@@ -27,6 +27,8 @@ private struct StudioSceneBatch {
     let vertexCount: Int
     var material: StudioSceneMaterialUniforms
     let baseColorTexture: MTLTexture
+    let metallicRoughnessTexture: MTLTexture
+    let normalTexture: MTLTexture
 }
 
 final class StudioSceneMeshRenderer {
@@ -35,6 +37,7 @@ final class StudioSceneMeshRenderer {
     private let depthState: MTLDepthStencilState
     private let samplerState: MTLSamplerState
     private let whiteTexture: MTLTexture
+    private let flatNormalTexture: MTLTexture
     private var simulatedBatches: [StudioSceneBatch] = []
     private var staticBatches: [StudioSceneBatch] = []
     private var staticBodies: MTLBuffer?
@@ -146,16 +149,33 @@ final class StudioSceneMeshRenderer {
             constant Camera& camera [[buffer(2)]],
             constant Material& material [[buffer(3)]],
             texture2d<float> baseColorTexture [[texture(0)]],
+            texture2d<float> metallicRoughnessTexture [[texture(1)]],
+            texture2d<float> normalTexture [[texture(2)]],
             sampler surfaceSampler [[sampler(0)]]) {
             float4 sampled = baseColorTexture.sample(surfaceSampler, in.uv);
+            float4 mrSample = metallicRoughnessTexture.sample(surfaceSampler, in.uv);
             float4 baseSample = sampled * material.baseColor;
             float3 albedo = max(baseSample.rgb, float3(0.0));
             float alpha = clamp(baseSample.a, 0.0, 1.0);
-            float metallic = clamp(material.emissiveMetallic.w, 0.0, 1.0);
-            float roughness = clamp(material.roughnessFlags.x, 0.04, 1.0);
+            float metallic = clamp(material.emissiveMetallic.w * mrSample.b, 0.0, 1.0);
+            float roughness = clamp(material.roughnessFlags.x * mrSample.g, 0.04, 1.0);
             float3 emissive = max(material.emissiveMetallic.xyz, float3(0.0));
 
             float3 n = normalize(in.normal);
+            float3 dpdx = dfdx(in.worldPosition);
+            float3 dpdy = dfdy(in.worldPosition);
+            float2 duvdx = dfdx(in.uv);
+            float2 duvdy = dfdy(in.uv);
+            float determinant = duvdx.x * duvdy.y - duvdx.y * duvdy.x;
+            if (abs(determinant) > 1e-7) {
+                float3 tangent = normalize((dpdx * duvdy.y - dpdy * duvdx.y) / determinant);
+                tangent = normalize(tangent - n * dot(n, tangent));
+                float3 bitangent = normalize(cross(n, tangent));
+                float3 mapped = normalTexture.sample(surfaceSampler, in.uv).xyz * 2.0 - 1.0;
+                mapped.xy *= material.roughnessFlags.y;
+                mapped = normalize(mapped);
+                n = normalize(tangent * mapped.x + bitangent * mapped.y + n * mapped.z);
+            }
             float3 v = normalize(camera.positionExposure.xyz - in.worldPosition);
             float3 l = normalize(float3(-0.42, 0.82, 0.52));
             float3 h = normalize(v + l);
@@ -234,6 +254,19 @@ final class StudioSceneMeshRenderer {
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0,
             withBytes: &pixel, bytesPerRow: 4)
         self.whiteTexture = whiteTexture
+
+        let flat = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm, width: 1, height: 1, mipmapped: false)
+        flat.usage = [.shaderRead]
+        guard let flatNormalTexture = device.makeTexture(descriptor: flat) else {
+            throw NSError(domain: "VulkaxSceneRenderer", code: 5,
+                          userInfo: [NSLocalizedDescriptionKey: "Could not create fallback normal texture"])
+        }
+        var normalPixel: [UInt8] = [128, 128, 255, 255]
+        flatNormalTexture.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0,
+            withBytes: &normalPixel, bytesPerRow: 4)
+        self.flatNormalTexture = flatNormalTexture
     }
 
     func rebuildIfNeeded(device: MTLDevice, model: PhysicsModel) {
@@ -301,6 +334,8 @@ final class StudioSceneMeshRenderer {
                 length: MemoryLayout<StudioSceneMaterialUniforms>.stride,
                 index: 3)
             encoder.setFragmentTexture(batch.baseColorTexture, index: 0)
+            encoder.setFragmentTexture(batch.metallicRoughnessTexture, index: 1)
+            encoder.setFragmentTexture(batch.normalTexture, index: 2)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: batch.vertexCount)
         }
     }
@@ -352,18 +387,20 @@ final class StudioSceneMeshRenderer {
                       let vertexBuffer = buffer(device: device, values: vertices) else { continue }
                 let sourceMaterial = materialIndex < mesh.materials.count
                     ? mesh.materials[materialIndex] : .default
-                let texture: MTLTexture
-                if let textureData = sourceMaterial.baseColorTextureData,
-                   let loaded = try? textureLoader.newTexture(
-                    data: textureData,
-                    options: [
-                        .SRGB: true,
-                        .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
-                    ]) {
-                    texture = loaded
-                } else {
-                    texture = whiteTexture
+                func loadedTexture(_ data: Data?, srgb: Bool, fallback: MTLTexture) -> MTLTexture {
+                    guard let data, let loaded = try? textureLoader.newTexture(
+                        data: data,
+                        options: [
+                            .SRGB: NSNumber(value: srgb),
+                            .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
+                        ]) else { return fallback }
+                    return loaded
                 }
+                let texture = loadedTexture(sourceMaterial.baseColorTextureData, srgb: true, fallback: whiteTexture)
+                let metallicRoughnessTexture = loadedTexture(
+                    sourceMaterial.metallicRoughnessTextureData, srgb: false, fallback: whiteTexture)
+                let normalTexture = loadedTexture(
+                    sourceMaterial.normalTextureData, srgb: false, fallback: flatNormalTexture)
                 let material = StudioSceneMaterialUniforms(
                     baseColor: sourceMaterial.baseColorFactor,
                     emissiveMetallic: SIMD4(
@@ -371,12 +408,14 @@ final class StudioSceneMeshRenderer {
                         sourceMaterial.emissiveFactor.y,
                         sourceMaterial.emissiveFactor.z,
                         sourceMaterial.metallicFactor),
-                    roughnessFlags: SIMD4(sourceMaterial.roughnessFactor, 0, 0, 0))
+                    roughnessFlags: SIMD4(sourceMaterial.roughnessFactor, sourceMaterial.normalScale, 0, 0))
                 batches.append(.init(
                     vertices: vertexBuffer,
                     vertexCount: vertices.count,
                     material: material,
-                    baseColorTexture: texture))
+                    baseColorTexture: texture,
+                    metallicRoughnessTexture: metallicRoughnessTexture,
+                    normalTexture: normalTexture))
             }
         }
         return batches
