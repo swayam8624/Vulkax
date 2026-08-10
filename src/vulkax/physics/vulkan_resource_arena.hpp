@@ -17,6 +17,13 @@ struct VulkanBarrierSummary {
   uint32_t imageBarriers = 0;
 };
 
+struct VulkanMemoryArenaStats {
+  uint32_t blockCount = 0;
+  uint32_t suballocationCount = 0;
+  VkDeviceSize reservedBytes = 0;
+  VkDeviceSize resourceBytes = 0;
+};
+
 // Imports one externally owned history slot into an arena. Imported handles are
 // written into descriptors and synchronized by the arena, but never destroyed
 // or mapped through it. This lets multiple reflected pass layouts share a field
@@ -57,6 +64,7 @@ class VulkanResourceArena {
   [[nodiscard]] uint32_t physicalHistorySlot(
       uint32_t binding, uint32_t historyAge = 0) const;
   [[nodiscard]] const VulkanResourcePlan& plan() const { return plan_; }
+  [[nodiscard]] const VulkanMemoryArenaStats& memoryStats() const { return memoryStats_; }
 
   void uploadBuffer(
       uint32_t binding,
@@ -74,7 +82,7 @@ class VulkanResourceArena {
   void recordInitialTransitions(VkCommandBuffer commandBuffer);
 
   // Resets dependency tracking for a new graph execution. recordPassBarrier()
-  // then emits only write-after/read or write-after/write dependencies required
+  // then emits only write-after/read or write-after-write dependencies required
   // by the reflected resource bindings.
   void beginPassSequence();
   [[nodiscard]] VulkanBarrierSummary recordPassBarrier(
@@ -92,8 +100,22 @@ class VulkanResourceArena {
     VkImage image = VK_NULL_HANDLE;
     VkImageView imageView = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkDeviceSize memoryOffset = 0;
     VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     bool owned = true;
+  };
+
+  struct MemoryBlock {
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkDeviceSize size = 0;
+    VkDeviceSize used = 0;
+    uint32_t memoryTypeIndex = 0;
+    bool imageMemory = false;
+  };
+
+  struct Suballocation {
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkDeviceSize offset = 0;
   };
 
   [[nodiscard]] const VulkanResourceBinding& binding(uint32_t bindingIndex) const;
@@ -101,6 +123,10 @@ class VulkanResourceArena {
   [[nodiscard]] const Slot& slot(uint32_t bindingIndex, uint32_t historyAge) const;
   [[nodiscard]] uint32_t findMemoryType(
       uint32_t typeMask, VkMemoryPropertyFlags properties) const;
+  [[nodiscard]] Suballocation allocateMemory(
+      const VkMemoryRequirements& requirements,
+      VkMemoryPropertyFlags properties,
+      bool imageMemory);
   void createResources();
   void createDescriptors(std::span<const VkPushConstantRange> pushConstants);
   void updateDescriptorSet(uint32_t frameIndex);
@@ -112,6 +138,8 @@ class VulkanResourceArena {
   VulkanResourcePlan plan_{};
   std::vector<VulkanResourceImport> imports_;
   std::vector<std::vector<Slot>> slots_;
+  std::vector<MemoryBlock> memoryBlocks_;
+  VulkanMemoryArenaStats memoryStats_{};
   std::vector<uint32_t> historyCursor_;
   std::vector<bool> previousWrite_;
   std::vector<VkDescriptorSet> descriptorSets_;
