@@ -132,6 +132,7 @@ target_include_directories(vulkax_sim PUBLIC ${PROJECT_SOURCE_DIR}/src)
 add_library(
   vulkax_physics_ir STATIC
   src/vulkax/physics/physics_ir.cpp
+  src/vulkax/physics/medium_inference.cpp
   src/vulkax/physics/pipeline_cache.cpp
   src/vulkax/physics/vulkan_resource_layout.cpp
   src/vulkax/physics/vulkan_resource_arena.cpp
