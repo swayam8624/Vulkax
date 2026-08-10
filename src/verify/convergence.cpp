@@ -1,5 +1,6 @@
 #include "vulkax/verify/convergence.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>

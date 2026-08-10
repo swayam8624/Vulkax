@@ -1,5 +1,6 @@
 #include "vulkax/solvers/diffusion.hpp"
 
+#include <limits>
 #include <stdexcept>
 
 namespace vulkax::solvers {
