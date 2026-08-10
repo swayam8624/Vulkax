@@ -296,7 +296,7 @@ final class PhysicsModel: ObservableObject {
 
     func importObstacleMesh() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "obj") ?? .data]
+        panel.allowedContentTypes = ["obj", "gltf", "glb"].compactMap { UTType(filenameExtension: $0) }
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         importObstacleMesh(from: url)
@@ -344,7 +344,7 @@ final class PhysicsModel: ObservableObject {
             body.position.x = min(0.86, 0.50 + 0.16 * Float(obstacleItems.count))
             body.linearVelocity.x = obstacleItems.count.isMultiple(of: 2) ? 0.035 : -0.035
         }
-        let visualMesh = try ImportedObstacleMesh.loadOBJ(from: url, requireWatertight: false)
+        let visualMesh = try ImportedObstacleMesh.load(from: url, requireWatertight: false)
         let defaultProxy: CollisionProxyKind = visualMesh.diagnostics.isWatertight ? .renderMesh : .box
         var effectiveProxy = collisionProxy ?? defaultProxy
         if effectiveProxy == .renderMesh && !visualMesh.diagnostics.isWatertight { effectiveProxy = .box }
@@ -362,8 +362,10 @@ final class PhysicsModel: ObservableObject {
     private func saveProject(to url: URL) {
         do {
             let obstacleRecords = try obstacleItems.enumerated().map { index, item in
+                let sourceExtension = item.url.pathExtension.lowercased()
+                let assetExtension = sourceExtension.isEmpty ? "obj" : sourceExtension
                 let path = try PhysicsProjectIO.packageObstacle(
-                    from: item.url, for: url, assetName: "obstacle-\(index).obj")
+                    from: item.url, for: url, assetName: "obstacle-\(index).\(assetExtension)")
                 return ProjectObstacleRecord(
                     meshPath: path,
                     body: item.body,

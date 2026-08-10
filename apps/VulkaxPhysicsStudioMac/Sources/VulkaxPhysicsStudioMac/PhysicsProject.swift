@@ -258,9 +258,52 @@ enum PhysicsProjectIO {
         let assetDirectory = projectURL.deletingPathExtension().appendingPathExtension("assets")
         try FileManager.default.createDirectory(
             at: assetDirectory, withIntermediateDirectories: true)
+
+        func safeRelativePath(_ raw: String) throws -> String? {
+            if raw.hasPrefix("data:") { return nil }
+            guard URL(string: raw)?.scheme == nil else {
+                throw CocoaError(.fileReadUnsupportedScheme)
+            }
+            let decoded = raw.removingPercentEncoding ?? raw
+            let components = NSString(string: decoded).pathComponents
+            guard !decoded.hasPrefix("/"), !components.contains(".."), !components.contains("~") else {
+                throw CocoaError(.fileReadInvalidFileName)
+            }
+            return decoded
+        }
+
+        func copyAsset(_ input: URL, _ output: URL) throws {
+            try FileManager.default.createDirectory(
+                at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if input.standardizedFileURL == output.standardizedFileURL { return }
+            if FileManager.default.fileExists(atPath: output.path) {
+                try FileManager.default.removeItem(at: output)
+            }
+            try FileManager.default.copyItem(at: input, to: output)
+        }
+
         let destination = assetDirectory.appendingPathComponent(assetName)
-        if source.standardizedFileURL != destination.standardizedFileURL {
-            try Data(contentsOf: source).write(to: destination, options: .atomic)
+        try copyAsset(source, destination)
+        if source.pathExtension.lowercased() == "gltf" {
+            guard let root = try JSONSerialization.jsonObject(with: Data(contentsOf: source)) as? [String: Any] else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            var dependencies: [String] = []
+            for buffer in root["buffers"] as? [[String: Any]] ?? [] {
+                if let uri = buffer["uri"] as? String { dependencies.append(uri) }
+            }
+            for image in root["images"] as? [[String: Any]] ?? [] {
+                if let uri = image["uri"] as? String { dependencies.append(uri) }
+            }
+            let sourceRoot = source.deletingLastPathComponent()
+            let packagedRoot = assetDirectory.standardizedFileURL.path + "/"
+            for raw in Set(dependencies) {
+                guard let relative = try safeRelativePath(raw) else { continue }
+                let input = sourceRoot.appendingPathComponent(relative).standardizedFileURL
+                let output = assetDirectory.appendingPathComponent(relative).standardizedFileURL
+                guard output.path.hasPrefix(packagedRoot) else { throw CocoaError(.fileReadInvalidFileName) }
+                try copyAsset(input, output)
+            }
         }
         return assetDirectory.lastPathComponent + "/" + destination.lastPathComponent
     }
