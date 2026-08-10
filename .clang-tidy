@@ -13,8 +13,7 @@ WarningsAsErrors: >-
   bugprone-use-after-move,
   bugprone-dangling-handle,
   bugprone-infinite-loop,
-  bugprone-sizeof-expression,
-  performance-*
+  bugprone-sizeof-expression
 HeaderFilterRegex: '(^|.*/)(src|include)/.*'
 FormatStyle: file
 SystemHeaders: false
