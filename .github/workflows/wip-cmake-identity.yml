@@ -1,0 +1,45 @@
+name: WIP CMake identity cleanup
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ libglfw3-dev libglm-dev \
+            nlohmann-json3-dev libsqlite3-dev libvulkan-dev libcurl4-openssl-dev \
+            glslang-tools pkg-config libopenexr-dev
+      - name: Apply CMake identity migration
+        run: python3 scripts/rename_vulkax_project.py
+      - name: Configure Vulkax project
+        run: >-
+          cmake -S . -B build-identity -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=OFF
+          -DVULKAX_BUILD_PHYSICS_STUDIO=OFF
+      - name: Assert project and compatibility target identities
+        run: |
+          grep -q '^CMAKE_PROJECT_NAME:STATIC=Vulkax$' build-identity/CMakeCache.txt
+          cmake --build build-identity --target LveEngine VulkaxPhysicsVulkanDirect VulkaxComputeBenchmark
+          test -x build-identity/LveEngine
+          test -x build-identity/vulkax-physics-vulkan-direct
+          test -x build-identity/vulkax-compute
+      - name: Commit final CMake source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CMakeLists.txt cmake/VulkaxApplications.cmake
+          git diff --cached --check
+          git commit -m "Make Vulkax the CMake project identity"
+          git push origin HEAD:main
