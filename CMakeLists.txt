@@ -11,6 +11,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_library(vulkax_core STATIC
     src/backend/backend.cpp
+    src/backend/probe.cpp
     src/operators/operator_graph.cpp
     src/problem/problem_ir.cpp
     src/problem/validation.cpp
@@ -19,6 +20,27 @@ add_library(vulkax_core STATIC
 
 target_include_directories(vulkax_core PUBLIC include)
 target_compile_features(vulkax_core PUBLIC cxx_std_20)
+
+find_package(Vulkan QUIET)
+if(Vulkan_FOUND)
+    target_sources(vulkax_core PRIVATE src/backend/vulkan_probe.cpp)
+    target_link_libraries(vulkax_core PRIVATE Vulkan::Vulkan)
+    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN=1)
+else()
+    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN=0)
+endif()
+
+if(APPLE)
+    enable_language(OBJCXX)
+    find_library(VULKAX_METAL_FRAMEWORK Metal REQUIRED)
+    find_library(VULKAX_FOUNDATION_FRAMEWORK Foundation REQUIRED)
+    target_sources(vulkax_core PRIVATE src/backend/metal_probe.mm)
+    set_source_files_properties(src/backend/metal_probe.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+    target_link_libraries(vulkax_core PRIVATE ${VULKAX_METAL_FRAMEWORK} ${VULKAX_FOUNDATION_FRAMEWORK})
+    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_METAL=1)
+else()
+    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_METAL=0)
+endif()
 
 if(MSVC)
     target_compile_options(vulkax_core PRIVATE /W4 /permissive-)
