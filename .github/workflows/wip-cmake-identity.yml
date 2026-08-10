@@ -42,4 +42,6 @@ jobs:
           git add CMakeLists.txt cmake/VulkaxApplications.cmake
           git diff --cached --check
           git commit -m "Make Vulkax the CMake project identity"
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
