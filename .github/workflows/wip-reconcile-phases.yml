@@ -1,0 +1,94 @@
+name: WIP Reconcile Vulkax Phases
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/wip-reconcile-phases.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vulkax-reconcile-phases
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Let earlier one-shot pushes settle
+        run: sleep 30
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Refresh exact current main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+      - name: Apply every missing phase in dependency order
+        run: |
+          for script in \
+            scripts/apply_problem_runner_migration.py \
+            scripts/apply_verticals_phase.py \
+            scripts/apply_gpu_dem_phase.py \
+            scripts/apply_opengl_phase.py; do
+            if [ -f "$script" ]; then
+              echo "Applying $script"
+              python "$script"
+            fi
+          done
+      - name: Remove all one-shot migration machinery
+        run: |
+          rm -f \
+            scripts/apply_problem_runner_migration.py \
+            scripts/apply_verticals_phase.py \
+            scripts/apply_gpu_dem_phase.py \
+            scripts/apply_opengl_phase.py \
+            .github/workflows/wip-problem-runner-migration.yml \
+            .github/workflows/wip-verticals-phase.yml \
+            .github/workflows/wip-gpu-dem-phase.yml \
+            .github/workflows/wip-opengl-phase.yml
+      - name: Install native validation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers glslang-tools libgl1-mesa-dev libegl1-mesa-dev
+      - name: Configure reconciled tree
+        run: cmake -S . -B build-reconcile -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build reconciled tree
+        run: cmake --build build-reconcile --parallel 2
+      - name: Test reconciled tree
+        run: ctest --test-dir build-reconcile --output-on-failure
+      - name: Vulkan runtime and compute gate
+        run: |
+          ./build-reconcile/vulkax --require-backend Vulkan
+          ./build-reconcile/vulkax --conformance Vulkan
+      - name: End-to-end problem gates when available
+        run: |
+          if [ -f examples/rotating_mill.vkx ] && ./build-reconcile/vulkax validate examples/rotating_mill.vkx; then
+            ./build-reconcile/vulkax run examples/rotating_mill.vkx --output build-reconcile/mill-run --frames 2 --width 160 --height 120
+            test -s build-reconcile/mill-run/result.json
+          fi
+          if [ -f examples/rubber_inverse.vkx ] && ./build-reconcile/vulkax validate examples/rubber_inverse.vkx; then
+            ./build-reconcile/vulkax run examples/rubber_inverse.vkx --output build-reconcile/rubber-run --frames 1 --width 120 --height 100
+            test -s build-reconcile/rubber-run/result.json
+          fi
+          if [ -f examples/car_aerodynamics.vkx ] && ./build-reconcile/vulkax validate examples/car_aerodynamics.vkx; then
+            ./build-reconcile/vulkax run examples/car_aerodynamics.vkx --output build-reconcile/aero-run --frames 1 --width 120 --height 100
+            test -s build-reconcile/aero-run/result.json
+          fi
+      - name: Remove reconciliation workflow and build output
+        run: |
+          rm -f .github/workflows/wip-reconcile-phases.yml
+          rm -rf build-reconcile
+      - name: Commit tested reconciled phase stack
+        run: |
+          git config user.name "Vulkax Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Reconcile executable verticals, GPU DEM, and OpenGL fallback"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
