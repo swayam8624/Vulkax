@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -26,11 +27,16 @@ struct ResultCertificate {
     std::string backend;
     std::string device;
     double wallSeconds{};
+    std::optional<double> observedOrder;
+    std::optional<double> discretizationRelativeUncertainty;
     std::vector<VerificationCriterion> criteria;
     std::vector<std::string> notes;
 
     [[nodiscard]] bool requiredEvidencePasses() const noexcept;
     void updateTrustState(bool convergenceStudyComplete) noexcept;
+    [[nodiscard]] std::string toJson() const;
 };
+
+[[nodiscard]] const char* toString(TrustState state) noexcept;
 
 } // namespace vulkax::verify
