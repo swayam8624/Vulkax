@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Vulkax VERSION 0.8.0 LANGUAGES CXX)
+project(Vulkax VERSION 0.9.0 LANGUAGES CXX)
 option(VULKAX_BUILD_TESTS "Build Vulkax tests" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -9,7 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_library(vulkax_core STATIC
     src/backend/backend.cpp src/backend/probe.cpp
     src/compiler/expression.cpp src/compute/conformance.cpp
-    src/experiment/design.cpp src/inverse/hyperelastic.cpp
+    src/execution/experiment.cpp src/experiment/design.cpp src/inverse/hyperelastic.cpp
     src/numerics/dense.cpp src/numerics/grid.cpp
     src/operators/operator_graph.cpp src/optimize/optimizer.cpp
     src/planning/solver_plan.cpp src/problem/problem_ir.cpp src/problem/validation.cpp
@@ -67,7 +67,7 @@ target_link_libraries(vulkax PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute visualization planning_fluid fem_dem_scale certificate)
+    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute visualization planning_fluid fem_dem_scale certificate execution)
         add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
         target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
         if(MSVC)
