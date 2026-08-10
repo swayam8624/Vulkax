@@ -1,0 +1,42 @@
+name: Phase 2 Vulkan target migration
+
+on:
+  push:
+    branches:
+      - agent/phase2-build-architecture
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/phase2-build-architecture
+      - name: Replace raw Vulkan library variables in target links
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          paths = [Path("CMakeLists.txt"), Path("cmake/VulkaxShaders.cmake")]
+          total = 0
+          for path in paths:
+              text = path.read_text()
+              count = text.count("${Vulkan_LIBRARIES}")
+              total += count
+              path.write_text(text.replace("${Vulkan_LIBRARIES}", "Vulkan::Vulkan"))
+          if total == 0:
+              raise SystemExit("no Vulkan_LIBRARIES target-link usages found")
+          print(f"migrated {total} Vulkan link references")
+          Path(".github/workflows/phase2-vulkan-targets.yml").unlink()
+          PY
+      - name: Commit target migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Use imported Vulkan target consistently"
+          git push origin HEAD:agent/phase2-build-architecture
