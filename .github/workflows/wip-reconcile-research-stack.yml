@@ -1,0 +1,80 @@
+name: WIP Reconcile Full Research Stack
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/wip-reconcile-research-stack.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vulkax-full-reconcile
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Let earlier phase jobs settle
+        run: sleep 45
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Refresh current main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+      - name: Apply any missing staged phases
+        run: |
+          for script in \
+            scripts/apply_problem_runner_migration.py \
+            scripts/apply_verticals_phase.py \
+            scripts/apply_gpu_dem_phase.py \
+            scripts/apply_opengl_phase.py \
+            scripts/apply_research_phase.py; do
+            if [ -f "$script" ]; then python "$script"; fi
+          done
+      - name: Remove all one-shot machinery
+        run: |
+          rm -f scripts/apply_problem_runner_migration.py scripts/apply_verticals_phase.py scripts/apply_gpu_dem_phase.py scripts/apply_opengl_phase.py scripts/apply_research_phase.py
+          rm -f .github/workflows/wip-problem-runner-migration.yml .github/workflows/wip-verticals-phase.yml .github/workflows/wip-gpu-dem-phase.yml .github/workflows/wip-opengl-phase.yml .github/workflows/wip-research-phase.yml .github/workflows/wip-reconcile-phases.yml
+      - name: Install validation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers glslang-tools libgl1-mesa-dev libegl1-mesa-dev
+      - name: Configure
+        run: cmake -S . -B build-full -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build-full --parallel 2
+      - name: Test complete combined core
+        run: ctest --test-dir build-full --output-on-failure
+      - name: Runtime Vulkan gates
+        run: |
+          ./build-full/vulkax --require-backend Vulkan
+          ./build-full/vulkax --conformance Vulkan
+      - name: End-to-end vertical gates
+        run: |
+          for problem in rotating_mill rubber_inverse car_aerodynamics; do
+            if [ -f "examples/${problem}.vkx" ]; then
+              ./build-full/vulkax validate "examples/${problem}.vkx"
+              ./build-full/vulkax run "examples/${problem}.vkx" --output "build-full/${problem}" --frames 1 --width 100 --height 80
+              test -s "build-full/${problem}/result.json"
+            fi
+          done
+      - name: Clean reconciliation artifacts
+        run: |
+          rm -rf build-full
+          rm -f .github/workflows/wip-reconcile-research-stack.yml
+      - name: Commit tested stack
+        run: |
+          git config user.name "Vulkax Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Reconcile Vulkax computational research stack"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
