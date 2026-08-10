@@ -1,5 +1,6 @@
 #include "vulkax/autodiff/discrete_adjoint.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 
