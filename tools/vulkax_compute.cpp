@@ -159,8 +159,14 @@ int main(int argc, char** argv) {
     pipelineLayoutInfo.setLayoutCount = 1; pipelineLayoutInfo.pSetLayouts = &descriptorLayout;
     VkPipelineLayout pipelineLayout{};
     check(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout), "vkCreatePipelineLayout");
-    const auto code = readFile(std::filesystem::path{ENGINE_DIR} /
-        (generated ? "shaders/vulkax_generated_wave_field.comp.spv" : "shaders/vulkax_wave_field.comp.spv"));
+    const auto shaderPath = generated
+#ifdef VULKAX_GENERATED_WAVE_SPIRV
+        ? std::filesystem::path{VULKAX_GENERATED_WAVE_SPIRV}
+#else
+        ? std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_generated_wave_field.comp.spv"
+#endif
+        : std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_wave_field.comp.spv";
+    const auto code = readFile(shaderPath);
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = code.size(); shaderInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
     VkShaderModule shader{}; check(vkCreateShaderModule(device, &shaderInfo, nullptr, &shader), "vkCreateShaderModule");
