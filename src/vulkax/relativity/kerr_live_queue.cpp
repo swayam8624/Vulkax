@@ -1,4 +1,5 @@
 #include "vulkax/relativity/kerr_live_queue.hpp"
+#include "runtime_paths.hpp"
 
 #include "lve_buffer.hpp"
 #include "lve_device.hpp"
@@ -345,11 +346,11 @@ void KerrLiveQueue::createPipelines() {
   queuePipeline_ = createComputePipeline(
       device_.device(),
       queuePipelineLayout_,
-      std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_active_ray_compaction.comp.spv");
+      lve::resolveRuntimeResource("shaders/vulkax_active_ray_compaction.comp.spv"));
   shadePipeline_ = createComputePipeline(
       device_.device(),
       shadePipelineLayout_,
-      std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_kerr_queue_shade.comp.spv");
+      lve::resolveRuntimeResource("shaders/vulkax_kerr_queue_shade.comp.spv"));
 }
 
 void KerrLiveQueue::record(

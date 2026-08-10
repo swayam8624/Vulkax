@@ -1,9 +1,7 @@
 # Vulkax shader compilation and generated Physics-IR shader targets.
 #
-# Static legacy shaders still emit beside their checked source files because
-# older executables resolve them through ENGINE_DIR. New/generated artifacts
-# must live under CMAKE_BINARY_DIR; migrate legacy paths only alongside the
-# runtime-resource contract that consumes them.
+# All compiled shader artifacts live in the build tree. Runtime binaries consume
+# staged executable-relative resources and never mutate the source checkout.
 
 ############## Build SHADERS #######################
 
@@ -27,11 +25,13 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
   "${PROJECT_SOURCE_DIR}/shaders/*.vert"
 )
 
+set(VULKAX_STATIC_SHADER_DIR "${CMAKE_BINARY_DIR}/generated/static-shaders")
 foreach(GLSL ${GLSL_SOURCE_FILES})
   get_filename_component(FILE_NAME ${GLSL} NAME)
-  set(SPIRV "${PROJECT_SOURCE_DIR}/shaders/${FILE_NAME}.spv")
+  set(SPIRV "${VULKAX_STATIC_SHADER_DIR}/${FILE_NAME}.spv")
   add_custom_command(
     OUTPUT ${SPIRV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${VULKAX_STATIC_SHADER_DIR}
     COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}
     DEPENDS ${GLSL})
   list(APPEND SPIRV_BINARY_FILES ${SPIRV})

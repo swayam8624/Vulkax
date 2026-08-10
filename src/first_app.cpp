@@ -60,15 +60,11 @@ uint64_t fnv1aFile(const std::filesystem::path& path) {
 }
 
 std::string currentGitCommit() {
-  std::ifstream head{std::filesystem::path{ENGINE_DIR} / ".git/HEAD"};
-  std::string value;
-  std::getline(head, value);
-  constexpr const char* prefix = "ref: ";
-  if (value.rfind(prefix, 0) == 0) {
-    std::ifstream ref{std::filesystem::path{ENGINE_DIR} / ".git" / value.substr(5)};
-    std::getline(ref, value);
-  }
-  return value.empty() ? "unknown" : value;
+#ifdef VULKAX_BUILD_GIT_COMMIT
+  return VULKAX_BUILD_GIT_COMMIT;
+#else
+  return "unknown";
+#endif
 }
 
 bool usesSsboLightBuffer(beacon::RenderTechnique technique) {
@@ -761,7 +757,7 @@ void FirstApp::run() {
     manifest << "  \"shaderInt64\": " << (capabilities.shaderInt64 ? "true" : "false") << ",\n";
     manifest << "  \"shaderHashesFnv1a64\": {\n";
     std::vector<std::filesystem::path> shaderFiles;
-    for (const auto& entry : std::filesystem::directory_iterator(std::filesystem::path{ENGINE_DIR} / "shaders")) {
+    for (const auto& entry : std::filesystem::directory_iterator(resolveRuntimeResource("shaders"))) {
       if (entry.path().extension() == ".spv") shaderFiles.push_back(entry.path());
     }
     std::sort(shaderFiles.begin(), shaderFiles.end());
@@ -1585,8 +1581,7 @@ void FirstApp::loadAtlasScene() {
   const std::filesystem::path replayPath =
       config.atlasNavigationReplay.is_absolute()
           ? config.atlasNavigationReplay
-          : std::filesystem::path{ENGINE_DIR} /
-                config.atlasNavigationReplay;
+          : resolveRuntimeResource(config.atlasNavigationReplay);
   if (std::filesystem::exists(replayPath)) {
     vulkax::atlas::ReplayNavigationProvider navigation{replayPath};
     vulkax::atlas::RouteRequest request{};

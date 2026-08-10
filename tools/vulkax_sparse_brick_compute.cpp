@@ -1,4 +1,5 @@
 #include "vulkax/sim/sparse_brick_storage.hpp"
+#include "runtime_paths.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -314,7 +315,7 @@ int main() {
     check(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout),
           "vkCreatePipelineLayout");
     const auto code = readBinary(
-        std::filesystem::path(ENGINE_DIR) / "shaders/vulkax_sparse_brick_diffusion.comp.spv");
+        lve::resolveRuntimeResource("shaders/vulkax_sparse_brick_diffusion.comp.spv"));
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = code.size();
     shaderInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());

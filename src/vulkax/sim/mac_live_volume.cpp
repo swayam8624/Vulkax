@@ -1,4 +1,5 @@
 #include "vulkax/sim/mac_live_volume.hpp"
+#include "runtime_paths.hpp"
 
 #include "lve_buffer.hpp"
 #include "lve_device.hpp"
@@ -294,13 +295,13 @@ void MacLiveVolume::createPipelines() {
         "vkCreatePipelineLayout MAC present");
   solverPipeline_ = createComputePipeline(
       device_.device(), solverPipelineLayout_,
-      std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_mac_projection.comp.spv");
+      lve::resolveRuntimeResource("shaders/vulkax_mac_projection.comp.spv"));
   residencyPipeline_ = createComputePipeline(
       device_.device(), solverPipelineLayout_,
-      std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_sparse_residency.comp.spv");
+      lve::resolveRuntimeResource("shaders/vulkax_sparse_residency.comp.spv"));
   presentPipeline_ = createComputePipeline(
       device_.device(), presentPipelineLayout_,
-      std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_mac_present.comp.spv");
+      lve::resolveRuntimeResource("shaders/vulkax_mac_present.comp.spv"));
 }
 
 void MacLiveVolume::record(VkCommandBuffer commandBuffer, float deltaSeconds) {
