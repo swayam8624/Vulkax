@@ -1,0 +1,10 @@
+#include "vulkax/optimize/optimizer.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+
+namespace vulkax::optimize {
+ScalarOptimum goldenSectionMinimize(const std::function<double(double)>&f,double a,double b,double tol,std::size_t maxIt){if(!(a<b)||tol<=0)throw std::invalid_argument("invalid golden-section bounds");constexpr double invphi=0.6180339887498948482;double c=b-invphi*(b-a),d=a+invphi*(b-a),fc=f(c),fd=f(d);std::size_t evals=2,it=0;for(;it<maxIt&&std::abs(b-a)>tol;++it){if(fc<fd){b=d;d=c;fd=fc;c=b-invphi*(b-a);fc=f(c);++evals;}else{a=c;c=d;fc=fd;d=a+invphi*(b-a);fd=f(d);++evals;}}double x=0.5*(a+b);return{x,f(x),evals+1,std::abs(b-a)<=tol};}
+VectorOptimum projectedGradientMinimize(const std::function<double(const std::vector<double>&)>&f,std::vector<double>x,const std::vector<double>&lo,const std::vector<double>&hi,double h,double tol,std::size_t maxIt){if(x.empty()||x.size()!=lo.size()||x.size()!=hi.size()||h<=0||tol<=0)throw std::invalid_argument("invalid projected-gradient inputs");for(std::size_t i=0;i<x.size();++i){if(lo[i]>hi[i])throw std::invalid_argument("lower bound exceeds upper bound");x[i]=std::clamp(x[i],lo[i],hi[i]);}double fx=f(x);for(std::size_t it=0;it<maxIt;++it){std::vector<double>g(x.size());double gn=0;for(std::size_t i=0;i<x.size();++i){auto xp=x;double step=h*std::max(1.0,std::abs(x[i]));xp[i]=std::clamp(xp[i]+step,lo[i],hi[i]);if(xp[i]==x[i]){xp[i]=std::clamp(xp[i]-2*step,lo[i],hi[i]);step=xp[i]-x[i];}else step=xp[i]-x[i];g[i]=std::abs(step)>1e-20?(f(xp)-fx)/step:0;gn+=g[i]*g[i];}gn=std::sqrt(gn);if(gn<=tol)return{x,fx,it,true};double alpha=1.0;std::vector<double>candidate=x;double candidateValue=fx;bool accepted=false;while(alpha>1e-10){for(std::size_t i=0;i<x.size();++i)candidate[i]=std::clamp(x[i]-alpha*g[i],lo[i],hi[i]);candidateValue=f(candidate);if(candidateValue<fx){accepted=true;break;}alpha*=0.5;}if(!accepted)return{x,fx,it,false};double move=0;for(std::size_t i=0;i<x.size();++i)move=std::max(move,std::abs(candidate[i]-x[i]));x=candidate;fx=candidateValue;if(move<=tol)return{x,fx,it+1,true};}return{x,fx,maxIt,false};}
+} // namespace vulkax::optimize
