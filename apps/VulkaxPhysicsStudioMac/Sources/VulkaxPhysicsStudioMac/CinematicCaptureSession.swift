@@ -9,6 +9,14 @@ struct CinematicCaptureTarget {
     let frameIndex: Int
 }
 
+struct CinematicCaptureRequest {
+    let revision: UInt64
+    let outputURL: URL
+    let settings: CinematicCaptureSettings
+    let camera: StudioCamera
+    let timelineSeconds: Float
+}
+
 enum CinematicCaptureError: LocalizedError {
     case writerCreation(String)
     case writerInputRejected
