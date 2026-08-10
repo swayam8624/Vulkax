@@ -14,7 +14,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build g++ libglfw3-dev libglm-dev \
             nlohmann-json3-dev libsqlite3-dev libvulkan-dev vulkan-tools mesa-vulkan-drivers \
-            libcurl4-openssl-dev glslang-tools xvfb pkg-config libopenexr-dev \
+            vulkan-validationlayers libcurl4-openssl-dev glslang-tools xvfb pkg-config libopenexr-dev \
             qt6-base-dev qt6-declarative-dev qml6-module-qtquick \
             qml6-module-qtquick-controls qml6-module-qtquick-layouts \
             qml6-module-qtquick-templates qml6-module-qtquick-window \
@@ -25,6 +25,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DBUILD_TESTING=ON
           -DVULKAX_REQUIRE_PHYSICS_STUDIO=ON
+          -DVULKAX_DIRECT_VULKAN_VALIDATION=ON
       - name: Build
         run: cmake --build build
       - name: Test
@@ -65,6 +66,25 @@ jobs:
           echo "Lavapipe manifest: $LVP_ICD"
       - name: Verify Vulkan software device
         run: vulkaninfo --summary
+      - name: Direct Physics Studio Vulkan validation
+        run: |
+          set -o pipefail
+          : > /tmp/vulkax-direct-validation.log
+          for mode in wave black-hole kerr volume; do
+            case "$mode" in
+              wave) args="" ;;
+              black-hole) args="--black-hole" ;;
+              kerr) args="--kerr --spin 0.72" ;;
+              volume) args="--volume" ;;
+            esac
+            echo "=== direct Vulkan $mode ===" | tee -a /tmp/vulkax-direct-validation.log
+            xvfb-run -a build/vulkax-physics-vulkan-direct --smoke --frames 2 $args \
+              2>&1 | tee -a /tmp/vulkax-direct-validation.log
+          done
+          if grep -E 'Validation Error|VUID-' /tmp/vulkax-direct-validation.log; then
+            echo "Vulkan validation errors were reported by the direct Physics Studio path" >&2
+            exit 1
+          fi
       - name: Relocated runtime resource smoke
         run: |
           test -f build/resources/shaders/vulkax_wave_field.comp.spv
@@ -92,6 +112,7 @@ jobs:
           path: |
             /tmp/geobeacon-ci
             /tmp/atlas-ci
+            /tmp/vulkax-direct-validation.log
 
   macos-native-metal:
     runs-on: macos-15
@@ -131,3 +152,49 @@ jobs:
       - name: Native dynamic equation project smoke
         working-directory: apps/VulkaxPhysicsStudioMac
         run: .build/release/VulkaxPhysicsStudioMac --native-dynamic-equation-project-gpu-smoke
+
+  windows-ucrt64:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-vulkan-headers
+            mingw-w64-ucrt-x86_64-vulkan-loader
+            mingw-w64-ucrt-x86_64-glslang
+            mingw-w64-ucrt-x86_64-glfw
+            mingw-w64-ucrt-x86_64-glm
+            mingw-w64-ucrt-x86_64-nlohmann-json
+            mingw-w64-ucrt-x86_64-sqlite3
+            mingw-w64-ucrt-x86_64-curl
+            mingw-w64-ucrt-x86_64-openexr
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-declarative
+      - name: Configure Windows product
+        run: >-
+          cmake -S . -B build-windows -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+          -DVULKAX_REQUIRE_PHYSICS_STUDIO=ON
+      - name: Build Windows product and tests
+        run: cmake --build build-windows
+      - name: Run portable numerical and contract tests
+        run: >-
+          ctest --test-dir build-windows --output-on-failure
+          -R '^(beacon_core|equation_core|equation_glsl|physics_ir|medium_inference|runtime_contract|simulation_graph|particle_gravity|buoyant_smoke|fluid_rigid_coupling|sparse_brick_storage|schwarzschild_lensing|kerr_geodesic|schwarzschild_thin_disk|quality_controller|atlas_core)$'
+      - name: Run Qt offscreen Studio smoke
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+        run: './build-windows/Vulkax\ Physics\ Studio.exe --smoke'
