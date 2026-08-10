@@ -140,6 +140,30 @@ int main() {
     }
     assert(rejectedImportedUpload);
 
+    // Multiple compatible reflected buffers should share one Vulkan device-memory
+    // block while retaining independent aligned offsets and CPU mapping behavior.
+    VulkanResourcePlan pooledPlan{};
+    pooledPlan.bindings.resize(3);
+    for (uint32_t index = 0; index < pooledPlan.bindings.size(); ++index) {
+      pooledPlan.bindings[index].binding = index;
+      pooledPlan.bindings[index].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      pooledPlan.bindings[index].bufferBytes = 64 + index * 64;
+      pooledPlan.bindings[index].memoryProperties = hostVisible;
+    }
+    auto pooledArena =
+        std::make_unique<VulkanResourceArena>(physical, device, std::move(pooledPlan));
+    const VulkanMemoryArenaStats pooledStats = pooledArena->memoryStats();
+    assert(pooledStats.suballocationCount == 3);
+    assert(pooledStats.blockCount == 1);
+    assert(pooledStats.reservedBytes >= pooledStats.resourceBytes);
+    const std::array<std::byte, 8> pooledUpload{
+        std::byte{0x11}, std::byte{0x22}, std::byte{0x33}, std::byte{0x44},
+        std::byte{0x55}, std::byte{0x66}, std::byte{0x77}, std::byte{0x7f}};
+    pooledArena->uploadBuffer(1, pooledUpload);
+    std::array<std::byte, pooledUpload.size()> pooledDownload{};
+    pooledArena->downloadBuffer(1, pooledDownload);
+    assert(pooledDownload == pooledUpload);
+
     PhysicsModel model{};
     model.name = "reflected-resource-runtime";
     model.domain.resolution = {8, 6, 4};
@@ -213,12 +237,15 @@ int main() {
     std::cout << "reflected Vulkan resources device=" << properties.deviceName
               << " bindings=" << layout.resources.size()
               << " history=" << stateResource->historyLength
-              << " image_barriers=" << second.imageBarriers << '\n';
+              << " image_barriers=" << second.imageBarriers
+              << " memory_blocks=" << arena->memoryStats().blockCount
+              << " suballocations=" << arena->memoryStats().suballocationCount << '\n';
 
     vkDestroyFence(device, fence, nullptr);
     vkDestroyCommandPool(device, commandPool, nullptr);
     vkDeviceWaitIdle(device);
     arena.reset();
+    pooledArena.reset();
     sharedView.reset();
     sharedOwner.reset();
     vkDestroyDevice(device, nullptr);
