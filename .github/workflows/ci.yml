@@ -65,6 +65,15 @@ jobs:
           echo "Lavapipe manifest: $LVP_ICD"
       - name: Verify Vulkan software device
         run: vulkaninfo --summary
+      - name: Relocated runtime resource smoke
+        run: |
+          test -f build/resources/shaders/vulkax_wave_field.comp.spv
+          rm -rf /tmp/vulkax-relocated
+          mkdir -p /tmp/vulkax-relocated
+          cp build/vulkax-compute /tmp/vulkax-relocated/
+          cp -R build/resources /tmp/vulkax-relocated/resources
+          (cd /tmp && /tmp/vulkax-relocated/vulkax-compute \
+            --width 16 --height 9 --output /tmp/vulkax-relocated-wave)
       - name: Vulkan software smoke test
         run: |
           xvfb-run -a build/LveEngine --geo --geo-policy fixed-lod1 \
