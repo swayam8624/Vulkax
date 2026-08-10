@@ -1,6 +1,11 @@
 # Vulkax application entrypoints, direct presentation targets and platform packaging.
 # Included after core/research targets and shader targets are defined.
 
+option(
+  VULKAX_DIRECT_VULKAN_VALIDATION
+  "Enable Vulkan validation layers for the direct Physics Studio presenter even in Release builds"
+  OFF)
+
 # A deliberately small direct Vulkan presentation target. It shares the
 # established swapchain implementation with the legacy renderer, but owns no
 # Qt surface or CPU image bridge. This is the portable reference path for the
@@ -25,6 +30,9 @@ target_include_directories(
   ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/include ${TINYOBJ_PATH})
 target_link_libraries(
   VulkaxPhysicsVulkanDirect PRIVATE glfw vulkax_relativity vulkax_sim vulkax_runtime_paths Vulkan::Vulkan)
+if (VULKAX_DIRECT_VULKAN_VALIDATION)
+  target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE VULKAX_FORCE_VALIDATION_LAYERS=1)
+endif()
 if (TARGET PkgConfig::OPENEXR)
   target_link_libraries(VulkaxPhysicsVulkanDirect PRIVATE PkgConfig::OPENEXR)
   target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE VULKAX_HAS_OPENEXR=1)
