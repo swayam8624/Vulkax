@@ -111,8 +111,8 @@ struct ImportedObstacleMesh {
             upper = simd_max(upper, position)
         }
         let extent = upper - lower
-        let scale = 0.28 / max(extent.x, max(extent.y, extent.z), 1e-6)
-        let centre = 0.5 * (lower + upper)
+        let scale = Float(0.28) / max(extent.x, max(extent.y, extent.z), Float(1e-6))
+        let centre = Float(0.5) * (lower + upper)
         let normalized = positions.map { SIMD4<Float>(($0 - centre) * scale, 0) }
         return ImportedObstacleMesh(vertices: normalized, indices: triangles, diagnostics: diagnostics)
     }
@@ -122,14 +122,15 @@ struct ImportedObstacleMesh {
     // retaining the original mesh as the visual asset.
     static func boxProxy(for visualMesh: ImportedObstacleMesh) -> ImportedObstacleMesh {
         guard let first = visualMesh.vertices.first else { return fixedBoxProxy() }
-        var lower = first.xyz
-        var upper = first.xyz
+        var lower = SIMD3<Float>(first.x, first.y, first.z)
+        var upper = lower
         for vertex in visualMesh.vertices {
-            lower = simd_min(lower, vertex.xyz)
-            upper = simd_max(upper, vertex.xyz)
+            let position = SIMD3<Float>(vertex.x, vertex.y, vertex.z)
+            lower = simd_min(lower, position)
+            upper = simd_max(upper, position)
         }
-        let centre = 0.5 * (lower + upper)
-        let halfExtent = simd_max(0.5 * (upper - lower), SIMD3<Float>(repeating: 0.006))
+        let centre = Float(0.5) * (lower + upper)
+        let halfExtent = simd_max(Float(0.5) * (upper - lower), SIMD3<Float>(repeating: 0.006))
         lower = centre - halfExtent
         upper = centre + halfExtent
         let vertices: [SIMD4<Float>] = [
