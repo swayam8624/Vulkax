@@ -1,0 +1,57 @@
+name: Phase 2 module extraction
+
+on:
+  push:
+    branches:
+      - agent/phase2-build-architecture
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/phase2-build-architecture
+      - name: Extract application packaging and test registry
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("CMakeLists.txt")
+          text = root.read_text()
+          app_marker = "# A deliberately small direct Vulkan presentation target. It shares the\n"
+          test_marker = "include(CTest)\n"
+          app_start = text.index(app_marker)
+          test_start = text.index(test_marker, app_start)
+
+          applications = text[app_start:test_start].rstrip() + "\n"
+          tests = text[test_start:].rstrip() + "\n"
+
+          Path("cmake/VulkaxApplications.cmake").write_text(
+              "# Vulkax application entrypoints, direct presentation targets and platform packaging.\n"
+              "# Included after core/research targets and shader targets are defined.\n\n" + applications
+          )
+          Path("cmake/VulkaxTests.cmake").write_text(
+              "# Vulkax CTest registry and validation targets.\n"
+              "# Included after all runtime/application targets are available.\n\n" + tests
+          )
+
+          root.write_text(
+              text[:app_start]
+              + "include(cmake/VulkaxApplications.cmake)\n"
+              + "include(cmake/VulkaxTests.cmake)\n"
+          )
+          Path(".github/workflows/phase2-module-extraction.yml").unlink()
+          PY
+      - name: Commit module extraction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Extract application and test CMake modules"
+          git push origin HEAD:agent/phase2-build-architecture
