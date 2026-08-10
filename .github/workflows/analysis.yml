@@ -81,3 +81,42 @@ jobs:
             src/vulkax/sim/simulation_graph.cpp \
             src/vulkax/sim/buoyant_smoke.cpp \
             src/vulkax/sim/fluid_rigid_coupling.cpp
+
+  vulkan-validation-stress:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Vulkan validation runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ libglfw3-dev libglm-dev \
+            nlohmann-json3-dev libsqlite3-dev libvulkan-dev vulkan-tools mesa-vulkan-drivers \
+            vulkan-validationlayers libcurl4-openssl-dev glslang-tools xvfb pkg-config libopenexr-dev
+      - name: Configure Debug Vulkan build
+        run: >-
+          cmake -S . -B build-validation -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DBUILD_TESTING=OFF
+          -DVULKAX_BUILD_PHYSICS_STUDIO=OFF
+      - name: Build legacy/direct Vulkan surface
+        run: cmake --build build-validation --target LveEngine
+      - name: Resolve Lavapipe driver
+        run: |
+          LVP_ICD="$(find /usr/share/vulkan/icd.d /etc/vulkan/icd.d \
+            -type f -name 'lvp_icd*.json' -print -quit 2>/dev/null)"
+          test -n "$LVP_ICD"
+          echo "VK_DRIVER_FILES=$LVP_ICD" >> "$GITHUB_ENV"
+      - name: Verify validation layer availability
+        run: |
+          vulkaninfo --summary
+          vulkaninfo 2>&1 | grep -q 'VK_LAYER_KHRONOS_validation'
+      - name: Run validation-layer stress smoke
+        run: |
+          set -o pipefail
+          xvfb-run -a build-validation/LveEngine --geo --geo-policy fixed-lod1 \
+            --lights 10 --width 160 --height 90 --warmup-frames 5 --frames 120 --quiet \
+            2> >(tee /tmp/vulkax-validation.stderr >&2)
+          if grep -E 'Validation Error|VUID-[A-Za-z0-9_-]+' /tmp/vulkax-validation.stderr; then
+            echo 'Vulkan validation diagnostics detected' >&2
+            exit 1
+          fi
