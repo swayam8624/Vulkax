@@ -45,10 +45,11 @@ const char* functionName(ScalarOpcode opcode) {
 std::string expression(
     const ScalarInstruction& instruction,
     const std::vector<std::string>& parameterNames,
+    const std::string& registerPrefix,
     const std::string& parameterPrefix,
     const std::string& timeName) {
   const auto reg = [&](uint8_t index) {
-    return "r" + std::to_string(instruction.operands[index]);
+    return registerPrefix + std::to_string(instruction.operands[index]);
   };
   switch (instruction.opcode) {
     case ScalarOpcode::Constant: return number(instruction.immediate);
@@ -82,18 +83,38 @@ uint32_t componentCount(ValueType type) {
   return 0;
 }
 
-void emitComponentBody(
+void emitComponent(
     std::ostringstream& shader,
     const ScalarComputeProgram& component,
+    size_t componentIndex,
     const std::string& parameterPrefix,
     const std::string& timeName,
     const std::string& indentation) {
+  const std::string prefix = "c" + std::to_string(componentIndex) + "r";
   for (size_t index = 0; index < component.instructions.size(); ++index) {
-    shader << indentation << "float r" << index << " = "
-           << expression(component.instructions[index], component.parameterNames,
-                         parameterPrefix, timeName)
+    shader << indentation << "float " << prefix << index << " = "
+           << expression(
+                  component.instructions[index], component.parameterNames,
+                  prefix, parameterPrefix, timeName)
            << ";\n";
   }
+}
+
+std::string outputConstructor(
+    const VectorComputeProgram& program,
+    const char* vectorType) {
+  std::string result = std::string{vectorType} + "(";
+  for (size_t component = 0; component < 3; ++component) {
+    if (component != 0) result += ", ";
+    if (component < program.components.size()) {
+      result += "c" + std::to_string(component) + "r" +
+                std::to_string(program.components[component].outputRegister);
+    } else {
+      result += "0.0";
+    }
+  }
+  result += ", 0.0)";
+  return result;
 }
 
 }  // namespace
@@ -182,32 +203,10 @@ std::string emitVectorProgramGlsl(const VectorComputeProgram& program) {
          << number(first.domain.maximum[1]) << ", uv.y);\n"
          << "  float z = " << number(0.5 * (first.domain.minimum[2] + first.domain.maximum[2])) << ";\n";
   for (size_t component = 0; component < program.components.size(); ++component) {
-    shader << "  {\n";
-    emitComponentBody(shader, program.components[component], "parameters.", "parameters.t", "    ");
-    shader << "    float component" << component << " = r"
-           << program.components[component].outputRegister << ";\n  }\n";
+    emitComponent(shader, program.components[component], component, "parameters.", "parameters.t", "  ");
   }
-  // Component blocks above intentionally scope registers, but component values
-  // need persistent names. Emit a second compact evaluation without scopes so
-  // GLSL remains straightforward and deterministic.
-  for (size_t component = 0; component < program.components.size(); ++component) {
-    const auto& scalar = program.components[component];
-    for (size_t index = 0; index < scalar.instructions.size(); ++index) {
-      shader << "  float c" << component << "r" << index << " = "
-             << expression(scalar.instructions[index], scalar.parameterNames,
-                           "parameters.", "parameters.t");
-      // Re-map register tokens to this component namespace.
-      std::string line = shader.str();
-      shader.seekp(0, std::ios_base::end);
-      static_cast<void>(line);
-      shader << ";\n";
-    }
-  }
-  // The namespace remap above cannot be expressed through the shared helper;
-  // build final component expressions via tiny local lambdas below instead.
-  // This emitter is validated by source-compilation tests before GPU adoption.
   shader << "  uint index = pixel.y * parameters.width + pixel.x;\n"
-            "  outputField.values[index] = vec4(0.0);\n"
+         << "  outputField.values[index] = " << outputConstructor(program, "vec4") << ";\n"
             "}\n"
          << "// vector Physics IR hash: " << program.canonicalHash << "\n";
   return shader.str();
@@ -215,15 +214,30 @@ std::string emitVectorProgramGlsl(const VectorComputeProgram& program) {
 
 std::string emitVectorProgramMsl(const VectorComputeProgram& program) {
   if (program.components.empty()) throw std::invalid_argument("vector compute program has no components");
-  // The first vector IR release makes the CPU/canonical lowering executable
-  // and preserves a backend contract. Native backend emission is deliberately
-  // explicit about its current foundation status rather than fabricating a
-  // partially-correct shader.
+  const auto& first = program.components.front();
   std::ostringstream shader;
-  shader << "// Vulkax vector compute IR\n"
-         << "// components: " << program.components.size() << "\n"
-         << "// canonical hash: " << program.canonicalHash << "\n"
-         << "// Metal vector storage emission is enabled in the next lowering stage.\n";
+  shader << "#include <metal_stdlib>\nusing namespace metal;\n"
+            "struct Parameters { uint width; uint height; float t; float _padding;\n";
+  for (const auto& name : first.parameterNames) shader << "  float " << name << ";\n";
+  shader << "};\n"
+            "kernel void vectorField(\n"
+            "    device float4* outputField [[buffer(0)]],\n"
+            "    constant Parameters& parameters [[buffer(1)]],\n"
+            "    uint2 pixel [[thread_position_in_grid]]) {\n"
+            "  if (pixel.x >= parameters.width || pixel.y >= parameters.height) return;\n"
+            "  float2 uv = (float2(pixel) + 0.5f) / float2(parameters.width, parameters.height);\n"
+         << "  float x = mix(float(" << number(first.domain.minimum[0]) << "), float("
+         << number(first.domain.maximum[0]) << "), uv.x);\n"
+         << "  float y = mix(float(" << number(first.domain.minimum[1]) << "), float("
+         << number(first.domain.maximum[1]) << "), uv.y);\n"
+         << "  float z = float(" << number(0.5 * (first.domain.minimum[2] + first.domain.maximum[2])) << ");\n";
+  for (size_t component = 0; component < program.components.size(); ++component) {
+    emitComponent(shader, program.components[component], component, "parameters.", "parameters.t", "  ");
+  }
+  shader << "  uint index = pixel.y * parameters.width + pixel.x;\n"
+         << "  outputField[index] = " << outputConstructor(program, "float4") << ";\n"
+            "}\n"
+         << "// vector Physics IR hash: " << program.canonicalHash << "\n";
   return shader.str();
 }
 
