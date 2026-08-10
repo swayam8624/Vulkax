@@ -16,9 +16,28 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
       - name: Build
-        run: cmake --build build --parallel
+        shell: bash
+        run: |
+          set +e
+          cmake --build build --parallel 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        shell: bash
+        run: |
+          set +e
+          ctest --test-dir build --output-on-failure 2>&1 | tee test.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-failure-diagnostics
+          path: |
+            build.log
+            test.log
+          if-no-files-found: ignore
       - name: Runtime Vulkan discovery
         run: ./build/vulkax --require-backend Vulkan
       - name: Vulkan compute conformance
