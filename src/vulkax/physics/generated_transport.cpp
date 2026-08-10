@@ -1,6 +1,7 @@
 #include "vulkax/physics/generated_transport.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <limits>
 
