@@ -12,6 +12,7 @@ This ledger separates implemented foundations from future scale claims.
 - structured scalar/vector/tensor fields and differential operators;
 - CG, RK4, Newton and CFL numerical primitives;
 - CPU/reference DEM with spatial hashing, nonlinear normal contact, damping, Coulomb-limited tangential friction and rotating cylindrical boundaries;
+- Vulkan DEM step with atomic uniform-grid binning, bounded 27-cell neighbor search, read-only input/write-only output integration and explicit bin-capacity overflow reporting;
 - tetrahedral compressible Neo-Hookean FEM reference dynamics and synthetic uniaxial material calibration;
 - 2D staggered-MAC incompressible pressure projection and scalar advection reference;
 - ProblemIR-driven solver-family planning with explicit verification evidence;
@@ -26,4 +27,4 @@ This ledger separates implemented foundations from future scale claims.
 
 ## Not yet claimed
 
-The reference implementations above are correctness substrates, not production-scale solvers. Vulkax Next does not yet claim million-particle GPU DEM, production CFD turbulence/aerodynamics, implicit production FEM, differentiable inverse mechanics, a complete PDE adjoint system, adaptive mesh refinement, or a finished interactive Vulkan scientific renderer. Those require dedicated GPU algorithms, convergence studies and benchmark evidence before they move into the implemented section.
+The current Vulkan DEM path establishes the scalable spatial-hash/contact architecture but still uses host-visible coherent buffers and recompiles its two test kernels per invocation; it is not yet a production persistent/device-local million-particle runtime. Vulkax Next also does not yet claim production CFD turbulence/aerodynamics, implicit production FEM, differentiable inverse mechanics, a complete PDE adjoint system, adaptive mesh refinement, or a finished interactive Vulkan scientific renderer. Those require dedicated performance work, convergence studies and benchmark evidence before they move into the implemented section.

@@ -23,6 +23,8 @@ jobs:
         run: ./build/vulkax --require-backend Vulkan
       - name: Vulkan ComputeIR conformance
         run: ./build/vulkax_compute_tests Vulkan
+      - name: Vulkan spatial-hash DEM
+        run: ./build/vulkax_gpu_physics_tests Vulkan
 
   macos:
     runs-on: macos-15

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(VulkaxNext VERSION 0.4.0 LANGUAGES CXX)
+project(VulkaxNext VERSION 0.5.0 LANGUAGES CXX)
 option(VULKAX_BUILD_TESTS "Build Vulkax core tests" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,6 +20,7 @@ add_library(vulkax_core STATIC
     src/optimize/optimizer.cpp
     src/physics/cfd.cpp
     src/physics/dem.cpp
+    src/physics/dem_gpu.cpp
     src/physics/fem.cpp
     src/planner/solver_plan.cpp
     src/problem/problem_ir.cpp
@@ -44,10 +45,10 @@ else()
     target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN=0)
 endif()
 if(Vulkan_FOUND AND VULKAX_GLSLANG_VALIDATOR)
-    target_sources(vulkax_core PRIVATE src/compute/vulkan_runtime.cpp)
-    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_RUNTIME=1 VULKAX_GLSLANG_VALIDATOR_PATH="${VULKAX_GLSLANG_VALIDATOR}")
+    target_sources(vulkax_core PRIVATE src/compute/vulkan_runtime.cpp src/physics/dem_vulkan.cpp)
+    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_RUNTIME=1 VULKAX_HAS_VULKAN_DEM=1 VULKAX_GLSLANG_VALIDATOR_PATH="${VULKAX_GLSLANG_VALIDATOR}")
 else()
-    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_RUNTIME=0)
+    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_RUNTIME=0 VULKAX_HAS_VULKAN_DEM=0)
 endif()
 
 if(APPLE)
@@ -74,7 +75,7 @@ target_link_libraries(vulkax PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-    foreach(test_name IN ITEMS core foundation compute physics research workflow)
+    foreach(test_name IN ITEMS core foundation compute physics research workflow gpu_physics)
         add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
         target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
         if(MSVC)
