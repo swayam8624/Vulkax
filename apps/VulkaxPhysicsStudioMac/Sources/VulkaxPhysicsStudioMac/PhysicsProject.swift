@@ -1,28 +1,16 @@
 import Foundation
 import simd
 
-enum VisualizerMode: String, CaseIterable, Identifiable, Codable {
-    case wave
-    case schwarzschild
-    case volumeSmoke = "volume-smoke"
-
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .wave: return "Wave Field"
-        case .schwarzschild: return "Schwarzschild Lens"
-        case .volumeSmoke: return "3D MAC Smoke"
-        }
-    }
-}
-
 struct ScalarPresetParameter: Identifiable, Hashable, Codable {
     var id: String { name }
     var name: String
     var value: Float
     var minimum: Float
     var maximum: Float
+    var units: String = ""
 }
+
+typealias LiveParameter = ScalarPresetParameter
 
 struct ScalarPreset: Identifiable, Hashable, Codable {
     var id: String

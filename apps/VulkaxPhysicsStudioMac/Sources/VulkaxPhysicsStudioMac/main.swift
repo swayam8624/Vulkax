@@ -5,7 +5,7 @@ import Darwin
 import VulkaxRuntimeContract
 import UniformTypeIdentifiers
 
-enum VisualizerMode: Float, CaseIterable, Identifiable {
+enum VisualizerMode: Float, CaseIterable, Identifiable, Codable {
     case wave = 0
     case schwarzschild = 1
     case volumeSmoke = 2
@@ -192,7 +192,7 @@ final class PhysicsModel: ObservableObject {
             let preset = ScalarPreset.builtins.first(where: { $0.id == scalarPresetId })
             let defaults = Dictionary(uniqueKeysWithValues: (preset?.parameters ?? []).map { ($0.name, $0) })
             liveParameters = compiled.parameterNames.map { name in
-                old[name] ?? defaults[name] ?? LiveParameter(
+                old[name] ?? defaults[name] ?? ScalarPresetParameter(
                     name: name, value: 1, minimum: -10, maximum: 10, units: "scalar")
             }
             compiledMetalSource = compiled.metalSource
@@ -2966,9 +2966,9 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         defer { if !submitted { inFlightFrames.signal() } }
         synchronizeCaptureRequest(device: device, model: model)
         let activeCapture = captureSession?.shouldEncodeMoreFrames == true ? captureSession : nil
-        let isRelativity = model.executionGraph.contains("integrate_active_rays")
-        let isVolume = model.executionGraph.contains("volume_transport")
-        let isScalar = model.executionGraph.contains("evaluate_scalar_field")
+        let isRelativity = model.mode == .schwarzschild
+        let isVolume = model.mode == .volumeSmoke
+        let isScalar = model.mode == .wave
         let renderScale: CGFloat = activeCapture == nil && isRelativity ? 0.55 : 1.0
         let renderSize = activeCapture.map { CGSize(width: $0.width, height: $0.height) } ?? view.drawableSize
         guard let radiance = ensureHdrRadiance(renderSize, scale: renderScale, device: device) else { return }
