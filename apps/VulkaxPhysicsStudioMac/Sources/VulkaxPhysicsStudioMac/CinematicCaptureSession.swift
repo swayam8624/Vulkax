@@ -50,7 +50,7 @@ final class CinematicCaptureSession {
     private var finishing = false
     private var completed = false
 
-    init(outputURL: URL, settings: CinematicCaptureSettings) throws {
+    init(outputURL: URL, settings: CinematicCaptureSettings, device: MTLDevice) throws {
         self.outputURL = outputURL
         self.settings = settings
         let dimensions = settings.resolution.dimensions
@@ -93,7 +93,7 @@ final class CinematicCaptureSession {
             ])
 
         var cache: CVMetalTextureCache?
-        let cacheStatus = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, MTLCreateSystemDefaultDevice()!, nil, &cache)
+        let cacheStatus = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
         guard cacheStatus == kCVReturnSuccess else {
             throw CinematicCaptureError.metalTextureCache(cacheStatus)
         }
@@ -131,15 +131,8 @@ final class CinematicCaptureSession {
         guard let textureCache else { throw CinematicCaptureError.metalTextureUnavailable }
         var wrappedTexture: CVMetalTexture?
         let textureStatus = CVMetalTextureCacheCreateTextureFromImage(
-            kCFAllocatorDefault,
-            textureCache,
-            buffer,
-            nil,
-            .bgra8Unorm,
-            width,
-            height,
-            0,
-            &wrappedTexture)
+            kCFAllocatorDefault, textureCache, buffer, nil, .bgra8Unorm,
+            width, height, 0, &wrappedTexture)
         guard textureStatus == kCVReturnSuccess else {
             throw CinematicCaptureError.metalTextureCache(textureStatus)
         }
@@ -159,9 +152,11 @@ final class CinematicCaptureSession {
                 "out-of-order frame \(target.frameIndex), expected \(appendedFrames)")
         }
         guard input.isReadyForMoreMediaData else { throw CinematicCaptureError.encoderBackpressure }
-        let presentationTime = CMTime(value: CMTimeValue(target.frameIndex), timescale: CMTimeScale(frameRate))
+        let presentationTime = CMTime(
+            value: CMTimeValue(target.frameIndex), timescale: CMTimeScale(frameRate))
         guard adaptor.append(target.pixelBuffer, withPresentationTime: presentationTime) else {
-            throw CinematicCaptureError.appendFailed(writer.error?.localizedDescription ?? "AVAssetWriter append returned false")
+            throw CinematicCaptureError.appendFailed(
+                writer.error?.localizedDescription ?? "AVAssetWriter append returned false")
         }
         appendedFrames += 1
         return appendedFrames >= targetFrameCount
@@ -198,7 +193,7 @@ func runCinematicCaptureWriterSmoke() -> Bool {
     settings.frameRate = .fps24
     settings.durationSeconds = 2.0 / 24.0
     do {
-        let capture = try CinematicCaptureSession(outputURL: url, settings: settings)
+        let capture = try CinematicCaptureSession(outputURL: url, settings: settings, device: device)
         for _ in 0..<2 {
             let target = try capture.makeTarget(device: device)
             CVPixelBufferLockBaseAddress(target.pixelBuffer, [])
@@ -223,7 +218,8 @@ func runCinematicCaptureWriterSmoke() -> Bool {
         }
         let size = track.naturalSize
         guard Int(abs(size.width)) == 3840, Int(abs(size.height)) == 2160 else {
-            throw CinematicCaptureError.appendFailed("expected 3840x2160, got \(size.width)x\(size.height)")
+            throw CinematicCaptureError.appendFailed(
+                "expected 3840x2160, got \(size.width)x\(size.height)")
         }
         try? FileManager.default.removeItem(at: url)
         print("Vulkax cinematic capture smoke passed: 3840x2160 HEVC .mov")
