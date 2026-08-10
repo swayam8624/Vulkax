@@ -146,6 +146,15 @@ jobs:
           .build/release/VulkaxPhysicsStudioMac
           --native-scene-mesh-gpu-smoke
           ../../tests/fixtures/airflow_cube.obj
+      - name: Native glTF PBR scene smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: >-
+          .build/release/VulkaxPhysicsStudioMac
+          --native-scene-mesh-gpu-smoke
+          ../../tests/fixtures/triangle_pbr.gltf
+      - name: Native camera director smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-camera-track-smoke
       - name: Native 4K cinematic capture smoke
         working-directory: apps/VulkaxPhysicsStudioMac
         run: .build/release/VulkaxPhysicsStudioMac --native-cinematic-capture-smoke
