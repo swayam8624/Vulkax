@@ -9,10 +9,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Install Vulkan runtime
+      - name: Install Vulkan runtime and shader compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers glslang-tools
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
       - name: Build
@@ -21,6 +21,8 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Runtime Vulkan discovery
         run: ./build/vulkax --require-backend Vulkan
+      - name: Vulkan compute conformance
+        run: ./build/vulkax --conformance Vulkan
 
   macos:
     runs-on: macos-15
@@ -34,6 +36,8 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Runtime Metal discovery
         run: ./build/vulkax --require-backend Metal
+      - name: Metal compute conformance
+        run: ./build/vulkax --conformance Metal
 
   windows:
     runs-on: windows-2025
