@@ -35,7 +35,6 @@ else()
 endif()
 message(STATUS "Using Vulkan libraries: ${Vulkan_LIBRARIES}")
 
-
 # 2. Set GLFW_PATH in .env.cmake to target specific glfw
 if (DEFINED GLFW_PATH)
   message(STATUS "Using GLFW path specified in .env")
@@ -52,14 +51,12 @@ else()
   message(STATUS "Found GLFW")
 endif()
 if (NOT GLFW_LIB)
-	message(FATAL_ERROR "Could not find glfw library!")
+  message(FATAL_ERROR "Could not find glfw library!")
 else()
-	message(STATUS "Using glfw lib at: ${GLFW_LIB}")
+  message(STATUS "Using glfw lib at: ${GLFW_LIB}")
 endif()
 
-include_directories(external)
-
-# If TINYOBJ_PATH not specified in .env.cmake, try fetching from git repo
+# If TINYOBJ_PATH not specified in .env.cmake, use the checked dependency.
 if (NOT TINYOBJ_PATH)
   message(STATUS "TINYOBJ_PATH not specified in .env.cmake, using external/tinyobjloader")
   set(TINYOBJ_PATH external/tinyobjloader)
