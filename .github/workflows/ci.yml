@@ -83,3 +83,33 @@ jobs:
           path: |
             /tmp/geobeacon-ci
             /tmp/atlas-ci
+
+  macos-native-metal:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Build native Physics Studio
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: swift build -c release
+      - name: Native Metal scalar smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-gpu-smoke
+      - name: Native Metal black-hole smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-black-hole-gpu-smoke
+      - name: Native Metal volume smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-volume-gpu-smoke
+      - name: Native Metal imported-mesh smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: >-
+          .build/release/VulkaxPhysicsStudioMac
+          --native-imported-mesh-gpu-smoke
+          ../../tests/fixtures/airflow_cube.obj
+      - name: Native dynamic equation project smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-dynamic-equation-project-gpu-smoke
