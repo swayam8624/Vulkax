@@ -17,7 +17,9 @@ jobs:
         with:
           ref: agent/phase13-canonical-equation-bridge
       - name: Apply canonical compiler integration
-        run: python3 scripts/phase13_canonical_bridge.py
+        run: |
+          python3 scripts/phase13_canonical_bridge.py
+          python3 -c 'from pathlib import Path; p=Path("apps/VulkaxPhysicsStudioMac/Package.swift"); t=p.read_text(); p.write_text(t.replace("    cxxLanguageStandard: .cxx20,\n    swiftLanguageModes: [.v5]\n)", "    swiftLanguageModes: [.v5],\n    cxxLanguageStandard: .cxx20\n)"))'
       - name: Build native Studio with canonical C++ compiler
         working-directory: apps/VulkaxPhysicsStudioMac
         run: swift build -c release
