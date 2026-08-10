@@ -60,9 +60,9 @@ private:
 };
 
 bool equalDimension(const units::Dimension& a, const units::Dimension& b){ return a==b; }
-units::Dimension mulDim(units::Dimension a,const units::Dimension& b){ for(std::size_t i=0;i<a.exponents.size();++i)a.exponents[i]+=b.exponents[i]; return a; }
-units::Dimension divDim(units::Dimension a,const units::Dimension& b){ for(std::size_t i=0;i<a.exponents.size();++i)a.exponents[i]-=b.exponents[i]; return a; }
-units::Dimension powDim(units::Dimension a,int p){ for(auto& e:a.exponents)e*=p; return a; }
+units::Dimension mulDim(units::Dimension a,const units::Dimension& b){ for(std::size_t i=0;i<a.exponent.size();++i)a.exponent[i]+=b.exponent[i]; return a; }
+units::Dimension divDim(units::Dimension a,const units::Dimension& b){ for(std::size_t i=0;i<a.exponent.size();++i)a.exponent[i]-=b.exponent[i]; return a; }
+units::Dimension powDim(units::Dimension a,int p){ for(auto& e:a.exponent)e=static_cast<std::int8_t>(e*p); return a; }
 
 } // namespace
 
@@ -121,7 +121,8 @@ std::optional<units::Dimension> inferDimension(const ExprNode& n,const std::unor
     if(n.kind==ExprKind::Function){auto d=inferDimension(*n.left,symbols,diagnostic);if(!d)return std::nullopt;if(!equalDimension(*d,units::dimensionless))return fail("function "+n.symbol+" requires dimensionless argument");return units::dimensionless;}
     auto a=inferDimension(*n.left,symbols,diagnostic);auto b=inferDimension(*n.right,symbols,diagnostic);if(!a||!b)return std::nullopt;
     if(n.kind==ExprKind::Add||n.kind==ExprKind::Subtract){if(!equalDimension(*a,*b))return fail("addition/subtraction dimension mismatch");return a;}
-    if(n.kind==ExprKind::Multiply)return mulDim(*a,*b); if(n.kind==ExprKind::Divide)return divDim(*a,*b);
+    if(n.kind==ExprKind::Multiply)return mulDim(*a,*b);
+    if(n.kind==ExprKind::Divide)return divDim(*a,*b);
     if(n.kind==ExprKind::Power){if(n.right->kind!=ExprKind::Constant)return fail("dimensional power exponent must be constant");double rounded=std::round(n.right->value);if(std::abs(rounded-n.right->value)>1e-12)return fail("dimensional power exponent must be integer");return powDim(*a,static_cast<int>(rounded));}
     return fail("unsupported dimension inference node");
 }
