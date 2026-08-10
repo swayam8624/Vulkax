@@ -92,9 +92,13 @@ struct ImportedObstacleMesh {
         case "obj": return try loadOBJ(from: url, requireWatertight: requireWatertight)
         case "gltf", "glb": return try loadGLTF(from: url, requireWatertight: requireWatertight)
         default:
+            if canImportWithModelIO(extension: url.pathExtension) {
+                return try loadModelIOCompatibility(from: url, requireWatertight: requireWatertight)
+            }
             throw NSError(
                 domain: "VulkaxMeshImport", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Unsupported model format .\(url.pathExtension). Use OBJ, glTF or GLB."])
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Unsupported model format .\(url.pathExtension). Use OBJ/glTF/GLB, or a format Model I/O reports as importable on this macOS installation."])
         }
     }
 

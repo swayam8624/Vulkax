@@ -299,7 +299,7 @@ final class PhysicsModel: ObservableObject {
 
     func importObstacleMesh() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = ["obj", "gltf", "glb"].compactMap { UTType(filenameExtension: $0) }
+        panel.allowedContentTypes = ["obj", "gltf", "glb", "fbx", "abc", "usd", "usda", "usdc", "usdz", "ply", "stl"].compactMap { UTType(filenameExtension: $0) }
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         importObstacleMesh(from: url)

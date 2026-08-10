@@ -51,7 +51,7 @@ struct StudioWorkspaceView: View {
             Button { model.importObstacleMesh() } label: {
                 Label("Add Model", systemImage: "car.side")
             }
-            .help("Import OBJ, glTF or GLB visual models. Vulkax creates a safe physics proxy when needed.")
+            .help("Import OBJ/glTF/GLB or a macOS Model I/O-compatible static asset. Vulkax creates a safe physics proxy when needed.")
             Button { model.capturePanelPresented.toggle() } label: {
                 Label("Record", systemImage: model.isCapturing ? "record.circle.fill" : "video.badge.plus")
             }
@@ -106,7 +106,7 @@ struct StudioWorkspaceView: View {
                             Image(systemName: "cube.transparent")
                                 .font(.system(size: 28, weight: .light))
                                 .foregroundStyle(.secondary)
-                            Text("Drop OBJ, glTF or GLB · or add a car/model")
+                            Text("Drop OBJ/glTF/GLB or a supported Model I/O asset · or add a car/model")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -485,7 +485,7 @@ struct StudioWorkspaceView: View {
             let url: URL?
             if let data = item as? Data { url = URL(dataRepresentation: data, relativeTo: nil) }
             else { url = item as? URL }
-            guard let url, ["obj", "gltf", "glb"].contains(url.pathExtension.lowercased()) else { return }
+            guard let url, ["obj", "gltf", "glb", "fbx", "abc", "usd", "usda", "usdc", "usdz", "ply", "stl"].contains(url.pathExtension.lowercased()) else { return }
             DispatchQueue.main.async { model.importObstacleMesh(from: url); inspectorTab = .object }
         }
         return true
