@@ -1,0 +1,41 @@
+name: WIP native model repair
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Apply model repair
+        run: python3 scripts/fix_native_model_split.py
+      - name: Build native Studio
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: swift build -c release
+      - name: Run native regression surface
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: |
+          .build/release/VulkaxPhysicsStudioMac --native-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-volume-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-camera-track-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-cinematic-capture-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-dynamic-equation-project-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-scene-mesh-gpu-smoke ../../tests/fixtures/triangle_pbr.gltf
+      - name: Commit validated source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/main.swift \
+                  apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/PhysicsProject.swift
+          git diff --cached --check
+          git commit -m "Unify native Studio state model"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
