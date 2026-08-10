@@ -1,0 +1,27 @@
+name: Promote migration scaffolding cleanup PR
+on:
+  push:
+    branches: [fix/remove-migration-scaffolding]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  ready:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: fix/remove-migration-scaffolding}
+      - env: {GH_TOKEN: "${{ github.token }}"}
+        run: |
+          for path in \
+            .github/workflows/phase12-windows-patch.yml \
+            .github/workflows/phase13-canonical-equation.yml \
+            .github/workflows/phase17-stabilize.yml \
+            scripts/phase12_fix_atlas.py scripts/phase17_stabilize.py; do
+            test ! -e "$path" || exit 0
+          done
+          test ! -e .github/workflows/wip-remove-migration-scaffolding.yml || exit 0
+          rm -f .github/workflows/ready-remove-migration-scaffolding.yml
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A; git commit -m "Finalize migration scaffolding cleanup"; git push origin HEAD:fix/remove-migration-scaffolding
+          gh pr ready 28 --repo swayam8624/Vulkax
