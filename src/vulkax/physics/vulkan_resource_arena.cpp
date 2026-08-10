@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -167,6 +168,49 @@ uint32_t VulkanResourceArena::findMemoryType(
   throw std::runtime_error("no Vulkan memory type satisfies reflected resource requirements");
 }
 
+VulkanResourceArena::Suballocation VulkanResourceArena::allocateMemory(
+    const VkMemoryRequirements& requirements,
+    VkMemoryPropertyFlags properties,
+    bool imageMemory) {
+  constexpr VkDeviceSize defaultBlockBytes = 16ull * 1024ull * 1024ull;
+  const uint32_t memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
+  const auto alignUp = [](VkDeviceSize value, VkDeviceSize alignment) {
+    if (alignment <= 1) return value;
+    const VkDeviceSize remainder = value % alignment;
+    if (remainder == 0) return value;
+    if (value > std::numeric_limits<VkDeviceSize>::max() - (alignment - remainder)) {
+      throw std::overflow_error("reflected Vulkan arena allocation alignment overflow");
+    }
+    return value + alignment - remainder;
+  };
+
+  for (MemoryBlock& block : memoryBlocks_) {
+    if (block.memoryTypeIndex != memoryTypeIndex || block.imageMemory != imageMemory) continue;
+    const VkDeviceSize offset = alignUp(block.used, requirements.alignment);
+    if (offset <= block.size && requirements.size <= block.size - offset) {
+      block.used = offset + requirements.size;
+      ++memoryStats_.suballocationCount;
+      memoryStats_.resourceBytes += requirements.size;
+      return {block.memory, offset};
+    }
+  }
+
+  const VkDeviceSize minimumSize = alignUp(requirements.size, requirements.alignment);
+  const VkDeviceSize blockSize = std::max(defaultBlockBytes, minimumSize);
+  VkMemoryAllocateInfo allocation{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+  allocation.allocationSize = blockSize;
+  allocation.memoryTypeIndex = memoryTypeIndex;
+  VkDeviceMemory memory = VK_NULL_HANDLE;
+  require(vkAllocateMemory(device_, &allocation, allocator_, &memory),
+          "allocate reflected Vulkan arena memory block");
+  memoryBlocks_.push_back({memory, blockSize, requirements.size, memoryTypeIndex, imageMemory});
+  ++memoryStats_.blockCount;
+  ++memoryStats_.suballocationCount;
+  memoryStats_.reservedBytes += blockSize;
+  memoryStats_.resourceBytes += requirements.size;
+  return {memory, 0};
+}
+
 void VulkanResourceArena::createResources() {
   for (uint32_t bindingIndex = 0; bindingIndex < plan_.bindings.size(); ++bindingIndex) {
     const VulkanResourceBinding& resource = plan_.bindings[bindingIndex];
@@ -204,15 +248,14 @@ void VulkanResourceArena::createResources() {
                 "create reflected Vulkan buffer");
         VkMemoryRequirements requirements{};
         vkGetBufferMemoryRequirements(device_, resourceSlot.buffer, &requirements);
-        const VkMemoryAllocateInfo allocation{
-            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-            nullptr,
-            requirements.size,
-            findMemoryType(requirements.memoryTypeBits, resource.memoryProperties)};
-        require(vkAllocateMemory(device_, &allocation, allocator_, &resourceSlot.memory),
-                "allocate reflected Vulkan buffer memory");
-        require(vkBindBufferMemory(device_, resourceSlot.buffer, resourceSlot.memory, 0),
-                "bind reflected Vulkan buffer memory");
+        const Suballocation allocation =
+            allocateMemory(requirements, resource.memoryProperties, false);
+        resourceSlot.memory = allocation.memory;
+        resourceSlot.memoryOffset = allocation.offset;
+        require(
+            vkBindBufferMemory(
+                device_, resourceSlot.buffer, resourceSlot.memory, resourceSlot.memoryOffset),
+            "bind reflected Vulkan buffer memory");
       } else {
         if (resource.imageFormat == VK_FORMAT_UNDEFINED || resource.extent.width == 0 ||
             resource.extent.height == 0 || resource.extent.depth == 0) {
@@ -239,15 +282,14 @@ void VulkanResourceArena::createResources() {
                 "create reflected Vulkan image");
         VkMemoryRequirements requirements{};
         vkGetImageMemoryRequirements(device_, resourceSlot.image, &requirements);
-        const VkMemoryAllocateInfo allocation{
-            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-            nullptr,
-            requirements.size,
-            findMemoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)};
-        require(vkAllocateMemory(device_, &allocation, allocator_, &resourceSlot.memory),
-                "allocate reflected Vulkan image memory");
-        require(vkBindImageMemory(device_, resourceSlot.image, resourceSlot.memory, 0),
-                "bind reflected Vulkan image memory");
+        const Suballocation allocation =
+            allocateMemory(requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, true);
+        resourceSlot.memory = allocation.memory;
+        resourceSlot.memoryOffset = allocation.offset;
+        require(
+            vkBindImageMemory(
+                device_, resourceSlot.image, resourceSlot.memory, resourceSlot.memoryOffset),
+            "bind reflected Vulkan image memory");
         VkImageViewCreateInfo viewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         viewInfo.image = resourceSlot.image;
         viewInfo.viewType = viewType;
@@ -336,7 +378,8 @@ void VulkanResourceArena::uploadBuffer(
   void* mapped = nullptr;
   require(vkMapMemory(device_, target.memory, 0, VK_WHOLE_SIZE, 0, &mapped),
           "map reflected Vulkan upload buffer");
-  std::memcpy(static_cast<std::byte*>(mapped) + offset, bytes.data(), bytes.size());
+  std::memcpy(
+      static_cast<std::byte*>(mapped) + target.memoryOffset + offset, bytes.data(), bytes.size());
   if ((resource.memoryProperties & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
     const VkMappedMemoryRange range{
         VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, nullptr, target.memory, 0, VK_WHOLE_SIZE};
@@ -372,7 +415,10 @@ void VulkanResourceArena::downloadBuffer(
     require(vkInvalidateMappedMemoryRanges(device_, 1, &range),
             "invalidate reflected Vulkan download buffer");
   }
-  std::memcpy(bytes.data(), static_cast<const std::byte*>(mapped) + offset, bytes.size());
+  std::memcpy(
+      bytes.data(),
+      static_cast<const std::byte*>(mapped) + source.memoryOffset + offset,
+      bytes.size());
   vkUnmapMemory(device_, source.memory);
 }
 
@@ -537,11 +583,15 @@ void VulkanResourceArena::destroy() noexcept {
         vkDestroyImage(device_, resourceSlot.image, allocator_);
       if (resourceSlot.buffer != VK_NULL_HANDLE)
         vkDestroyBuffer(device_, resourceSlot.buffer, allocator_);
-      if (resourceSlot.memory != VK_NULL_HANDLE)
-        vkFreeMemory(device_, resourceSlot.memory, allocator_);
       resourceSlot = {};
     }
   }
+  for (MemoryBlock& block : memoryBlocks_) {
+    if (block.memory != VK_NULL_HANDLE) vkFreeMemory(device_, block.memory, allocator_);
+    block = {};
+  }
+  memoryBlocks_.clear();
+  memoryStats_ = {};
 }
 
 }  // namespace vulkax::physics
