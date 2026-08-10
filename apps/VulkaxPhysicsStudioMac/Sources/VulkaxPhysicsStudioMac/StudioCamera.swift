@@ -31,28 +31,15 @@ struct StudioCamera: Equatable, Codable {
 
     mutating func apply(_ preset: StudioCameraPreset) {
         switch preset {
-        case .perspective:
-            self = .default
+        case .perspective: self = .default
         case .front:
-            position = SIMD3(0.0, 0.20, 3.5)
-            target = SIMD3(0.0, 0.20, 0.0)
-            up = SIMD3(0, 1, 0)
-            verticalFovDegrees = 42
+            position = SIMD3(0.0, 0.20, 3.5); target = SIMD3(0.0, 0.20, 0.0); up = SIMD3(0, 1, 0); verticalFovDegrees = 42
         case .top:
-            position = SIMD3(0.0, 3.5, 0.001)
-            target = SIMD3(0.0, 0.20, 0.0)
-            up = SIMD3(0, 0, -1)
-            verticalFovDegrees = 44
+            position = SIMD3(0.0, 3.5, 0.001); target = SIMD3(0.0, 0.20, 0.0); up = SIMD3(0, 0, -1); verticalFovDegrees = 44
         case .isometric:
-            position = SIMD3(2.65, 2.10, 2.85)
-            target = SIMD3(0.0, 0.25, 0.0)
-            up = SIMD3(0, 1, 0)
-            verticalFovDegrees = 48
+            position = SIMD3(2.65, 2.10, 2.85); target = SIMD3(0.0, 0.25, 0.0); up = SIMD3(0, 1, 0); verticalFovDegrees = 48
         case .closeUp:
-            position = SIMD3(1.10, 0.70, 1.40)
-            target = SIMD3(0.0, 0.28, 0.0)
-            up = SIMD3(0, 1, 0)
-            verticalFovDegrees = 52
+            position = SIMD3(1.10, 0.70, 1.40); target = SIMD3(0.0, 0.28, 0.0); up = SIMD3(0, 1, 0); verticalFovDegrees = 52
         }
         sanitize()
     }
@@ -65,10 +52,7 @@ struct StudioCamera: Equatable, Codable {
         yaw -= deltaX * 0.006
         pitch = max(-1.45, min(1.45, pitch + deltaY * 0.006))
         let horizontal = cos(pitch) * radius
-        position = target + SIMD3(
-            sin(yaw) * horizontal,
-            sin(pitch) * radius,
-            cos(yaw) * horizontal)
+        position = target + SIMD3(sin(yaw) * horizontal, sin(pitch) * radius, cos(yaw) * horizontal)
         up = SIMD3(0, 1, 0)
         sanitize()
     }
@@ -80,9 +64,7 @@ struct StudioCamera: Equatable, Codable {
         let distance = max(simd_length(target - position), 0.1)
         let scale = distance * 0.0018
         let movement = right * (-deltaX * scale) + cameraUp * (deltaY * scale)
-        position += movement
-        target += movement
-        sanitize()
+        position += movement; target += movement; sanitize()
     }
 
     mutating func dolly(_ delta: Float) {
@@ -90,8 +72,7 @@ struct StudioCamera: Equatable, Codable {
         let distance = max(simd_length(target - position), 0.05)
         let requested = distance * delta * 0.0018
         let bounded = max(-distance + 0.035, min(distance * 0.80, requested))
-        position += forward * bounded
-        sanitize()
+        position += forward * bounded; sanitize()
     }
 
     mutating func sanitize() {
@@ -100,9 +81,7 @@ struct StudioCamera: Equatable, Codable {
         if !position.x.isFinite || !position.y.isFinite || !position.z.isFinite { position = Self.default.position }
         if !target.x.isFinite || !target.y.isFinite || !target.z.isFinite { target = Self.default.target }
         if simd_length_squared(target - position) < 1e-8 { target = position + SIMD3(0, 0, -1) }
-        if !up.x.isFinite || !up.y.isFinite || !up.z.isFinite || simd_length_squared(up) < 1e-8 {
-            up = SIMD3(0, 1, 0)
-        }
+        if !up.x.isFinite || !up.y.isFinite || !up.z.isFinite || simd_length_squared(up) < 1e-8 { up = SIMD3(0, 1, 0) }
         up = simd_normalize(up)
     }
 
@@ -116,17 +95,10 @@ struct CinematicCaptureSettings: Equatable, Codable {
     enum Resolution: String, CaseIterable, Identifiable, Codable {
         case fullHD = "1920x1080"
         case fourK = "3840x2160"
-
         var id: String { rawValue }
         var title: String { self == .fourK ? "4K UHD" : "1080p" }
-        var dimensions: (width: Int, height: Int) {
-            switch self {
-            case .fullHD: return (1920, 1080)
-            case .fourK: return (3840, 2160)
-            }
-        }
+        var dimensions: (width: Int, height: Int) { self == .fourK ? (3840, 2160) : (1920, 1080) }
     }
-
     enum FrameRate: Int, CaseIterable, Identifiable, Codable {
         case fps24 = 24
         case fps30 = 30
@@ -134,7 +106,6 @@ struct CinematicCaptureSettings: Equatable, Codable {
         var id: Int { rawValue }
         var title: String { "\(rawValue) fps" }
     }
-
     var resolution: Resolution = .fourK
     var frameRate: FrameRate = .fps30
     var durationSeconds: Double = 10
