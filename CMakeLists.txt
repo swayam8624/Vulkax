@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Vulkax VERSION 0.13.0 LANGUAGES CXX)
+project(Vulkax VERSION 0.14.0 LANGUAGES CXX)
 option(VULKAX_BUILD_TESTS "Build Vulkax tests" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -7,7 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_library(vulkax_core STATIC
     src/adapt/goal_oriented.cpp src/backend/backend.cpp src/backend/probe.cpp src/compiler/expression.cpp src/compute/conformance.cpp
-    src/execution/experiment.cpp src/experiment/design.cpp src/inverse/hyperelastic.cpp
+    src/execution/experiment.cpp src/experiment/design.cpp src/geometry/mesh.cpp src/geometry/voxelize.cpp src/inverse/hyperelastic.cpp
     src/numerics/dense.cpp src/numerics/grid.cpp src/operators/operator_graph.cpp src/optimize/optimizer.cpp
     src/planning/solver_plan.cpp src/problem/document.cpp src/problem/problem_ir.cpp src/problem/validation.cpp
     src/render/headless.cpp src/research/operator_influence.cpp src/research/local_operator_influence.cpp
@@ -16,7 +16,6 @@ add_library(vulkax_core STATIC
     src/verify/convergence.cpp src/verify/result_certificate.cpp src/visualization/scientific.cpp)
 target_include_directories(vulkax_core PUBLIC include)
 target_compile_features(vulkax_core PUBLIC cxx_std_20)
-
 find_package(Vulkan QUIET)
 if(Vulkan_FOUND)
     target_sources(vulkax_core PRIVATE src/backend/vulkan_probe.cpp)
@@ -38,16 +37,13 @@ if(Vulkan_FOUND)
         add_dependencies(vulkax_core vulkax_gpu_shaders)
         target_sources(vulkax_core PRIVATE src/compute/vulkan_conformance.cpp src/render/vulkan_headless.cpp)
         target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_COMPUTE=1 VULKAX_HAS_VULKAN_RENDER=1
-            VULKAX_CONFORMANCE_SPV_PATH="${VULKAX_CONFORMANCE_SPV}"
-            VULKAX_PARTICLE_VERT_SPV_PATH="${VULKAX_PARTICLE_VERT_SPV}"
-            VULKAX_PARTICLE_FRAG_SPV_PATH="${VULKAX_PARTICLE_FRAG_SPV}")
+            VULKAX_CONFORMANCE_SPV_PATH="${VULKAX_CONFORMANCE_SPV}" VULKAX_PARTICLE_VERT_SPV_PATH="${VULKAX_PARTICLE_VERT_SPV}" VULKAX_PARTICLE_FRAG_SPV_PATH="${VULKAX_PARTICLE_FRAG_SPV}")
     else()
         target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_COMPUTE=0 VULKAX_HAS_VULKAN_RENDER=0)
     endif()
 else()
     target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN=0 VULKAX_HAS_VULKAN_COMPUTE=0 VULKAX_HAS_VULKAN_RENDER=0)
 endif()
-
 if(APPLE)
     enable_language(OBJCXX)
     find_library(VULKAX_METAL_FRAMEWORK Metal REQUIRED)
@@ -59,7 +55,6 @@ if(APPLE)
 else()
     target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_METAL=0 VULKAX_HAS_METAL_COMPUTE=0 VULKAX_HAS_METAL_RENDER=0)
 endif()
-
 if(MSVC)
     target_compile_options(vulkax_core PRIVATE /W4 /permissive-)
 else()
@@ -70,7 +65,7 @@ target_link_libraries(vulkax PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render)
+    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render geometry)
         add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
         target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
         if(MSVC)
