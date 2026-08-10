@@ -10,6 +10,15 @@ elif new not in text:
     raise SystemExit('VisualizerMode marker missing')
 text = text.replace('old[name] ?? defaults[name] ?? LiveParameter(',
                     'old[name] ?? defaults[name] ?? ScalarPresetParameter(')
+text = text.replace(
+    'let isRelativity = model.executionGraph.contains("integrate_active_rays")',
+    'let isRelativity = model.mode == .schwarzschild')
+text = text.replace(
+    'let isVolume = model.executionGraph.contains("volume_transport")',
+    'let isVolume = model.mode == .volumeSmoke')
+text = text.replace(
+    'let isScalar = model.executionGraph.contains("evaluate_scalar_field")',
+    'let isScalar = model.mode == .wave')
 main.write_text(text)
 
 project = Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/PhysicsProject.swift')
