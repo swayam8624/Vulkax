@@ -1,0 +1,189 @@
+name: Relocatable runtime resource refactor
+
+on:
+  push:
+    branches:
+      - agent/phase2-runtime-resources
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/phase2-runtime-resources
+      - name: Migrate source-relative Vulkax resource consumers
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("CMakeLists.txt")
+          cmake = root.read_text()
+          dependency_include = "include(cmake/VulkaxDependencies.cmake)\n\n"
+          runtime_target = '''include(cmake/VulkaxDependencies.cmake)\n\nadd_library(vulkax_runtime_paths STATIC src/runtime_paths.cpp)\ntarget_compile_features(vulkax_runtime_paths PUBLIC cxx_std_20)\ntarget_include_directories(vulkax_runtime_paths PUBLIC ${PROJECT_SOURCE_DIR}/src)\n\n'''
+          if dependency_include not in cmake:
+              raise SystemExit("dependency include marker missing")
+          cmake = cmake.replace(dependency_include, runtime_target, 1)
+          cmake = cmake.replace(
+              'list(FILTER SOURCES EXCLUDE REGEX "/src/vulkax/")\n',
+              'list(FILTER SOURCES EXCLUDE REGEX "/src/vulkax/")\n'
+              'list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/runtime_paths.cpp")\n',
+              1)
+
+          cmake = cmake.replace(
+              'add_executable(${PROJECT_NAME} ${SOURCES})\n\n'
+              'target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)\n'
+              'target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")\n'
+              'target_link_libraries(${PROJECT_NAME} glm::glm VulkaxAtlasCore)\n',
+              'add_executable(${PROJECT_NAME} ${SOURCES})\n\n'
+              'target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)\n'
+              'execute_process(\n'
+              '  COMMAND git rev-parse HEAD\n'
+              '  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"\n'
+              '  OUTPUT_VARIABLE VULKAX_BUILD_GIT_COMMIT\n'
+              '  OUTPUT_STRIP_TRAILING_WHITESPACE\n'
+              '  ERROR_QUIET\n'
+              ')\n'
+              'if (NOT VULKAX_BUILD_GIT_COMMIT)\n'
+              '  set(VULKAX_BUILD_GIT_COMMIT "unknown")\n'
+              'endif()\n'
+              'target_compile_definitions(\n'
+              '  ${PROJECT_NAME} PRIVATE VULKAX_BUILD_GIT_COMMIT="${VULKAX_BUILD_GIT_COMMIT}")\n'
+              'target_link_libraries(${PROJECT_NAME} glm::glm VulkaxAtlasCore vulkax_runtime_paths)\n',
+              1)
+
+          tool_targets = [
+              "VulkaxComputeBenchmark",
+              "VulkaxActiveRayCompaction",
+              "VulkaxSchwarzschildComputeBenchmark",
+              "VulkaxSimulationComputeBenchmark",
+              "VulkaxReactionComputeBenchmark",
+              "VulkaxMacProjectionCompute",
+              "VulkaxSparseBrickCompute",
+              "VulkaxParticleComputeBenchmark",
+          ]
+          for target in tool_targets:
+              cmake = re.sub(
+                  rf'target_compile_definitions\({target} PRIVATE ENGINE_DIR="\$\{{PROJECT_SOURCE_DIR\}}/"\)\n',
+                  '',
+                  cmake,
+                  count=1)
+              pattern = rf'(target_link_libraries\({target} PRIVATE[^\n]*)(\))'
+              cmake, count = re.subn(pattern, rf'\1 vulkax_runtime_paths\2', cmake, count=1)
+              if count != 1:
+                  raise SystemExit(f"link line not found for {target}")
+
+          for target in ("VulkaxPhysicsStudio", "VulkaxPhysicsStudioTestRunner"):
+              cmake = re.sub(
+                  rf'\s*target_compile_definitions\({target} PRIVATE ENGINE_DIR="\$\{{PROJECT_SOURCE_DIR\}}/"\)\n',
+                  '\n',
+                  cmake,
+                  count=1)
+              marker = '      vulkax_research vulkax_sim vulkax_relativity vulkax_physics_ir Vulkan::Vulkan\n'
+              if marker in cmake:
+                  cmake = cmake.replace(
+                      marker,
+                      '      vulkax_research vulkax_sim vulkax_relativity vulkax_physics_ir '\
+                      'vulkax_runtime_paths Vulkan::Vulkan\n',
+                      1)
+              else:
+                  raise SystemExit(f"editor link marker not found for {target}")
+
+          cmake = cmake.replace(
+              'include(cmake/VulkaxShaders.cmake)\n\ninclude(cmake/VulkaxApplications.cmake)\n',
+              'include(cmake/VulkaxShaders.cmake)\n'
+              'include(cmake/VulkaxRuntimeResources.cmake)\n\n'
+              'include(cmake/VulkaxApplications.cmake)\n',
+              1)
+          root.write_text(cmake)
+
+          applications = Path("cmake/VulkaxApplications.cmake")
+          app = applications.read_text()
+          app = app.replace('  src/runtime_paths.cpp\n', '', 1)
+          app = app.replace(
+              'target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")\n',
+              '',
+              1)
+          app = app.replace(
+              '  VulkaxPhysicsVulkanDirect PRIVATE glfw vulkax_relativity vulkax_sim Vulkan::Vulkan)\n',
+              '  VulkaxPhysicsVulkanDirect PRIVATE glfw vulkax_relativity vulkax_sim '
+              'vulkax_runtime_paths Vulkan::Vulkan)\n',
+              1)
+          app = app.replace(
+              'add_dependencies(VulkaxPhysicsVulkanDirect Shaders)\n',
+              'add_dependencies(VulkaxPhysicsVulkanDirect Shaders VulkaxRuntimeResources)\n',
+              1)
+          applications.write_text(app)
+
+          source_files = [
+              "src/vulkax/sim/mac_live_volume.cpp",
+              "src/vulkax/relativity/kerr_live_queue.cpp",
+              "src/vulkax/editor/vulkan_field_executor.cpp",
+              "tools/vulkax_mac_projection_compute.cpp",
+              "tools/vulkax_particle_compute.cpp",
+              "tools/vulkax_sparse_brick_compute.cpp",
+              "tools/vulkax_active_ray_compaction.cpp",
+              "tools/vulkax_schwarzschild_compute.cpp",
+              "tools/vulkax_sim_compute.cpp",
+              "tools/vulkax_physics_vulkan_direct.cpp",
+              "tools/vulkax_reaction_compute.cpp",
+              "tools/vulkax_compute.cpp",
+          ]
+          engine_shader = re.compile(
+              r'std::filesystem::path(?:\{|\()\s*ENGINE_DIR\s*(?:\}|\))\s*/\s*'
+              r'("shaders/[^"]+")')
+          for name in source_files:
+              path = Path(name)
+              text = path.read_text()
+              migrated, count = engine_shader.subn(r'lve::resolveRuntimeResource(\1)', text)
+              if count == 0 and name != "tools/vulkax_physics_vulkan_direct.cpp":
+                  raise SystemExit(f"no source-relative shader path found in {name}")
+              if migrated != text and '#include "runtime_paths.hpp"' not in migrated:
+                  migrated = '#include "runtime_paths.hpp"\n' + migrated
+              path.write_text(migrated)
+
+          first_app = Path("src/first_app.cpp")
+          text = first_app.read_text()
+          old_git = '''std::string currentGitCommit() {\n  std::ifstream head{std::filesystem::path{ENGINE_DIR} / ".git/HEAD"};\n  std::string value;\n  std::getline(head, value);\n  constexpr const char* prefix = "ref: ";\n  if (value.rfind(prefix, 0) == 0) {\n    std::ifstream ref{std::filesystem::path{ENGINE_DIR} / ".git" / value.substr(5)};\n    std::getline(ref, value);\n  }\n  return value.empty() ? "unknown" : value;\n}\n'''
+          new_git = '''std::string currentGitCommit() {\n#ifdef VULKAX_BUILD_GIT_COMMIT\n  return VULKAX_BUILD_GIT_COMMIT;\n#else\n  return "unknown";\n#endif\n}\n'''
+          if old_git not in text:
+              raise SystemExit("legacy git lookup block not found")
+          text = text.replace(old_git, new_git, 1)
+          text = text.replace(
+              'std::filesystem::directory_iterator(std::filesystem::path{ENGINE_DIR} / "shaders")',
+              'std::filesystem::directory_iterator(resolveRuntimeResource("shaders"))',
+              1)
+          text = text.replace(
+              '      config.atlasNavigationReplay.is_absolute()\n'
+              '          ? config.atlasNavigationReplay\n'
+              '          : std::filesystem::path{ENGINE_DIR} /\n'
+              '                config.atlasNavigationReplay;',
+              '      config.atlasNavigationReplay.is_absolute()\n'
+              '          ? config.atlasNavigationReplay\n'
+              '          : resolveRuntimeResource(config.atlasNavigationReplay);',
+              1)
+          first_app.write_text(text)
+
+          ci = Path(".github/workflows/ci.yml")
+          workflow = ci.read_text()
+          validation_anchor = '''      - name: Verify Vulkan software device\n        run: vulkaninfo --summary\n'''
+          relocated = validation_anchor + '''      - name: Relocated runtime resource smoke\n        run: |\n          test -f build/resources/shaders/vulkax_wave_field.comp.spv\n          rm -rf /tmp/vulkax-relocated\n          mkdir -p /tmp/vulkax-relocated\n          cp build/vulkax-compute /tmp/vulkax-relocated/\n          cp -R build/resources /tmp/vulkax-relocated/resources\n          (cd /tmp && /tmp/vulkax-relocated/vulkax-compute \\\n            --width 16 --height 9 --output /tmp/vulkax-relocated-wave)\n'''
+          if validation_anchor not in workflow:
+              raise SystemExit("Vulkan validation anchor missing")
+          ci.write_text(workflow.replace(validation_anchor, relocated, 1))
+
+          Path(".github/workflows/runtime-resource-refactor.yml").unlink()
+          PY
+      - name: Commit resource migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Make Vulkax runtime resources relocatable"
+          git push origin HEAD:agent/phase2-runtime-resources
