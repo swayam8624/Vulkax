@@ -2,7 +2,8 @@ name: WIP wire glTF Studio
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -13,121 +14,12 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
-      - name: Wire glTF and GLB into Studio open/save flow
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          main = Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/main.swift')
-          text = main.read_text()
-          text = text.replace(
-              'panel.allowedContentTypes = [UTType(filenameExtension: "obj") ?? .data]',
-              'panel.allowedContentTypes = ["obj", "gltf", "glb"].compactMap { UTType(filenameExtension: $0) }',
-              1)
-          text = text.replace(
-              'let visualMesh = try ImportedObstacleMesh.loadOBJ(from: url, requireWatertight: false)',
-              'let visualMesh = try ImportedObstacleMesh.load(from: url, requireWatertight: false)',
-              1)
-          old_save = '''                let path = try PhysicsProjectIO.packageObstacle(
-                    from: item.url, for: url, assetName: "obstacle-\(index).obj")
-'''
-          new_save = '''                let sourceExtension = item.url.pathExtension.lowercased()
-                let assetExtension = sourceExtension.isEmpty ? "obj" : sourceExtension
-                let path = try PhysicsProjectIO.packageObstacle(
-                    from: item.url, for: url, assetName: "obstacle-\(index).\(assetExtension)")
-'''
-          if old_save not in text:
-              raise SystemExit('project asset save marker missing')
-          text = text.replace(old_save, new_save, 1)
-          main.write_text(text)
-
-          project = Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/PhysicsProject.swift')
-          text = project.read_text()
-          old = '''    static func packageObstacle(
-        from source: URL,
-        for projectURL: URL,
-        assetName: String = "obstacle.obj"
-    ) throws -> String {
-        let assetDirectory = projectURL.deletingPathExtension().appendingPathExtension("assets")
-        try FileManager.default.createDirectory(
-            at: assetDirectory, withIntermediateDirectories: true)
-        let destination = assetDirectory.appendingPathComponent(assetName)
-        if source.standardizedFileURL != destination.standardizedFileURL {
-            try Data(contentsOf: source).write(to: destination, options: .atomic)
-        }
-        return assetDirectory.lastPathComponent + "/" + destination.lastPathComponent
-    }
-'''
-          new = '''    static func packageObstacle(
-        from source: URL,
-        for projectURL: URL,
-        assetName: String = "obstacle.obj"
-    ) throws -> String {
-        let assetDirectory = projectURL.deletingPathExtension().appendingPathExtension("assets")
-        try FileManager.default.createDirectory(
-            at: assetDirectory, withIntermediateDirectories: true)
-
-        func safeRelativeURL(_ raw: String) throws -> URL? {
-            if raw.hasPrefix("data:") { return nil }
-            guard URL(string: raw)?.scheme == nil else {
-                throw CocoaError(.fileReadUnsupportedScheme)
-            }
-            let relative = URL(fileURLWithPath: raw)
-            guard !relative.path.hasPrefix("/"),
-                  !relative.pathComponents.contains("..") else {
-                throw CocoaError(.fileReadInvalidFileName)
-            }
-            return relative
-        }
-
-        func copyAsset(_ input: URL, _ output: URL) throws {
-            try FileManager.default.createDirectory(
-                at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if input.standardizedFileURL == output.standardizedFileURL { return }
-            if FileManager.default.fileExists(atPath: output.path) {
-                try FileManager.default.removeItem(at: output)
-            }
-            try FileManager.default.copyItem(at: input, to: output)
-        }
-
-        let destination = assetDirectory.appendingPathComponent(assetName)
-        try copyAsset(source, destination)
-
-        if source.pathExtension.lowercased() == "gltf" {
-            let data = try Data(contentsOf: source)
-            guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw CocoaError(.fileReadCorruptFile)
-            }
-            var dependencies: [String] = []
-            for buffer in root["buffers"] as? [[String: Any]] ?? [] {
-                if let uri = buffer["uri"] as? String { dependencies.append(uri) }
-            }
-            for image in root["images"] as? [[String: Any]] ?? [] {
-                if let uri = image["uri"] as? String { dependencies.append(uri) }
-            }
-            let sourceRoot = source.deletingLastPathComponent()
-            for raw in Set(dependencies) {
-                guard let relative = try safeRelativeURL(raw) else { continue }
-                let input = sourceRoot.appendingPathComponent(relative.path).standardizedFileURL
-                let output = assetDirectory.appendingPathComponent(relative.path).standardizedFileURL
-                let rootPath = assetDirectory.standardizedFileURL.path + "/"
-                guard output.path.hasPrefix(rootPath) else {
-                    throw CocoaError(.fileReadInvalidFileName)
-                }
-                try copyAsset(input, output)
-            }
-        }
-        return assetDirectory.lastPathComponent + "/" + destination.lastPathComponent
-    }
-'''
-          if old not in text:
-              raise SystemExit('PhysicsProject packageObstacle marker missing')
-          project.write_text(text.replace(old, new, 1))
-          PY
+      - name: Apply focused model-import migration
+        run: python3 scripts/wire_gltf_studio.py
       - name: Build native Studio
         working-directory: apps/VulkaxPhysicsStudioMac
         run: swift build -c release
-      - name: Run imported scene and capture regressions
+      - name: Run imported-scene and capture regressions
         working-directory: apps/VulkaxPhysicsStudioMac
         run: |
           .build/release/VulkaxPhysicsStudioMac --native-scene-mesh-gpu-smoke ../../tests/fixtures/airflow_cube.obj
