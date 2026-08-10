@@ -1,0 +1,12 @@
+vulkax 1
+id "rubber-inverse"
+name "Hyperelastic material identification"
+domain "specimen" volume 3
+field "displacement" "specimen" vector 3 1 0 0 0 0 0 0
+operator "equilibrium" "Nonlinear equilibrium" "displacement" "hyperelastic" "div(P(F,theta)) + body_force" "displacement"
+material "rubber"
+property "rubber" "density" 1050 -3 1 0 0 0 0 0
+objective "fit-error" "Experiment mismatch" minimize "measurement_error(displacement)"
+accuracy "fit-error" 0.02 0 0
+budget_wall 180
+budget_memory 4294967296

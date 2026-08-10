@@ -1,0 +1,14 @@
+vulkax 1
+id "rotating-mill"
+name "Granular rotating mill"
+domain "particles" particles 3
+field "position" "particles" vector 3 1 0 0 0 0 0 0
+field "velocity" "particles" vector 3 1 0 -1 0 0 0 0
+operator "contact" "Particle contact mechanics" "velocity" "dem" "m*dv/dt - contact(position,velocity) - gravity" "position" "velocity"
+material "granular"
+property "granular" "density" 2700 -3 1 0 0 0 0 0
+property "granular" "friction" 0.45 0 0 0 0 0 0 0
+objective "impact-energy" "Useful impact energy" maximize "high_energy_collision_rate()"
+accuracy "impact-energy" 0.03 0 0
+budget_wall 60
+budget_memory 8589934592

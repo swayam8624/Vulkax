@@ -1,0 +1,17 @@
+vulkax 1
+id "car-aerodynamics"
+name "Vehicle aerodynamics problem"
+domain "air" volume 3
+field "velocity" "air" vector 3 1 0 -1 0 0 0 0
+field "pressure" "air" scalar 1 -1 1 -2 0 0 0 0
+operator "momentum" "Momentum balance" "velocity" "fluid" "du/dt + advect(velocity) + grad(pressure)/rho - nu*laplacian(velocity)" "velocity" "pressure"
+operator "continuity" "Incompressibility" "pressure" "incompressible" "div(velocity)" "velocity"
+material "air"
+property "air" "density" 1.225 -3 1 0 0 0 0 0
+property "air" "dynamic_viscosity" 1.81e-5 -1 1 -1 0 0 0 0
+bc "inlet" "air" "velocity" "velocity_inlet" 1 0 -1 0 0 0 0 3 40 0 0
+objective "drag" "Drag coefficient" minimize "drag_coefficient(body)"
+objective "lift" "Lift coefficient" observe "lift_coefficient(body)"
+accuracy "drag" 0.02 0 0
+budget_wall 120
+budget_memory 8589934592
