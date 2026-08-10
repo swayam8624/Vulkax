@@ -1,0 +1,41 @@
+name: WIP remove leaked migration scaffolding
+
+on:
+  push:
+    branches:
+      - fix/remove-migration-scaffolding
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/remove-migration-scaffolding
+      - name: Remove one-time migration files
+        run: |
+          rm -f \
+            .github/workflows/phase12-windows-patch.yml \
+            .github/workflows/phase13-canonical-equation.yml \
+            .github/workflows/phase17-stabilize.yml \
+            .github/workflows/wip-stabilize.yml \
+            scripts/phase12_windows.py \
+            scripts/phase12_fix_atlas.py \
+            scripts/phase13_canonical_bridge.py \
+            scripts/phase13_fix_manifest.py \
+            scripts/phase17_stabilize.py \
+            scripts/quality_policy_benchmark_patch.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- ':!.github/workflows/wip-remove-migration-scaffolding.yml'
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No leaked migration files remain.'
+            exit 0
+          fi
+          git commit -m "Remove one-time migration scaffolding"
+          git push origin HEAD:fix/remove-migration-scaffolding
