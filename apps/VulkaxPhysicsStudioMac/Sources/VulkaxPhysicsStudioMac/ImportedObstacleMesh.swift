@@ -20,6 +20,18 @@ struct ObstacleMeshDiagnostics {
     }
 }
 
+struct ImportedMeshMaterial {
+    var name: String = "Default"
+    var baseColorFactor = SIMD4<Float>(0.18, 0.42, 0.45, 1)
+    var metallicFactor: Float = 0
+    var roughnessFactor: Float = 0.45
+    var emissiveFactor = SIMD3<Float>(repeating: 0)
+    var baseColorTextureData: Data?
+    var baseColorTextureMimeType: String?
+
+    static let `default` = ImportedMeshMaterial()
+}
+
 private struct MeshEdge: Hashable {
     var lower: UInt32
     var upper: UInt32
@@ -34,7 +46,7 @@ private struct ObstacleMeshTopologyError: LocalizedError {
     var diagnostics: ObstacleMeshDiagnostics
 
     var errorDescription: String? {
-        "OBJ is not a closed manifold: \(diagnostics.degenerateTriangles) degenerate triangles, " +
+        "Mesh is not a closed manifold: \(diagnostics.degenerateTriangles) degenerate triangles, " +
             "\(diagnostics.boundaryEdges) boundary edges, \(diagnostics.nonManifoldEdges) " +
             "non-manifold edges, \(diagnostics.inconsistentWindingEdges) winding conflicts"
     }
@@ -44,6 +56,42 @@ struct ImportedObstacleMesh {
     var vertices: [SIMD4<Float>]
     var indices: [UInt32]
     var diagnostics: ObstacleMeshDiagnostics
+    // Optional render-only attributes. The numerical voxelizer intentionally
+    // consumes only vertices/indices so material complexity cannot destabilize physics.
+    var vertexNormals: [SIMD3<Float>]
+    var vertexTexCoords: [SIMD2<Float>]
+    // One material index per triangle. Missing entries fall back to material 0.
+    var triangleMaterialIndices: [UInt16]
+    var materials: [ImportedMeshMaterial]
+
+    init(
+        vertices: [SIMD4<Float>],
+        indices: [UInt32],
+        diagnostics: ObstacleMeshDiagnostics,
+        vertexNormals: [SIMD3<Float>] = [],
+        vertexTexCoords: [SIMD2<Float>] = [],
+        triangleMaterialIndices: [UInt16] = [],
+        materials: [ImportedMeshMaterial] = [.default]
+    ) {
+        self.vertices = vertices
+        self.indices = indices
+        self.diagnostics = diagnostics
+        self.vertexNormals = vertexNormals
+        self.vertexTexCoords = vertexTexCoords
+        self.triangleMaterialIndices = triangleMaterialIndices
+        self.materials = materials.isEmpty ? [.default] : materials
+    }
+
+    static func load(from url: URL, requireWatertight: Bool = true) throws -> ImportedObstacleMesh {
+        switch url.pathExtension.lowercased() {
+        case "obj": return try loadOBJ(from: url, requireWatertight: requireWatertight)
+        case "gltf", "glb": return try loadGLTF(from: url, requireWatertight: requireWatertight)
+        default:
+            throw NSError(
+                domain: "VulkaxMeshImport", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Unsupported model format .\(url.pathExtension). Use OBJ, glTF or GLB."])
+        }
+    }
 
     static func loadOBJ(from url: URL, requireWatertight: Bool = true) throws -> ImportedObstacleMesh {
         let source = try String(contentsOf: url, encoding: .utf8)
@@ -72,11 +120,32 @@ struct ImportedObstacleMesh {
             }
         }
         guard !positions.isEmpty, !triangles.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
+        return try normalizedMesh(
+            positions: positions, indices: triangles, requireWatertight: requireWatertight)
+    }
+
+    static func normalizedMesh(
+        positions: [SIMD3<Float>],
+        indices: [UInt32],
+        normals: [SIMD3<Float>] = [],
+        texCoords: [SIMD2<Float>] = [],
+        triangleMaterialIndices: [UInt16] = [],
+        materials: [ImportedMeshMaterial] = [.default],
+        requireWatertight: Bool
+    ) throws -> ImportedObstacleMesh {
+        guard !positions.isEmpty, indices.count >= 3, indices.count.isMultiple(of: 3) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        guard indices.allSatisfy({ Int($0) < positions.count }) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        if !normals.isEmpty && normals.count != positions.count { throw CocoaError(.fileReadCorruptFile) }
+        if !texCoords.isEmpty && texCoords.count != positions.count { throw CocoaError(.fileReadCorruptFile) }
 
         var edgeUses: [MeshEdge: EdgeUse] = [:]
         var degenerateTriangles = 0
-        for triangle in stride(from: 0, to: triangles.count, by: 3) {
-            let triangleIndices = [triangles[triangle], triangles[triangle + 1], triangles[triangle + 2]]
+        for triangle in stride(from: 0, to: indices.count, by: 3) {
+            let triangleIndices = [indices[triangle], indices[triangle + 1], indices[triangle + 2]]
             let a = positions[Int(triangleIndices[0])]
             let b = positions[Int(triangleIndices[1])]
             let c = positions[Int(triangleIndices[2])]
@@ -95,7 +164,7 @@ struct ImportedObstacleMesh {
             }
         }
         let diagnostics = ObstacleMeshDiagnostics(
-            triangleCount: triangles.count / 3,
+            triangleCount: indices.count / 3,
             degenerateTriangles: degenerateTriangles,
             boundaryEdges: edgeUses.values.filter { $0.count == 1 }.count,
             nonManifoldEdges: edgeUses.values.filter { $0.count != 1 && $0.count != 2 }.count,
@@ -114,12 +183,23 @@ struct ImportedObstacleMesh {
         let scale = Float(0.28) / max(extent.x, max(extent.y, extent.z), Float(1e-6))
         let centre = Float(0.5) * (lower + upper)
         let normalized = positions.map { SIMD4<Float>(($0 - centre) * scale, 0) }
-        return ImportedObstacleMesh(vertices: normalized, indices: triangles, diagnostics: diagnostics)
+        let normalizedNormals = normals.map { normal -> SIMD3<Float> in
+            let lengthSquared = simd_length_squared(normal)
+            return lengthSquared > 1e-16 ? normal / sqrt(lengthSquared) : SIMD3<Float>(0, 1, 0)
+        }
+        return ImportedObstacleMesh(
+            vertices: normalized,
+            indices: indices,
+            diagnostics: diagnostics,
+            vertexNormals: normalizedNormals,
+            vertexTexCoords: texCoords,
+            triangleMaterialIndices: triangleMaterialIndices,
+            materials: materials)
     }
 
     // A car/prop render mesh is often open, non-manifold or far too detailed
     // for robust voxelization. Use its bounds as a closed physics proxy while
-    // retaining the original mesh as the visual asset.
+    // retaining the original mesh and material data as the visual asset.
     static func boxProxy(for visualMesh: ImportedObstacleMesh) -> ImportedObstacleMesh {
         guard let first = visualMesh.vertices.first else { return fixedBoxProxy() }
         var lower = SIMD3<Float>(first.x, first.y, first.z)
