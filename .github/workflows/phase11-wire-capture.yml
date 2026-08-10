@@ -1,0 +1,48 @@
+name: Phase 11 4K capture and scene render
+
+on:
+  push:
+    branches:
+      - agent/phase11-4k-capture-scene-render
+
+permissions:
+  contents: write
+
+jobs:
+  wire-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/phase11-4k-capture-scene-render
+      - name: Wire renderer capture and scene pass
+        run: |
+          python3 scripts/phase11_wire_capture.py
+          python3 scripts/phase11_add_scene_cli.py
+      - name: Build native Studio
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: swift build -c release
+      - name: Verify 4K movie writer
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-cinematic-capture-smoke
+      - name: Verify imported visual mesh rendering
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: >-
+          .build/release/VulkaxPhysicsStudioMac
+          --native-scene-mesh-gpu-smoke
+          ../../tests/fixtures/airflow_cube.obj
+      - name: Verify simulation regressions
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: |
+          .build/release/VulkaxPhysicsStudioMac --native-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-volume-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-imported-mesh-gpu-smoke ../../tests/fixtures/airflow_cube.obj
+      - name: Commit validated feature integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- ':!.github/workflows'
+          git diff --cached --check
+          git commit -m "Add 4K cinematic capture and visual scene rendering"
+          git push origin HEAD:agent/phase11-4k-capture-scene-render
