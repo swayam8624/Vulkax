@@ -21,7 +21,13 @@ add_custom_target(
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${PROJECT_SOURCE_DIR}/models"
           "${VULKAX_RUNTIME_RESOURCE_DIR}/models"
-  DEPENDS Shaders
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${VULKAX_STATIC_SHADER_DIR}"
+          "${VULKAX_RUNTIME_RESOURCE_DIR}/shaders"
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${VULKAX_GENERATED_SHADER_DIR}"
+          "${VULKAX_RUNTIME_RESOURCE_DIR}/shaders"
+  DEPENDS Shaders VulkaxGeneratedEquationShaders VulkaxGeneratedStencilShaders
   COMMENT "Staging relocatable Vulkax runtime resources"
 )
 
@@ -45,6 +51,14 @@ endforeach()
 include(GNUInstallDirs)
 install(
   DIRECTORY "${PROJECT_SOURCE_DIR}/shaders/"
+  DESTINATION "${CMAKE_INSTALL_DATADIR}/vulkax/shaders"
+)
+install(
+  DIRECTORY "${VULKAX_STATIC_SHADER_DIR}/"
+  DESTINATION "${CMAKE_INSTALL_DATADIR}/vulkax/shaders"
+)
+install(
+  DIRECTORY "${VULKAX_GENERATED_SHADER_DIR}/"
   DESTINATION "${CMAKE_INSTALL_DATADIR}/vulkax/shaders"
 )
 install(

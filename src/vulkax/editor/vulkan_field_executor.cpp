@@ -1,4 +1,5 @@
 #include "vulkax/editor/vulkan_field_executor.hpp"
+#include "runtime_paths.hpp"
 #include "vulkax/physics/vulkan_resource_arena.hpp"
 #include "vulkax/runtime/runtime_contract.hpp"
 
@@ -287,7 +288,7 @@ struct VulkanFieldExecutor::Impl {
 
   void createFieldPipelines() {
     const auto shaderBytes =
-        readBinary(std::filesystem::path(ENGINE_DIR) / "shaders/vulkax_wave_field.comp.spv");
+        readBinary(lve::resolveRuntimeResource("shaders/vulkax_wave_field.comp.spv"));
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = shaderBytes.size();
     shaderInfo.pCode = reinterpret_cast<const uint32_t*>(shaderBytes.data());
@@ -303,7 +304,7 @@ struct VulkanFieldExecutor::Impl {
     check(pipelineResult, "vkCreateComputePipelines");
 
     const auto hdrShaderBytes = readBinary(
-        std::filesystem::path(ENGINE_DIR) / "shaders/vulkax_field_visualize.comp.spv");
+        lve::resolveRuntimeResource("shaders/vulkax_field_visualize.comp.spv"));
     VkShaderModuleCreateInfo hdrShaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     hdrShaderInfo.codeSize = hdrShaderBytes.size();
     hdrShaderInfo.pCode = reinterpret_cast<const uint32_t*>(hdrShaderBytes.data());
@@ -480,7 +481,7 @@ struct VulkanFieldExecutor::Impl {
     check(vkCreatePipelineLayout(device, &reactionPipelineLayoutInfo, nullptr, &reactionPipelineLayout),
           "vkCreatePipelineLayout reaction");
     const auto reactionShaderBytes = readBinary(
-        std::filesystem::path(ENGINE_DIR) / "shaders/vulkax_reaction_diffusion_step.comp.spv");
+        lve::resolveRuntimeResource("shaders/vulkax_reaction_diffusion_step.comp.spv"));
     VkShaderModuleCreateInfo reactionShaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     reactionShaderInfo.codeSize = reactionShaderBytes.size();
     reactionShaderInfo.pCode = reinterpret_cast<const uint32_t*>(reactionShaderBytes.data());

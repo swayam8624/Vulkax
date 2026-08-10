@@ -1,4 +1,5 @@
 #include <vulkan/vulkan.h>
+#include "runtime_paths.hpp"
 
 #include <algorithm>
 #include <array>
@@ -334,7 +335,7 @@ int main() {
         vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout),
         "vkCreatePipelineLayout");
     const auto code = readFile(
-        std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_active_ray_compaction.comp.spv");
+        lve::resolveRuntimeResource("shaders/vulkax_active_ray_compaction.comp.spv"));
     VkShaderModuleCreateInfo moduleInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     moduleInfo.codeSize = code.size();
     moduleInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());

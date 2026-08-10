@@ -1,4 +1,5 @@
 #include <vulkan/vulkan.h>
+#include "runtime_paths.hpp"
 
 #include "vulkax/relativity/schwarzschild_lensing.hpp"
 
@@ -177,7 +178,7 @@ int main(int argc, char** argv) {
     pipelineLayoutInfo.setLayoutCount = 1; pipelineLayoutInfo.pSetLayouts = &descriptorLayout;
     VkPipelineLayout pipelineLayout{};
     check(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout), "vkCreatePipelineLayout");
-    const auto code = readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_schwarzschild_geodesic.comp.spv");
+    const auto code = readFile(lve::resolveRuntimeResource("shaders/vulkax_schwarzschild_geodesic.comp.spv"));
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = code.size(); shaderInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
     VkShaderModule shader{}; check(vkCreateShaderModule(device, &shaderInfo, nullptr, &shader), "vkCreateShaderModule");

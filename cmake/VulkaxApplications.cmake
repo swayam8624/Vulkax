@@ -17,16 +17,14 @@ add_executable(
   src/lve_pipeline.cpp
   src/lve_buffer.cpp
   src/lve_model.cpp
-  src/runtime_paths.cpp
 )
 set_target_properties(VulkaxPhysicsVulkanDirect PROPERTIES OUTPUT_NAME vulkax-physics-vulkan-direct)
 target_compile_features(VulkaxPhysicsVulkanDirect PRIVATE cxx_std_20)
-target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
 target_include_directories(
   VulkaxPhysicsVulkanDirect PRIVATE
   ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/include ${TINYOBJ_PATH})
 target_link_libraries(
-  VulkaxPhysicsVulkanDirect PRIVATE glfw vulkax_relativity vulkax_sim Vulkan::Vulkan)
+  VulkaxPhysicsVulkanDirect PRIVATE glfw vulkax_relativity vulkax_sim vulkax_runtime_paths Vulkan::Vulkan)
 if (TARGET PkgConfig::OPENEXR)
   target_link_libraries(VulkaxPhysicsVulkanDirect PRIVATE PkgConfig::OPENEXR)
   target_compile_definitions(VulkaxPhysicsVulkanDirect PRIVATE VULKAX_HAS_OPENEXR=1)
@@ -38,7 +36,7 @@ endif()
 if (APPLE)
   target_link_libraries(VulkaxPhysicsVulkanDirect PRIVATE "-framework Cocoa" "-framework QuartzCore")
 endif()
-add_dependencies(VulkaxPhysicsVulkanDirect Shaders)
+add_dependencies(VulkaxPhysicsVulkanDirect Shaders VulkaxRuntimeResources)
 
 add_dependencies(${PROJECT_NAME} Shaders)
 add_custom_command(

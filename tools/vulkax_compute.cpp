@@ -1,4 +1,5 @@
 #include <vulkan/vulkan.h>
+#include "runtime_paths.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -163,9 +164,9 @@ int main(int argc, char** argv) {
 #ifdef VULKAX_GENERATED_WAVE_SPIRV
         ? std::filesystem::path{VULKAX_GENERATED_WAVE_SPIRV}
 #else
-        ? std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_generated_wave_field.comp.spv"
+        ? lve::resolveRuntimeResource("shaders/vulkax_generated_wave_field.comp.spv")
 #endif
-        : std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_wave_field.comp.spv";
+        : lve::resolveRuntimeResource("shaders/vulkax_wave_field.comp.spv");
     const auto code = readFile(shaderPath);
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = code.size(); shaderInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());

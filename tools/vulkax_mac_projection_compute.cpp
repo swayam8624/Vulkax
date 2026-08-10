@@ -1,4 +1,5 @@
 #include <vulkan/vulkan.h>
+#include "runtime_paths.hpp"
 
 #include "vulkax/sim/sparse_brick_storage.hpp"
 
@@ -668,9 +669,9 @@ int main(int argc, char** argv) {
         vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout),
         "vkCreatePipelineLayout");
     const auto shaderCode =
-        readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_mac_projection.comp.spv");
+        readFile(lve::resolveRuntimeResource("shaders/vulkax_mac_projection.comp.spv"));
     const auto residencyShaderCode =
-        readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_sparse_residency.comp.spv");
+        readFile(lve::resolveRuntimeResource("shaders/vulkax_sparse_residency.comp.spv"));
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = shaderCode.size();
     shaderInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
@@ -679,7 +680,7 @@ int main(int argc, char** argv) {
     VkShaderModule contactShader = VK_NULL_HANDLE;
     if (runtimeBodyCount > 1u) {
       const auto contactShaderCode =
-          readFile(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_rigid_contacts.comp.spv");
+          readFile(lve::resolveRuntimeResource("shaders/vulkax_rigid_contacts.comp.spv"));
       shaderInfo.codeSize = contactShaderCode.size();
       shaderInfo.pCode = reinterpret_cast<const uint32_t*>(contactShaderCode.data());
       check(

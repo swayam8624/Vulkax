@@ -1,4 +1,5 @@
 #include "vulkax/sim/particle_system.hpp"
+#include "runtime_paths.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -206,7 +207,7 @@ int main(int argc, char** argv) {
     pipelineLayoutInfo.pSetLayouts = &descriptorLayout;
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     check(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout), "vkCreatePipelineLayout");
-    const auto shaderBytes = binary(std::filesystem::path(ENGINE_DIR) / "shaders/vulkax_particle_gravity_step.comp.spv");
+    const auto shaderBytes = binary(lve::resolveRuntimeResource("shaders/vulkax_particle_gravity_step.comp.spv"));
     VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     shaderInfo.codeSize = shaderBytes.size();
     shaderInfo.pCode = reinterpret_cast<const uint32_t*>(shaderBytes.data());

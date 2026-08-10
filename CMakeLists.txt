@@ -1,7 +1,7 @@
 include(./.env.cmake OPTIONAL RESULT_VARIABLE LOCAL_ENV)
 message(STATUS "Local .env.cmake: ${LOCAL_ENV}")
 
-cmake_minimum_required(VERSION 3.11.0)
+cmake_minimum_required(VERSION 3.24)
 
 set(NAME LveEngine)
 
@@ -19,9 +19,14 @@ project(${NAME} VERSION 0.24.0)
 
 include(cmake/VulkaxDependencies.cmake)
 
+add_library(vulkax_runtime_paths STATIC src/runtime_paths.cpp)
+target_compile_features(vulkax_runtime_paths PUBLIC cxx_std_20)
+target_include_directories(vulkax_runtime_paths PUBLIC ${PROJECT_SOURCE_DIR}/src)
+
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/src/*.cpp)
 list(FILTER SOURCES EXCLUDE REGEX "/src/atlas/")
 list(FILTER SOURCES EXCLUDE REGEX "/src/vulkax/")
+list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/runtime_paths.cpp")
 if (APPLE)
   enable_language(OBJCXX)
   list(REMOVE_ITEM SOURCES
@@ -163,21 +168,18 @@ target_link_libraries(VulkaxRelativityBenchmark PRIVATE vulkax_relativity)
 add_executable(VulkaxComputeBenchmark tools/vulkax_compute.cpp)
 set_target_properties(VulkaxComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-compute)
 target_compile_features(VulkaxComputeBenchmark PRIVATE cxx_std_20)
-target_compile_definitions(VulkaxComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
-target_link_libraries(VulkaxComputeBenchmark PRIVATE Vulkan::Vulkan)
+target_link_libraries(VulkaxComputeBenchmark PRIVATE Vulkan::Vulkan vulkax_runtime_paths)
 
 add_executable(VulkaxActiveRayCompaction tools/vulkax_active_ray_compaction.cpp)
 set_target_properties(VulkaxActiveRayCompaction PROPERTIES OUTPUT_NAME vulkax-active-rays)
 target_compile_features(VulkaxActiveRayCompaction PRIVATE cxx_std_20)
-target_compile_definitions(VulkaxActiveRayCompaction PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
 target_include_directories(VulkaxActiveRayCompaction PRIVATE ${Vulkan_INCLUDE_DIRS})
-target_link_libraries(VulkaxActiveRayCompaction PRIVATE vulkax_relativity Vulkan::Vulkan)
+target_link_libraries(VulkaxActiveRayCompaction PRIVATE vulkax_relativity Vulkan::Vulkan vulkax_runtime_paths)
 
 add_executable(VulkaxSchwarzschildComputeBenchmark tools/vulkax_schwarzschild_compute.cpp)
 set_target_properties(VulkaxSchwarzschildComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-schwarzschild-compute)
 target_compile_features(VulkaxSchwarzschildComputeBenchmark PRIVATE cxx_std_20)
-target_compile_definitions(VulkaxSchwarzschildComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
-target_link_libraries(VulkaxSchwarzschildComputeBenchmark PRIVATE vulkax_relativity Vulkan::Vulkan)
+target_link_libraries(VulkaxSchwarzschildComputeBenchmark PRIVATE vulkax_relativity Vulkan::Vulkan vulkax_runtime_paths)
 
 add_executable(VulkaxEquationShaderEmit tools/equation_shader_emit.cpp)
 set_target_properties(VulkaxEquationShaderEmit PROPERTIES OUTPUT_NAME vulkax-equation-shader)
@@ -192,32 +194,27 @@ target_link_libraries(VulkaxStencilShaderEmit PRIVATE vulkax_physics_ir)
 add_executable(VulkaxSimulationComputeBenchmark tools/vulkax_sim_compute.cpp)
 set_target_properties(VulkaxSimulationComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-sim-compute)
 target_compile_features(VulkaxSimulationComputeBenchmark PRIVATE cxx_std_20)
-target_compile_definitions(VulkaxSimulationComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
-target_link_libraries(VulkaxSimulationComputeBenchmark PRIVATE vulkax_sim Vulkan::Vulkan)
+target_link_libraries(VulkaxSimulationComputeBenchmark PRIVATE vulkax_sim Vulkan::Vulkan vulkax_runtime_paths)
 
 add_executable(VulkaxReactionComputeBenchmark tools/vulkax_reaction_compute.cpp)
 set_target_properties(VulkaxReactionComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-reaction-compute)
 target_compile_features(VulkaxReactionComputeBenchmark PRIVATE cxx_std_20)
-target_compile_definitions(VulkaxReactionComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
-target_link_libraries(VulkaxReactionComputeBenchmark PRIVATE vulkax_sim Vulkan::Vulkan)
+target_link_libraries(VulkaxReactionComputeBenchmark PRIVATE vulkax_sim Vulkan::Vulkan vulkax_runtime_paths)
 
 add_executable(VulkaxMacProjectionCompute tools/vulkax_mac_projection_compute.cpp)
 set_target_properties(VulkaxMacProjectionCompute PROPERTIES OUTPUT_NAME vulkax-mac-projection)
 target_compile_features(VulkaxMacProjectionCompute PRIVATE cxx_std_20)
-target_compile_definitions(VulkaxMacProjectionCompute PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
-target_link_libraries(VulkaxMacProjectionCompute PRIVATE vulkax_sim Vulkan::Vulkan)
+target_link_libraries(VulkaxMacProjectionCompute PRIVATE vulkax_sim Vulkan::Vulkan vulkax_runtime_paths)
 
 add_executable(VulkaxSparseBrickCompute tools/vulkax_sparse_brick_compute.cpp)
 set_target_properties(VulkaxSparseBrickCompute PROPERTIES OUTPUT_NAME vulkax-sparse-bricks)
 target_compile_features(VulkaxSparseBrickCompute PRIVATE cxx_std_20)
-target_compile_definitions(VulkaxSparseBrickCompute PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
-target_link_libraries(VulkaxSparseBrickCompute PRIVATE vulkax_sim Vulkan::Vulkan)
+target_link_libraries(VulkaxSparseBrickCompute PRIVATE vulkax_sim Vulkan::Vulkan vulkax_runtime_paths)
 
 add_executable(VulkaxParticleComputeBenchmark tools/vulkax_particle_compute.cpp)
 set_target_properties(VulkaxParticleComputeBenchmark PROPERTIES OUTPUT_NAME vulkax-particle-compute)
 target_compile_features(VulkaxParticleComputeBenchmark PRIVATE cxx_std_20)
-target_compile_definitions(VulkaxParticleComputeBenchmark PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
-target_link_libraries(VulkaxParticleComputeBenchmark PRIVATE vulkax_sim Vulkan::Vulkan)
+target_link_libraries(VulkaxParticleComputeBenchmark PRIVATE vulkax_sim Vulkan::Vulkan vulkax_runtime_paths)
 
 add_executable(VulkaxEquationBenchmark tools/equation_benchmark.cpp)
 set_target_properties(VulkaxEquationBenchmark PROPERTIES OUTPUT_NAME vulkax-equations)
@@ -275,13 +272,12 @@ if (VULKAX_BUILD_PHYSICS_STUDIO)
       )
     endif()
     target_compile_features(VulkaxPhysicsStudio PRIVATE cxx_std_20)
-    target_compile_definitions(VulkaxPhysicsStudio PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
     target_include_directories(
       VulkaxPhysicsStudio PRIVATE ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/include)
     target_link_libraries(
       VulkaxPhysicsStudio PRIVATE
       vulkax_equation Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
-      vulkax_research vulkax_sim vulkax_relativity vulkax_physics_ir Vulkan::Vulkan
+      vulkax_research vulkax_sim vulkax_relativity vulkax_physics_ir vulkax_runtime_paths Vulkan::Vulkan
     )
     if (TARGET PkgConfig::OPENEXR)
       target_link_libraries(VulkaxPhysicsStudio PRIVATE PkgConfig::OPENEXR)
@@ -310,13 +306,12 @@ if (VULKAX_BUILD_PHYSICS_STUDIO)
         src/vulkax/editor/resources.qrc
       )
       target_compile_features(VulkaxPhysicsStudioTestRunner PRIVATE cxx_std_20)
-      target_compile_definitions(VulkaxPhysicsStudioTestRunner PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
       target_include_directories(
         VulkaxPhysicsStudioTestRunner PRIVATE ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/include)
       target_link_libraries(
         VulkaxPhysicsStudioTestRunner PRIVATE
         vulkax_equation Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
-        vulkax_research vulkax_sim vulkax_relativity vulkax_physics_ir Vulkan::Vulkan
+        vulkax_research vulkax_sim vulkax_relativity vulkax_physics_ir vulkax_runtime_paths Vulkan::Vulkan
       )
       if (TARGET PkgConfig::OPENEXR)
         target_link_libraries(VulkaxPhysicsStudioTestRunner PRIVATE PkgConfig::OPENEXR)
@@ -356,8 +351,18 @@ target_link_libraries(VulkaxAtlasBenchmark PRIVATE VulkaxAtlasCore)
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
-target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_DIR="${PROJECT_SOURCE_DIR}/")
-target_link_libraries(${PROJECT_NAME} glm::glm VulkaxAtlasCore)
+execute_process(
+  COMMAND git rev-parse HEAD
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+  OUTPUT_VARIABLE VULKAX_BUILD_GIT_COMMIT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+)
+if (NOT VULKAX_BUILD_GIT_COMMIT)
+  set(VULKAX_BUILD_GIT_COMMIT "unknown")
+endif()
+target_compile_definitions(${PROJECT_NAME} PRIVATE VULKAX_BUILD_GIT_COMMIT="${VULKAX_BUILD_GIT_COMMIT}")
+target_link_libraries(${PROJECT_NAME} glm::glm VulkaxAtlasCore vulkax_runtime_paths)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
 
@@ -381,12 +386,11 @@ if (WIN32)
     ${GLM_PATH}
     )
 
-  target_link_directories(${PROJECT_NAME} PUBLIC
-    Vulkan::Vulkan
-    ${GLFW_LIB}
-  )
+  if (GLFW_LIB AND NOT GLFW_LIB STREQUAL "glfw")
+    target_link_directories(${PROJECT_NAME} PUBLIC ${GLFW_LIB})
+  endif()
 
-  target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 nlohmann_json::nlohmann_json)
+  target_link_libraries(${PROJECT_NAME} glfw3 Vulkan::Vulkan nlohmann_json::nlohmann_json)
 elseif (UNIX)
     message(STATUS "CREATING BUILD FOR UNIX")
     target_include_directories(${PROJECT_NAME} PUBLIC
@@ -401,6 +405,7 @@ endif()
 
 
 include(cmake/VulkaxShaders.cmake)
+include(cmake/VulkaxRuntimeResources.cmake)
 
 include(cmake/VulkaxApplications.cmake)
 include(cmake/VulkaxTests.cmake)

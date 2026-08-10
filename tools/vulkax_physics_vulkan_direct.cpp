@@ -1,4 +1,5 @@
 #include <GLFW/glfw3.h>
+#include "runtime_paths.hpp"
 
 #include <array>
 #include <chrono>
@@ -299,7 +300,7 @@ class DirectPhysicsPresenter final {
         "vkCreatePipelineLayout compute");
 
     const auto computeCode =
-        readBinary(std::filesystem::path{ENGINE_DIR} / "shaders/vulkax_direct_wave.comp.spv");
+        readBinary(lve::resolveRuntimeResource("shaders/vulkax_direct_wave.comp.spv"));
     VkShaderModuleCreateInfo moduleInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     moduleInfo.codeSize = computeCode.size();
     moduleInfo.pCode = reinterpret_cast<const uint32_t*>(computeCode.data());
