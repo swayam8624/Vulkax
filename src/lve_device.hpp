@@ -40,7 +40,9 @@ struct QueueFamilyIndices {
 
 class LveDevice {
  public:
-#ifdef NDEBUG
+#if defined(VULKAX_FORCE_VALIDATION_LAYERS)
+  const bool enableValidationLayers = true;
+#elif defined(NDEBUG)
   const bool enableValidationLayers = false;
 #else
   const bool enableValidationLayers = true;
