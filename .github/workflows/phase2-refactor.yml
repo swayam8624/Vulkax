@@ -19,6 +19,17 @@ jobs:
           fetch-depth: 0
       - name: Apply deterministic refactor
         run: python3 tools/maintenance/phase2_refactor.py
+      - name: Normalize extracted modules
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ("cmake/VulkaxDependencies.cmake", "cmake/VulkaxShaders.cmake"):
+              path = Path(name)
+              lines = [line.rstrip() for line in path.read_text().splitlines()]
+              while lines and not lines[-1]:
+                  lines.pop()
+              path.write_text("\n".join(lines) + "\n")
+          PY
       - name: Commit refactor
         run: |
           git config user.name "github-actions[bot]"
