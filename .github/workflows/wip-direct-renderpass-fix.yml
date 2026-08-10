@@ -1,0 +1,66 @@
+name: WIP direct presenter render-pass fix
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Vulkan validation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ libglfw3-dev libglm-dev \
+            nlohmann-json3-dev libsqlite3-dev libvulkan-dev vulkan-tools mesa-vulkan-drivers \
+            vulkan-validationlayers libcurl4-openssl-dev glslang-tools xvfb pkg-config libopenexr-dev
+      - name: Apply render-pass generation fix
+        run: python3 scripts/fix_direct_presenter_renderpass.py
+      - name: Configure validated direct presenter
+        run: >-
+          cmake -S . -B build-direct -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=OFF
+          -DVULKAX_BUILD_PHYSICS_STUDIO=OFF
+          -DVULKAX_DIRECT_VULKAN_VALIDATION=ON
+      - name: Build direct presenter
+        run: cmake --build build-direct --target VulkaxPhysicsVulkanDirect
+      - name: Resolve Lavapipe
+        run: |
+          LVP_ICD="$(find /usr/share/vulkan/icd.d /etc/vulkan/icd.d -type f -name 'lvp_icd*.json' -print -quit 2>/dev/null)"
+          test -n "$LVP_ICD"
+          echo "VK_DRIVER_FILES=$LVP_ICD" >> "$GITHUB_ENV"
+      - name: Run all direct presentation modes with validation
+        run: |
+          set -o pipefail
+          : > /tmp/direct-validation.log
+          for mode in wave black-hole kerr volume; do
+            case "$mode" in
+              wave) args="" ;;
+              black-hole) args="--black-hole" ;;
+              kerr) args="--kerr --spin 0.72" ;;
+              volume) args="--volume" ;;
+            esac
+            xvfb-run -a build-direct/vulkax-physics-vulkan-direct --smoke --frames 2 $args \
+              2>&1 | tee -a /tmp/direct-validation.log
+          done
+          if grep -E 'Validation Error|VUID-' /tmp/direct-validation.log; then
+            echo "Direct presenter emitted Vulkan validation errors" >&2
+            exit 1
+          fi
+      - name: Commit validated source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lve_renderer.hpp src/lve_renderer.cpp tools/vulkax_physics_vulkan_direct.cpp
+          git diff --cached --check
+          git commit -m "Rebuild direct graphics pipeline after swapchain recreation"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
