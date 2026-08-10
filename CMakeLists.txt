@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(VulkaxNext VERSION 0.1.0 LANGUAGES CXX)
+project(Vulkax VERSION 0.2.0 LANGUAGES CXX)
 
-option(VULKAX_BUILD_TESTS "Build Vulkax core tests" ON)
+option(VULKAX_BUILD_TESTS "Build Vulkax tests" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,9 +12,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_library(vulkax_core STATIC
     src/backend/backend.cpp
     src/backend/probe.cpp
+    src/numerics/dense.cpp
+    src/numerics/grid.cpp
     src/operators/operator_graph.cpp
     src/problem/problem_ir.cpp
     src/problem/validation.cpp
+    src/research/operator_influence.cpp
+    src/solvers/dem.cpp
+    src/solvers/diffusion.cpp
+    src/verify/convergence.cpp
     src/verify/result_certificate.cpp
 )
 
@@ -54,12 +60,15 @@ target_link_libraries(vulkax PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-    add_executable(vulkax_core_tests tests/core_tests.cpp)
-    target_link_libraries(vulkax_core_tests PRIVATE vulkax_core)
-    if(MSVC)
-        target_compile_options(vulkax_core_tests PRIVATE /W4 /permissive-)
-    else()
-        target_compile_options(vulkax_core_tests PRIVATE -Wall -Wextra -Wpedantic)
-    endif()
-    add_test(NAME vulkax_core COMMAND vulkax_core_tests)
+
+    foreach(test_name IN ITEMS core numerics research)
+        add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
+        target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
+        if(MSVC)
+            target_compile_options(vulkax_${test_name}_tests PRIVATE /W4 /permissive-)
+        else()
+            target_compile_options(vulkax_${test_name}_tests PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+        add_test(NAME vulkax_${test_name} COMMAND vulkax_${test_name}_tests)
+    endforeach()
 endif()
