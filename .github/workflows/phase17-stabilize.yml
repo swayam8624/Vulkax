@@ -1,0 +1,48 @@
+name: Phase 17 stabilize premature merges
+
+on:
+  push:
+    branches:
+      - agent/phase17-stabilize-premature-merges
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/phase17-stabilize-premature-merges
+      - name: Apply intended source migrations
+        run: python3 scripts/phase17_stabilize.py
+      - name: Build native Studio with canonical compiler
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: swift build -c release
+      - name: Verify canonical equation bridge
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-canonical-equation-bridge-smoke
+      - name: Verify dynamic equation and cinematic paths
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: |
+          .build/release/VulkaxPhysicsStudioMac --native-dynamic-equation-project-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-cinematic-capture-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-scene-mesh-gpu-smoke ../../tests/fixtures/airflow_cube.obj
+      - name: Configure portable CMake surface
+        run: >-
+          cmake -S . -B build-stabilize -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+          -DVULKAX_BUILD_PHYSICS_STUDIO=OFF
+      - name: Build migrated vulkax_gpu compute tool
+        run: cmake --build build-stabilize --target VulkaxComputeBenchmark PhysicsIrTests
+      - name: Commit validated source migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- ':!.github/workflows'
+          git diff --cached --check
+          git commit -m "Finish canonical compiler, Windows and vulkax_gpu migrations"
+          git push origin HEAD:agent/phase17-stabilize-premature-merges
