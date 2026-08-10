@@ -1,0 +1,236 @@
+name: WIP camera director track
+
+on:
+  push:
+    branches:
+      - fix/camera-director-track
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/camera-director-track
+      - name: Wire camera track into projects, UI and capture
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          project=Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/PhysicsProject.swift')
+          text=project.read_text()
+          text=text.replace('    var version = 8\n','    var version = 9\n',1)
+          if 'var cameraTrack: StudioCameraTrack' not in text:
+              text=text.replace('''    var camera: StudioCamera
+    var captureSettings: CinematicCaptureSettings
+''','''    var camera: StudioCamera
+    var cameraTrack: StudioCameraTrack
+    var captureSettings: CinematicCaptureSettings
+''',1)
+              text=text.replace('''        case camera
+        case captureSettings = "capture_settings"
+''','''        case camera
+        case cameraTrack = "camera_track"
+        case captureSettings = "capture_settings"
+''',1)
+              text=text.replace('''        camera: StudioCamera = .default,
+        captureSettings: CinematicCaptureSettings = .init()
+''','''        camera: StudioCamera = .default,
+        cameraTrack: StudioCameraTrack = .init(),
+        captureSettings: CinematicCaptureSettings = .init()
+''',1)
+              text=text.replace('''        self.camera = camera
+        self.captureSettings = captureSettings
+''','''        self.camera = camera
+        self.cameraTrack = cameraTrack
+        self.captureSettings = captureSettings
+''',1)
+              text=text.replace('''        camera = try container.decodeIfPresent(StudioCamera.self, forKey: .camera) ?? .default
+        captureSettings = try container.decodeIfPresent(
+''','''        camera = try container.decodeIfPresent(StudioCamera.self, forKey: .camera) ?? .default
+        cameraTrack = try container.decodeIfPresent(StudioCameraTrack.self, forKey: .cameraTrack) ?? .init()
+        captureSettings = try container.decodeIfPresent(
+''',1)
+          text=text.replace('(1...8).contains(project.version)','(1...9).contains(project.version)',1)
+          project.write_text(text)
+
+          capture=Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/CinematicCaptureSession.swift')
+          text=capture.read_text()
+          if 'let cameraTrack: StudioCameraTrack' not in text:
+              text=text.replace('''    let camera: StudioCamera
+    let timelineSeconds: Float
+''','''    let camera: StudioCamera
+    let cameraTrack: StudioCameraTrack
+    let timelineSeconds: Float
+''',1)
+          capture.write_text(text)
+
+          main=Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/main.swift')
+          text=main.read_text()
+          if '@Published var cameraTrack' not in text:
+              text=text.replace('''    @Published var camera = StudioCamera.default
+    @Published var mediumOverride: SimulationMedium?
+''','''    @Published var camera = StudioCamera.default
+    @Published var cameraTrack = StudioCameraTrack()
+    @Published var mediumOverride: SimulationMedium?
+''',1)
+              text=text.replace('''        camera = .default
+        mediumOverride = nil
+''','''        camera = .default
+        cameraTrack = .init()
+        mediumOverride = nil
+''',1)
+              text=text.replace('''            camera = project.camera
+            mediumOverride = project.mediumOverride
+''','''            camera = project.camera
+            cameraTrack = project.cameraTrack
+            mediumOverride = project.mediumOverride
+''',1)
+              text=text.replace('''                mediumOverride: mediumOverride,
+                camera: camera,
+                captureSettings: captureSettings)
+''','''                mediumOverride: mediumOverride,
+                camera: camera,
+                cameraTrack: cameraTrack,
+                captureSettings: captureSettings)
+''',1)
+              marker='''    func applyCameraPreset(_ preset: StudioCameraPreset) {
+        camera.apply(preset)
+        accumulationResetToken &+= 1
+    }
+'''
+              addition=marker+'''\n    func addCameraKeyframe() {
+        cameraTrack.insert(timeSeconds: time, camera: camera)
+        equationStatus = "Camera key added at \(String(format: \"%.2f\", time)) s"
+    }
+
+    func removeCameraKeyframe(_ id: UUID) {
+        cameraTrack.remove(id: id)
+    }
+
+    func jumpToCameraKeyframe(_ keyframe: StudioCameraKeyframe) {
+        time = keyframe.timeSeconds
+        camera = keyframe.camera
+        playing = false
+        accumulationResetToken &+= 1
+    }
+'''
+              if marker not in text: raise SystemExit('camera method marker missing')
+              text=text.replace(marker,addition,1)
+              text=text.replace('''            settings: captureSettings,
+            camera: camera,
+            timelineSeconds: time)
+''','''            settings: captureSettings,
+            camera: camera,
+            cameraTrack: cameraTrack,
+            timelineSeconds: time)
+''',1)
+              text=text.replace('''    private var activeCaptureCamera: StudioCamera?
+    private var captureStartTimeline: Float = 0
+''','''    private var activeCaptureCamera: StudioCamera?
+    private var activeCaptureCameraTrack = StudioCameraTrack()
+    private var captureStartTimeline: Float = 0
+''',1)
+              text=text.replace('''            activeCaptureCamera = request.camera
+            captureStartTimeline = request.timelineSeconds
+''','''            activeCaptureCamera = request.camera
+            activeCaptureCameraTrack = request.cameraTrack
+            captureStartTimeline = request.timelineSeconds
+''',1)
+              text=text.replace('''        let effectiveCamera = activeCaptureCamera.flatMap { activeCapture == nil ? nil : $0 } ?? model.camera
+''','''        let effectiveCamera: StudioCamera
+        if activeCapture != nil, let fallback = activeCaptureCamera {
+            effectiveCamera = activeCaptureCameraTrack.camera(at: simulationTime, fallback: fallback)
+        } else {
+            effectiveCamera = model.cameraTrack.camera(at: model.time, fallback: model.camera)
+        }
+''',1)
+              # Ensure all capture completion/failure paths reset the track snapshot too.
+              text=text.replace('''                activeCaptureCamera = nil
+                failedSession?.finish''','''                activeCaptureCamera = nil
+                activeCaptureCameraTrack = .init()
+                failedSession?.finish''')
+              text=text.replace('''                            self?.activeCaptureCamera = nil
+                            DispatchQueue.main.async''','''                            self?.activeCaptureCamera = nil
+                            self?.activeCaptureCameraTrack = .init()
+                            DispatchQueue.main.async''')
+              text=text.replace('''                    self?.activeCaptureCamera = nil
+                    failedSession?.finish''','''                    self?.activeCaptureCamera = nil
+                    self?.activeCaptureCameraTrack = .init()
+                    failedSession?.finish''')
+          cli='''        if CommandLine.arguments.contains("--native-cinematic-capture-smoke") {
+            exit(runCinematicCaptureWriterSmoke() ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
+'''
+          if '--native-camera-track-smoke' not in text:
+              if cli not in text: raise SystemExit('capture CLI marker missing')
+              text=text.replace(cli,cli+'''        if CommandLine.arguments.contains("--native-camera-track-smoke") {
+            exit(runCameraTrackSmoke() ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
+''',1)
+          main.write_text(text)
+
+          ui=Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/StudioWorkspaceView.swift')
+          text=ui.read_text()
+          marker='''            scalar("Exposure", value: cameraBinding(\\.exposure), range: 0.05...8)
+            Divider()
+            Text("CAPTURE").sectionLabel()
+'''
+          if 'Add Camera Key' not in text:
+              addition='''            scalar("Exposure", value: cameraBinding(\\.exposure), range: 0.05...8)
+            HStack {
+                Button { model.addCameraKeyframe() } label: { Label("Add Camera Key", systemImage: "diamond.fill") }
+                Spacer()
+                Text("\(model.cameraTrack.keyframes.count) keys").font(.caption).foregroundStyle(.secondary)
+            }
+            if !model.cameraTrack.keyframes.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(model.cameraTrack.keyframes) { keyframe in
+                        HStack {
+                            Button { model.jumpToCameraKeyframe(keyframe) } label: {
+                                Text(String(format: "%.2f s", keyframe.timeSeconds)).monospacedDigit()
+                            }
+                            .buttonStyle(.plain)
+                            Spacer()
+                            Text(String(format: "FOV %.1f°", keyframe.camera.verticalFovDegrees))
+                                .font(.caption2).foregroundStyle(.secondary)
+                            Button { model.removeCameraKeyframe(keyframe.id) } label: { Image(systemName: "xmark.circle") }
+                                .buttonStyle(.borderless)
+                        }
+                    }
+                }
+                .padding(7)
+                .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 7))
+            }
+            Divider()
+            Text("CAPTURE").sectionLabel()
+'''
+              if marker not in text: raise SystemExit('camera inspector marker missing')
+              text=text.replace(marker,addition,1)
+          ui.write_text(text)
+          PY
+      - name: Build native Studio
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: swift build -c release
+      - name: Verify camera interpolation and capture regressions
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: |
+          .build/release/VulkaxPhysicsStudioMac --native-camera-track-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-cinematic-capture-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-volume-gpu-smoke
+      - name: Commit final source only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/StudioCameraTrack.swift \
+            apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/PhysicsProject.swift \
+            apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/CinematicCaptureSession.swift \
+            apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/main.swift \
+            apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/StudioWorkspaceView.swift
+          git diff --cached --check
+          git commit -m "Add cinematic camera keyframe tracks"
+          git push origin HEAD:fix/camera-director-track
