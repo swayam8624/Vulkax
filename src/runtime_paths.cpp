@@ -1,5 +1,6 @@
 #include "runtime_paths.hpp"
 
+#include <array>
 #include <cstdlib>
 #include <system_error>
 #include <vector>
