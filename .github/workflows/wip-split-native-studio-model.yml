@@ -1,0 +1,56 @@
+name: WIP split native Studio model
+
+on:
+  push:
+    branches:
+      - fix/split-native-studio-model
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/split-native-studio-model
+      - name: Extract editor state from main.swift
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/main.swift')
+          text=path.read_text()
+          start=text.find('enum VisualizerMode: Float, CaseIterable, Identifiable {')
+          if start < 0: raise SystemExit('VisualizerMode start marker missing')
+          candidates=['private struct WaveUniforms', 'struct WaveUniforms', 'private struct NativeFrameUniforms', 'struct NativeFrameUniforms']
+          end=-1
+          for marker in candidates:
+              candidate=text.find(marker,start)
+              if candidate >= 0 and (end < 0 or candidate < end): end=candidate
+          if end < 0: raise SystemExit('renderer uniform boundary marker missing')
+          extracted=text[start:end].rstrip()+"\n"
+          # Imports are repeated intentionally: Swift files compile as one module.
+          model='''import SwiftUI\nimport MetalKit\nimport Foundation\nimport UniformTypeIdentifiers\nimport simd\n\n'''+extracted
+          Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/PhysicsModel.swift').write_text(model)
+          path.write_text(text[:start]+text[end:])
+          PY
+      - name: Build native Studio
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: swift build -c release
+      - name: Run product regression smokes
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: |
+          .build/release/VulkaxPhysicsStudioMac --native-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-volume-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-cinematic-capture-smoke
+      - name: Commit behavior-preserving extraction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/main.swift \
+            apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/PhysicsModel.swift
+          git diff --cached --check
+          git commit -m "Split native Studio editor state from renderer"
+          git push origin HEAD:fix/split-native-studio-model
