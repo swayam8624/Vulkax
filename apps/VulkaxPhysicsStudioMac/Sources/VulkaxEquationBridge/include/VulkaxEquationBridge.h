@@ -1,5 +1,4 @@
-#ifndef VULKAX_EQUATION_BRIDGE_H
-#define VULKAX_EQUATION_BRIDGE_H
+#pragma once
 
 #include <stdint.h>
 
@@ -7,8 +6,6 @@
 extern "C" {
 #endif
 
-// Opaque result owned by the bridge. The result exists even when compilation
-// fails so Swift can surface the canonical C++ diagnostic verbatim.
 typedef void* VulkaxCompiledEquationHandle;
 
 VulkaxCompiledEquationHandle vulkax_compile_scalar_equation(const char* source);
@@ -21,6 +18,4 @@ void vulkax_destroy_compiled_equation(VulkaxCompiledEquationHandle handle);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

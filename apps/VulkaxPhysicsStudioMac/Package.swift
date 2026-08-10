@@ -11,11 +11,18 @@ let package = Package(
             path: "Sources/VulkaxRuntimeContract",
             publicHeadersPath: "include"
         ),
+        .target(
+            name: "VulkaxEquationBridge",
+            path: "Sources/VulkaxEquationBridge",
+            publicHeadersPath: "include",
+            cxxSettings: [.unsafeFlags(["-I../../src"])]
+        ),
         .executableTarget(
             name: "VulkaxPhysicsStudioMac",
-            dependencies: ["VulkaxRuntimeContract"],
+            dependencies: ["VulkaxRuntimeContract", "VulkaxEquationBridge"],
             swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         )
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v5],
+    cxxLanguageStandard: .cxx20
 )
