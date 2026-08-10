@@ -1,10 +1,12 @@
 import Foundation
 import Metal
+import MetalKit
 import simd
 
 private struct StudioSceneVertex {
     var positionBody: SIMD4<Float>
     var normal: SIMD4<Float>
+    var texCoord: SIMD4<Float>
 }
 
 private struct StudioSceneCameraUniforms {
@@ -14,14 +16,27 @@ private struct StudioSceneCameraUniforms {
     var aspectNearFar: SIMD4<Float>
 }
 
+private struct StudioSceneMaterialUniforms {
+    var baseColor: SIMD4<Float>
+    var emissiveMetallic: SIMD4<Float>
+    var roughnessFlags: SIMD4<Float>
+}
+
+private struct StudioSceneBatch {
+    let vertices: MTLBuffer
+    let vertexCount: Int
+    var material: StudioSceneMaterialUniforms
+    let baseColorTexture: MTLTexture
+}
+
 final class StudioSceneMeshRenderer {
     private let interactivePipeline: MTLRenderPipelineState
     private let capturePipeline: MTLRenderPipelineState
     private let depthState: MTLDepthStencilState
-    private var simulatedVertices: MTLBuffer?
-    private var simulatedVertexCount = 0
-    private var staticVertices: MTLBuffer?
-    private var staticVertexCount = 0
+    private let samplerState: MTLSamplerState
+    private let whiteTexture: MTLTexture
+    private var simulatedBatches: [StudioSceneBatch] = []
+    private var staticBatches: [StudioSceneBatch] = []
     private var staticBodies: MTLBuffer?
     private var activeRevision: UInt64 = .max
     private var captureDepth: MTLTexture?
@@ -31,7 +46,7 @@ final class StudioSceneMeshRenderer {
         #include <metal_stdlib>
         using namespace metal;
 
-        struct SceneVertex { float4 positionBody; float4 normal; };
+        struct SceneVertex { float4 positionBody; float4 normal; float4 texCoord; };
         struct RigidMeshState {
             float4 positionMass;
             float4 orientation;
@@ -46,11 +61,16 @@ final class StudioSceneMeshRenderer {
             float4 upFov;
             float4 aspectNearFar;
         };
+        struct Material {
+            float4 baseColor;
+            float4 emissiveMetallic;
+            float4 roughnessFlags;
+        };
         struct Out {
             float4 position [[position]];
             float3 worldPosition;
             float3 normal;
-            float bodyIndex;
+            float2 uv;
         };
 
         float3 rotateByQuaternion(float3 value, float4 q) {
@@ -93,26 +113,73 @@ final class StudioSceneMeshRenderer {
                 viewZ);
             out.worldPosition = world;
             out.normal = normal;
-            out.bodyIndex = float(bodyIndex);
+            out.uv = source.texCoord.xy;
             return out;
         }
 
-        fragment half4 studioSceneFragment(Out in [[stage_in]], constant Camera& camera [[buffer(2)]]) {
+        float distributionGGX(float3 n, float3 h, float roughness) {
+            float a = roughness * roughness;
+            float a2 = a * a;
+            float ndoth = max(dot(n, h), 0.0);
+            float ndoth2 = ndoth * ndoth;
+            float denominator = ndoth2 * (a2 - 1.0) + 1.0;
+            return a2 / max(M_PI_F * denominator * denominator, 1e-5);
+        }
+
+        float geometrySchlickGGX(float ndotv, float roughness) {
+            float r = roughness + 1.0;
+            float k = (r * r) / 8.0;
+            return ndotv / max(ndotv * (1.0 - k) + k, 1e-5);
+        }
+
+        float geometrySmith(float3 n, float3 v, float3 l, float roughness) {
+            return geometrySchlickGGX(max(dot(n, v), 0.0), roughness) *
+                   geometrySchlickGGX(max(dot(n, l), 0.0), roughness);
+        }
+
+        float3 fresnelSchlick(float cosTheta, float3 f0) {
+            return f0 + (1.0 - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+        }
+
+        fragment half4 studioSceneFragment(
+            Out in [[stage_in]],
+            constant Camera& camera [[buffer(2)]],
+            constant Material& material [[buffer(3)]],
+            texture2d<float> baseColorTexture [[texture(0)]],
+            sampler surfaceSampler [[sampler(0)]]) {
+            float4 sampled = baseColorTexture.sample(surfaceSampler, in.uv);
+            float4 baseSample = sampled * material.baseColor;
+            float3 albedo = max(baseSample.rgb, float3(0.0));
+            float alpha = clamp(baseSample.a, 0.0, 1.0);
+            float metallic = clamp(material.emissiveMetallic.w, 0.0, 1.0);
+            float roughness = clamp(material.roughnessFlags.x, 0.04, 1.0);
+            float3 emissive = max(material.emissiveMetallic.xyz, float3(0.0));
+
             float3 n = normalize(in.normal);
-            float3 view = normalize(camera.positionExposure.xyz - in.worldPosition);
-            float3 key = normalize(float3(-0.45, 0.85, 0.55));
-            float3 rimDirection = normalize(float3(0.65, 0.25, -0.70));
-            float diffuse = max(dot(n, key), 0.0);
-            float rim = pow(max(1.0 - dot(n, view), 0.0), 2.4);
-            float fill = 0.18 + 0.16 * max(dot(n, rimDirection), 0.0);
-            float3 base = mix(float3(0.055, 0.075, 0.095), float3(0.10, 0.36, 0.38),
-                              0.45 + 0.25 * sin(in.bodyIndex * 1.73));
-            float3 color = base * (fill + 0.92 * diffuse) + float3(0.20, 0.75, 0.80) * rim * 0.42;
-            float specular = pow(max(dot(reflect(-key, n), view), 0.0), 48.0);
-            color += specular * 0.45;
+            float3 v = normalize(camera.positionExposure.xyz - in.worldPosition);
+            float3 l = normalize(float3(-0.42, 0.82, 0.52));
+            float3 h = normalize(v + l);
+            float ndotl = max(dot(n, l), 0.0);
+            float ndotv = max(dot(n, v), 0.0);
+            float3 f0 = mix(float3(0.04), albedo, metallic);
+            float3 f = fresnelSchlick(max(dot(h, v), 0.0), f0);
+            float d = distributionGGX(n, h, roughness);
+            float g = geometrySmith(n, v, l, roughness);
+            float3 specular = (d * g * f) / max(4.0 * ndotv * ndotl, 1e-4);
+            float3 kd = (1.0 - f) * (1.0 - metallic);
+            float3 keyRadiance = float3(4.2, 4.0, 3.7);
+            float3 color = (kd * albedo / M_PI_F + specular) * keyRadiance * ndotl;
+
+            float horizon = clamp(0.5 + 0.5 * n.y, 0.0, 1.0);
+            float3 ambient = mix(float3(0.025, 0.032, 0.045), float3(0.16, 0.19, 0.22), horizon);
+            color += ambient * albedo * (0.55 + 0.45 * (1.0 - metallic));
+            float rim = pow(max(1.0 - ndotv, 0.0), 3.0) * (0.10 + 0.16 * metallic);
+            color += rim * float3(0.34, 0.58, 0.72);
+            color += emissive;
+            color *= exp2(clamp(camera.positionExposure.w, -6.0, 6.0));
             color = color / (1.0 + color);
             color = pow(max(color, 0.0), float3(1.0 / 2.2));
-            return half4(half3(color), 1.0h);
+            return half4(half3(color), half(alpha));
         }
         """
         let library = try device.makeLibrary(source: source, options: nil)
@@ -124,7 +191,7 @@ final class StudioSceneMeshRenderer {
 
         func makePipeline(_ colorFormat: MTLPixelFormat) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.label = "Vulkax scene mesh \(colorFormat.rawValue)"
+            descriptor.label = "Vulkax PBR scene mesh \(colorFormat.rawValue)"
             descriptor.vertexFunction = vertex
             descriptor.fragmentFunction = fragment
             descriptor.colorAttachments[0].pixelFormat = colorFormat
@@ -133,6 +200,7 @@ final class StudioSceneMeshRenderer {
         }
         interactivePipeline = try makePipeline(interactiveColorFormat)
         capturePipeline = try makePipeline(.bgra8Unorm)
+
         let depth = MTLDepthStencilDescriptor()
         depth.depthCompareFunction = .less
         depth.isDepthWriteEnabled = true
@@ -141,6 +209,31 @@ final class StudioSceneMeshRenderer {
                           userInfo: [NSLocalizedDescriptionKey: "Could not create scene depth state"])
         }
         self.depthState = depthState
+
+        let sampler = MTLSamplerDescriptor()
+        sampler.minFilter = .linear
+        sampler.magFilter = .linear
+        sampler.mipFilter = .linear
+        sampler.sAddressMode = .repeat
+        sampler.tAddressMode = .repeat
+        guard let samplerState = device.makeSamplerState(descriptor: sampler) else {
+            throw NSError(domain: "VulkaxSceneRenderer", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "Could not create PBR material sampler"])
+        }
+        self.samplerState = samplerState
+
+        let white = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm_srgb, width: 1, height: 1, mipmapped: false)
+        white.usage = [.shaderRead]
+        guard let whiteTexture = device.makeTexture(descriptor: white) else {
+            throw NSError(domain: "VulkaxSceneRenderer", code: 4,
+                          userInfo: [NSLocalizedDescriptionKey: "Could not create fallback material texture"])
+        }
+        var pixel: [UInt8] = [255, 255, 255, 255]
+        whiteTexture.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0,
+            withBytes: &pixel, bytesPerRow: 4)
+        self.whiteTexture = whiteTexture
     }
 
     func rebuildIfNeeded(device: MTLDevice, model: PhysicsModel) {
@@ -152,12 +245,8 @@ final class StudioSceneMeshRenderer {
         let visualOnly = model.obstacleItems.filter {
             !$0.role.participatesInSimulation || $0.collisionProxy == .none
         }
-        let simulatedData = makeVertices(simulated)
-        simulatedVertexCount = simulatedData.count
-        simulatedVertices = buffer(device: device, values: simulatedData)
-        let staticData = makeVertices(visualOnly)
-        staticVertexCount = staticData.count
-        staticVertices = buffer(device: device, values: staticData)
+        simulatedBatches = makeBatches(device: device, items: simulated)
+        staticBatches = makeBatches(device: device, items: visualOnly)
         let staticBodyData = visualOnly.flatMap { bodyState($0.body) }
         staticBodies = buffer(device: device, values: staticBodyData)
     }
@@ -189,47 +278,108 @@ final class StudioSceneMeshRenderer {
         encoder.setDepthStencilState(depthState)
         encoder.setVertexBytes(&cameraUniforms, length: MemoryLayout<StudioSceneCameraUniforms>.stride, index: 2)
         encoder.setFragmentBytes(&cameraUniforms, length: MemoryLayout<StudioSceneCameraUniforms>.stride, index: 2)
+        encoder.setFragmentSamplerState(samplerState, index: 0)
 
-        if simulatedVertexCount > 0, let simulatedVertices, let simulatedBodyBuffer {
-            encoder.setVertexBuffer(simulatedVertices, offset: 0, index: 0)
-            encoder.setVertexBuffer(simulatedBodyBuffer, offset: 0, index: 1)
-            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: simulatedVertexCount)
+        if let simulatedBodyBuffer {
+            encode(batches: simulatedBatches, bodyBuffer: simulatedBodyBuffer, encoder: encoder)
         }
-        if staticVertexCount > 0, let staticVertices, let staticBodies {
-            encoder.setVertexBuffer(staticVertices, offset: 0, index: 0)
-            encoder.setVertexBuffer(staticBodies, offset: 0, index: 1)
-            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: staticVertexCount)
+        if let staticBodies {
+            encode(batches: staticBatches, bodyBuffer: staticBodies, encoder: encoder)
         }
     }
 
-    private func makeVertices(_ items: [ObstacleSceneItem]) -> [StudioSceneVertex] {
-        var result: [StudioSceneVertex] = []
+    private func encode(
+        batches: [StudioSceneBatch],
+        bodyBuffer: MTLBuffer,
+        encoder: MTLRenderCommandEncoder
+    ) {
+        encoder.setVertexBuffer(bodyBuffer, offset: 0, index: 1)
+        for var batch in batches {
+            encoder.setVertexBuffer(batch.vertices, offset: 0, index: 0)
+            encoder.setFragmentBytes(
+                &batch.material,
+                length: MemoryLayout<StudioSceneMaterialUniforms>.stride,
+                index: 3)
+            encoder.setFragmentTexture(batch.baseColorTexture, index: 0)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: batch.vertexCount)
+        }
+    }
+
+    private func makeBatches(device: MTLDevice, items: [ObstacleSceneItem]) -> [StudioSceneBatch] {
+        var batches: [StudioSceneBatch] = []
+        let textureLoader = MTKTextureLoader(device: device)
         for (bodyIndex, item) in items.enumerated() {
-            for triangle in stride(from: 0, to: item.visualMesh.indices.count, by: 3) {
-                guard triangle + 2 < item.visualMesh.indices.count else { continue }
-                let ia = Int(item.visualMesh.indices[triangle])
-                let ib = Int(item.visualMesh.indices[triangle + 1])
-                let ic = Int(item.visualMesh.indices[triangle + 2])
-                guard ia < item.visualMesh.vertices.count,
-                      ib < item.visualMesh.vertices.count,
-                      ic < item.visualMesh.vertices.count else { continue }
-                let a4 = item.visualMesh.vertices[ia]
-                let b4 = item.visualMesh.vertices[ib]
-                let c4 = item.visualMesh.vertices[ic]
+            let mesh = item.visualMesh
+            var verticesByMaterial: [Int: [StudioSceneVertex]] = [:]
+            for triangle in stride(from: 0, to: mesh.indices.count, by: 3) {
+                guard triangle + 2 < mesh.indices.count else { continue }
+                let ia = Int(mesh.indices[triangle])
+                let ib = Int(mesh.indices[triangle + 1])
+                let ic = Int(mesh.indices[triangle + 2])
+                guard ia < mesh.vertices.count, ib < mesh.vertices.count, ic < mesh.vertices.count else { continue }
+                let a4 = mesh.vertices[ia], b4 = mesh.vertices[ib], c4 = mesh.vertices[ic]
                 let a = SIMD3(a4.x, a4.y, a4.z)
                 let b = SIMD3(b4.x, b4.y, b4.z)
                 let c = SIMD3(c4.x, c4.y, c4.z)
                 let cross = simd_cross(b - a, c - a)
                 let lengthSquared = simd_length_squared(cross)
                 guard lengthSquared > 1e-14 else { continue }
-                let normal = cross / sqrt(lengthSquared)
-                let n = SIMD4(normal, 0)
-                result.append(.init(positionBody: SIMD4(a, Float(bodyIndex)), normal: n))
-                result.append(.init(positionBody: SIMD4(b, Float(bodyIndex)), normal: n))
-                result.append(.init(positionBody: SIMD4(c, Float(bodyIndex)), normal: n))
+                let faceNormal = cross / sqrt(lengthSquared)
+                let triangleIndex = triangle / 3
+                let materialIndex = triangleIndex < mesh.triangleMaterialIndices.count
+                    ? Int(mesh.triangleMaterialIndices[triangleIndex]) : 0
+                var destination = verticesByMaterial[materialIndex, default: []]
+                for vertexIndex in [ia, ib, ic] {
+                    let position4 = mesh.vertices[vertexIndex]
+                    let position = SIMD3(position4.x, position4.y, position4.z)
+                    let suppliedNormal = vertexIndex < mesh.vertexNormals.count
+                        ? mesh.vertexNormals[vertexIndex] : faceNormal
+                    let normalLengthSquared = simd_length_squared(suppliedNormal)
+                    let normal = normalLengthSquared > 1e-14
+                        ? suppliedNormal / sqrt(normalLengthSquared) : faceNormal
+                    let uv = vertexIndex < mesh.vertexTexCoords.count
+                        ? mesh.vertexTexCoords[vertexIndex] : .zero
+                    destination.append(.init(
+                        positionBody: SIMD4(position, Float(bodyIndex)),
+                        normal: SIMD4(normal, 0),
+                        texCoord: SIMD4(uv.x, uv.y, 0, 0)))
+                }
+                verticesByMaterial[materialIndex] = destination
+            }
+
+            for materialIndex in verticesByMaterial.keys.sorted() {
+                guard let vertices = verticesByMaterial[materialIndex],
+                      let vertexBuffer = buffer(device: device, values: vertices) else { continue }
+                let sourceMaterial = materialIndex < mesh.materials.count
+                    ? mesh.materials[materialIndex] : .default
+                let texture: MTLTexture
+                if let textureData = sourceMaterial.baseColorTextureData,
+                   let loaded = try? textureLoader.newTexture(
+                    data: textureData,
+                    options: [
+                        .SRGB: true,
+                        .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
+                    ]) {
+                    texture = loaded
+                } else {
+                    texture = whiteTexture
+                }
+                let material = StudioSceneMaterialUniforms(
+                    baseColor: sourceMaterial.baseColorFactor,
+                    emissiveMetallic: SIMD4(
+                        sourceMaterial.emissiveFactor.x,
+                        sourceMaterial.emissiveFactor.y,
+                        sourceMaterial.emissiveFactor.z,
+                        sourceMaterial.metallicFactor),
+                    roughnessFlags: SIMD4(sourceMaterial.roughnessFactor, 0, 0, 0))
+                batches.append(.init(
+                    vertices: vertexBuffer,
+                    vertexCount: vertices.count,
+                    material: material,
+                    baseColorTexture: texture))
             }
         }
-        return result
+        return batches
     }
 
     private func bodyState(_ body: RigidObstacleConfiguration) -> [SIMD4<Float>] {
