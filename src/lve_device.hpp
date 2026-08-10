@@ -4,6 +4,8 @@
 #include "platform/vulkan_surface_host.hpp"
 
 // std lib headers
+#include <functional>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -95,6 +97,7 @@ class LveDevice {
   void pickPhysicalDevice();
   void createLogicalDevice();
   void createCommandPool();
+  void submitImmediate(const std::function<void(VkCommandBuffer)>& record);
 
   // helper functions
   bool isDeviceSuitable(VkPhysicalDevice device);
@@ -113,7 +116,10 @@ class LveDevice {
   std::string deviceUuid;
   DeviceCapabilities capabilities{};
   VulkanSurfaceHost &surfaceHost;
-  VkCommandPool commandPool;
+  VkCommandPool commandPool = VK_NULL_HANDLE;
+  VkCommandBuffer immediateCommandBuffer = VK_NULL_HANDLE;
+  VkFence immediateFence = VK_NULL_HANDLE;
+  std::mutex immediateSubmitMutex;
 
   VkDevice device_;
   VkSurfaceKHR surface_;

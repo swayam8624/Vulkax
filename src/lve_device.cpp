@@ -125,6 +125,7 @@ LveDevice::~LveDevice() {
     }
   }
 
+  vkDestroyFence(device_, immediateFence, nullptr);
   vkDestroyCommandPool(device_, commandPool, nullptr);
   vkDestroyDevice(device_, nullptr);
 
@@ -300,6 +301,19 @@ void LveDevice::createCommandPool() {
       VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
   checkVk(vkCreateCommandPool(device_, &poolInfo, nullptr, &commandPool), "vkCreateCommandPool");
+
+  VkCommandBufferAllocateInfo commandInfo{};
+  commandInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  commandInfo.commandPool = commandPool;
+  commandInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  commandInfo.commandBufferCount = 1;
+  checkVk(
+      vkAllocateCommandBuffers(device_, &commandInfo, &immediateCommandBuffer),
+      "vkAllocateCommandBuffers(immediate)");
+
+  VkFenceCreateInfo fenceInfo{};
+  fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  checkVk(vkCreateFence(device_, &fenceInfo, nullptr, &immediateFence), "vkCreateFence(immediate)");
 }
 
 void LveDevice::createSurface() { surface_ = surfaceHost.createVulkanSurface(instance); }
@@ -535,6 +549,8 @@ void LveDevice::createBuffer(
     VkMemoryPropertyFlags properties,
     VkBuffer &buffer,
     VkDeviceMemory &bufferMemory) {
+  buffer = VK_NULL_HANDLE;
+  bufferMemory = VK_NULL_HANDLE;
   VkBufferCreateInfo bufferInfo{};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferInfo.size = size;
@@ -620,43 +636,54 @@ void LveDevice::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
   vkFreeCommandBuffers(device_, commandPool, 1, &commandBuffer);
 }
 
+void LveDevice::submitImmediate(const std::function<void(VkCommandBuffer)>& record) {
+  std::scoped_lock lock{immediateSubmitMutex};
+  checkVk(vkResetFences(device_, 1, &immediateFence), "vkResetFences(immediate)");
+  checkVk(vkResetCommandBuffer(immediateCommandBuffer, 0), "vkResetCommandBuffer(immediate)");
+
+  VkCommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  checkVk(vkBeginCommandBuffer(immediateCommandBuffer, &beginInfo), "vkBeginCommandBuffer(immediate)");
+  record(immediateCommandBuffer);
+  checkVk(vkEndCommandBuffer(immediateCommandBuffer), "vkEndCommandBuffer(immediate)");
+
+  VkSubmitInfo submitInfo{};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &immediateCommandBuffer;
+  checkVk(vkQueueSubmit(graphicsQueue_, 1, &submitInfo, immediateFence), "vkQueueSubmit(immediate)");
+  checkVk(
+      vkWaitForFences(device_, 1, &immediateFence, VK_TRUE, UINT64_MAX),
+      "vkWaitForFences(immediate)");
+}
+
 void LveDevice::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-  VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
-  VkBufferCopy copyRegion{};
-  copyRegion.srcOffset = 0;  // Optional
-  copyRegion.dstOffset = 0;  // Optional
-  copyRegion.size = size;
-  vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-  endSingleTimeCommands(commandBuffer);
+  submitImmediate([&](VkCommandBuffer commandBuffer) {
+    VkBufferCopy copyRegion{};
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+  });
 }
 
 void LveDevice::copyBufferToImage(
     VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount) {
-  VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+  submitImmediate([&](VkCommandBuffer commandBuffer) {
+    VkBufferImageCopy region{};
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = layerCount;
+    region.imageExtent = {width, height, 1};
 
-  VkBufferImageCopy region{};
-  region.bufferOffset = 0;
-  region.bufferRowLength = 0;
-  region.bufferImageHeight = 0;
-
-  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  region.imageSubresource.mipLevel = 0;
-  region.imageSubresource.baseArrayLayer = 0;
-  region.imageSubresource.layerCount = layerCount;
-
-  region.imageOffset = {0, 0, 0};
-  region.imageExtent = {width, height, 1};
-
-  vkCmdCopyBufferToImage(
-      commandBuffer,
-      buffer,
-      image,
-      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-      1,
-      &region);
-  endSingleTimeCommands(commandBuffer);
+    vkCmdCopyBufferToImage(
+        commandBuffer,
+        buffer,
+        image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &region);
+  });
 }
 
 void LveDevice::createImageWithInfo(
@@ -664,6 +691,8 @@ void LveDevice::createImageWithInfo(
     VkMemoryPropertyFlags properties,
     VkImage &image,
     VkDeviceMemory &imageMemory) {
+  image = VK_NULL_HANDLE;
+  imageMemory = VK_NULL_HANDLE;
   checkVk(vkCreateImage(device_, &imageInfo, nullptr, &image), "vkCreateImage");
 
   VkMemoryRequirements memRequirements;
