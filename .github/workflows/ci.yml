@@ -25,6 +25,12 @@ jobs:
         run: ./build/vulkax_compute_tests Vulkan
       - name: Vulkan spatial-hash DEM
         run: ./build/vulkax_gpu_physics_tests Vulkan
+      - name: Generate scientific reference suite
+        run: ./build/vulkax-lab suite --output build/reference-suite --particles 320 --steps 80 --dt 0.0002
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-next-reference-suite
+          path: build/reference-suite
 
   macos:
     runs-on: macos-15

@@ -23,8 +23,9 @@ This ledger separates implemented foundations from future scale claims.
 - weighted fitting/model selection for Neo-Hookean, Mooney-Rivlin and three-term Yeoh uniaxial responses;
 - next-experiment recommendation based on disagreement between surviving material hypotheses;
 - bounded scalar and multivariate numerical optimization;
-- reusable scientific colormaps, scalar-slice rendering, particle sphere-splat reference rendering, PPM image export and OBJ geometry export.
+- reusable scientific colormaps, scalar-slice rendering, particle sphere-splat reference rendering, PPM image export and OBJ geometry export;
+- `vulkax-lab` headless research client that writes deterministic granular, incompressible-field, material-identification and implicit-field-to-geometry experiment outputs; Linux CI publishes a complete generated suite as a workflow artifact.
 
 ## Not yet claimed
 
-The current Vulkan DEM path establishes the scalable spatial-hash/contact architecture but still uses host-visible coherent buffers and recompiles its two test kernels per invocation; it is not yet a production persistent/device-local million-particle runtime. Vulkax Next also does not yet claim production CFD turbulence/aerodynamics, implicit production FEM, differentiable inverse mechanics, a complete PDE adjoint system, adaptive mesh refinement, or a finished interactive Vulkan scientific renderer. Those require dedicated performance work, convergence studies and benchmark evidence before they move into the implemented section.
+The current Vulkan DEM path establishes the scalable spatial-hash/contact architecture but still uses host-visible coherent buffers and recompiles its two kernels per invocation; it is not yet a production persistent/device-local million-particle runtime. Vulkax Next also does not yet claim production CFD turbulence/aerodynamics, implicit production FEM, differentiable inverse mechanics, a complete PDE adjoint system, adaptive mesh refinement, or a finished interactive Vulkan scientific renderer. Those require dedicated performance work, convergence studies and benchmark evidence before they move into the implemented section.
