@@ -8,7 +8,7 @@
 
 namespace vulkax::backend {
 
-enum class BackendKind : std::uint8_t { Vulkan, Metal, OpenGL };
+enum class BackendKind : std::uint8_t { Vulkan, Metal, OpenGL, CPUReference };
 enum class PlatformKind : std::uint8_t { MacOS, Windows, Linux, Other };
 
 enum class Feature : std::uint8_t {
@@ -30,7 +30,7 @@ struct BackendCapabilities {
     bool available{false};
     bool nativePlatformBackend{false};
     bool dedicatedGpu{false};
-    double driverQuality{0.5}; // normalized [0, 1], supplied by the probe layer
+    double driverQuality{0.5};
     std::uint64_t deviceMemoryBytes{};
     std::string deviceName;
     std::vector<Feature> features;
