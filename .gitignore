@@ -28,7 +28,16 @@ imgui.ini
 beacon_results/
 beacon_results_*/
 
-# Physics Studio sequence frames are reproducible build/test artifacts. Keep
-# manifests, summaries and deliberately curated stills in Git; publish complete
-# frame sequences through CI artifacts or releases instead.
+# Reproducible simulation/render output belongs in CI artifacts or releases,
+# not Git history. Keep manifests, summaries, source fixtures, and deliberately
+# curated figures in docs/results when they are part of an experiment record.
 docs/results/**/frame_*.png
+docs/results/**/frame_*.ppm
+docs/results/**/frame_*.exr
+docs/results/**/*.mov
+docs/results/**/*.mp4
+docs/results/**/*.mkv
+docs/results/**/*.raw
+docs/results/**/*.bin
+docs/results/**/frames/
+docs/results/**/captures/
