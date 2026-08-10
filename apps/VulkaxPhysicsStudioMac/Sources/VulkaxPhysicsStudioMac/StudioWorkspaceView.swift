@@ -51,7 +51,7 @@ struct StudioWorkspaceView: View {
             Button { model.importObstacleMesh() } label: {
                 Label("Add Model", systemImage: "car.side")
             }
-            .help("Import an OBJ visual model. Vulkax creates a safe physics proxy when needed.")
+            .help("Import OBJ, glTF or GLB visual models. Vulkax creates a safe physics proxy when needed.")
             Button { model.capturePanelPresented.toggle() } label: {
                 Label("Record", systemImage: model.isCapturing ? "record.circle.fill" : "video.badge.plus")
             }
@@ -106,7 +106,7 @@ struct StudioWorkspaceView: View {
                             Image(systemName: "cube.transparent")
                                 .font(.system(size: 28, weight: .light))
                                 .foregroundStyle(.secondary)
-                            Text("Drop an OBJ or add a car/model")
+                            Text("Drop OBJ, glTF or GLB · or add a car/model")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -174,8 +174,8 @@ struct StudioWorkspaceView: View {
                     mediumBadge(compact: false)
                     Spacer()
                     HStack(spacing: 6) {
-                        Label(String(format: "%.1f°", model.camera.verticalFovDegrees), systemImage: "camera.aperture")
-                        Text(String(format: "EV %.2f", model.camera.exposure))
+                        Label(String(format: "%.1f°", model.effectiveTimelineCamera.verticalFovDegrees), systemImage: "camera.aperture")
+                        Text(String(format: "EV %.2f", model.effectiveTimelineCamera.exposure))
                     }
                     .font(.caption.monospacedDigit())
                     .padding(.horizontal, 9).padding(.vertical, 6)
@@ -211,6 +211,10 @@ struct StudioWorkspaceView: View {
             Text(String(format: "%06.2f s", model.time))
                 .font(.caption.monospacedDigit())
                 .frame(width: 64, alignment: .trailing)
+            if !model.cameraTrack.isEmpty {
+                Text("\(model.cameraTrack.keyframes.count) CAM KEYS")
+                    .font(.caption2.bold()).foregroundStyle(.cyan)
+            }
             Text(model.playing ? "LIVE GPU" : "PAUSED")
                 .font(.caption2.bold())
                 .foregroundStyle(model.playing ? .mint : .orange)
@@ -350,6 +354,47 @@ struct StudioWorkspaceView: View {
             scalar("Vertical FOV", value: cameraBinding(\.verticalFovDegrees), range: 10...120)
             scalar("Exposure", value: cameraBinding(\.exposure), range: 0.05...8)
             Divider()
+            HStack {
+                Text("DIRECTOR TRACK").sectionLabel()
+                Spacer()
+                Text("\(model.cameraTrack.keyframes.count) keys")
+                    .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            HStack {
+                Button { model.addOrUpdateCameraKeyframe() } label: {
+                    Label("Add / Update Key", systemImage: "diamond.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                Button("Use Key at Playhead") { model.useKeyedCameraAtPlayhead() }
+                    .buttonStyle(.bordered)
+                    .disabled(model.cameraTrack.isEmpty)
+            }
+            if !model.cameraTrack.keyframes.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(model.cameraTrack.keyframes) { key in
+                        HStack {
+                            Image(systemName: "diamond.fill").font(.caption2).foregroundStyle(.cyan)
+                            Button(String(format: "%.2f s", key.timeSeconds)) {
+                                model.time = key.timeSeconds
+                                model.camera = key.camera
+                                model.accumulationResetToken &+= 1
+                            }
+                            .buttonStyle(.plain)
+                            Spacer()
+                            Text(String(format: "%.0f°", key.camera.verticalFovDegrees))
+                                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                            Button(role: .destructive) { model.removeCameraKeyframe(key.id) } label: {
+                                Image(systemName: "xmark.circle.fill")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
+                .padding(8)
+                .background(Color.black.opacity(0.20), in: RoundedRectangle(cornerRadius: 8))
+            }
+            Divider()
             Text("CAPTURE").sectionLabel()
             Picker("Resolution", selection: $model.captureSettings.resolution) {
                 ForEach(CinematicCaptureSettings.Resolution.allCases) { Text($0.title).tag($0) }
@@ -406,7 +451,7 @@ struct StudioWorkspaceView: View {
                 Text("Cinematic Capture").font(.title2.bold())
                 Spacer()
             }
-            Text("Capture uses the current Studio camera. Orbit/pan/dolly to frame the shot before recording.")
+            Text(model.cameraTrack.isEmpty ? "Capture uses the current Studio camera." : "Capture follows the director camera track from the current playhead.")
                 .foregroundStyle(.secondary)
             Picker("Resolution", selection: $model.captureSettings.resolution) {
                 ForEach(CinematicCaptureSettings.Resolution.allCases) { Text("\($0.title) · \($0.rawValue)").tag($0) }
@@ -440,7 +485,7 @@ struct StudioWorkspaceView: View {
             let url: URL?
             if let data = item as? Data { url = URL(dataRepresentation: data, relativeTo: nil) }
             else { url = item as? URL }
-            guard let url, url.pathExtension.lowercased() == "obj" else { return }
+            guard let url, ["obj", "gltf", "glb"].contains(url.pathExtension.lowercased()) else { return }
             DispatchQueue.main.async { model.importObstacleMesh(from: url); inspectorTab = .object }
         }
         return true

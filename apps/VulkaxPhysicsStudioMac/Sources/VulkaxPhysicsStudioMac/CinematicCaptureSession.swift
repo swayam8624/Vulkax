@@ -14,6 +14,7 @@ struct CinematicCaptureRequest {
     let outputURL: URL
     let settings: CinematicCaptureSettings
     let camera: StudioCamera
+    let cameraTrack: StudioCameraTrack
     let timelineSeconds: Float
 }
 

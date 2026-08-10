@@ -53,6 +53,7 @@ final class PhysicsModel: ObservableObject {
     @Published var volumeExtinction: Float = 2.2
     @Published var volumeEmission: Float = 1.0
     @Published var camera = StudioCamera.default
+    @Published var cameraTrack = StudioCameraTrack()
     @Published var mediumOverride: SimulationMedium?
     @Published var captureSettings = CinematicCaptureSettings()
     @Published var capturePanelPresented = false
@@ -229,6 +230,7 @@ final class PhysicsModel: ObservableObject {
         time = 0
         playing = true
         camera = .default
+        cameraTrack = .init()
         mediumOverride = nil
         captureSettings = .init()
         removeAllObstacleMeshes()
@@ -273,6 +275,7 @@ final class PhysicsModel: ObservableObject {
             equationSource = project.expression
             time = project.timelineSeconds
             camera = project.camera
+            cameraTrack = project.cameraTrack
             mediumOverride = project.mediumOverride
             captureSettings = project.captureSettings
             compileEquation()
@@ -385,6 +388,7 @@ final class PhysicsModel: ObservableObject {
                 obstacles: obstacleRecords,
                 mediumOverride: mediumOverride,
                 camera: camera,
+                cameraTrack: cameraTrack,
                 captureSettings: captureSettings)
             try PhysicsProjectIO.save(project, to: url)
             projectURL = url
@@ -392,6 +396,28 @@ final class PhysicsModel: ObservableObject {
         } catch {
             equationStatus = "Save failed: \(error.localizedDescription)"
         }
+    }
+
+    var effectiveTimelineCamera: StudioCamera {
+        cameraTrack.camera(at: time, fallback: camera)
+    }
+
+    func addOrUpdateCameraKeyframe() {
+        cameraTrack.insert(timeSeconds: time, camera: camera)
+        accumulationResetToken &+= 1
+        equationStatus = String(format: "Camera key saved at %.2f s", time)
+    }
+
+    func removeCameraKeyframe(_ id: UUID) {
+        cameraTrack.remove(id: id)
+        accumulationResetToken &+= 1
+        equationStatus = "Camera key removed"
+    }
+
+    func useKeyedCameraAtPlayhead() {
+        guard !cameraTrack.isEmpty else { return }
+        camera = cameraTrack.camera(at: time, fallback: camera)
+        accumulationResetToken &+= 1
     }
 
     func applyCameraPreset(_ preset: StudioCameraPreset) {
@@ -415,6 +441,7 @@ final class PhysicsModel: ObservableObject {
             outputURL: url,
             settings: captureSettings,
             camera: camera,
+            cameraTrack: cameraTrack,
             timelineSeconds: time)
         equationStatus = "Preparing \(captureSettings.resolution.title) capture · \(captureSettings.frameRate.title)"
     }
@@ -2511,6 +2538,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
     private var lastResetToken: UInt32 = 0
     private var captureSession: CinematicCaptureSession?
     private var activeCaptureCamera: StudioCamera?
+    private var activeCaptureTrack = StudioCameraTrack()
     private var captureStartTimeline: Float = 0
     private var lastCaptureRequestRevision: UInt64 = 0
     private(set) var latestTelemetry = VulkaxFrameTelemetry()
@@ -2627,6 +2655,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
             captureSession = try CinematicCaptureSession(
                 outputURL: request.outputURL, settings: request.settings, device: device)
             activeCaptureCamera = request.camera
+            activeCaptureTrack = request.cameraTrack
             captureStartTimeline = request.timelineSeconds
             model.accumulationResetToken &+= 1
             DispatchQueue.main.async { [weak model] in
@@ -2950,7 +2979,14 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         let simulationTime = activeCapture.map {
             captureStartTimeline + Float($0.frameCount) / Float($0.frameRate)
         } ?? model.time
-        let effectiveCamera = activeCaptureCamera.flatMap { activeCapture == nil ? nil : $0 } ?? model.camera
+        let effectiveCamera: StudioCamera
+        if activeCapture != nil {
+            effectiveCamera = activeCaptureTrack.camera(
+                at: simulationTime,
+                fallback: activeCaptureCamera ?? model.camera)
+        } else {
+            effectiveCamera = model.cameraTrack.camera(at: simulationTime, fallback: model.camera)
+        }
         scheduleEquationPipeline(device: device, model: model)
         sceneRenderer.rebuildIfNeeded(device: device, model: model)
         frameIndex &+= 1
@@ -3358,6 +3394,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
                 let failedSession = captureSession
                 captureSession = nil
                 activeCaptureCamera = nil
+                activeCaptureTrack = .init()
                 failedSession?.finish { _ in }
                 DispatchQueue.main.async { [weak model] in
                     model?.reportCaptureState(active: false, message: "Capture failed: \(error.localizedDescription)")
@@ -3387,6 +3424,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
                         capture.finish { [weak self, weak model] result in
                             self?.captureSession = nil
                             self?.activeCaptureCamera = nil
+                            self?.activeCaptureTrack = .init()
                             DispatchQueue.main.async {
                                 switch result {
                                 case let .success(url):
@@ -3405,6 +3443,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
                     let failedSession = self?.captureSession
                     self?.captureSession = nil
                     self?.activeCaptureCamera = nil
+                    self?.activeCaptureTrack = .init()
                     failedSession?.finish { _ in }
                     DispatchQueue.main.async {
                         model?.reportCaptureState(active: false, message: "Capture encode failed: \(error.localizedDescription)")
@@ -3485,6 +3524,9 @@ struct ContentView: View {
         }
         if CommandLine.arguments.contains("--native-cinematic-capture-smoke") {
             exit(runCinematicCaptureWriterSmoke() ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
+        if CommandLine.arguments.contains("--native-camera-track-smoke") {
+            exit(runCameraTrackSmoke() ? EXIT_SUCCESS : EXIT_FAILURE)
         }
         if let option = CommandLine.arguments.firstIndex(of: "--native-scene-mesh-gpu-smoke") {
             guard option + 1 < CommandLine.arguments.count else { exit(EXIT_FAILURE) }

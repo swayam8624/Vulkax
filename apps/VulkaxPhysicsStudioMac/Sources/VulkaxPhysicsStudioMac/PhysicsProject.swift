@@ -162,7 +162,7 @@ struct ProjectObstacleRecord: Codable, Equatable {
 
 struct PhysicsProjectFile: Codable {
     var format = "vulkax.physics-project"
-    var version = 8
+    var version = 9
     var name: String
     var preset: String
     var visualization: String
@@ -175,6 +175,7 @@ struct PhysicsProjectFile: Codable {
     var obstacles: [ProjectObstacleRecord]
     var mediumOverride: SimulationMedium?
     var camera: StudioCamera
+    var cameraTrack: StudioCameraTrack
     var captureSettings: CinematicCaptureSettings
 
     enum CodingKeys: String, CodingKey {
@@ -185,6 +186,7 @@ struct PhysicsProjectFile: Codable {
         case obstacles
         case mediumOverride = "medium_override"
         case camera
+        case cameraTrack = "camera_track"
         case captureSettings = "capture_settings"
     }
 
@@ -201,6 +203,7 @@ struct PhysicsProjectFile: Codable {
         obstacles: [ProjectObstacleRecord] = [],
         mediumOverride: SimulationMedium? = nil,
         camera: StudioCamera = .default,
+        cameraTrack: StudioCameraTrack = .init(),
         captureSettings: CinematicCaptureSettings = .init()
     ) {
         self.name = name
@@ -215,6 +218,7 @@ struct PhysicsProjectFile: Codable {
         self.obstacles = obstacles
         self.mediumOverride = mediumOverride
         self.camera = camera
+        self.cameraTrack = cameraTrack
         self.captureSettings = captureSettings
     }
 
@@ -244,6 +248,7 @@ struct PhysicsProjectFile: Codable {
         }
         mediumOverride = try container.decodeIfPresent(SimulationMedium.self, forKey: .mediumOverride)
         camera = try container.decodeIfPresent(StudioCamera.self, forKey: .camera) ?? .default
+        cameraTrack = try container.decodeIfPresent(StudioCameraTrack.self, forKey: .cameraTrack) ?? .init()
         captureSettings = try container.decodeIfPresent(
             CinematicCaptureSettings.self, forKey: .captureSettings) ?? .init()
     }
