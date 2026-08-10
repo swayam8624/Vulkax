@@ -1,0 +1,249 @@
+name: WIP canonical equation runtime
+
+on:
+  push:
+    branches:
+      - fix/canonical-equation-runtime
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/canonical-equation-runtime
+      - name: Apply canonical compiler migration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Canonical Physics IR must parse floating literals on libc++,
+          # libstdc++ and Windows. Apple's libc++ deletes floating from_chars.
+          path = Path('src/vulkax/physics/physics_ir.cpp')
+          text = path.read_text()
+          if '#include <cerrno>' not in text:
+              text = text.replace('#include <charconv>\n', '#include <charconv>\n#include <cerrno>\n#include <cstdlib>\n', 1)
+          old = '''std::optional<double> parseDouble(const std::string& value) {
+  double result = 0.0;
+  const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), result);
+  return error == std::errc{} && end == value.data() + value.size() ? std::optional<double>{result}
+                                                                    : std::nullopt;
+}
+'''
+          new = '''std::optional<double> parseDouble(const std::string& value) {
+  if (value.empty()) return std::nullopt;
+  errno = 0;
+  char* end = nullptr;
+  const char* begin = value.c_str();
+  const double result = std::strtod(begin, &end);
+  if (begin == end || errno == ERANGE || end != begin + value.size()) return std::nullopt;
+  return result;
+}
+'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif 'std::strtod(begin, &end)' not in text:
+              raise SystemExit('parseDouble marker missing')
+          path.write_text(text)
+
+          # Use the already-checked canonical bridge files, but emit the native
+          # texture kernel inside the bridge so the root compute IR need not grow
+          # a second editor-only public API.
+          bridge = Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxEquationBridge/EquationBridge.cpp')
+          bridge.write_text(r'''#include "VulkaxEquationBridge.h"
+
+#include "vulkax/equation/equation.hpp"
+#include "vulkax/physics/compute_ir.hpp"
+#include "vulkax/physics/physics_ir.hpp"
+
+#include <algorithm>
+#include <exception>
+#include <iomanip>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <vector>
+
+namespace {
+struct CompileResult {
+  bool success = false;
+  std::string metalSource;
+  std::string parameterNames;
+  std::string diagnostic;
+  uint64_t canonicalHash = 0;
+};
+
+std::string number(double value) {
+  std::ostringstream stream;
+  stream << std::setprecision(17) << value;
+  std::string result = stream.str();
+  if (result.find_first_of(".eE") == std::string::npos) result += ".0";
+  return result;
+}
+
+const char* functionName(vulkax::physics::ScalarOpcode opcode) {
+  using O = vulkax::physics::ScalarOpcode;
+  switch (opcode) {
+    case O::Power: return "pow"; case O::Sin: return "sin"; case O::Cos: return "cos";
+    case O::Tan: return "tan"; case O::Exp: return "exp"; case O::Sqrt: return "sqrt";
+    case O::Abs: return "abs"; case O::Log: return "log"; case O::Min: return "min";
+    case O::Max: return "max"; case O::Clamp: return "clamp"; default: return nullptr;
+  }
+}
+
+std::string expression(const vulkax::physics::ScalarInstruction& instruction) {
+  using O = vulkax::physics::ScalarOpcode;
+  const auto reg = [&](uint8_t index) { return "r" + std::to_string(instruction.operands[index]); };
+  switch (instruction.opcode) {
+    case O::Constant: return "float(" + number(instruction.immediate) + ")";
+    case O::CoordinateX: return "x"; case O::CoordinateY: return "y";
+    case O::CoordinateZ: return "z"; case O::Time: return "t";
+    case O::Parameter: return "parameters[" + std::to_string(instruction.parameterIndex) + "]";
+    case O::Add: return "(" + reg(0) + " + " + reg(1) + ")";
+    case O::Subtract: return "(" + reg(0) + " - " + reg(1) + ")";
+    case O::Multiply: return "(" + reg(0) + " * " + reg(1) + ")";
+    case O::Divide: return "(" + reg(0) + " / " + reg(1) + ")";
+    case O::Negate: return "(-" + reg(0) + ")";
+    default: {
+      const char* name = functionName(instruction.opcode);
+      if (!name) throw std::runtime_error("unsupported native Metal scalar opcode");
+      std::string value = std::string{name} + "(";
+      for (uint8_t i = 0; i < instruction.operandCount; ++i) {
+        if (i) value += ", ";
+        value += reg(i);
+      }
+      return value + ")";
+    }
+  }
+}
+
+std::string emitNativeMetal(const vulkax::physics::ScalarComputeProgram& program) {
+  std::ostringstream shader;
+  shader << "#include <metal_stdlib>\nusing namespace metal;\n"
+            "struct Uniforms {\n"
+            " float time; float amplitude; float wavenumber; float angularFrequency;\n"
+            " float width; float height; float4 padding; float4 control; float4 renderParameters;\n"
+            " float4 cameraPositionExposure; float4 cameraTarget; float4 cameraUpFov;\n};\n"
+            "float3 equationPalette(float value) {\n"
+            " float shadow = pow(clamp(value, 0.0f, 1.0f), 0.72f);\n"
+            " return float3(0.025f + 0.91f * pow(shadow, 1.55f),"
+            " 0.055f + 0.54f * sin(shadow * 1.47f),"
+            " 0.13f + 0.70f * (1.0f-shadow)*(1.0f-shadow));\n}\n"
+            "kernel void renderCompiledEquation(texture2d<half, access::write> outputRadiance [[texture(0)]],"
+            " constant Uniforms& u [[buffer(0)]], device const float* parameters [[buffer(1)]],"
+            " uint2 pixel [[thread_position_in_grid]]) {\n"
+            " if (pixel.x >= uint(u.width) || pixel.y >= uint(u.height)) return;\n"
+            " float2 uv = (float2(pixel)+0.5f)/float2(u.width,u.height);\n"
+            " float aspect=u.width/max(1.0f,u.height);\n"
+         << " float x=mix(float(" << number(program.domain.minimum[0]) << ")*aspect,float("
+         << number(program.domain.maximum[0]) << ")*aspect,uv.x);\n"
+         << " float y=mix(float(" << number(program.domain.maximum[1]) << "),float("
+         << number(program.domain.minimum[1]) << "),uv.y);\n"
+         << " float z=float(" << number(0.5*(program.domain.minimum[2]+program.domain.maximum[2])) << ");\n"
+            " float t=u.time;\n";
+  for (size_t i = 0; i < program.instructions.size(); ++i)
+    shader << " float r" << i << "=" << expression(program.instructions[i]) << ";\n";
+  shader << " float field=r" << program.outputRegister << "; if(!isfinite(field)) field=0.0f;\n"
+            " float3 radiance=equationPalette(0.5f+0.5f*tanh(field));\n"
+            " outputRadiance.write(half4(half3(radiance*2.25f),1.0h),pixel);\n}\n"
+         << "// canonical Physics IR hash: " << program.canonicalHash << "\n";
+  return shader.str();
+}
+
+CompileResult compile(const char* source) {
+  CompileResult result{};
+  if (!source) { result.diagnostic = "equation source is null"; return result; }
+  try {
+    const auto parsed = vulkax::equation::parseScalarExpression(source);
+    auto parameters = vulkax::equation::variableNames(parsed);
+    parameters.erase(std::remove_if(parameters.begin(), parameters.end(), [](const std::string& n) {
+      return n=="x" || n=="y" || n=="z" || n=="t";
+    }), parameters.end());
+    if (parameters.size() > 16) {
+      result.diagnostic = "The GPU runtime supports at most 16 parameters; this equation uses " + std::to_string(parameters.size());
+      return result;
+    }
+    vulkax::physics::PhysicsModel model{};
+    model.name = "native-scalar-equation";
+    model.domain.minimum = {-4.0,-4.0,0.0}; model.domain.maximum = {4.0,4.0,0.0};
+    model.domain.resolution = {128,72,1};
+    model.fields.push_back({"value", vulkax::physics::ValueType::Scalar,
+      vulkax::physics::Dimension::dimensionless(), vulkax::physics::FieldPlacement::CellCenter});
+    auto lowered = vulkax::physics::lowerScalarFieldProgram(model,"value",parsed,parameters);
+    if (!lowered.valid()) {
+      std::ostringstream msg;
+      for (size_t i=0;i<lowered.issues.size();++i) { if(i) msg<<"; "; msg<<lowered.issues[i].message; }
+      result.diagnostic = msg.str().empty()?"equation lowering failed":msg.str(); return result;
+    }
+    result.metalSource = emitNativeMetal(*lowered.program);
+    result.canonicalHash = lowered.program->canonicalHash;
+    for (size_t i=0;i<lowered.program->parameterNames.size();++i) {
+      if(i) result.parameterNames.push_back('\n'); result.parameterNames += lowered.program->parameterNames[i];
+    }
+    result.success = true;
+  } catch (const std::exception& e) { result.diagnostic = e.what(); }
+  return result;
+}
+CompileResult* unwrap(VulkaxCompiledEquationHandle handle) { return static_cast<CompileResult*>(handle); }
+} // namespace
+
+extern "C" VulkaxCompiledEquationHandle vulkax_compile_scalar_equation(const char* source) {
+  try { return new CompileResult(compile(source)); } catch (...) { return nullptr; }
+}
+extern "C" int32_t vulkax_compiled_equation_success(VulkaxCompiledEquationHandle h) { auto*r=unwrap(h); return r&&r->success?1:0; }
+extern "C" const char* vulkax_compiled_equation_metal_source(VulkaxCompiledEquationHandle h) { auto*r=unwrap(h); return r?r->metalSource.c_str():""; }
+extern "C" const char* vulkax_compiled_equation_parameter_names(VulkaxCompiledEquationHandle h) { auto*r=unwrap(h); return r?r->parameterNames.c_str():""; }
+extern "C" const char* vulkax_compiled_equation_diagnostic(VulkaxCompiledEquationHandle h) { auto*r=unwrap(h); return r?r->diagnostic.c_str():"equation compiler allocation failed"; }
+extern "C" uint64_t vulkax_compiled_equation_canonical_hash(VulkaxCompiledEquationHandle h) { auto*r=unwrap(h); return r?r->canonicalHash:0; }
+extern "C" void vulkax_destroy_compiled_equation(VulkaxCompiledEquationHandle h) { delete unwrap(h); }
+''')
+
+          package = Path('apps/VulkaxPhysicsStudioMac/Package.swift')
+          text = package.read_text()
+          if 'name: "VulkaxEquationBridge"' not in text:
+              text = text.replace('''        .target(
+            name: "VulkaxRuntimeContract",
+            path: "Sources/VulkaxRuntimeContract",
+            publicHeadersPath: "include"
+        ),
+''','''        .target(
+            name: "VulkaxRuntimeContract",
+            path: "Sources/VulkaxRuntimeContract",
+            publicHeadersPath: "include"
+        ),
+        .target(
+            name: "VulkaxEquationBridge",
+            path: "Sources/VulkaxEquationBridge",
+            publicHeadersPath: "include"
+        ),
+''',1)
+          text = text.replace('dependencies: ["VulkaxRuntimeContract"],','dependencies: ["VulkaxRuntimeContract", "VulkaxEquationBridge"],',1)
+          text = text.replace('    swiftLanguageModes: [.v5]\n)','    swiftLanguageModes: [.v5],\n    cxxLanguageStandard: .cxx20\n)',1)
+          package.write_text(text)
+
+          compiler = Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/ScalarEquationCompiler.swift')
+          compiler.write_text('''import Foundation\nimport VulkaxEquationBridge\n\nstruct CompiledScalarEquation {\n    let metalExpression: String\n    let parameterNames: [String]\n    let metalSource: String\n    let sourceHash: UInt64\n}\n\nenum ScalarEquationError: LocalizedError {\n    case canonicalCompiler(String)\n    var errorDescription: String? { if case let .canonicalCompiler(message)=self { return message }; return nil }\n}\n\nenum ScalarEquationCompiler {\n    static func compile(_ source: String) throws -> CompiledScalarEquation {\n        guard let handle = source.withCString({ vulkax_compile_scalar_equation($0) }) else {\n            throw ScalarEquationError.canonicalCompiler("Canonical equation compiler allocation failed")\n        }\n        defer { vulkax_destroy_compiled_equation(handle) }\n        guard vulkax_compiled_equation_success(handle) != 0 else {\n            let diagnostic = vulkax_compiled_equation_diagnostic(handle).map(String.init(cString:)) ?? "Canonical equation compilation failed"\n            throw ScalarEquationError.canonicalCompiler(diagnostic)\n        }\n        guard let sourcePointer = vulkax_compiled_equation_metal_source(handle),\n              let parameterPointer = vulkax_compiled_equation_parameter_names(handle) else {\n            throw ScalarEquationError.canonicalCompiler("Canonical compiler returned incomplete output")\n        }\n        let blob = String(cString: parameterPointer)\n        return CompiledScalarEquation(\n            metalExpression: "",\n            parameterNames: blob.isEmpty ? [] : blob.split(separator: "\\n").map(String.init),\n            metalSource: String(cString: sourcePointer),\n            sourceHash: vulkax_compiled_equation_canonical_hash(handle))\n    }\n}\n''')
+          PY
+      - name: Build native Studio
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: swift build -c release
+      - name: Verify canonical path through existing dynamic equation smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: |
+          .build/release/VulkaxPhysicsStudioMac --native-dynamic-equation-project-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-gpu-smoke
+      - name: Commit only final source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/vulkax/physics/physics_ir.cpp \
+            apps/VulkaxPhysicsStudioMac/Package.swift \
+            apps/VulkaxPhysicsStudioMac/Sources/VulkaxEquationBridge/EquationBridge.cpp \
+            apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/ScalarEquationCompiler.swift
+          git diff --cached --check
+          git commit -m "Use canonical C++ equation compiler in native Studio"
+          git push origin HEAD:fix/canonical-equation-runtime
