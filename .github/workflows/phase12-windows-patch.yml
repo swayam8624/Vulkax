@@ -43,19 +43,7 @@ jobs:
         run: |
           python scripts/phase12_windows.py
           git show origin/main:src/atlas/streaming/tile_source.cpp > src/atlas/streaming/tile_source.cpp
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('src/atlas/streaming/tile_source.cpp')
-          text = path.read_text()
-          old = 'if (relativeToRoot.empty() || relativeToRoot.native().starts_with("..")) {'
-          new = '''const auto firstComponent = relativeToRoot.begin();
-        if (relativeToRoot.empty() ||
-            (firstComponent != relativeToRoot.end() &&
-             *firstComponent == std::filesystem::path{".."})) {'''
-          if old not in text:
-              raise SystemExit('Atlas root-containment marker missing')
-          path.write_text(text.replace(old, new, 1))
-          PY
+          python scripts/phase12_fix_atlas.py
       - name: Configure Windows UCRT64
         run: >-
           cmake -S . -B build-windows -G Ninja
