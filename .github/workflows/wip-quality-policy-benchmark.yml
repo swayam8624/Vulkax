@@ -1,0 +1,54 @@
+name: WIP quality policy benchmark
+
+on:
+  push:
+    branches:
+      - fix/quality-policy-benchmark
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/quality-policy-benchmark
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ libglfw3-dev libglm-dev \
+            nlohmann-json3-dev libsqlite3-dev libvulkan-dev libcurl4-openssl-dev \
+            glslang-tools pkg-config libopenexr-dev
+      - name: Apply four-policy benchmark
+        run: python3 scripts/quality_policy_benchmark_patch.py
+      - name: Configure
+        run: >-
+          cmake -S . -B build-quality -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+          -DVULKAX_BUILD_PHYSICS_STUDIO=OFF
+      - name: Build full CPU/research surface
+        run: cmake --build build-quality --target QualityControllerTests VulkaxQualityBenchmark
+      - name: Test controller
+        run: ctest --test-dir build-quality -R '^quality_controller$' --output-on-failure
+      - name: Run four-policy benchmark
+        run: build-quality/vulkax-quality-benchmark --frames 32 --width 128 --height 72 --target-ms 1.5 --output /tmp/vulkax-quality-policy
+      - name: Verify raw comparison schema
+        run: |
+          grep -q 'equation_aware' /tmp/vulkax-quality-policy/quality_summary.json
+          grep -q 'numerical_only' /tmp/vulkax-quality-policy/quality_summary.json
+          grep -q 'screen_space_only' /tmp/vulkax-quality-policy/quality_summary.json
+          grep -q 'cpu_analytical_preview_policy_comparison' /tmp/vulkax-quality-policy/quality_summary.json
+          test "$(awk -F, 'NR>1 {print $1}' /tmp/vulkax-quality-policy/quality_frames.csv | sort -u | wc -l)" -eq 4
+      - name: Commit final benchmark source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/vulkax/research/quality_controller.hpp src/vulkax/research/quality_controller.cpp \
+            tests/quality_controller_tests.cpp tools/quality_benchmark.cpp
+          git diff --cached --check
+          git commit -m "Compare fixed and equation-aware quality policies"
+          git push origin HEAD:fix/quality-policy-benchmark
