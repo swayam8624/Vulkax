@@ -1,0 +1,83 @@
+name: Vulkax Analysis
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  asan-ubsan:
+    runs-on: ubuntu-24.04
+    env:
+      ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1:check_initialization_order=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang libglfw3-dev libglm-dev \
+            nlohmann-json3-dev libsqlite3-dev libvulkan-dev libcurl4-openssl-dev \
+            glslang-tools pkg-config libopenexr-dev
+      - name: Configure sanitizer build
+        run: >-
+          cmake -S . -B build-sanitize -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_C_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer'
+          -DCMAKE_CXX_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer'
+          -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address,undefined'
+          -DBUILD_TESTING=ON
+          -DVULKAX_BUILD_PHYSICS_STUDIO=OFF
+      - name: Build sanitizer test surface
+        run: >-
+          cmake --build build-sanitize --target
+          BeaconCoreTests
+          EquationCoreTests
+          EquationGlslTests
+          PhysicsIrTests
+          RuntimeContractTests
+          SimulationGraphTests
+          ParticleGravityTests
+          BuoyantSmokeTests
+          FluidRigidCouplingTests
+          SparseBrickStorageTests
+          SchwarzschildLensingTests
+          KerrGeodesicTests
+          SchwarzschildThinDiskTests
+          QualityControllerTests
+          AtlasCoreTests
+      - name: Run CPU and numerical tests under sanitizers
+        run: >-
+          ctest --test-dir build-sanitize --output-on-failure
+          -R '^(beacon_core|equation_core|equation_glsl|physics_ir|runtime_contract|simulation_graph|particle_gravity|buoyant_smoke|fluid_rigid_coupling|sparse_brick_storage|schwarzschild_lensing|kerr_geodesic|schwarzschild_thin_disk|quality_controller|atlas_core)$'
+
+  clang-tidy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang clang-tidy libglfw3-dev libglm-dev \
+            nlohmann-json3-dev libsqlite3-dev libvulkan-dev libcurl4-openssl-dev \
+            glslang-tools pkg-config libopenexr-dev
+      - name: Generate compile database
+        run: >-
+          cmake -S . -B build-tidy -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DBUILD_TESTING=ON
+          -DVULKAX_BUILD_PHYSICS_STUDIO=OFF
+      - name: Run focused static analysis
+        run: |
+          clang-tidy -p build-tidy \
+            src/vulkax/equation/equation.cpp \
+            src/vulkax/physics/physics_ir.cpp \
+            src/vulkax/relativity/kerr_geodesic.cpp \
+            src/vulkax/relativity/kerr_jacobi.cpp \
+            src/vulkax/sim/simulation_graph.cpp \
+            src/vulkax/sim/buoyant_smoke.cpp \
+            src/vulkax/sim/fluid_rigid_coupling.cpp
