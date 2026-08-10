@@ -1,7 +1,0 @@
-{
-  "measurement_class": "vulkan_ping_pong_compute_readback",
-  "device": "Apple M2 Pro",
-  "steps": 32,
-  "mse": 0,
-  "max_error": 0
-}

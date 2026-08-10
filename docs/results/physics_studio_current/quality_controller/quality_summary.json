@@ -1,7 +1,0 @@
-{
-  "measurement_class": "cpu_analytical_preview_quality_benchmark",
-  "frames": 120,
-  "target_frame_ms": 1,
-  "fixed": {"p50_frame_ms": 9.54804, "p95_frame_ms": 9.9035, "mean_visual_mse": 0, "changes": 0},
-  "adaptive": {"p50_frame_ms": 1.18925, "p95_frame_ms": 3.55625, "mean_visual_mse": 0.00161693, "changes": 13}
-}

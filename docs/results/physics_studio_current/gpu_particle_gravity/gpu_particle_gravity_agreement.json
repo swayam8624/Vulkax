@@ -1,9 +1,0 @@
-{
-  "measurement_class": "vulkan_two_pass_velocity_verlet_readback",
-  "device": "Apple M2 Pro",
-  "particles": 7,
-  "steps": 128,
-  "mse": 1.8617e-12,
-  "max_error": 5.45021e-06,
-  "gpu_dispatch_ms": 15.1534
-}

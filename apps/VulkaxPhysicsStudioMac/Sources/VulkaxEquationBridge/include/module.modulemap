@@ -1,4 +1,0 @@
-module VulkaxEquationBridge {
-  header "VulkaxEquationBridge.h"
-  export *
-}
