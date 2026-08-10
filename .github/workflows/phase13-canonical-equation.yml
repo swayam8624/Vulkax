@@ -1,0 +1,42 @@
+name: Phase 13 canonical equation bridge
+
+on:
+  push:
+    branches:
+      - agent/phase13-canonical-equation-bridge
+
+permissions:
+  contents: write
+
+jobs:
+  canonical-bridge:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/phase13-canonical-equation-bridge
+      - name: Apply canonical compiler integration
+        run: python3 scripts/phase13_canonical_bridge.py
+      - name: Build native Studio with canonical C++ compiler
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: swift build -c release
+      - name: Verify canonical compiler bridge
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-canonical-equation-bridge-smoke
+      - name: Verify dynamic equation GPU project
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-dynamic-equation-project-gpu-smoke
+      - name: Verify scalar and capture regressions
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: |
+          .build/release/VulkaxPhysicsStudioMac --native-gpu-smoke
+          .build/release/VulkaxPhysicsStudioMac --native-cinematic-capture-smoke
+      - name: Commit validated canonical compiler integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- ':!.github/workflows'
+          git diff --cached --check
+          git commit -m "Use canonical C++ equation compiler in native Studio"
+          git push origin HEAD:agent/phase13-canonical-equation-bridge
