@@ -1,151 +1,97 @@
-import AppKit
 import Foundation
+import simd
 
-struct LiveParameter: Identifiable, Codable, Equatable {
+enum VisualizerMode: String, CaseIterable, Identifiable, Codable {
+    case wave
+    case schwarzschild
+    case volumeSmoke = "volume-smoke"
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .wave: return "Wave Field"
+        case .schwarzschild: return "Schwarzschild Lens"
+        case .volumeSmoke: return "3D MAC Smoke"
+        }
+    }
+}
+
+struct ScalarPresetParameter: Identifiable, Hashable, Codable {
     var id: String { name }
-    let name: String
+    var name: String
     var value: Float
     var minimum: Float
     var maximum: Float
-    var units: String
 }
 
-struct ScalarPreset: Identifiable {
-    let id: String
-    let title: String
-    let equation: String
-    let parameters: [LiveParameter]
+struct ScalarPreset: Identifiable, Hashable, Codable {
+    var id: String
+    var title: String
+    var equation: String
+    var parameters: [ScalarPresetParameter]
 
     static let builtins: [ScalarPreset] = [
-        .init(id: "wave-field", title: "Wave Field",
-              equation: "amplitude * sin(wavenumber * x - angular_frequency * t)",
-              parameters: [
-                .init(name: "amplitude", value: 1, minimum: 0, maximum: 10, units: "field"),
-                .init(name: "angular_frequency", value: 3, minimum: 0.01, maximum: 50, units: "rad/s"),
-                .init(name: "wavenumber", value: 2, minimum: 0.01, maximum: 50, units: "rad/m")]),
-        .init(id: "gravity-potential", title: "Gravity Potential",
-              equation: "-gravitational_parameter / sqrt(x*x + y*y + z*z + softening*softening)",
-              parameters: [
-                .init(name: "gravitational_parameter", value: 8, minimum: 0.001, maximum: 100, units: "m3/s2"),
-                .init(name: "softening", value: 0.25, minimum: 0.001, maximum: 10, units: "m")]),
-        .init(id: "quantum-wavepacket", title: "Quantum Wavepacket",
-              equation: "exp(-((x-velocity*t)*(x-velocity*t))/(2*width*width))*cos(wavenumber*x-angular_frequency*t)",
-              parameters: [
-                .init(name: "angular_frequency", value: 3, minimum: 0.01, maximum: 100, units: "rad/s"),
-                .init(name: "velocity", value: 0.6, minimum: -10, maximum: 10, units: "m/s"),
-                .init(name: "wavenumber", value: 5, minimum: 0.01, maximum: 100, units: "rad/m"),
-                .init(name: "width", value: 1.2, minimum: 0.01, maximum: 20, units: "m")]),
-        .init(id: "electromagnetic-pulse", title: "Electromagnetic Pulse",
-              equation: "amplitude * exp(-decay*t) * sin(wavenumber*x-angular_frequency*t)",
-              parameters: [
-                .init(name: "amplitude", value: 1, minimum: 0, maximum: 10, units: "field"),
-                .init(name: "angular_frequency", value: 5, minimum: 0.01, maximum: 100, units: "rad/s"),
-                .init(name: "decay", value: 0.3, minimum: 0, maximum: 10, units: "1/s"),
-                .init(name: "wavenumber", value: 4, minimum: 0.01, maximum: 100, units: "rad/m")])
+        .init(
+            id: "plane-wave",
+            title: "Plane Wave",
+            equation: "amplitude * sin(wavenumber * x - angular_frequency * t)",
+            parameters: [
+                .init(name: "amplitude", value: 1.0, minimum: 0.05, maximum: 4.0),
+                .init(name: "angular_frequency", value: 2.0, minimum: 0.05, maximum: 12.0),
+                .init(name: "wavenumber", value: 1.6, minimum: 0.05, maximum: 8.0)
+            ]),
+        .init(
+            id: "radial-pulse",
+            title: "Radial Pulse",
+            equation: "amplitude * sin(wavenumber * sqrt(x*x + y*y) - angular_frequency*t)",
+            parameters: [
+                .init(name: "amplitude", value: 1.2, minimum: 0.05, maximum: 4.0),
+                .init(name: "angular_frequency", value: 3.0, minimum: 0.05, maximum: 12.0),
+                .init(name: "wavenumber", value: 2.4, minimum: 0.05, maximum: 8.0)
+            ])
     ]
 }
 
-enum RuntimeGraphKind: String, Codable {
-    case scalarField = "scalar-field"
-    case kerrRelativity = "kerr-relativity"
-    case incompressibleVolume = "incompressible-volume"
-}
-
 struct EquationRuntimeGraph: Codable, Equatable {
-    var kind: RuntimeGraphKind
-    var equations: [String]
-    var passes: [RuntimeGraphPass]
-
-    func contains(_ kernel: String) -> Bool {
-        passes.contains { $0.kernel == kernel }
-    }
+    var graphVersion: Int
+    var visualization: VisualizerMode
+    var scalarEquation: String
 
     static func builtIn(for mode: VisualizerMode, scalarEquation: String) -> EquationRuntimeGraph {
-        switch mode {
-        case .wave:
-            return .init(kind: .scalarField, equations: ["field = \(scalarEquation)"],
-                         passes: [.init(kernel: "evaluate_scalar_field"), .init(kernel: "tone_map_present")])
-        case .schwarzschild:
-            return .init(kind: .kerrRelativity,
-                         equations: ["g_mu_nu dx^mu dx^nu = 0", "D^2 xi^mu / dlambda^2 = -R^mu_ab_nu k^a k^b xi^nu"],
-                         passes: [.init(kernel: "integrate_active_rays"), .init(kernel: "compact_active_rays"),
-                                  .init(kernel: "resolve_disk_events"), .init(kernel: "radiative_transfer"),
-                                  .init(kernel: "tone_map_present")])
-        case .volumeSmoke:
-            return .init(kind: .incompressibleVolume,
-                         equations: ["du/dt + u dot grad(u) = -grad(p) + f", "div(u) = 0", "drho/dt + u dot grad(rho) = 0"],
-                         passes: [.init(kernel: "gpu_cfl"), .init(kernel: "advect_velocity"),
-                                  .init(kernel: "apply_forces"), .init(kernel: "curl_vorticity"),
-                                  .init(kernel: "divergence"), .init(kernel: "multigrid_pressure", iterations: 1),
-                                  .init(kernel: "project_velocity"), .init(kernel: "advect_scalars"),
-                                  .init(kernel: "volume_transport"), .init(kernel: "tone_map_present")])
-        }
+        .init(graphVersion: 1, visualization: mode, scalarEquation: scalarEquation)
     }
-}
-
-struct RuntimeGraphPass: Codable, Equatable {
-    var kernel: String
-    var reads: [String]
-    var writes: [String]
-    var iterations: Int
-
-    init(kernel: String, reads: [String] = [], writes: [String] = [], iterations: Int = 1) {
-        self.kernel = kernel
-        self.reads = reads
-        self.writes = writes
-        self.iterations = max(1, iterations)
-    }
-
-    init(from decoder: Decoder) throws {
-        if let legacy = try? decoder.singleValueContainer().decode(String.self) {
-            self.init(kernel: legacy)
-            return
-        }
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(
-            kernel: try container.decode(String.self, forKey: .kernel),
-            reads: try container.decodeIfPresent([String].self, forKey: .reads) ?? [],
-            writes: try container.decodeIfPresent([String].self, forKey: .writes) ?? [],
-            iterations: try container.decodeIfPresent(Int.self, forKey: .iterations) ?? 1)
-    }
-}
-
-struct CodableVector3: Codable, Equatable {
-    var x: Float
-    var y: Float
-    var z: Float
 }
 
 struct RigidObstacleConfiguration: Codable, Equatable {
-    var position: CodableVector3
-    var rotationDegrees: CodableVector3
-    var scale: CodableVector3
-    var linearVelocity: CodableVector3
-    var angularVelocity: CodableVector3
-    var diagonalInertia: CodableVector3
+    var position: SIMD3<Float>
+    var rotationDegrees: SIMD3<Float>
+    var scale: SIMD3<Float>
+    var linearVelocity: SIMD3<Float>
+    var angularVelocity: SIMD3<Float>
     var mass: Float
+    var diagonalInertia: SIMD3<Float>
 
     static let `default` = RigidObstacleConfiguration(
-        position: .init(x: 0.66, y: 0.30, z: 0.50),
-        rotationDegrees: .init(x: 0, y: 0, z: 0),
-        scale: .init(x: 1, y: 1, z: 1),
-        linearVelocity: .init(x: 0.035, y: 0, z: 0),
-        angularVelocity: .init(x: 0, y: 0, z: 0),
-        diagonalInertia: .init(x: 0.012, y: 0.012, z: 0.012),
-        mass: 2)
+        position: SIMD3(0.5, 0.42, 0.5),
+        rotationDegrees: .zero,
+        scale: SIMD3(repeating: 1),
+        linearVelocity: .zero,
+        angularVelocity: .zero,
+        mass: 1,
+        diagonalInertia: SIMD3(repeating: 0.02))
 }
 
 struct ProjectObstacleRecord: Codable, Equatable {
     var meshPath: String
     var body: RigidObstacleConfiguration
-    var role: SceneEntityRole?
-    var collisionProxy: CollisionProxyKind?
+    var role: SceneEntityRole
+    var collisionProxy: CollisionProxyKind
 
     init(
         meshPath: String,
         body: RigidObstacleConfiguration,
-        role: SceneEntityRole? = nil,
-        collisionProxy: CollisionProxyKind? = nil
+        role: SceneEntityRole = .fluidObstacle,
+        collisionProxy: CollisionProxyKind = .renderMesh
     ) {
         self.meshPath = meshPath
         self.body = body
@@ -321,7 +267,7 @@ enum PhysicsProjectIO {
 
     static func load(from url: URL) throws -> PhysicsProjectFile {
         let project = try JSONDecoder().decode(PhysicsProjectFile.self, from: Data(contentsOf: url))
-        guard project.format == "vulkax.physics-project", (1...8).contains(project.version) else {
+        guard project.format == "vulkax.physics-project", (1...9).contains(project.version) else {
             throw CocoaError(.fileReadCorruptFile)
         }
         return project
