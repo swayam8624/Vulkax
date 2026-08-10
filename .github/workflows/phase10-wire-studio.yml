@@ -17,7 +17,17 @@ jobs:
         with:
           ref: agent/phase10-studio-scene-ui
       - name: Wire scene model, camera and workspace
-        run: python3 scripts/phase10_wire_studio.py
+        run: |
+          python3 scripts/phase10_wire_studio.py
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/main.swift')
+          text = path.read_text()
+          text = text.replace(
+              'tan(radians(clamp(u.cameraUpFov.w, 10.0, 120.0)) * 0.5)',
+              'tan(clamp(u.cameraUpFov.w, 10.0, 120.0) * (M_PI_F / 180.0) * 0.5)')
+          path.write_text(text)
+          PY
       - name: Build native Studio
         working-directory: apps/VulkaxPhysicsStudioMac
         run: swift build -c release
