@@ -23,14 +23,27 @@ new = (
 if old in text:
     atlas.write_text(text.replace(old, new, 1))
 else:
-    if 'firstComponent == relativeToRoot.end()' in text:
-        raise SystemExit('unexpected Atlas containment implementation')
     if 'std::filesystem::path{".."}' not in text:
         raise SystemExit('Atlas containment marker missing')
 
 fix_atlas = root / "scripts/phase12_fix_atlas.py"
 if fix_atlas.exists():
     fix_atlas.unlink()
+
+# libc++ in the current Apple toolchain does not provide floating-point
+# std::from_chars. Keep integer from_chars, but make Physics IR floating token
+# parsing portable across libc++, libstdc++ and Windows.
+physics_ir = root / "src/vulkax/physics/physics_ir.cpp"
+text = physics_ir.read_text()
+if '#include <cerrno>' not in text:
+    text = text.replace('#include <charconv>\n', '#include <charconv>\n#include <cerrno>\n#include <cstdlib>\n', 1)
+old_double = '''std::optional<double> parseDouble(const std::string& value) {\n  double result = 0.0;\n  const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), result);\n  return error == std::errc{} && end == value.data() + value.size() ? std::optional<double>{result}\n                                                                    : std::nullopt;\n}\n'''
+new_double = '''std::optional<double> parseDouble(const std::string& value) {\n  if (value.empty()) return std::nullopt;\n  errno = 0;\n  char* end = nullptr;\n  const char* begin = value.c_str();\n  const double result = std::strtod(begin, &end);\n  if (begin == end || errno == ERANGE || end != begin + value.size()) return std::nullopt;\n  return result;\n}\n'''
+if old_double in text:
+    text = text.replace(old_double, new_double, 1)
+elif 'std::strtod(begin, &end)' not in text:
+    raise SystemExit('Physics IR parseDouble marker missing')
+physics_ir.write_text(text)
 
 run("scripts/phase13_canonical_bridge.py")
 
