@@ -1,0 +1,32 @@
+name: WIP Vertical Phase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/wip-verticals-phase.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Apply vertical phase
+        run: python scripts/apply_verticals_phase.py
+      - name: Remove one-shot phase machinery
+        run: |
+          rm .github/workflows/wip-verticals-phase.yml
+          rm scripts/apply_verticals_phase.py
+      - name: Commit phase
+        run: |
+          git config user.name "Vulkax Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Add hyperelastic and aerodynamics end-to-end verticals"
+          git push origin HEAD:main
