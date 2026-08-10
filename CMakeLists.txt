@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(Vulkax VERSION 0.4.0 LANGUAGES CXX)
+project(Vulkax VERSION 0.5.0 LANGUAGES CXX)
 
 option(VULKAX_BUILD_TESTS "Build Vulkax tests" ON)
 
@@ -27,6 +27,7 @@ add_library(vulkax_core STATIC
     src/solvers/diffusion.cpp
     src/verify/convergence.cpp
     src/verify/result_certificate.cpp
+    src/visualization/scientific.cpp
 )
 
 target_include_directories(vulkax_core PUBLIC include)
@@ -83,8 +84,7 @@ target_link_libraries(vulkax PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-
-    foreach(test_name IN ITEMS core numerics research compiler_inverse compute)
+    foreach(test_name IN ITEMS core numerics research compiler_inverse compute visualization)
         add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
         target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
         if(MSVC)
