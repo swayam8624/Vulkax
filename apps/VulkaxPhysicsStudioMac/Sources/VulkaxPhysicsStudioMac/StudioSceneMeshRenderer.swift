@@ -1,3 +1,4 @@
+import Foundation
 import Metal
 import simd
 
@@ -174,19 +175,20 @@ final class StudioSceneMeshRenderer {
     func encode(
         encoder: MTLRenderCommandEncoder,
         model: PhysicsModel,
+        camera: StudioCamera,
         simulatedBodyBuffer: MTLBuffer?,
         capture: Bool,
         aspect: Float
     ) {
-        var camera = StudioSceneCameraUniforms(
-            positionExposure: SIMD4(model.camera.position, model.camera.exposure),
-            target: SIMD4(model.camera.target, 0),
-            upFov: SIMD4(model.camera.up, model.camera.verticalFovDegrees),
+        var cameraUniforms = StudioSceneCameraUniforms(
+            positionExposure: SIMD4(camera.position, camera.exposure),
+            target: SIMD4(camera.target, 0),
+            upFov: SIMD4(camera.up, camera.verticalFovDegrees),
             aspectNearFar: SIMD4(max(aspect, 0.01), 0.01, 100.0, 0))
         encoder.setRenderPipelineState(capture ? capturePipeline : interactivePipeline)
         encoder.setDepthStencilState(depthState)
-        encoder.setVertexBytes(&camera, length: MemoryLayout<StudioSceneCameraUniforms>.stride, index: 2)
-        encoder.setFragmentBytes(&camera, length: MemoryLayout<StudioSceneCameraUniforms>.stride, index: 2)
+        encoder.setVertexBytes(&cameraUniforms, length: MemoryLayout<StudioSceneCameraUniforms>.stride, index: 2)
+        encoder.setFragmentBytes(&cameraUniforms, length: MemoryLayout<StudioSceneCameraUniforms>.stride, index: 2)
 
         if simulatedVertexCount > 0, let simulatedVertices, let simulatedBodyBuffer {
             encoder.setVertexBuffer(simulatedVertices, offset: 0, index: 0)
