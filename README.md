@@ -15,6 +15,7 @@ They remain runnable regression baselines and source material for the editor's f
 research controller. They are not presented as unfinished requirements for Physics Studio.
 
 The complete, honest phase plan is [Vulkax Physics Studio Roadmap](docs/VULKAX_PHYSICS_STUDIO_ROADMAP.md).
+The repository ownership map is documented in [Vulkax Architecture](docs/VULKAX_ARCHITECTURE.md).
 
 ## Run Physics Studio
 
