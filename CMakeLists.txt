@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(VulkaxNext VERSION 0.2.0 LANGUAGES CXX)
+project(VulkaxNext VERSION 0.3.0 LANGUAGES CXX)
 option(VULKAX_BUILD_TESTS "Build Vulkax core tests" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,9 +16,15 @@ add_library(vulkax_core STATIC
     src/field/field.cpp
     src/numerics/solvers.cpp
     src/operators/operator_graph.cpp
+    src/physics/cfd.cpp
+    src/physics/dem.cpp
+    src/physics/fem.cpp
+    src/planner/solver_plan.cpp
     src/problem/problem_ir.cpp
     src/problem/validation.cpp
+    src/research/operator_influence.cpp
     src/verify/result_certificate.cpp
+    src/visualization/scientific.cpp
 )
 target_include_directories(vulkax_core PUBLIC include)
 target_compile_features(vulkax_core PUBLIC cxx_std_20)
@@ -63,7 +69,7 @@ target_link_libraries(vulkax PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-    foreach(test_name IN ITEMS core foundation compute)
+    foreach(test_name IN ITEMS core foundation compute physics research)
         add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
         target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
         if(MSVC)
