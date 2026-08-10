@@ -1,0 +1,66 @@
+name: Phase 12 Windows build validation
+
+on:
+  push:
+    branches:
+      - agent/phase12-windows-ci
+
+permissions:
+  contents: write
+
+jobs:
+  windows-ucrt64:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-vulkan-headers
+            mingw-w64-ucrt-x86_64-vulkan-loader
+            mingw-w64-ucrt-x86_64-glslang
+            mingw-w64-ucrt-x86_64-glfw
+            mingw-w64-ucrt-x86_64-glm
+            mingw-w64-ucrt-x86_64-nlohmann-json
+            mingw-w64-ucrt-x86_64-sqlite3
+            mingw-w64-ucrt-x86_64-curl
+            mingw-w64-ucrt-x86_64-openexr
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-declarative
+      - name: Apply portable target cleanup
+        run: python scripts/phase12_windows.py
+      - name: Configure Windows UCRT64
+        run: >-
+          cmake -S . -B build-windows -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+          -DVULKAX_REQUIRE_PHYSICS_STUDIO=ON
+      - name: Build Windows product and tests
+        run: cmake --build build-windows
+      - name: Run CPU numerical contract tests
+        run: >-
+          ctest --test-dir build-windows --output-on-failure
+          -R '^(beacon_core|equation_core|equation_glsl|physics_ir|medium_inference|runtime_contract|simulation_graph|particle_gravity|buoyant_smoke|fluid_rigid_coupling|sparse_brick_storage|schwarzschild_lensing|kerr_geodesic|schwarzschild_thin_disk|quality_controller|atlas_core)$'
+      - name: Run Qt compatibility smoke
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+        run: './build-windows/Vulkax\ Physics\ Studio.exe --smoke'
+      - name: Commit validated CMake cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CMakeLists.txt cmake/VulkaxDependencies.cmake cmake/VulkaxApplications.cmake
+          git diff --cached --check
+          git commit -m "Make Vulkax build cleanly on Windows UCRT64"
+          git push origin HEAD:agent/phase12-windows-ci
