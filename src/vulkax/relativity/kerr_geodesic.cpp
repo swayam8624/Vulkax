@@ -153,12 +153,18 @@ std::array<double, 3> cieApproximation(double wavelengthNanometres) {
   return {std::max(0.0, x), std::max(0.0, y), std::max(0.0, z)};
 }
 
-double planckFrequencyRadiance(double wavelengthMetres, double temperatureKelvin) {
-  const double frequency = kLightSpeed / wavelengthMetres;
-  const double exponent = kPlanck * frequency / (kBoltzmann * temperatureKelvin);
+// Spectral samples below are integrated on a uniform wavelength grid, so use
+// Planck's wavelength-domain radiance B_lambda directly. Mixing B_nu with a
+// wavelength-domain quadrature biases the colour because dnu/dlambda is not
+// constant across the visible spectrum.
+double planckWavelengthRadiance(double wavelengthMetres, double temperatureKelvin) {
+  const double exponent =
+      kPlanck * kLightSpeed / (wavelengthMetres * kBoltzmann * temperatureKelvin);
   if (exponent > 700.0) return 0.0;
-  return 2.0 * kPlanck * frequency * frequency * frequency /
-         (kLightSpeed * kLightSpeed * std::expm1(exponent));
+  const double wavelength2 = wavelengthMetres * wavelengthMetres;
+  const double wavelength5 = wavelength2 * wavelength2 * wavelengthMetres;
+  return 2.0 * kPlanck * kLightSpeed * kLightSpeed /
+         (wavelength5 * std::expm1(exponent));
 }
 
 State equatorRoot(
@@ -577,7 +583,11 @@ KerrDiskSpectrum evaluateKerrThinDiskSpectrum(
   if (!(redshiftDenominator > 0.0) || !std::isfinite(redshiftDenominator)) return result;
   result.frequencyShift = 1.0 / redshiftDenominator;
   if (!(result.frequencyShift > 0.0) || !std::isfinite(result.frequencyShift)) return result;
+  // I_nu / nu^3 is Lorentz invariant. Keep this telemetry field in its
+  // historical frequency-domain form, while the wavelength-domain spectrum
+  // below uses the corresponding g^5 transformation for I_lambda.
   result.invariantIntensityScale = std::pow(result.frequencyShift, 3.0);
+  const double wavelengthIntensityScale = std::pow(result.frequencyShift, 5.0);
   const double innerRatio = innerRadius / diskRadius;
   result.emitterTemperatureKelvin = maximumTemperatureKelvin * std::pow(innerRatio, 0.75) *
                                     std::pow(std::max(0.0, 1.0 - std::sqrt(innerRatio)), 0.25);
@@ -585,18 +595,21 @@ KerrDiskSpectrum evaluateKerrThinDiskSpectrum(
 
   constexpr double firstWavelength = 390.0;
   constexpr double wavelengthStep = 30.0;
+  constexpr double nanometresToMetres = 1e-9;
+  const double wavelengthWeightMetres = wavelengthStep * nanometresToMetres;
   std::array<double, 3> xyz{};
   for (size_t index = 0; index < result.spectralRadiance.size(); ++index) {
     const double observedWavelength = firstWavelength + wavelengthStep * index;
     const double emittedWavelength = result.frequencyShift * observedWavelength;
     const double radiance =
-        result.invariantIntensityScale *
-        planckFrequencyRadiance(emittedWavelength * 1e-9, result.emitterTemperatureKelvin);
+        wavelengthIntensityScale *
+        planckWavelengthRadiance(
+            emittedWavelength * nanometresToMetres, result.emitterTemperatureKelvin);
     result.observedWavelengthNanometres[index] = observedWavelength;
     result.spectralRadiance[index] = radiance;
     const auto matching = cieApproximation(observedWavelength);
     for (size_t component = 0; component < 3; ++component)
-      xyz[component] += radiance * matching[component];
+      xyz[component] += radiance * matching[component] * wavelengthWeightMetres;
   }
   result.relativeLuminance = xyz[1];
   const std::array<double, 3> rgb{

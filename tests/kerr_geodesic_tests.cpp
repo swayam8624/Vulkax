@@ -112,6 +112,23 @@ int main() {
   assert(blueShiftedSpectrum.relativeLuminance != redShiftedSpectrum.relativeLuminance);
   assert(!evaluateKerrThinDiskSpectrum(spinning, constants, 2.0).valid);
 
+  // Wavelength-domain Planck integration must retain the expected blackbody
+  // colour trend: increasing the emitter temperature shifts the normalized
+  // visible result toward blue. This catches accidental B_nu sampling on a
+  // uniform wavelength grid and incorrect g-factor conversions.
+  const auto spectralConstants = kerrConstantsFromImagePlane(spinning, 0.0, 1.0);
+  const auto coolSpectrum =
+      evaluateKerrThinDiskSpectrum(spinning, spectralConstants, 8.0, 4500.0);
+  const auto hotSpectrum =
+      evaluateKerrThinDiskSpectrum(spinning, spectralConstants, 8.0, 12000.0);
+  assert(coolSpectrum.valid && hotSpectrum.valid);
+  const double coolBlueToRed =
+      coolSpectrum.linearSrgb[2] / std::max(coolSpectrum.linearSrgb[0], 1e-12);
+  const double hotBlueToRed =
+      hotSpectrum.linearSrgb[2] / std::max(hotSpectrum.linearSrgb[0], 1e-12);
+  assert(hotBlueToRed > coolBlueToRed);
+  assert(hotSpectrum.relativeLuminance > coolSpectrum.relativeLuminance);
+
   const auto diskRay = integrateKerrImageRay(spinning, -10.0, -2.0);
   assert(diskRay.diskCrossings >= 1);
   assert(diskRay.intersectionCount >= diskRay.diskCrossings);

@@ -2091,9 +2091,13 @@ private func runImportedMeshGpuSmoke(path: String) -> Bool {
         descriptor.height = 32
         descriptor.depth = 32
         descriptor.usage = [.shaderRead, .shaderWrite]
+        // This deterministic smoke test validates the voxelized texture on the
+        // CPU after GPU completion. Keep only that readback texture shared; the
+        // interactive solver continues to allocate private GPU-resident fields.
+        descriptor.storageMode = .shared
+        guard let obstacles = device.makeTexture(descriptor: descriptor) else { return false }
         descriptor.storageMode = .private
-        guard let obstacles = device.makeTexture(descriptor: descriptor),
-              let pressure = device.makeTexture(descriptor: descriptor) else { return false }
+        guard let pressure = device.makeTexture(descriptor: descriptor) else { return false }
         var combinedVertices: [SIMD4<Float>] = []
         var combinedIndices: [UInt32] = []
         for bodyIndex in 0..<2 {
