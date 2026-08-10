@@ -119,6 +119,15 @@ jobs:
           .build/release/VulkaxPhysicsStudioMac
           --native-imported-mesh-gpu-smoke
           ../../tests/fixtures/airflow_cube.obj
+      - name: Native visual scene mesh smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: >-
+          .build/release/VulkaxPhysicsStudioMac
+          --native-scene-mesh-gpu-smoke
+          ../../tests/fixtures/airflow_cube.obj
+      - name: Native 4K cinematic capture smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: .build/release/VulkaxPhysicsStudioMac --native-cinematic-capture-smoke
       - name: Native dynamic equation project smoke
         working-directory: apps/VulkaxPhysicsStudioMac
         run: .build/release/VulkaxPhysicsStudioMac --native-dynamic-equation-project-gpu-smoke

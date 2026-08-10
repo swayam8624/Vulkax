@@ -2421,6 +2421,8 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
     private weak var model: PhysicsModel?
     private let commandQueue: MTLCommandQueue
     private let displayPipeline: MTLRenderPipelineState
+    private let captureDisplayPipeline: MTLRenderPipelineState
+    private let sceneRenderer: StudioSceneMeshRenderer
     private let simulationPipeline: MTLComputePipelineState
     private let clearScalarVolumePipeline: MTLComputePipelineState
     private let clearVectorVolumePipeline: MTLComputePipelineState
@@ -2490,6 +2492,10 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
     private let inFlightFrames = DispatchSemaphore(value: 3)
     private var frameIndex: UInt64 = 0
     private var lastResetToken: UInt32 = 0
+    private var captureSession: CinematicCaptureSession?
+    private var activeCaptureCamera: StudioCamera?
+    private var captureStartTimeline: Float = 0
+    private var lastCaptureRequestRevision: UInt64 = 0
     private(set) var latestTelemetry = VulkaxFrameTelemetry()
     let runtimeCapabilities: VulkaxRuntimeCapabilities
 
@@ -2511,7 +2517,19 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
             descriptor.fragmentFunction = library.makeFunction(name: "display")
             descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
             descriptor.colorAttachments[0].isBlendingEnabled = false
+            descriptor.depthAttachmentPixelFormat = .depth32Float
             self.displayPipeline = try device.makeRenderPipelineState(descriptor: descriptor)
+            let captureDescriptor = MTLRenderPipelineDescriptor()
+            captureDescriptor.vertexFunction = library.makeFunction(name: "fullscreen")
+            captureDescriptor.fragmentFunction = library.makeFunction(name: "display")
+            captureDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+            captureDescriptor.colorAttachments[0].isBlendingEnabled = false
+            captureDescriptor.depthAttachmentPixelFormat = .depth32Float
+            self.captureDisplayPipeline = try device.makeRenderPipelineState(descriptor: captureDescriptor)
+            self.sceneRenderer = try StudioSceneMeshRenderer(
+                device: device,
+                interactiveColorFormat: view.colorPixelFormat,
+                depthFormat: .depth32Float)
             guard let simulation = library.makeFunction(name: "simulateWave") else { return nil }
             guard let clearScalarVolume = library.makeFunction(name: "clearScalarVolume"),
                   let clearVectorVolume = library.makeFunction(name: "clearVectorVolume"),
@@ -2567,6 +2585,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         super.init()
         view.device = device
         view.delegate = self
+        view.depthStencilPixelFormat = .depth32Float
         view.framebufferOnly = true
         view.enableSetNeedsDisplay = false
         view.isPaused = false
@@ -2581,6 +2600,30 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         accumulatedMode = nil
         accumulationSignature = nil
         model?.accumulationResetToken &+= 1
+    }
+
+    private func synchronizeCaptureRequest(device: MTLDevice, model: PhysicsModel) {
+        guard model.captureRequestRevision != lastCaptureRequestRevision else { return }
+        lastCaptureRequestRevision = model.captureRequestRevision
+        guard let request = model.pendingCaptureRequest, request.revision == model.captureRequestRevision else { return }
+        do {
+            captureSession = try CinematicCaptureSession(
+                outputURL: request.outputURL, settings: request.settings, device: device)
+            activeCaptureCamera = request.camera
+            captureStartTimeline = request.timelineSeconds
+            model.accumulationResetToken &+= 1
+            DispatchQueue.main.async { [weak model] in
+                model?.reportCaptureState(
+                    active: true,
+                    message: "Recording \(request.settings.resolution.title) · \(request.settings.frameRate.title) · \(request.outputURL.lastPathComponent)")
+            }
+        } catch {
+            captureSession = nil
+            activeCaptureCamera = nil
+            DispatchQueue.main.async { [weak model] in
+                model?.reportCaptureState(active: false, message: "Capture failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     private func scheduleEquationPipeline(device: MTLDevice, model: PhysicsModel) {
@@ -2875,15 +2918,24 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         guard inFlightFrames.wait(timeout: .now()) == .success else { return }
         var submitted = false
         defer { if !submitted { inFlightFrames.signal() } }
+        synchronizeCaptureRequest(device: device, model: model)
+        let activeCapture = captureSession?.shouldEncodeMoreFrames == true ? captureSession : nil
         let isRelativity = model.executionGraph.contains("integrate_active_rays")
         let isVolume = model.executionGraph.contains("volume_transport")
         let isScalar = model.executionGraph.contains("evaluate_scalar_field")
-        let renderScale: CGFloat = isRelativity ? 0.55 : 1.0
-        guard let radiance = ensureHdrRadiance(view.drawableSize, scale: renderScale, device: device) else { return }
+        let renderScale: CGFloat = activeCapture == nil && isRelativity ? 0.55 : 1.0
+        let renderSize = activeCapture.map { CGSize(width: $0.width, height: $0.height) } ?? view.drawableSize
+        guard let radiance = ensureHdrRadiance(renderSize, scale: renderScale, device: device) else { return }
         let now = CACurrentMediaTime()
-        let delta = min(Float(now - lastTime), 1.0 / 20.0)
+        let interactiveDelta = min(Float(now - lastTime), 1.0 / 20.0)
         lastTime = now
+        let delta = activeCapture.map { 1.0 / Float($0.frameRate) } ?? interactiveDelta
+        let simulationTime = activeCapture.map {
+            captureStartTimeline + Float($0.frameCount) / Float($0.frameRate)
+        } ?? model.time
+        let effectiveCamera = activeCaptureCamera.flatMap { activeCapture == nil ? nil : $0 } ?? model.camera
         scheduleEquationPipeline(device: device, model: model)
+        sceneRenderer.rebuildIfNeeded(device: device, model: model)
         frameIndex &+= 1
         let scalarParameters = model.parameterValuesInCompilerOrder()
         var frameRequest = VulkaxFrameRequest()
@@ -2893,9 +2945,9 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         frameRequest.drawableWidth = UInt32(max(1, Int(view.drawableSize.width)))
         frameRequest.drawableHeight = UInt32(max(1, Int(view.drawableSize.height)))
         frameRequest.frameIndex = frameIndex
-        frameRequest.timelineSeconds = model.time
+        frameRequest.timelineSeconds = simulationTime
         frameRequest.deltaSeconds = delta
-        frameRequest.renderScale = isRelativity ? 0.55 : 1.0
+        frameRequest.renderScale = Float(renderScale)
         frameRequest.resetHistory = model.accumulationResetToken == lastResetToken ? 0 : 1
         lastResetToken = model.accumulationResetToken
         frameRequest.parameterCount = UInt32(scalarParameters.count)
@@ -2915,7 +2967,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
             renderParameters = .zero
         }
         let resetAccumulation = accumulatedMode != model.mode || accumulationSignature != schwarzschildSignature
-        let uniforms = WaveUniforms(time: model.time,
+        let uniforms = WaveUniforms(time: simulationTime,
                                    amplitude: model.scalarParameter("amplitude", fallback: 1),
                                    wavenumber: model.scalarParameter("wavenumber", fallback: 2),
                                    angularFrequency: model.scalarParameter("angular_frequency", fallback: 3),
@@ -3239,12 +3291,62 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
             accumulationSignature = nil
         }
 
+        pass.depthAttachment.clearDepth = 1.0
         guard let encoder = command.makeRenderCommandEncoder(descriptor: pass) else { return }
         encoder.setRenderPipelineState(displayPipeline)
         encoder.setFragmentTexture(displayRadiance, index: 0)
         encoder.setFragmentBytes(&copy, length: MemoryLayout<WaveUniforms>.stride, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        sceneRenderer.encode(
+            encoder: encoder,
+            model: model,
+            camera: effectiveCamera,
+            simulatedBodyBuffer: obstacleBody,
+            capture: false,
+            aspect: Float(max(view.drawableSize.width, 1) / max(view.drawableSize.height, 1)))
         encoder.endEncoding()
+
+        var captureTarget: CinematicCaptureTarget?
+        if let activeCapture {
+            do {
+                let target = try activeCapture.makeTarget(device: device)
+                guard let captureDepth = sceneRenderer.captureDepthTexture(
+                    device: device, width: activeCapture.width, height: activeCapture.height) else {
+                    throw CinematicCaptureError.metalTextureUnavailable
+                }
+                let capturePass = MTLRenderPassDescriptor()
+                capturePass.colorAttachments[0].texture = target.texture
+                capturePass.colorAttachments[0].loadAction = .clear
+                capturePass.colorAttachments[0].storeAction = .store
+                capturePass.colorAttachments[0].clearColor = MTLClearColor(red: 0.01, green: 0.02, blue: 0.06, alpha: 1)
+                capturePass.depthAttachment.texture = captureDepth
+                capturePass.depthAttachment.loadAction = .clear
+                capturePass.depthAttachment.storeAction = .dontCare
+                capturePass.depthAttachment.clearDepth = 1.0
+                guard let captureEncoder = command.makeRenderCommandEncoder(descriptor: capturePass) else { return }
+                captureEncoder.setRenderPipelineState(captureDisplayPipeline)
+                captureEncoder.setFragmentTexture(displayRadiance, index: 0)
+                captureEncoder.setFragmentBytes(&copy, length: MemoryLayout<WaveUniforms>.stride, index: 0)
+                captureEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+                sceneRenderer.encode(
+                    encoder: captureEncoder,
+                    model: model,
+                    camera: effectiveCamera,
+                    simulatedBodyBuffer: obstacleBody,
+                    capture: true,
+                    aspect: Float(activeCapture.width) / Float(activeCapture.height))
+                captureEncoder.endEncoding()
+                captureTarget = target
+            } catch {
+                let failedSession = captureSession
+                captureSession = nil
+                activeCaptureCamera = nil
+                failedSession?.finish { _ in }
+                DispatchQueue.main.async { [weak model] in
+                    model?.reportCaptureState(active: false, message: "Capture failed: \(error.localizedDescription)")
+                }
+            }
+        }
         let submittedFrame = frameRequest
         let submittedHistory = UInt32(accumulationSamples)
         command.addCompletedHandler { [weak self, weak model, inFlightFrames] completed in
@@ -3259,13 +3361,53 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
             telemetry.frameSubmitted = 1
             telemetry.framePresented = completed.status == .completed ? 1 : 0
             self?.latestTelemetry = telemetry
+            if completed.status == .completed,
+               let target = captureTarget,
+               let capture = activeCapture {
+                do {
+                    let finished = try capture.append(target)
+                    if finished {
+                        capture.finish { [weak self, weak model] result in
+                            self?.captureSession = nil
+                            self?.activeCaptureCamera = nil
+                            DispatchQueue.main.async {
+                                switch result {
+                                case let .success(url):
+                                    model?.reportCaptureState(
+                                        active: false,
+                                        message: "Saved cinematic capture · \(url.lastPathComponent)")
+                                case let .failure(error):
+                                    model?.reportCaptureState(
+                                        active: false,
+                                        message: "Capture finalize failed: \(error.localizedDescription)")
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    let failedSession = self?.captureSession
+                    self?.captureSession = nil
+                    self?.activeCaptureCamera = nil
+                    failedSession?.finish { _ in }
+                    DispatchQueue.main.async {
+                        model?.reportCaptureState(active: false, message: "Capture encode failed: \(error.localizedDescription)")
+                    }
+                }
+            }
             DispatchQueue.main.async { model?.reportFrame(telemetry) }
             inFlightFrames.signal()
         }
         command.present(drawable)
         command.commit()
         submitted = true
-        if model.playing { DispatchQueue.main.async { model.time += delta } }
+        if captureTarget != nil {
+            // Offline capture is deliberately serialized so AVAssetWriter sees
+            // exact frame ordering and each simulation step is exactly 1/fps.
+            command.waitUntilCompleted()
+            DispatchQueue.main.async { model.time = simulationTime + delta }
+        } else if model.playing {
+            DispatchQueue.main.async { model.time += delta }
+        }
     }
 }
 
@@ -3276,6 +3418,7 @@ struct MetalWaveView: NSViewRepresentable {
         let view = StudioMetalView(frame: .zero, device: MTLCreateSystemDefaultDevice())
         view.physicsModel = model
         view.colorPixelFormat = .bgra8Unorm_srgb
+        view.depthStencilPixelFormat = .depth32Float
         view.clearColor = MTLClearColor(red: 0.01, green: 0.02, blue: 0.06, alpha: 1.0)
         let renderer = MetalWaveRenderer(view: view, model: model)
         view.delegate = renderer
@@ -3322,6 +3465,14 @@ struct ContentView: View {
         }
         if CommandLine.arguments.contains("--native-all-formulas-gpu-smoke") {
             exit(runAllFormulaPresetsGpuSmoke() ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
+        if CommandLine.arguments.contains("--native-cinematic-capture-smoke") {
+            exit(runCinematicCaptureWriterSmoke() ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
+        if let option = CommandLine.arguments.firstIndex(of: "--native-scene-mesh-gpu-smoke") {
+            guard option + 1 < CommandLine.arguments.count else { exit(EXIT_FAILURE) }
+            exit(runStudioSceneMeshRendererSmoke(path: CommandLine.arguments[option + 1])
+                 ? EXIT_SUCCESS : EXIT_FAILURE)
         }
     }
 
