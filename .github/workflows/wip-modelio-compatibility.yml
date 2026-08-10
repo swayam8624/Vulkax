@@ -1,0 +1,44 @@
+name: WIP Model I/O compatibility
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Apply compatibility importer wiring
+        run: python3 scripts/wire_modelio_compatibility.py
+      - name: Build native Studio
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: swift build -c release
+      - name: Run guaranteed Model I/O PLY compatibility smoke
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: >-
+          .build/release/VulkaxPhysicsStudioMac
+          --native-scene-mesh-gpu-smoke
+          ../../tests/fixtures/modelio_triangle.ply
+      - name: Preserve primary format regressions
+        working-directory: apps/VulkaxPhysicsStudioMac
+        run: |
+          .build/release/VulkaxPhysicsStudioMac --native-scene-mesh-gpu-smoke ../../tests/fixtures/triangle_pbr.gltf
+          .build/release/VulkaxPhysicsStudioMac --native-cinematic-capture-smoke
+      - name: Commit validated product source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/ImportedObstacleMesh.swift \
+                  apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/main.swift \
+                  apps/VulkaxPhysicsStudioMac/Sources/VulkaxPhysicsStudioMac/StudioWorkspaceView.swift
+          git diff --cached --check
+          git commit -m "Add runtime-gated Model I/O asset fallback"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
