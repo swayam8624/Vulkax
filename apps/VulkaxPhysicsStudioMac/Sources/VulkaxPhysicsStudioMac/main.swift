@@ -22,9 +22,15 @@ enum VisualizerMode: Float, CaseIterable, Identifiable {
 
 struct ObstacleSceneItem: Identifiable {
     let id: UUID
+    // mesh is the closed simulation proxy consumed by voxelization/contact.
     var mesh: ImportedObstacleMesh
+    // visualMesh preserves the imported car/prop topology even when it is not
+    // suitable for numerical coupling.
+    var visualMesh: ImportedObstacleMesh
     var url: URL
     var body: RigidObstacleConfiguration
+    var role: SceneEntityRole
+    var collisionProxy: CollisionProxyKind
 }
 
 final class PhysicsModel: ObservableObject {
@@ -46,6 +52,12 @@ final class PhysicsModel: ObservableObject {
     @Published var smokeTurbulence: Float = 1.0
     @Published var volumeExtinction: Float = 2.2
     @Published var volumeEmission: Float = 1.0
+    @Published var camera = StudioCamera.default
+    @Published var mediumOverride: SimulationMedium?
+    @Published var captureSettings = CinematicCaptureSettings()
+    @Published var capturePanelPresented = false
+    @Published private(set) var isCapturing = false
+    @Published private(set) var captureRequestRevision: UInt64 = 0
     @Published private(set) var obstacleItems: [ObstacleSceneItem] = []
     @Published var selectedObstacleID: UUID?
     @Published private(set) var obstacleMeshRevision: UInt64 = 0
@@ -92,6 +104,60 @@ final class PhysicsModel: ObservableObject {
     private var selectedObstacleIndex: Int? {
         guard let selectedObstacleID else { return nil }
         return obstacleItems.firstIndex { $0.id == selectedObstacleID }
+    }
+
+    var inferredMedium: MediumInferenceResult {
+        SimulationMediumInference.infer(equation: equationSource, visualizerMode: mode)
+    }
+
+    var activeMedium: SimulationMedium { mediumOverride ?? inferredMedium.medium }
+
+    var selectedObstacleName: String {
+        selectedObstacleIndex.map { obstacleItems[$0].url.deletingPathExtension().lastPathComponent } ?? "No selection"
+    }
+
+    var selectedVisualDiagnostics: String {
+        selectedObstacleIndex.map { obstacleItems[$0].visualMesh.diagnostics.summary } ?? ""
+    }
+
+    var selectedProxyDescription: String {
+        guard let index = selectedObstacleIndex else { return "No simulation proxy" }
+        let item = obstacleItems[index]
+        switch item.collisionProxy {
+        case .none: return "Visual-only entity; excluded from the numerical domain."
+        case .renderMesh: return "The imported closed mesh is used directly for voxelization/contact."
+        case .box: return "A closed bounds proxy is used for stable GPU simulation; the imported model remains the visual asset."
+        case .convexHull: return "Convex-hull mode currently uses the conservative bounds proxy until hull generation lands."
+        case .sphere: return "Sphere mode currently uses the conservative bounds proxy until analytic proxy voxelization lands."
+        }
+    }
+
+    var selectedObstacleRole: SceneEntityRole {
+        get { selectedObstacleIndex.map { obstacleItems[$0].role } ?? .visual }
+        set {
+            guard let index = selectedObstacleIndex else { return }
+            obstacleItems[index].role = newValue
+            obstacleMeshRevision &+= 1
+            accumulationResetToken &+= 1
+        }
+    }
+
+    var selectedCollisionProxy: CollisionProxyKind {
+        get { selectedObstacleIndex.map { obstacleItems[$0].collisionProxy } ?? .none }
+        set {
+            guard let index = selectedObstacleIndex else { return }
+            var item = obstacleItems[index]
+            var effective = newValue
+            if effective == .renderMesh && !item.visualMesh.diagnostics.isWatertight {
+                effective = .box
+                equationStatus = "Visual mesh is open/non-manifold; using a closed box simulation proxy"
+            }
+            item.collisionProxy = effective
+            item.mesh = effective == .renderMesh ? item.visualMesh : ImportedObstacleMesh.boxProxy(for: item.visualMesh)
+            obstacleItems[index] = item
+            obstacleMeshRevision &+= 1
+            accumulationResetToken &+= 1
+        }
     }
 
     func scalarParameter(_ name: String, fallback: Float = 0) -> Float {
@@ -161,6 +227,9 @@ final class PhysicsModel: ObservableObject {
         projectURL = nil
         time = 0
         playing = true
+        camera = .default
+        mediumOverride = nil
+        captureSettings = .init()
         removeAllObstacleMeshes()
         defaultObstacleBody = .default
         selectScalarPreset("wave-field")
@@ -194,10 +263,17 @@ final class PhysicsModel: ObservableObject {
             for record in project.obstacles {
                 let meshURL = URL(fileURLWithPath: record.meshPath, relativeTo: url.deletingLastPathComponent())
                     .standardizedFileURL
-                try loadObstacleMesh(from: meshURL, body: record.body)
+                try loadObstacleMesh(
+                    from: meshURL,
+                    body: record.body,
+                    role: record.role,
+                    collisionProxy: record.collisionProxy)
             }
             equationSource = project.expression
             time = project.timelineSeconds
+            camera = project.camera
+            mediumOverride = project.mediumOverride
+            captureSettings = project.captureSettings
             compileEquation()
             for (name, value) in project.parameters {
                 switch name {
@@ -258,15 +334,24 @@ final class PhysicsModel: ObservableObject {
 
     private func loadObstacleMesh(
         from url: URL,
-        body suppliedBody: RigidObstacleConfiguration? = nil
+        body suppliedBody: RigidObstacleConfiguration? = nil,
+        role: SceneEntityRole? = nil,
+        collisionProxy: CollisionProxyKind? = nil
     ) throws {
         var body = suppliedBody ?? .default
         if suppliedBody == nil && !obstacleItems.isEmpty {
             body.position.x = min(0.86, 0.50 + 0.16 * Float(obstacleItems.count))
             body.linearVelocity.x = obstacleItems.count.isMultiple(of: 2) ? 0.035 : -0.035
         }
+        let visualMesh = try ImportedObstacleMesh.loadOBJ(from: url, requireWatertight: false)
+        let defaultProxy: CollisionProxyKind = visualMesh.diagnostics.isWatertight ? .renderMesh : .box
+        var effectiveProxy = collisionProxy ?? defaultProxy
+        if effectiveProxy == .renderMesh && !visualMesh.diagnostics.isWatertight { effectiveProxy = .box }
+        let simulationMesh = effectiveProxy == .renderMesh
+            ? visualMesh : ImportedObstacleMesh.boxProxy(for: visualMesh)
         let item = ObstacleSceneItem(
-            id: UUID(), mesh: try ImportedObstacleMesh.loadOBJ(from: url), url: url, body: body)
+            id: UUID(), mesh: simulationMesh, visualMesh: visualMesh, url: url, body: body,
+            role: role ?? .fluidObstacle, collisionProxy: effectiveProxy)
         obstacleItems.append(item)
         selectedObstacleID = item.id
         obstacleMeshRevision &+= 1
@@ -278,7 +363,11 @@ final class PhysicsModel: ObservableObject {
             let obstacleRecords = try obstacleItems.enumerated().map { index, item in
                 let path = try PhysicsProjectIO.packageObstacle(
                     from: item.url, for: url, assetName: "obstacle-\(index).obj")
-                return ProjectObstacleRecord(meshPath: path, body: item.body)
+                return ProjectObstacleRecord(
+                    meshPath: path,
+                    body: item.body,
+                    role: item.role,
+                    collisionProxy: item.collisionProxy)
             }
             let project = PhysicsProjectFile(
                 name: projectName,
@@ -290,13 +379,32 @@ final class PhysicsModel: ObservableObject {
                 graph: executionGraph,
                 obstacleMeshPath: obstacleRecords.first?.meshPath,
                 obstacleBody: obstacleRecords.first?.body ?? .default,
-                obstacles: obstacleRecords)
+                obstacles: obstacleRecords,
+                mediumOverride: mediumOverride,
+                camera: camera,
+                captureSettings: captureSettings)
             try PhysicsProjectIO.save(project, to: url)
             projectURL = url
             equationStatus = "Saved \(url.lastPathComponent)"
         } catch {
             equationStatus = "Save failed: \(error.localizedDescription)"
         }
+    }
+
+    func applyCameraPreset(_ preset: StudioCameraPreset) {
+        camera.apply(preset)
+        accumulationResetToken &+= 1
+    }
+
+    func requestCinematicCapture() {
+        capturePanelPresented = false
+        captureRequestRevision &+= 1
+        equationStatus = "Cinematic capture requested · \(captureSettings.resolution.title) · \(captureSettings.frameRate.title)"
+    }
+
+    func reportCaptureState(active: Bool, message: String) {
+        isCapturing = active
+        equationStatus = message
     }
 
     private static func key(for mode: VisualizerMode) -> String {
@@ -338,6 +446,11 @@ struct WaveUniforms {
     var padding: SIMD4<Float> = .zero
     var control: SIMD4<Float> = .zero
     var renderParameters: SIMD4<Float> = .zero
+    // Trailing fields keep the original shader ABI prefix intact for runtime-
+    // compiled scalar equations while giving 3D renderers a real camera.
+    var cameraPositionExposure: SIMD4<Float> = SIMD4(0, 0.1, 3.1, 1)
+    var cameraTarget: SIMD4<Float> = SIMD4(0, 0.1, 0, 0)
+    var cameraUpFov: SIMD4<Float> = SIMD4(0, 1, 0, 46.94)
 }
 
 struct GeneratedFieldParameters {
@@ -390,6 +503,9 @@ struct Uniforms {
     float4 padding;
     float4 control;
     float4 renderParameters;
+    float4 cameraPositionExposure;
+    float4 cameraTarget;
+    float4 cameraUpFov;
 };
 
 struct VertexOut {
@@ -1385,8 +1501,15 @@ kernel void renderVolume(
     if (pixel.x >= uint(u.width) || pixel.y >= uint(u.height)) return;
     float2 uv = (float2(pixel) + 0.5) / float2(u.width, u.height);
     float aspect = u.width / max(1.0, u.height);
-    float3 origin = float3(0.0, 0.1, 3.1);
-    float3 direction = normalize(float3((uv.x - 0.5) * 1.65 * aspect, (0.5 - uv.y) * 1.65, -1.9));
+    float3 origin = u.cameraPositionExposure.xyz;
+    float3 forward = normalize(u.cameraTarget.xyz - origin);
+    float3 referenceUp = normalize(u.cameraUpFov.xyz);
+    float3 right = normalize(cross(forward, referenceUp));
+    float3 cameraUp = normalize(cross(right, forward));
+    float tanHalfFov = tan(clamp(u.cameraUpFov.w, 10.0, 120.0) * (M_PI_F / 180.0) * 0.5);
+    float2 ndc = float2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    float3 direction = normalize(
+        forward + ndc.x * aspect * tanHalfFov * right + ndc.y * tanHalfFov * cameraUp);
     float entry = 0.0;
     float exit = 0.0;
     if (!intersectUnitVolume(origin, direction, entry, exit)) {
@@ -1446,6 +1569,7 @@ fragment float4 display(
     constant Uniforms& u [[buffer(0)]]) {
     constexpr sampler linearSampler(filter::linear, mip_filter::none, address::clamp_to_edge);
     float3 linear = float3(radiance.sample(linearSampler, in.uv).rgb);
+    linear *= max(u.cameraPositionExposure.w, 0.001);
     float2 texel = 1.0 / max(float2(u.width, u.height), float2(1.0));
     constexpr float2 directions[8] = {
         float2(1.0, 0.0), float2(-1.0, 0.0), float2(0.0, 1.0), float2(0.0, -1.0),
@@ -2619,7 +2743,10 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
         var combinedVertices: [SIMD4<Float>] = []
         var combinedIndices: [UInt32] = []
         var bodyStates: [SIMD4<Float>] = []
-        for (bodyIndex, item) in model.obstacleItems.enumerated() {
+        let simulatedItems = model.obstacleItems.filter {
+            $0.role.participatesInSimulation && $0.collisionProxy != .none
+        }
+        for (bodyIndex, item) in simulatedItems.enumerated() {
             let vertexOffset = UInt32(combinedVertices.count)
             combinedVertices.append(contentsOf: item.mesh.vertices.map { source in
                 var vertex = source
@@ -2633,7 +2760,7 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
             bodyStates = rigidBodyGpuState(.default)
             obstacleBodyCount = 1
         } else {
-            obstacleBodyCount = UInt32(model.obstacleItems.count)
+            obstacleBodyCount = UInt32(simulatedItems.count)
         }
         obstacleBody = bodyStates.withUnsafeBytes { bytes in
             guard let address = bytes.baseAddress else { return nil }
@@ -2798,6 +2925,9 @@ final class MetalWaveRenderer: NSObject, MTKViewDelegate, GpuRuntimeBackend {
                                                   Float(accumulationSamples), 0),
                                    renderParameters: renderParameters)
         var copy = uniforms
+        copy.cameraPositionExposure = SIMD4(model.camera.position, model.camera.exposure)
+        copy.cameraTarget = SIMD4(model.camera.target, 0)
+        copy.cameraUpFov = SIMD4(model.camera.up, model.camera.verticalFovDegrees)
         if isVolume {
             guard ensureVolumeSolver(device: device), prepareObstacleMesh(device: device, model: model),
                   let divergence = volumeDivergence,
@@ -3143,7 +3273,8 @@ struct MetalWaveView: NSViewRepresentable {
     @ObservedObject var model: PhysicsModel
 
     func makeNSView(context: Context) -> MTKView {
-        let view = MTKView(frame: .zero, device: MTLCreateSystemDefaultDevice())
+        let view = StudioMetalView(frame: .zero, device: MTLCreateSystemDefaultDevice())
+        view.physicsModel = model
         view.colorPixelFormat = .bgra8Unorm_srgb
         view.clearColor = MTLClearColor(red: 0.01, green: 0.02, blue: 0.06, alpha: 1.0)
         let renderer = MetalWaveRenderer(view: view, model: model)
@@ -3159,293 +3290,7 @@ struct ContentView: View {
     @StateObject private var model = PhysicsModel()
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Text("VULKAX").font(.system(size: 20, weight: .bold, design: .rounded)).foregroundStyle(.mint)
-                TextField("Project name", text: $model.projectName)
-                    .textFieldStyle(.plain)
-                    .font(.headline)
-                    .frame(maxWidth: 280)
-                Divider().frame(height: 22)
-                Button { model.newProject() } label: { Label("New", systemImage: "doc.badge.plus") }
-                Button { model.openProject() } label: { Label("Open", systemImage: "folder") }
-                Button { model.saveProject() } label: { Label("Save", systemImage: "square.and.arrow.down") }
-                Button { model.importObstacleMesh() } label: {
-                    Label("Add 3D Object", systemImage: "cube.transparent")
-                }
-                .help("Import an OBJ mesh and switch to GPU-coupled volume smoke")
-                Spacer()
-                Text(model.runtimeStatus).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 16)
-            .frame(height: 48)
-            .background(Color(red: 0.035, green: 0.05, blue: 0.075))
-
-            HSplitView {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("SCENE").font(.caption.bold()).foregroundStyle(.secondary)
-                    Picker("Visualization", selection: $model.mode) {
-                        ForEach(VisualizerMode.allCases) { mode in Text(mode.title).tag(mode) }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.radioGroup)
-                    Divider()
-                    Text("OBJECTS").font(.caption.bold()).foregroundStyle(.secondary)
-                    Button { model.importObstacleMesh() } label: {
-                        Label("Add 3D object", systemImage: "cube.transparent")
-                    }
-                    .help("Import a closed OBJ mesh into the GPU fluid domain")
-                    if !model.obstacleItems.isEmpty {
-                        ForEach(model.obstacleItems) { item in
-                            HStack {
-                                Button { model.selectObstacle(item.id) } label: {
-                                    Label(
-                                        item.url.lastPathComponent,
-                                        systemImage: model.selectedObstacleID == item.id
-                                            ? "checkmark.circle.fill" : "cube")
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                                if model.selectedObstacleID == item.id {
-                                    Button { model.removeObstacleMesh() } label: {
-                                        Image(systemName: "trash")
-                                    }
-                                    .help("Remove selected object")
-                                }
-                            }
-                        }
-                    } else {
-                        Text("Drop an OBJ onto the viewport")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Divider()
-                    Text("TIMELINE").font(.caption.bold()).foregroundStyle(.secondary)
-                    HStack {
-                        Button {
-                            model.playing.toggle()
-                        } label: {
-                            Image(systemName: model.playing ? "pause.fill" : "play.fill")
-                        }
-                        .help(model.playing ? "Pause" : "Play")
-                        Button {
-                            model.time = 0
-                            model.accumulationResetToken &+= 1
-                        } label: {
-                            Image(systemName: "backward.end.fill")
-                        }
-                        .help("Reset timeline")
-                    }
-                    Slider(value: $model.time, in: 0...12) { editing in
-                        if editing { model.playing = false }
-                        model.accumulationResetToken &+= 1
-                    }
-                    Text(String(format: "%.3f s", model.time)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .frame(minWidth: 190, idealWidth: 210)
-                .padding(16)
-                .background(Color(red: 0.045, green: 0.07, blue: 0.12))
-
-                VStack(spacing: 0) {
-                MetalWaveView(model: model)
-                    .onDrop(of: [UTType.fileURL.identifier], isTargeted: nil) { providers in
-                        guard let provider = providers.first else { return false }
-                        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) {
-                            item, _ in
-                            let url: URL?
-                            if let data = item as? Data {
-                                url = URL(dataRepresentation: data, relativeTo: nil)
-                            } else {
-                                url = item as? URL
-                            }
-                            guard let url, url.pathExtension.lowercased() == "obj" else { return }
-                            DispatchQueue.main.async { model.importObstacleMesh(from: url) }
-                        }
-                        return true
-                    }
-                    .overlay(alignment: .topLeading) {
-                        Text(model.playing ? "LIVE GPU" : "PAUSED")
-                            .font(.caption.bold()).foregroundStyle(model.playing ? .mint : .orange)
-                            .padding(8).background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 4))
-                            .padding(14)
-                    }
-                }
-                .frame(minWidth: 620, minHeight: 540)
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("INSPECTOR").font(.caption.bold()).foregroundStyle(.secondary)
-                if model.mode == .wave {
-                            Picker("Preset", selection: Binding(
-                                get: { model.scalarPresetId },
-                                set: { model.selectScalarPreset($0) })) {
-                                ForEach(ScalarPreset.builtins) { preset in Text(preset.title).tag(preset.id) }
-                            }
-                            Text("EQUATION").font(.caption.bold()).foregroundStyle(.secondary)
-                            TextEditor(text: $model.equationSource)
-                                .font(.system(.body, design: .monospaced))
-                                .frame(minHeight: 118)
-                                .padding(6)
-                                .background(Color.black.opacity(0.28))
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                            HStack {
-                                Button { model.compileEquation() } label: {
-                                    Label("Compile", systemImage: "hammer.fill")
-                                }
-                                Spacer()
-                                Text(String(model.compiledSourceHash, radix: 16).prefix(8))
-                                    .font(.caption.monospaced()).foregroundStyle(.secondary)
-                            }
-                            Text(model.equationStatus)
-                                .font(.caption)
-                                .foregroundStyle(model.equationStatus.contains("failed") || model.equationStatus.contains("Column") ? .red : .secondary)
-                            Divider()
-                            ForEach(model.liveParameters) { value in
-                                parameter(value)
-                            }
-                } else if model.mode == .schwarzschild {
-                    parameter("Mass", value: $model.blackHoleMass, range: 0.25...1.6)
-                    parameter("Disk gain", value: $model.diskGain, range: 0...4)
-                    parameter("Camera scale", value: $model.cameraScale, range: 0.5...2.0)
-                } else {
-                    HStack {
-                        Button { model.importObstacleMesh() } label: {
-                            Label("Add object", systemImage: "cube.transparent")
-                        }
-                        if model.obstacleMeshURL != nil {
-                            Button { model.removeObstacleMesh() } label: {
-                                Image(systemName: "trash")
-                            }
-                            .help("Remove the fluid obstacle")
-                        }
-                    }
-                    .help("Import an OBJ mesh for GPU voxelization and fluid coupling")
-                    Text(model.obstacleMeshURL.map { "GPU coupled: \($0.lastPathComponent)" } ??
-                         "No 3D object in the fluid domain")
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                    if let diagnostics = model.obstacleMesh?.diagnostics {
-                        Text("\(diagnostics.triangleCount) triangles · closed manifold")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if model.obstacleMeshURL != nil {
-                        HStack {
-                            Text("OBJECT TRANSFORM").font(.caption.bold()).foregroundStyle(.secondary)
-                            Spacer()
-                            Button { model.obstacleBody = .default } label: {
-                                Image(systemName: "arrow.counterclockwise")
-                            }
-                            .help("Reset object transform and dynamics")
-                        }
-                        axisParameters(
-                            "Position", x: obstacleBinding(\.position.x),
-                            y: obstacleBinding(\.position.y), z: obstacleBinding(\.position.z),
-                            range: 0.05...0.95)
-                        axisParameters(
-                            "Rotation", x: obstacleBinding(\.rotationDegrees.x),
-                            y: obstacleBinding(\.rotationDegrees.y), z: obstacleBinding(\.rotationDegrees.z),
-                            range: -180...180, suffix: "°")
-                        axisParameters(
-                            "Scale", x: obstacleBinding(\.scale.x),
-                            y: obstacleBinding(\.scale.y), z: obstacleBinding(\.scale.z),
-                            range: 0.25...2.0)
-                        parameter("Mass", value: obstacleBinding(\.mass), range: 0.1...20)
-                        axisParameters(
-                            "Linear velocity", x: obstacleBinding(\.linearVelocity.x),
-                            y: obstacleBinding(\.linearVelocity.y), z: obstacleBinding(\.linearVelocity.z),
-                            range: -1...1)
-                        axisParameters(
-                            "Angular velocity", x: obstacleBinding(\.angularVelocity.x),
-                            y: obstacleBinding(\.angularVelocity.y), z: obstacleBinding(\.angularVelocity.z),
-                            range: -8...8, suffix: " rad/s")
-                        axisParameters(
-                            "Diagonal inertia", x: obstacleBinding(\.diagonalInertia.x),
-                            y: obstacleBinding(\.diagonalInertia.y), z: obstacleBinding(\.diagonalInertia.z),
-                            range: 0.0001...1.0, suffix: " kg m2")
-                    }
-                    parameter("Buoyancy", value: $model.smokeBuoyancy, range: 0...3)
-                    parameter("Turbulence", value: $model.smokeTurbulence, range: 0...3)
-                    parameter("Extinction", value: $model.volumeExtinction, range: 0.1...5)
-                    parameter("Emission", value: $model.volumeEmission, range: 0...3)
-                }
-                    }
-                    .padding(16)
-                }
-                .frame(minWidth: 280, idealWidth: 330)
-                .background(Color(red: 0.045, green: 0.07, blue: 0.12))
-            }
-        }
-        .frame(minWidth: 1120, minHeight: 720)
-        .preferredColorScheme(.dark)
-    }
-
-    @ViewBuilder private func parameter(_ label: String, value: Binding<Float>, range: ClosedRange<Float>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack { Text(label).font(.subheadline.weight(.medium)); Spacer(); Text(String(format: "%.2f", value.wrappedValue)).monospacedDigit().foregroundStyle(.secondary) }
-            Slider(value: value, in: range)
-        }
-    }
-
-    private func obstacleBinding(
-        _ keyPath: WritableKeyPath<RigidObstacleConfiguration, Float>
-    ) -> Binding<Float> {
-        Binding(
-            get: { model.obstacleBody[keyPath: keyPath] },
-            set: { model.obstacleBody[keyPath: keyPath] = $0 })
-    }
-
-    @ViewBuilder private func axisParameters(
-        _ label: String,
-        x: Binding<Float>,
-        y: Binding<Float>,
-        z: Binding<Float>,
-        range: ClosedRange<Float>,
-        suffix: String = ""
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(label).font(.subheadline.weight(.medium))
-            HStack(spacing: 8) {
-                axisField("X", value: x, range: range, suffix: suffix)
-                axisField("Y", value: y, range: range, suffix: suffix)
-                axisField("Z", value: z, range: range, suffix: suffix)
-            }
-        }
-    }
-
-    @ViewBuilder private func axisField(
-        _ axis: String,
-        value: Binding<Float>,
-        range: ClosedRange<Float>,
-        suffix: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(axis).font(.caption2.bold()).foregroundStyle(.secondary)
-            TextField(axis, value: value, format: .number.precision(.fractionLength(2)))
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { value.wrappedValue = min(max(value.wrappedValue, range.lowerBound), range.upperBound) }
-            if !suffix.isEmpty {
-                Text(suffix).font(.caption2).foregroundStyle(.tertiary)
-            }
-        }
-    }
-
-    @ViewBuilder private func parameter(_ parameter: LiveParameter) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(parameter.name.replacingOccurrences(of: "_", with: " ").capitalized)
-                    .font(.subheadline.weight(.medium))
-                Spacer()
-                Text(String(format: "%.3f", parameter.value)).monospacedDigit().foregroundStyle(.secondary)
-            }
-            Slider(
-                value: Binding(
-                    get: { model.liveParameters.first(where: { $0.id == parameter.id })?.value ?? parameter.value },
-                    set: { model.updateParameter(id: parameter.id, value: $0) }),
-                in: parameter.minimum...parameter.maximum)
-        }
+        StudioWorkspaceView(model: model)
     }
 }
 
