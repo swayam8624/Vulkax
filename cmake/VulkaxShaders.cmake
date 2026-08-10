@@ -166,7 +166,7 @@ target_compile_definitions(
   VULKAX_GENERATED_DIFFUSION_SPIRV="${VULKAX_GENERATED_DIFFUSION_SPIRV}"
   VULKAX_GENERATED_GRAY_SCOTT_SPIRV="${VULKAX_GENERATED_GRAY_SCOTT_SPIRV}"
 )
-target_link_libraries(VulkaxStencilComputeBenchmark PRIVATE vulkax_physics_ir ${Vulkan_LIBRARIES})
+target_link_libraries(VulkaxStencilComputeBenchmark PRIVATE vulkax_physics_ir Vulkan::Vulkan)
 add_dependencies(VulkaxStencilComputeBenchmark VulkaxGeneratedStencilShaders)
 
 add_dependencies(VulkaxComputeBenchmark Shaders)
