@@ -1,0 +1,20 @@
+---
+Checks: >-
+  -*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  misc-const-correctness,
+  misc-misplaced-const,
+  misc-new-delete-overloads,
+  misc-non-copyable-objects,
+  misc-throw-by-value-catch-by-reference
+WarningsAsErrors: >-
+  bugprone-use-after-move,
+  bugprone-dangling-handle,
+  bugprone-infinite-loop,
+  bugprone-sizeof-expression
+HeaderFilterRegex: '(^|.*/)(src|include)/.*'
+FormatStyle: file
+SystemHeaders: false
+...
