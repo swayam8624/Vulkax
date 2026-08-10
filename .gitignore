@@ -27,3 +27,8 @@ imgui.ini
 .env.cmake
 beacon_results/
 beacon_results_*/
+
+# Physics Studio sequence frames are reproducible build/test artifacts. Keep
+# manifests, summaries and deliberately curated stills in Git; publish complete
+# frame sequences through CI artifacts or releases instead.
+docs/results/**/frame_*.png
