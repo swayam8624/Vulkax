@@ -142,6 +142,8 @@ add_library(
   src/vulkax/physics/vulkan_resource_layout.cpp
   src/vulkax/physics/vulkan_resource_arena.cpp
   src/vulkax/physics/compute_ir.cpp
+  src/vulkax/physics/vector_compute_ir.cpp
+  src/vulkax/physics/tensor_compute_ir.cpp
   src/vulkax/physics/stencil_ir.cpp
 )
 target_compile_features(vulkax_physics_ir PUBLIC cxx_std_20)
