@@ -1,0 +1,49 @@
+name: Phase 4 README status split
+
+on:
+  push:
+    branches:
+      - agent/phase4-repo-hygiene
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/phase4-repo-hygiene
+      - name: Move detailed status ledger out of README
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          readme = Path("README.md")
+          text = readme.read_text()
+          start_marker = "## Current status\n"
+          end_marker = "## Equation Examples\n"
+          start = text.index(start_marker)
+          end = text.index(end_marker)
+          status_block = text[start:end].rstrip() + "\n"
+          status = Path("docs/STATUS.md")
+          status.write_text(
+              "# Vulkax implementation status\n\n"
+              "This is the detailed implementation ledger moved from the repository front page. "
+              "States such as `Implemented foundation` and `Implemented research path` are intentionally "
+              "more conservative than production-readiness claims.\n\n" +
+              status_block.removeprefix(start_marker)
+          )
+          replacement = '''## Current status\n\nVulkax Physics Studio is the active product. Equation/Physics IR, native Metal presentation, direct Vulkan presentation, relativistic rendering foundations, MAC smoke, imported-mesh coupling, deterministic exports, and the preserved BEACON/GeoBEACON/Atlas baselines are implemented at varying levels of maturity.\n\nThe complete per-subsystem implementation ledger and claim boundaries now live in [docs/STATUS.md](docs/STATUS.md). The roadmap remains in [docs/VULKAX_PHYSICS_STUDIO_ROADMAP.md](docs/VULKAX_PHYSICS_STUDIO_ROADMAP.md).\n\n'''
+          readme.write_text(text[:start] + replacement + text[end:])
+          Path(".github/workflows/phase4-readme-status-split.yml").unlink()
+          PY
+      - name: Commit documentation split
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Move implementation ledger out of README"
+          git push origin HEAD:agent/phase4-repo-hygiene
