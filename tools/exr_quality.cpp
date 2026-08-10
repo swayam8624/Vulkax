@@ -19,7 +19,11 @@ struct Image {
 };
 
 Image read(const std::filesystem::path& path) {
-  OPENEXR_IMF_NAMESPACE::RgbaInputFile input(path.c_str());
+  // OpenEXR's filename API accepts const char*. On Windows path::c_str() is
+  // wchar_t*, so convert at this narrow third-party API boundary instead of
+  // leaking platform-specific path types through the quality tool.
+  const std::string filename = path.string();
+  OPENEXR_IMF_NAMESPACE::RgbaInputFile input(filename.c_str());
   const auto window = input.dataWindow();
   Image image{};
   image.width = window.max.x - window.min.x + 1;
