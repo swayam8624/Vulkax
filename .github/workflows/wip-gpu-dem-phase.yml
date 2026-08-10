@@ -1,0 +1,32 @@
+name: WIP GPU DEM Phase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/wip-gpu-dem-phase.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Apply GPU DEM phase
+        run: python scripts/apply_gpu_dem_phase.py
+      - name: Remove one-shot phase machinery
+        run: |
+          rm .github/workflows/wip-gpu-dem-phase.yml
+          rm scripts/apply_gpu_dem_phase.py
+      - name: Commit phase
+        run: |
+          git config user.name "Vulkax Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Add native Vulkan and Metal GPU DEM reference"
+          git push origin HEAD:main
