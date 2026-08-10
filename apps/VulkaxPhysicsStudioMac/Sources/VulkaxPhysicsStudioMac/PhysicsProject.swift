@@ -138,16 +138,31 @@ struct RigidObstacleConfiguration: Codable, Equatable {
 struct ProjectObstacleRecord: Codable, Equatable {
     var meshPath: String
     var body: RigidObstacleConfiguration
+    var role: SceneEntityRole?
+    var collisionProxy: CollisionProxyKind?
+
+    init(
+        meshPath: String,
+        body: RigidObstacleConfiguration,
+        role: SceneEntityRole? = nil,
+        collisionProxy: CollisionProxyKind? = nil
+    ) {
+        self.meshPath = meshPath
+        self.body = body
+        self.role = role
+        self.collisionProxy = collisionProxy
+    }
 
     enum CodingKeys: String, CodingKey {
         case meshPath = "mesh_path"
-        case body
+        case body, role
+        case collisionProxy = "collision_proxy"
     }
 }
 
 struct PhysicsProjectFile: Codable {
     var format = "vulkax.physics-project"
-    var version = 7
+    var version = 8
     var name: String
     var preset: String
     var visualization: String
@@ -158,6 +173,9 @@ struct PhysicsProjectFile: Codable {
     var obstacleMeshPath: String?
     var obstacleBody: RigidObstacleConfiguration
     var obstacles: [ProjectObstacleRecord]
+    var mediumOverride: SimulationMedium?
+    var camera: StudioCamera
+    var captureSettings: CinematicCaptureSettings
 
     enum CodingKeys: String, CodingKey {
         case format, version, name, preset, visualization, expression, parameters, graph
@@ -165,6 +183,9 @@ struct PhysicsProjectFile: Codable {
         case obstacleMeshPath = "obstacle_mesh_path"
         case obstacleBody = "obstacle_body"
         case obstacles
+        case mediumOverride = "medium_override"
+        case camera
+        case captureSettings = "capture_settings"
     }
 
     init(
@@ -177,7 +198,10 @@ struct PhysicsProjectFile: Codable {
         graph: EquationRuntimeGraph,
         obstacleMeshPath: String? = nil,
         obstacleBody: RigidObstacleConfiguration = .default,
-        obstacles: [ProjectObstacleRecord] = []
+        obstacles: [ProjectObstacleRecord] = [],
+        mediumOverride: SimulationMedium? = nil,
+        camera: StudioCamera = .default,
+        captureSettings: CinematicCaptureSettings = .init()
     ) {
         self.name = name
         self.preset = preset
@@ -189,6 +213,9 @@ struct PhysicsProjectFile: Codable {
         self.obstacleMeshPath = obstacleMeshPath
         self.obstacleBody = obstacleBody
         self.obstacles = obstacles
+        self.mediumOverride = mediumOverride
+        self.camera = camera
+        self.captureSettings = captureSettings
     }
 
     init(from decoder: Decoder) throws {
@@ -215,6 +242,10 @@ struct PhysicsProjectFile: Codable {
         } else {
             obstacles = []
         }
+        mediumOverride = try container.decodeIfPresent(SimulationMedium.self, forKey: .mediumOverride)
+        camera = try container.decodeIfPresent(StudioCamera.self, forKey: .camera) ?? .default
+        captureSettings = try container.decodeIfPresent(
+            CinematicCaptureSettings.self, forKey: .captureSettings) ?? .init()
     }
 }
 
@@ -242,7 +273,7 @@ enum PhysicsProjectIO {
 
     static func load(from url: URL) throws -> PhysicsProjectFile {
         let project = try JSONDecoder().decode(PhysicsProjectFile.self, from: Data(contentsOf: url))
-        guard project.format == "vulkax.physics-project", (1...7).contains(project.version) else {
+        guard project.format == "vulkax.physics-project", (1...8).contains(project.version) else {
             throw CocoaError(.fileReadCorruptFile)
         }
         return project
