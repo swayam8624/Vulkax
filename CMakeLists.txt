@@ -3,7 +3,7 @@ message(STATUS "Local .env.cmake: ${LOCAL_ENV}")
 
 cmake_minimum_required(VERSION 3.24)
 
-set(NAME LveEngine)
+set(VULKAX_LEGACY_TARGET LveEngine)
 
 message(STATUS "using ${CMAKE_GENERATOR}")
 if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
@@ -15,7 +15,7 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
     set(CMAKE_CXX_COMPILER  ${MINGW_PATH}/bin/g++.exe)
 endif()
 
-project(${NAME} VERSION 0.24.0)
+project(Vulkax VERSION 0.24.0)
 
 include(cmake/VulkaxDependencies.cmake)
 
@@ -354,9 +354,9 @@ set_target_properties(VulkaxAtlasBenchmark PROPERTIES OUTPUT_NAME atlas-benchmar
 target_compile_features(VulkaxAtlasBenchmark PRIVATE cxx_std_20)
 target_link_libraries(VulkaxAtlasBenchmark PRIVATE VulkaxAtlasCore)
 
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_executable(${VULKAX_LEGACY_TARGET} ${SOURCES})
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+target_compile_features(${VULKAX_LEGACY_TARGET} PUBLIC cxx_std_20)
 execute_process(
   COMMAND git rev-parse HEAD
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
@@ -367,24 +367,24 @@ execute_process(
 if (NOT VULKAX_BUILD_GIT_COMMIT)
   set(VULKAX_BUILD_GIT_COMMIT "unknown")
 endif()
-target_compile_definitions(${PROJECT_NAME} PRIVATE VULKAX_BUILD_GIT_COMMIT="${VULKAX_BUILD_GIT_COMMIT}")
-target_link_libraries(${PROJECT_NAME} glm::glm VulkaxAtlasCore vulkax_runtime_paths)
+target_compile_definitions(${VULKAX_LEGACY_TARGET} PRIVATE VULKAX_BUILD_GIT_COMMIT="${VULKAX_BUILD_GIT_COMMIT}")
+target_link_libraries(${VULKAX_LEGACY_TARGET} glm::glm VulkaxAtlasCore vulkax_runtime_paths)
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
+set_property(TARGET ${VULKAX_LEGACY_TARGET} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
 
 if (WIN32)
   message(STATUS "CREATING BUILD FOR WINDOWS")
 
   if (USE_MINGW)
-    target_include_directories(${PROJECT_NAME} PUBLIC
+    target_include_directories(${VULKAX_LEGACY_TARGET} PUBLIC
       ${MINGW_PATH}/include
     )
-    target_link_directories(${PROJECT_NAME} PUBLIC
+    target_link_directories(${VULKAX_LEGACY_TARGET} PUBLIC
       ${MINGW_PATH}/lib
     )
   endif()
 
-  target_include_directories(${PROJECT_NAME} PUBLIC
+  target_include_directories(${VULKAX_LEGACY_TARGET} PUBLIC
     ${PROJECT_SOURCE_DIR}/src
     ${Vulkan_INCLUDE_DIRS}
     ${TINYOBJ_PATH}
@@ -393,19 +393,19 @@ if (WIN32)
     )
 
   if (GLFW_LIB AND NOT GLFW_LIB STREQUAL "glfw")
-    target_link_directories(${PROJECT_NAME} PUBLIC ${GLFW_LIB})
+    target_link_directories(${VULKAX_LEGACY_TARGET} PUBLIC ${GLFW_LIB})
   endif()
 
-  target_link_libraries(${PROJECT_NAME} glfw3 Vulkan::Vulkan nlohmann_json::nlohmann_json)
+  target_link_libraries(${VULKAX_LEGACY_TARGET} glfw3 Vulkan::Vulkan nlohmann_json::nlohmann_json)
 elseif (UNIX)
     message(STATUS "CREATING BUILD FOR UNIX")
-    target_include_directories(${PROJECT_NAME} PUBLIC
+    target_include_directories(${VULKAX_LEGACY_TARGET} PUBLIC
       ${PROJECT_SOURCE_DIR}/src
       ${TINYOBJ_PATH}
     )
-    target_link_libraries(${PROJECT_NAME} glfw Vulkan::Vulkan nlohmann_json::nlohmann_json)
+    target_link_libraries(${VULKAX_LEGACY_TARGET} glfw Vulkan::Vulkan nlohmann_json::nlohmann_json)
     if (APPLE)
-      target_link_libraries(${PROJECT_NAME} "-framework Cocoa" "-framework QuartzCore")
+      target_link_libraries(${VULKAX_LEGACY_TARGET} "-framework Cocoa" "-framework QuartzCore")
     endif()
 endif()
 

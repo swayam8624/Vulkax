@@ -46,30 +46,30 @@ if (APPLE)
 endif()
 add_dependencies(VulkaxPhysicsVulkanDirect Shaders VulkaxRuntimeResources)
 
-add_dependencies(${PROJECT_NAME} Shaders)
+add_dependencies(${VULKAX_LEGACY_TARGET} Shaders)
 add_custom_command(
-  TARGET ${PROJECT_NAME}
+  TARGET ${VULKAX_LEGACY_TARGET}
   POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy
-          $<TARGET_FILE:${PROJECT_NAME}>
-          $<TARGET_FILE_DIR:${PROJECT_NAME}>/VulkaxAtlas
+          $<TARGET_FILE:${VULKAX_LEGACY_TARGET}>
+          $<TARGET_FILE_DIR:${VULKAX_LEGACY_TARGET}>/VulkaxAtlas
   COMMENT "Creating the VulkaxAtlas application entrypoint"
 )
 if (APPLE)
   set(VULKAX_ATLAS_APP_DIR
-      "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Vulkax.app")
+      "$<TARGET_FILE_DIR:${VULKAX_LEGACY_TARGET}>/Vulkax.app")
   configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/VulkaxAtlasInfo.plist.in"
     "${PROJECT_BINARY_DIR}/VulkaxAtlasInfo.plist"
     @ONLY
   )
   add_custom_command(
-    TARGET ${PROJECT_NAME}
+    TARGET ${VULKAX_LEGACY_TARGET}
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
             "${VULKAX_ATLAS_APP_DIR}/Contents/MacOS"
     COMMAND ${CMAKE_COMMAND} -E copy
-            $<TARGET_FILE:${PROJECT_NAME}>
+            $<TARGET_FILE:${VULKAX_LEGACY_TARGET}>
             "${VULKAX_ATLAS_APP_DIR}/Contents/MacOS/VulkaxGeoBEACON"
     COMMAND ${CMAKE_COMMAND} -E copy
             "${PROJECT_BINARY_DIR}/VulkaxAtlasInfo.plist"
@@ -122,13 +122,13 @@ if (APPLE)
             "${PROJECT_SOURCE_DIR}/data/midtown_manhattan/LICENSE-ODbL.md"
             "${PROJECT_SOURCE_DIR}/data/midtown_manhattan/README.md"
             "${VULKAX_ATLAS_APP_DIR}/Contents/Resources/data/midtown_manhattan"
-    DEPENDS ${PROJECT_NAME} Shaders
+    DEPENDS ${VULKAX_LEGACY_TARGET} Shaders
     COMMENT "Bundling checked Vulkax city and shader resources"
   )
 endif()
 if (APPLE)
   add_custom_target(
-    atlas_app_desktop DEPENDS ${PROJECT_NAME} VulkaxAppResources)
+    atlas_app_desktop DEPENDS ${VULKAX_LEGACY_TARGET} VulkaxAppResources)
 else()
-  add_custom_target(atlas_app_desktop DEPENDS ${PROJECT_NAME})
+  add_custom_target(atlas_app_desktop DEPENDS ${VULKAX_LEGACY_TARGET})
 endif()
