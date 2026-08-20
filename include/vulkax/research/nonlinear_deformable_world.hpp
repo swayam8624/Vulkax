@@ -21,6 +21,7 @@ struct NonlinearDeformableWorldSettings {
     };
     std::size_t couplingNeighborCount{20};
     solvers::MpmTransferScheme transferScheme{solvers::MpmTransferScheme::APIC};
+    double flipBlend{0.0};
 };
 
 struct NonlinearDeformableWorldFrameEvidence {
@@ -75,7 +76,8 @@ using NonlinearDeformableWorldObserver = std::function<void(
 // forces. There is no gravity, no external force and no boundary contact.
 // This makes momentum, center-of-mass and locality errors meaningful while
 // energy drift exposes transfer and time-integration behavior. APIC remains
-// the default; PIC and FLIP are available for controlled transfer ablations.
+// the default; PIC, FLIP and APIC_FLIP are available for controlled transfer
+// experiments. flipBlend is used only by APIC_FLIP.
 [[nodiscard]] NonlinearDeformableWorldResult runNonlinearDeformableWorld(
     gaussian::GaussianCloud world,
     const std::vector<std::size_t>& activeGaussianIndices,
