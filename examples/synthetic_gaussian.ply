@@ -1,0 +1,26 @@
+ply
+format ascii 1.0
+comment Vulkax synthetic Gaussian renderer smoke-test scene
+element vertex 7
+property float x
+property float y
+property float z
+property float f_dc_0
+property float f_dc_1
+property float f_dc_2
+property float opacity
+property float scale_0
+property float scale_1
+property float scale_2
+property float rot_0
+property float rot_1
+property float rot_2
+property float rot_3
+end_header
+0.000 0.000 0.000 1.60 -0.70 -0.70 4.0 -1.25 -2.10 -2.10 1 0 0 0
+-0.360 0.120 0.020 -0.60 1.55 -0.55 3.6 -1.65 -2.20 -2.20 1 0 0 0
+0.360 0.120 0.010 -0.60 -0.55 1.55 3.6 -1.65 -2.20 -2.20 1 0 0 0
+-0.260 -0.250 0.030 1.20 1.00 -0.65 3.8 -1.80 -2.15 -2.15 0.9238795 0 0 0.3826834
+0.260 -0.250 0.000 0.90 -0.65 1.20 3.8 -1.80 -2.15 -2.15 0.9238795 0 0 -0.3826834
+0.000 0.360 -0.020 -0.30 1.10 1.10 3.4 -1.95 -1.55 -2.20 1 0 0 0
+0.000 -0.430 0.020 1.10 -0.30 1.10 3.4 -1.95 -1.55 -2.20 1 0 0 0

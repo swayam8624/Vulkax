@@ -8,8 +8,11 @@
 #include "vulkax/problem/document.hpp"
 #include "vulkax/problem/problem_ir.hpp"
 #include "vulkax/problem/validation.hpp"
+#include "vulkax/render/gaussian.hpp"
+#include "vulkax/render/headless.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -71,38 +74,95 @@ void printBackendProbe() {
     else std::cout << "No backend satisfies generic compute requirements.\n";
 }
 
+struct GaussianBounds {
+    vulkax::math::Vec3 minimum;
+    vulkax::math::Vec3 maximum;
+};
+
+GaussianBounds gaussianBounds(const vulkax::gaussian::GaussianCloud& cloud) {
+    if (cloud.empty()) throw std::invalid_argument("Gaussian scene is empty");
+    GaussianBounds result{
+        {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(),
+         std::numeric_limits<double>::infinity()},
+        {-std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
+         -std::numeric_limits<double>::infinity()},
+    };
+    for (const auto& splat : cloud.splats) {
+        result.minimum.x = std::min(result.minimum.x, splat.position.x);
+        result.minimum.y = std::min(result.minimum.y, splat.position.y);
+        result.minimum.z = std::min(result.minimum.z, splat.position.z);
+        result.maximum.x = std::max(result.maximum.x, splat.position.x);
+        result.maximum.y = std::max(result.maximum.y, splat.position.y);
+        result.maximum.z = std::max(result.maximum.z, splat.position.z);
+    }
+    return result;
+}
+
 int gaussianInfoCommand(int argc, char** argv) {
     if (argc < 3 || std::string_view(argv[1]) != "gaussian-info") return -1;
     const auto cloud = vulkax::gaussian::load3dgsPly(argv[2]);
-    if (cloud.empty()) {
-        std::cerr << "Gaussian scene is empty\n";
-        return 1;
-    }
-
-    vulkax::math::Vec3 minimum{std::numeric_limits<double>::infinity(),
-                               std::numeric_limits<double>::infinity(),
-                               std::numeric_limits<double>::infinity()};
-    vulkax::math::Vec3 maximum{-std::numeric_limits<double>::infinity(),
-                               -std::numeric_limits<double>::infinity(),
-                               -std::numeric_limits<double>::infinity()};
+    const auto bounds = gaussianBounds(cloud);
     double opacitySum = 0.0;
-    for (const auto& splat : cloud.splats) {
-        minimum.x = std::min(minimum.x, splat.position.x);
-        minimum.y = std::min(minimum.y, splat.position.y);
-        minimum.z = std::min(minimum.z, splat.position.z);
-        maximum.x = std::max(maximum.x, splat.position.x);
-        maximum.y = std::max(maximum.y, splat.position.y);
-        maximum.z = std::max(maximum.z, splat.position.z);
-        opacitySum += splat.opacity();
-    }
+    for (const auto& splat : cloud.splats) opacitySum += splat.opacity();
 
     std::cout << "3D Gaussian scene\n"
               << "  splats: " << cloud.size() << '\n'
               << "  sh_rest_coefficients_per_splat: " << cloud.shRestCoefficientsPerSplat << '\n'
               << std::setprecision(9)
-              << "  bounds_min: " << minimum.x << ' ' << minimum.y << ' ' << minimum.z << '\n'
-              << "  bounds_max: " << maximum.x << ' ' << maximum.y << ' ' << maximum.z << '\n'
+              << "  bounds_min: " << bounds.minimum.x << ' ' << bounds.minimum.y << ' ' << bounds.minimum.z << '\n'
+              << "  bounds_max: " << bounds.maximum.x << ' ' << bounds.maximum.y << ' ' << bounds.maximum.z << '\n'
               << "  mean_opacity: " << opacitySum / static_cast<double>(cloud.size()) << '\n';
+    return 0;
+}
+
+int gaussianRenderCommand(int argc, char** argv) {
+    if (argc < 4 || std::string_view(argv[1]) != "gaussian-render") return -1;
+    const auto cloud = vulkax::gaussian::load3dgsPly(argv[2]);
+    const auto bounds = gaussianBounds(cloud);
+
+    const auto available = vulkax::render::availableHeadlessRenderBackends();
+    if (available.empty()) throw std::runtime_error("no native headless render backend is available");
+
+    std::optional<vulkax::backend::BackendKind> selected;
+    if (argc >= 5) {
+        selected = parseBackend(argv[4]);
+        if (!selected) throw std::invalid_argument("unknown Gaussian render backend");
+        if (std::find(available.begin(), available.end(), *selected) == available.end())
+            throw std::runtime_error("requested Gaussian render backend is not available in this build");
+    } else {
+        const auto metal = std::find(available.begin(), available.end(), vulkax::backend::BackendKind::Metal);
+        const auto vulkan = std::find(available.begin(), available.end(), vulkax::backend::BackendKind::Vulkan);
+        if (vulkax::backend::currentPlatform() == vulkax::backend::PlatformKind::MacOS && metal != available.end())
+            selected = *metal;
+        else if (vulkan != available.end())
+            selected = *vulkan;
+        else
+            selected = available.front();
+    }
+
+    const vulkax::math::Vec3 center = (bounds.minimum + bounds.maximum) * 0.5;
+    const vulkax::math::Vec3 extent = bounds.maximum - bounds.minimum;
+    const double sceneSpan = std::max({extent.x, extent.y, extent.z, 1.0e-3});
+
+    vulkax::render::GaussianRenderSettings settings;
+    settings.image.width = 1280;
+    settings.image.height = 720;
+    settings.camera.target = center;
+    settings.camera.position = {center.x, center.y, center.z + 2.5 * sceneSpan};
+    settings.camera.up = {0.0, 1.0, 0.0};
+    settings.camera.verticalFovDegrees = 50.0;
+    settings.nearPlane = std::max(1.0e-5, sceneSpan * 1.0e-5);
+
+    const auto result = vulkax::render::renderGaussianCloudHeadless(*selected, cloud, settings);
+    vulkax::render::writePpm(result.image, argv[3]);
+    std::cout << "Gaussian render\n"
+              << "  backend: " << vulkax::backend::toString(*selected) << '\n'
+              << "  input_splats: " << result.stats.inputSplats << '\n'
+              << "  visible_splats: " << result.stats.visibleSplats << '\n'
+              << "  culled_behind: " << result.stats.culledBehindCamera << '\n'
+              << "  culled_opacity: " << result.stats.culledOpacity << '\n'
+              << "  culled_outside: " << result.stats.culledOutsideImage << '\n'
+              << "  output: " << argv[3] << '\n';
     return 0;
 }
 
@@ -164,6 +224,8 @@ int problemCommand(int argc, char** argv) {
 int main(int argc, char** argv) {
     using namespace vulkax;
     try {
+        const int gaussianRenderResult = gaussianRenderCommand(argc, argv);
+        if (gaussianRenderResult >= 0) return gaussianRenderResult;
         const int gaussianResult = gaussianInfoCommand(argc, argv);
         if (gaussianResult >= 0) return gaussianResult;
         const int documentResult = problemCommand(argc, argv);
@@ -211,12 +273,13 @@ int main(int argc, char** argv) {
             return 0;
         }
 
-        std::cout << "Vulkax computational physics system\n"
+        std::cout << "Vulkax computational physics and rewritable-reality research system\n"
                   << "Commands:\n"
                   << "  vulkax validate <problem.vkx>\n"
                   << "  vulkax inspect <problem.vkx>\n"
                   << "  vulkax plan <problem.vkx>\n"
                   << "  vulkax gaussian-info <point_cloud.ply>\n"
+                  << "  vulkax gaussian-render <point_cloud.ply> <output.ppm> [Vulkan|Metal]\n"
                   << "  vulkax --probe-backends\n"
                   << "  vulkax --conformance Vulkan|Metal\n";
         return 0;
