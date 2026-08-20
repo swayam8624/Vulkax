@@ -1,5 +1,6 @@
 #include "vulkax/backend/backend.hpp"
 #include "vulkax/backend/probe.hpp"
+#include "vulkax/cli/deformable_animation.hpp"
 #include "vulkax/cli/deformable_reference.hpp"
 #include "vulkax/compute/conformance.hpp"
 #include "vulkax/core/units.hpp"
@@ -225,6 +226,8 @@ int problemCommand(int argc, char** argv) {
 int main(int argc, char** argv) {
     using namespace vulkax;
     try {
+        const int deformableAnimationResult = cli::deformableAnimationCommand(argc, argv);
+        if (deformableAnimationResult >= 0) return deformableAnimationResult;
         const int deformableReferenceResult = cli::deformableReferenceCommand(argc, argv);
         if (deformableReferenceResult >= 0) return deformableReferenceResult;
         const int gaussianRenderResult = gaussianRenderCommand(argc, argv);
@@ -285,6 +288,7 @@ int main(int argc, char** argv) {
                   << "  vulkax gaussian-render <point_cloud.ply> <output.ppm> [Vulkan|Metal]\n"
                   << "  vulkax deformable-reference <output.csv>\n"
                   << "  vulkax deformable-nonlinear <output.csv>\n"
+                  << "  vulkax deformable-nonlinear-render <output-dir> [Metal|Vulkan] [stride]\n"
                   << "  vulkax --probe-backends\n"
                   << "  vulkax --conformance Vulkan|Metal\n";
         return 0;
