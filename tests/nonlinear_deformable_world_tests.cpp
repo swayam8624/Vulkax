@@ -11,7 +11,9 @@
 
 namespace {
 
-vulkax::math::Vec3 apply(const vulkax::solvers::Matrix3& matrix, vulkax::math::Vec3 value) {
+vulkax::math::Vec3 multiplyMatrixVector(
+    const vulkax::solvers::Matrix3& matrix,
+    vulkax::math::Vec3 value) {
     return {
         matrix[0] * value.x + matrix[1] * value.y + matrix[2] * value.z,
         matrix[3] * value.x + matrix[4] * value.y + matrix[5] * value.z,
@@ -131,7 +133,9 @@ int main() {
 
     // The experiment must not have merely translated the entire body rigidly.
     const auto initialBody = makeBody();
-    const auto deformedFirst = apply(settings.initialDeformation, initialBody.front().restPosition);
+    const auto deformedFirst = multiplyMatrixVector(
+        settings.initialDeformation,
+        initialBody.front().restPosition);
     assert(math::length(result.finalParticles.front().position - deformedFirst) > 1.0e-7);
     return 0;
 }
