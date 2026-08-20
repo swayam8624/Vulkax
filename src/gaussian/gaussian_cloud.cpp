@@ -12,8 +12,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
-#include <utility>
 
 namespace vulkax::gaussian {
 namespace {
@@ -67,7 +65,7 @@ struct Header {
     if (dataOffset < bytes.size() && bytes[dataOffset] == '\r') ++dataOffset;
     if (dataOffset < bytes.size() && bytes[dataOffset] == '\n') ++dataOffset;
 
-    std::istringstream input(std::string(bytes.substr(0, end)));
+    std::istringstream input{std::string(bytes.substr(0, end))};
     std::string line;
     Header header;
     bool sawPly = false;
@@ -79,7 +77,7 @@ struct Header {
             sawPly = true;
             continue;
         }
-        std::istringstream fields(line);
+        std::istringstream fields{line};
         std::string keyword;
         fields >> keyword;
         if (keyword == "format") {
@@ -235,7 +233,7 @@ GaussianCloud parse3dgsPly(std::string_view bytes) {
     cloud.splats.reserve(header.vertexCount);
 
     if (header.format == PlyFormat::Ascii) {
-        std::istringstream input(std::string(bytes.substr(header.dataOffset)));
+        std::istringstream input{std::string(bytes.substr(header.dataOffset))};
         std::vector<double> values(header.properties.size(), 0.0);
         for (std::size_t vertex = 0; vertex < header.vertexCount; ++vertex) {
             for (double& value : values) {
