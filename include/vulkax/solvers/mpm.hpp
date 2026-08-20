@@ -22,6 +22,7 @@ enum class MpmTransferScheme {
     PIC,
     FLIP,
     APIC,
+    APIC_FLIP,
 };
 
 [[nodiscard]] constexpr std::string_view toString(MpmTransferScheme scheme) noexcept {
@@ -29,6 +30,7 @@ enum class MpmTransferScheme {
         case MpmTransferScheme::PIC: return "PIC";
         case MpmTransferScheme::FLIP: return "FLIP";
         case MpmTransferScheme::APIC: return "APIC";
+        case MpmTransferScheme::APIC_FLIP: return "APIC-FLIP";
     }
     return "unknown";
 }
@@ -90,12 +92,18 @@ struct MpmStepEvidence {
     double maximumDeformationDeterminant{1.0};
 };
 
+// For APIC_FLIP, flipBlend controls only the G2P particle velocity blend:
+//   v_new = (1-beta) * v_PIC + beta * (v_old + delta_v_FLIP).
+// Affine APIC P2G and affine-state reconstruction remain active. Therefore
+// beta=0 reproduces APIC, while beta=1 is an affine-P2G FLIP-like endpoint
+// and is intentionally distinct from the pure FLIP scheme.
 [[nodiscard]] MpmTransferEvidence particleToGridMpm(
     const std::vector<MpmParticle>& particles,
     const MpmGridSettings& settings,
     const MpmMaterial& material,
     std::vector<MpmGridNode>& grid,
-    MpmTransferScheme transferScheme = MpmTransferScheme::APIC);
+    MpmTransferScheme transferScheme = MpmTransferScheme::APIC,
+    double flipBlend = 0.0);
 
 [[nodiscard]] MpmStepEvidence stepMpm(
     std::vector<MpmParticle>& particles,
@@ -103,7 +111,8 @@ struct MpmStepEvidence {
     const MpmMaterial& material,
     double dt,
     math::Vec3 gravity = {0.0, -9.81, 0.0},
-    MpmTransferScheme transferScheme = MpmTransferScheme::APIC);
+    MpmTransferScheme transferScheme = MpmTransferScheme::APIC,
+    double flipBlend = 0.0);
 
 [[nodiscard]] double deformationDeterminant(const MpmParticle& particle) noexcept;
 [[nodiscard]] math::Vec3 totalMpmMomentum(const std::vector<MpmParticle>& particles) noexcept;
