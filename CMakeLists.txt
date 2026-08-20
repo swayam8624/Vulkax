@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_library(vulkax_core STATIC
-    src/adapt/goal_oriented.cpp src/autodiff/discrete_adjoint.cpp src/backend/backend.cpp src/backend/probe.cpp src/compiler/expression.cpp src/compute/conformance.cpp src/coupling/mls_embedding.cpp src/coupling/mpm_gaussian.cpp
+    src/adapt/goal_oriented.cpp src/autodiff/discrete_adjoint.cpp src/backend/backend.cpp src/backend/probe.cpp src/cli/deformable_reference.cpp src/compiler/expression.cpp src/compute/conformance.cpp src/coupling/mls_embedding.cpp src/coupling/mpm_gaussian.cpp
     src/execution/experiment.cpp src/experiment/design.cpp src/gaussian/gaussian_cloud.cpp src/gaussian/hierarchy.cpp src/geometry/mesh.cpp src/geometry/voxelize.cpp src/inverse/hyperelastic.cpp
     src/numerics/dense.cpp src/numerics/grid.cpp src/operators/operator_graph.cpp src/optimize/optimizer.cpp
     src/planning/solver_plan.cpp src/problem/document.cpp src/problem/problem_ir.cpp src/problem/validation.cpp
