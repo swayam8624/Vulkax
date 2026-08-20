@@ -186,7 +186,8 @@ NonlinearDeformableWorldResult runNonlinearDeformableWorld(
     const std::vector<std::size_t>& activeGaussianIndices,
     std::vector<solvers::MpmParticle> particles,
     const solvers::MpmGridSettings& grid,
-    const NonlinearDeformableWorldSettings& settings) {
+    const NonlinearDeformableWorldSettings& settings,
+    const NonlinearDeformableWorldObserver& observer) {
     if (world.empty() || activeGaussianIndices.empty() || particles.size() < 4)
         throw std::invalid_argument("nonlinear deformable-world experiment has insufficient state");
     if (settings.steps == 0 || !std::isfinite(settings.dt) || settings.dt <= 0.0)
@@ -286,6 +287,7 @@ NonlinearDeformableWorldResult runNonlinearDeformableWorld(
         updateMaximum(result.maximumGaussianDisplacement, frame.maximumGaussianDisplacement);
         updateMaximum(result.maximumUnaffectedRegionDrift, frame.unaffectedRegionDrift);
         result.frames.push_back(frame);
+        if (observer) observer(result.frames.back(), world);
     }
 
     result.finalMechanicalEnergy = result.frames.back().mechanicalEnergy;
