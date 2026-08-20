@@ -2,6 +2,7 @@
 #include "vulkax/backend/probe.hpp"
 #include "vulkax/cli/deformable_animation.hpp"
 #include "vulkax/cli/deformable_reference.hpp"
+#include "vulkax/cli/energy_cycle.hpp"
 #include "vulkax/cli/research_validation.hpp"
 #include "vulkax/cli/transfer_ablation.hpp"
 #include "vulkax/compute/conformance.hpp"
@@ -228,6 +229,8 @@ int problemCommand(int argc, char** argv) {
 int main(int argc, char** argv) {
     using namespace vulkax;
     try {
+        const int transferCycleResult = cli::transferEnergyCycleCommand(argc, argv);
+        if (transferCycleResult >= 0) return transferCycleResult;
         const int transferDiagnosticsResult = cli::transferDiagnosticsCommand(argc, argv);
         if (transferDiagnosticsResult >= 0) return transferDiagnosticsResult;
         const int transferAblationResult = cli::transferAblationCommand(argc, argv);
@@ -303,6 +306,7 @@ int main(int argc, char** argv) {
                   << "  vulkax deformable-timestep-sweep <output.csv>\n"
                   << "  vulkax deformable-transfer-ablation <output.csv>\n"
                   << "  vulkax deformable-transfer-diagnostics <output-dir>\n"
+                  << "  vulkax deformable-transfer-cycle <output-dir>\n"
                   << "  vulkax --probe-backends\n"
                   << "  vulkax --conformance Vulkan|Metal\n";
         return 0;
