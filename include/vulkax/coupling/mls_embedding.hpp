@@ -3,6 +3,7 @@
 #include "vulkax/core/math.hpp"
 #include "vulkax/gaussian/gaussian_cloud.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -23,7 +24,11 @@ struct SupportWeight {
 
 struct GaussianSupport {
     std::size_t gaussianIndex{};
+    math::Vec3 restPosition{};
+    std::array<double, 3> restLogScale{};
+    std::array<double, 4> restRotation{1.0, 0.0, 0.0, 0.0};
     std::vector<SupportWeight> weights;
+    std::vector<SupportWeight> fitWeights;
     double partitionOfUnityError{};
     double affineReproductionError{};
 };
@@ -51,6 +56,15 @@ struct ForceTransferEvidence {
     std::size_t neighborCount = 12);
 
 void updateGaussianPositionsFromPhysics(
+    const MlsEmbedding& embedding,
+    const std::vector<PhysicalPoint>& physicalPoints,
+    gaussian::GaussianCloud& cloud);
+
+// Fits a local affine map from each Gaussian's physical support, then transports
+// both its center and its full covariance. Rest geometry stored in the embedding
+// makes this operation non-accumulating: repeated calls always map from the same
+// captured reference state.
+void updateGaussianGeometryFromPhysics(
     const MlsEmbedding& embedding,
     const std::vector<PhysicalPoint>& physicalPoints,
     gaussian::GaussianCloud& cloud);
