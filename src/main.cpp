@@ -3,6 +3,7 @@
 #include "vulkax/cli/deformable_animation.hpp"
 #include "vulkax/cli/deformable_reference.hpp"
 #include "vulkax/cli/research_validation.hpp"
+#include "vulkax/cli/transfer_ablation.hpp"
 #include "vulkax/compute/conformance.hpp"
 #include "vulkax/core/units.hpp"
 #include "vulkax/gaussian/gaussian_cloud.hpp"
@@ -227,6 +228,8 @@ int problemCommand(int argc, char** argv) {
 int main(int argc, char** argv) {
     using namespace vulkax;
     try {
+        const int transferAblationResult = cli::transferAblationCommand(argc, argv);
+        if (transferAblationResult >= 0) return transferAblationResult;
         const int backendCompareResult = cli::deformableBackendCompareCommand(argc, argv);
         if (backendCompareResult >= 0) return backendCompareResult;
         const int timestepSweepResult = cli::deformableTimestepSweepCommand(argc, argv);
@@ -296,6 +299,7 @@ int main(int argc, char** argv) {
                   << "  vulkax deformable-nonlinear-render <output-dir> [Metal|Vulkan] [stride]\n"
                   << "  vulkax deformable-backend-compare <output-dir> [stride]\n"
                   << "  vulkax deformable-timestep-sweep <output.csv>\n"
+                  << "  vulkax deformable-transfer-ablation <output.csv>\n"
                   << "  vulkax --probe-backends\n"
                   << "  vulkax --conformance Vulkan|Metal\n";
         return 0;
