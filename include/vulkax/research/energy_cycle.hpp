@@ -25,18 +25,22 @@ struct TransferEnergyCycleSchemeResult {
     NonlinearDeformableWorldResult experiment;
     std::vector<EnergyCyclePeak> kineticPeaks;
     std::size_t meaningfulKineticPeakCount{};
+    std::size_t completedMeaningfulCycles{};
     double minimumMechanicalEnergyFraction{1.0};
     double maximumMechanicalEnergyFraction{1.0};
     double finalMechanicalEnergyFraction{1.0};
     double peakKineticEnergyFraction{};
     double firstMeaningfulPeakTime{};
     double lastMeaningfulPeakTime{};
+    double meanMeaningfulCyclePeriod{};
     double firstMeaningfulPeakMechanicalEnergyFraction{};
     double lastMeaningfulPeakMechanicalEnergyFraction{};
     double peakToPeakMechanicalEnergyRetention{};
+    double meanMechanicalEnergyRetentionPerCycle{};
     double firstMeaningfulPeakKineticEnergyFraction{};
     double lastMeaningfulPeakKineticEnergyFraction{};
     double peakToPeakKineticAmplitudeRetention{};
+    double meanKineticAmplitudeRetentionPerCycle{};
 };
 
 struct TransferEnergyCycleResult {
