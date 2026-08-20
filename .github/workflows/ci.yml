@@ -30,6 +30,11 @@ jobs:
         run: ./build/vulkax --require-backend Vulkan
       - name: Vulkan compute conformance
         run: ./build/vulkax --conformance Vulkan
+      - name: Gaussian scene ingestion and native Vulkan render
+        run: |
+          ./build/vulkax gaussian-info examples/synthetic_gaussian.ply
+          ./build/vulkax gaussian-render examples/synthetic_gaussian.ply build/gaussian-vulkan.ppm Vulkan
+          test -s build/gaussian-vulkan.ppm
 
   macos:
     runs-on: macos-15
@@ -50,6 +55,11 @@ jobs:
         run: ./build/vulkax --require-backend Metal
       - name: Metal compute conformance
         run: ./build/vulkax --conformance Metal
+      - name: Gaussian scene ingestion and native Metal render
+        run: |
+          ./build/vulkax gaussian-info examples/synthetic_gaussian.ply
+          ./build/vulkax gaussian-render examples/synthetic_gaussian.ply build/gaussian-metal.ppm Metal
+          test -s build/gaussian-metal.ppm
 
   windows:
     runs-on: windows-2025
@@ -66,3 +76,5 @@ jobs:
           .\build\Release\vulkax.exe validate examples\rotating_mill.vkx
           .\build\Release\vulkax.exe validate examples\car_aerodynamics.vkx
           .\build\Release\vulkax.exe validate examples\rubber_inverse.vkx
+      - name: Gaussian scene ingestion
+        run: .\build\Release\vulkax.exe gaussian-info examples\synthetic_gaussian.ply
