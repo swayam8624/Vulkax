@@ -1,10 +1,68 @@
-name: Vulkax Next CI
+name: Vulkax CI
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 jobs:
-  placeholder:
-    runs-on: ubuntu-latest
+  linux:
+    runs-on: ubuntu-24.04
     steps:
-      - run: echo "CI temporarily paused during an atomic repository migration; push/PR matrix restored in the final commit."
+      - uses: actions/checkout@v4
+      - name: Install Vulkan runtime and shader compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers glslang-tools
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Validate example problems
+        run: |
+          ./build/vulkax validate examples/rotating_mill.vkx
+          ./build/vulkax validate examples/car_aerodynamics.vkx
+          ./build/vulkax validate examples/rubber_inverse.vkx
+      - name: Runtime Vulkan discovery
+        run: ./build/vulkax --require-backend Vulkan
+      - name: Vulkan compute conformance
+        run: ./build/vulkax --conformance Vulkan
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Validate example problems
+        run: |
+          ./build/vulkax validate examples/rotating_mill.vkx
+          ./build/vulkax validate examples/car_aerodynamics.vkx
+          ./build/vulkax validate examples/rubber_inverse.vkx
+      - name: Runtime Metal discovery
+        run: ./build/vulkax --require-backend Metal
+      - name: Metal compute conformance
+        run: ./build/vulkax --conformance Metal
+
+  windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DVULKAX_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Validate example problems
+        run: |
+          .\build\Release\vulkax.exe validate examples\rotating_mill.vkx
+          .\build\Release\vulkax.exe validate examples\car_aerodynamics.vkx
+          .\build\Release\vulkax.exe validate examples\rubber_inverse.vkx
