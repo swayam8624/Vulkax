@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -96,15 +97,31 @@ research::NonlinearDeformableWorldSettings physicsSettings() {
     return settings;
 }
 
+double parsePositiveDouble(std::string_view text, std::string_view label) {
+    std::size_t consumed = 0;
+    const std::string owned(text);
+    double value = 0.0;
+    try {
+        value = std::stod(owned, &consumed);
+    } catch (const std::exception&) {
+        throw std::invalid_argument(std::string(label) + " must be a positive finite number");
+    }
+    if (consumed != owned.size() || !std::isfinite(value) || value <= 0.0)
+        throw std::invalid_argument(std::string(label) + " must be a positive finite number");
+    return value;
+}
+
 } // namespace
 
 int transferEnergyCycleCommand(int argc, char** argv) {
     if (argc < 2 || std::string_view(argv[1]) != "deformable-transfer-cycle") return -1;
     if (argc < 3)
-        throw std::invalid_argument("usage: vulkax deformable-transfer-cycle <output-dir>");
+        throw std::invalid_argument(
+            "usage: vulkax deformable-transfer-cycle <output-dir> [physical-horizon] [dt]");
 
-    constexpr double physicalHorizon = 0.192;
-    constexpr double dt = 5.0e-5;
+    const double physicalHorizon =
+        argc >= 4 ? parsePositiveDouble(argv[3], "physical horizon") : 0.192;
+    const double dt = argc >= 5 ? parsePositiveDouble(argv[4], "timestep") : 5.0e-5;
     constexpr double meaningfulPeakThreshold = 0.01;
 
     auto dense = makeDenseWorld();
@@ -130,12 +147,18 @@ int transferEnergyCycleCommand(int argc, char** argv) {
                   << "    peak_kinetic_fraction: " << scheme.peakKineticEnergyFraction << '\n'
                   << "    all_kinetic_peaks: " << scheme.kineticPeaks.size() << '\n'
                   << "    meaningful_kinetic_peaks: " << scheme.meaningfulKineticPeakCount << '\n'
+                  << "    completed_meaningful_cycles: " << scheme.completedMeaningfulCycles << '\n'
                   << "    first_peak_time: " << scheme.firstMeaningfulPeakTime << '\n'
                   << "    last_peak_time: " << scheme.lastMeaningfulPeakTime << '\n'
+                  << "    mean_cycle_period: " << scheme.meanMeaningfulCyclePeriod << '\n'
                   << "    peak_to_peak_total_energy_retention: "
                   << scheme.peakToPeakMechanicalEnergyRetention << '\n'
+                  << "    mean_total_energy_retention_per_cycle: "
+                  << scheme.meanMechanicalEnergyRetentionPerCycle << '\n'
                   << "    peak_to_peak_kinetic_retention: "
                   << scheme.peakToPeakKineticAmplitudeRetention << '\n'
+                  << "    mean_kinetic_retention_per_cycle: "
+                  << scheme.meanKineticAmplitudeRetentionPerCycle << '\n'
                   << "    max_gaussian_displacement: "
                   << scheme.experiment.maximumGaussianDisplacement << '\n'
                   << "    max_mls_rms_residual: " << scheme.experiment.maximumMlsRmsResidual << '\n'
