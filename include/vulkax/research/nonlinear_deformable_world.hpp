@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <vector>
 
 namespace vulkax::research {
@@ -61,6 +62,13 @@ struct NonlinearDeformableWorldResult {
     double maximumUnaffectedRegionDrift{};
 };
 
+// Called after a completed nonlinear MPM step and Gaussian rewrite. The world
+// reference is valid only for the duration of the callback, allowing streaming
+// render/export without retaining every captured-world state in memory.
+using NonlinearDeformableWorldObserver = std::function<void(
+    const NonlinearDeformableWorldFrameEvidence& frame,
+    const gaussian::GaussianCloud& world)>;
+
 // Free nonlinear elastic relaxation. Particles are initialized in a finite
 // deformation and then evolved only by compressible Neo-Hookean internal
 // forces. There is no gravity, no external force and no boundary contact.
@@ -71,7 +79,8 @@ struct NonlinearDeformableWorldResult {
     const std::vector<std::size_t>& activeGaussianIndices,
     std::vector<solvers::MpmParticle> particles,
     const solvers::MpmGridSettings& grid,
-    const NonlinearDeformableWorldSettings& settings = {});
+    const NonlinearDeformableWorldSettings& settings = {},
+    const NonlinearDeformableWorldObserver& observer = {});
 
 void writeNonlinearDeformableWorldEvidenceCsv(
     const NonlinearDeformableWorldResult& result,
