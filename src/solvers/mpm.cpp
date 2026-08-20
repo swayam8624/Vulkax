@@ -152,6 +152,11 @@ void validateSettings(const MpmGridSettings& settings) {
         throw std::invalid_argument("MPM boundary layer consumes the whole grid");
 }
 
+void validateFlipBlend(double flipBlend) {
+    if (!std::isfinite(flipBlend) || flipBlend < 0.0 || flipBlend > 1.0)
+        throw std::invalid_argument("MPM FLIP blend must lie in [0, 1]");
+}
+
 void applyBoundary(math::Vec3& velocity, std::size_t x, std::size_t y, std::size_t z, const MpmGridSettings& settings) noexcept {
     const std::size_t boundary = settings.boundaryCells;
     if (boundary == 0) return;
@@ -181,8 +186,9 @@ double totalMpmMass(const std::vector<MpmParticle>& particles) noexcept {
 
 MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles, const MpmGridSettings& settings,
                                       const MpmMaterial& material, std::vector<MpmGridNode>& grid,
-                                      MpmTransferScheme transferScheme) {
+                                      MpmTransferScheme transferScheme, double flipBlend) {
     validateSettings(settings);
+    validateFlipBlend(flipBlend);
     if (particles.empty()) throw std::invalid_argument("MPM transfer requires at least one particle");
     grid.assign(settings.nx * settings.ny * settings.nz, MpmGridNode{});
     MpmTransferEvidence evidence;
@@ -199,7 +205,7 @@ MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles,
             [&](std::size_t x, std::size_t y, std::size_t z, double weight, math::Vec3 gradient, math::Vec3 nodeOffset) {
                 auto& node = grid[nodeIndex(x, y, z, settings)];
                 math::Vec3 transferVelocity = particle.velocity;
-                if (transferScheme == MpmTransferScheme::APIC)
+                if (transferScheme == MpmTransferScheme::APIC || transferScheme == MpmTransferScheme::APIC_FLIP)
                     transferVelocity += multiply(particle.affineVelocity, nodeOffset);
                 node.mass += weight * particle.mass;
                 node.momentum += transferVelocity * (weight * particle.mass);
@@ -220,13 +226,14 @@ MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles,
 
 MpmStepEvidence stepMpm(std::vector<MpmParticle>& particles, const MpmGridSettings& settings,
                         const MpmMaterial& material, double dt, math::Vec3 gravity,
-                        MpmTransferScheme transferScheme) {
+                        MpmTransferScheme transferScheme, double flipBlend) {
     if (!std::isfinite(dt) || dt <= 0.0) throw std::invalid_argument("MPM timestep must be positive");
+    validateFlipBlend(flipBlend);
     MpmStepEvidence evidence;
     evidence.initialMomentum = totalMpmMomentum(particles);
     const double totalMass = totalMpmMass(particles);
     std::vector<MpmGridNode> grid;
-    evidence.transfer = particleToGridMpm(particles, settings, material, grid, transferScheme);
+    evidence.transfer = particleToGridMpm(particles, settings, material, grid, transferScheme, flipBlend);
 
     std::vector<math::Vec3> gridVelocityBeforeUpdate(grid.size());
     for (std::size_t z = 0; z < settings.nz; ++z)
@@ -269,6 +276,12 @@ MpmStepEvidence stepMpm(std::vector<MpmParticle>& particles, const MpmGridSettin
                 particle.velocity = picVelocity;
                 particle.affineVelocity = velocityGradient;
                 break;
+            case MpmTransferScheme::APIC_FLIP: {
+                const math::Vec3 flipVelocity = particle.velocity + flipIncrement;
+                particle.velocity = picVelocity * (1.0 - flipBlend) + flipVelocity * flipBlend;
+                particle.affineVelocity = velocityGradient;
+                break;
+            }
         }
 
         particle.position += particle.velocity * dt;
