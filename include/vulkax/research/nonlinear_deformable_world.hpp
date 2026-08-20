@@ -20,6 +20,7 @@ struct NonlinearDeformableWorldSettings {
         0.00, 0.01, 1.02,
     };
     std::size_t couplingNeighborCount{20};
+    solvers::MpmTransferScheme transferScheme{solvers::MpmTransferScheme::APIC};
 };
 
 struct NonlinearDeformableWorldFrameEvidence {
@@ -73,7 +74,8 @@ using NonlinearDeformableWorldObserver = std::function<void(
 // deformation and then evolved only by compressible Neo-Hookean internal
 // forces. There is no gravity, no external force and no boundary contact.
 // This makes momentum, center-of-mass and locality errors meaningful while
-// energy drift measures the explicit APIC/MPM time integration itself.
+// energy drift exposes transfer and time-integration behavior. APIC remains
+// the default; PIC and FLIP are available for controlled transfer ablations.
 [[nodiscard]] NonlinearDeformableWorldResult runNonlinearDeformableWorld(
     gaussian::GaussianCloud world,
     const std::vector<std::size_t>& activeGaussianIndices,
