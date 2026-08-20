@@ -106,8 +106,15 @@ int main() {
         assert(scheme.experiment.maximumMassConservationError < 1.0e-9);
         assert(scheme.meaningfulKineticPeakCount <= scheme.kineticPeaks.size());
         if (scheme.meaningfulKineticPeakCount >= 2) {
+            assert(scheme.completedMeaningfulCycles == scheme.meaningfulKineticPeakCount - 1);
+            assert(scheme.meanMeaningfulCyclePeriod > 0.0);
             assert(scheme.peakToPeakMechanicalEnergyRetention > 0.0);
+            assert(scheme.meanMechanicalEnergyRetentionPerCycle > 0.0);
             assert(scheme.peakToPeakKineticAmplitudeRetention > 0.0);
+            assert(scheme.meanKineticAmplitudeRetentionPerCycle > 0.0);
+        } else {
+            assert(scheme.completedMeaningfulCycles == 0);
+            assert(scheme.meanMeaningfulCyclePeriod == 0.0);
         }
     }
 
