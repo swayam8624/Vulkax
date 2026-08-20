@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.25)
-project(Vulkax VERSION 0.19.0 LANGUAGES CXX)
+project(Vulkax VERSION 0.20.0 LANGUAGES CXX)
 option(VULKAX_BUILD_TESTS "Build Vulkax tests" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_library(vulkax_core STATIC
-    src/adapt/goal_oriented.cpp src/autodiff/discrete_adjoint.cpp src/backend/backend.cpp src/backend/probe.cpp src/compiler/expression.cpp src/compute/conformance.cpp
+    src/adapt/goal_oriented.cpp src/autodiff/discrete_adjoint.cpp src/backend/backend.cpp src/backend/probe.cpp src/compiler/expression.cpp src/compute/conformance.cpp src/coupling/mls_embedding.cpp
     src/execution/experiment.cpp src/experiment/design.cpp src/gaussian/gaussian_cloud.cpp src/geometry/mesh.cpp src/geometry/voxelize.cpp src/inverse/hyperelastic.cpp
     src/numerics/dense.cpp src/numerics/grid.cpp src/operators/operator_graph.cpp src/optimize/optimizer.cpp
     src/planning/solver_plan.cpp src/problem/document.cpp src/problem/problem_ir.cpp src/problem/validation.cpp
@@ -70,7 +70,7 @@ target_link_libraries(vulkax PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render geometry camera_capture mac3d autodiff world_gaussian gaussian_render)
+    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute coupling visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render geometry camera_capture mac3d autodiff world_gaussian gaussian_render)
         add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
         target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
         if(MSVC)
