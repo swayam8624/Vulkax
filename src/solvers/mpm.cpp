@@ -180,7 +180,8 @@ double totalMpmMass(const std::vector<MpmParticle>& particles) noexcept {
 }
 
 MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles, const MpmGridSettings& settings,
-                                      const MpmMaterial& material, std::vector<MpmGridNode>& grid) {
+                                      const MpmMaterial& material, std::vector<MpmGridNode>& grid,
+                                      MpmTransferScheme transferScheme) {
     validateSettings(settings);
     if (particles.empty()) throw std::invalid_argument("MPM transfer requires at least one particle");
     grid.assign(settings.nx * settings.ny * settings.nz, MpmGridNode{});
@@ -197,9 +198,11 @@ MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles,
         visitStencil(particle, settings, stencil,
             [&](std::size_t x, std::size_t y, std::size_t z, double weight, math::Vec3 gradient, math::Vec3 nodeOffset) {
                 auto& node = grid[nodeIndex(x, y, z, settings)];
-                const math::Vec3 apicVelocity = particle.velocity + multiply(particle.affineVelocity, nodeOffset);
+                math::Vec3 transferVelocity = particle.velocity;
+                if (transferScheme == MpmTransferScheme::APIC)
+                    transferVelocity += multiply(particle.affineVelocity, nodeOffset);
                 node.mass += weight * particle.mass;
-                node.momentum += apicVelocity * (weight * particle.mass);
+                node.momentum += transferVelocity * (weight * particle.mass);
                 node.force += multiply(kirchhoff, gradient) * (-particle.restVolume);
                 node.force += particle.externalForce * weight;
             });
@@ -216,41 +219,66 @@ MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles,
 }
 
 MpmStepEvidence stepMpm(std::vector<MpmParticle>& particles, const MpmGridSettings& settings,
-                        const MpmMaterial& material, double dt, math::Vec3 gravity) {
+                        const MpmMaterial& material, double dt, math::Vec3 gravity,
+                        MpmTransferScheme transferScheme) {
     if (!std::isfinite(dt) || dt <= 0.0) throw std::invalid_argument("MPM timestep must be positive");
     MpmStepEvidence evidence;
     evidence.initialMomentum = totalMpmMomentum(particles);
     const double totalMass = totalMpmMass(particles);
     std::vector<MpmGridNode> grid;
-    evidence.transfer = particleToGridMpm(particles, settings, material, grid);
+    evidence.transfer = particleToGridMpm(particles, settings, material, grid, transferScheme);
+
+    std::vector<math::Vec3> gridVelocityBeforeUpdate(grid.size());
     for (std::size_t z = 0; z < settings.nz; ++z)
         for (std::size_t y = 0; y < settings.ny; ++y)
             for (std::size_t x = 0; x < settings.nx; ++x) {
-                auto& node = grid[nodeIndex(x, y, z, settings)];
+                const std::size_t index = nodeIndex(x, y, z, settings);
+                auto& node = grid[index];
                 if (node.mass <= std::numeric_limits<double>::epsilon()) continue;
                 ++evidence.activeGridNodes;
-                node.velocity = node.momentum / node.mass + (node.force / node.mass + gravity) * dt;
+                gridVelocityBeforeUpdate[index] = node.momentum / node.mass;
+                node.velocity = gridVelocityBeforeUpdate[index] + (node.force / node.mass + gravity) * dt;
                 applyBoundary(node.velocity, x, y, z, settings);
             }
-    const double apicFactor = 4.0 / (settings.cellSize * settings.cellSize);
+
+    const double affineFactor = 4.0 / (settings.cellSize * settings.cellSize);
     for (auto& particle : particles) {
         const ParticleStencil stencil = stencilFor(particle, settings);
-        math::Vec3 newVelocity{};
-        Matrix3 newAffine{};
+        math::Vec3 picVelocity{};
+        math::Vec3 flipIncrement{};
+        Matrix3 velocityGradient{};
         visitStencil(particle, settings, stencil,
             [&](std::size_t x, std::size_t y, std::size_t z, double weight, math::Vec3, math::Vec3 nodeOffset) {
-                const auto& node = grid[nodeIndex(x, y, z, settings)];
-                newVelocity += node.velocity * weight;
-                addScaled(newAffine, outer(node.velocity, nodeOffset), apicFactor * weight);
+                const std::size_t index = nodeIndex(x, y, z, settings);
+                const auto& node = grid[index];
+                picVelocity += node.velocity * weight;
+                flipIncrement += (node.velocity - gridVelocityBeforeUpdate[index]) * weight;
+                addScaled(velocityGradient, outer(node.velocity, nodeOffset), affineFactor * weight);
             });
-        particle.velocity = newVelocity;
-        particle.affineVelocity = newAffine;
+
+        switch (transferScheme) {
+            case MpmTransferScheme::PIC:
+                particle.velocity = picVelocity;
+                particle.affineVelocity = {};
+                break;
+            case MpmTransferScheme::FLIP:
+                particle.velocity += flipIncrement;
+                particle.affineVelocity = {};
+                break;
+            case MpmTransferScheme::APIC:
+                particle.velocity = picVelocity;
+                particle.affineVelocity = velocityGradient;
+                break;
+        }
+
         particle.position += particle.velocity * dt;
         Matrix3 update = identityMatrix3();
-        for (std::size_t index = 0; index < update.size(); ++index) update[index] += dt * newAffine[index];
+        for (std::size_t index = 0; index < update.size(); ++index)
+            update[index] += dt * velocityGradient[index];
         particle.deformationGradient = multiply(update, particle.deformationGradient);
         particle.externalForce = {};
     }
+
     evidence.finalMomentum = totalMpmMomentum(particles);
     evidence.expectedMomentumWithoutBoundary = evidence.initialMomentum +
         (evidence.transfer.appliedExternalForce + gravity * totalMass) * dt;
