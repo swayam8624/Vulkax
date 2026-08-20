@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_set>
 
 namespace vulkax::world {
