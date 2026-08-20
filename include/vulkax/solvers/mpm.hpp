@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 namespace vulkax::solvers {
@@ -15,6 +16,21 @@ using Matrix3 = std::array<double, 9>;
     return {1.0, 0.0, 0.0,
             0.0, 1.0, 0.0,
             0.0, 0.0, 1.0};
+}
+
+enum class MpmTransferScheme {
+    PIC,
+    FLIP,
+    APIC,
+};
+
+[[nodiscard]] constexpr std::string_view toString(MpmTransferScheme scheme) noexcept {
+    switch (scheme) {
+        case MpmTransferScheme::PIC: return "PIC";
+        case MpmTransferScheme::FLIP: return "FLIP";
+        case MpmTransferScheme::APIC: return "APIC";
+    }
+    return "unknown";
 }
 
 struct MpmMaterial {
@@ -78,14 +94,16 @@ struct MpmStepEvidence {
     const std::vector<MpmParticle>& particles,
     const MpmGridSettings& settings,
     const MpmMaterial& material,
-    std::vector<MpmGridNode>& grid);
+    std::vector<MpmGridNode>& grid,
+    MpmTransferScheme transferScheme = MpmTransferScheme::APIC);
 
 [[nodiscard]] MpmStepEvidence stepMpm(
     std::vector<MpmParticle>& particles,
     const MpmGridSettings& settings,
     const MpmMaterial& material,
     double dt,
-    math::Vec3 gravity = {0.0, -9.81, 0.0});
+    math::Vec3 gravity = {0.0, -9.81, 0.0},
+    MpmTransferScheme transferScheme = MpmTransferScheme::APIC);
 
 [[nodiscard]] double deformationDeterminant(const MpmParticle& particle) noexcept;
 [[nodiscard]] math::Vec3 totalMpmMomentum(const std::vector<MpmParticle>& particles) noexcept;
