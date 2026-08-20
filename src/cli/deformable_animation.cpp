@@ -88,8 +88,9 @@ DenseWorld makeDenseWorld() {
                 result.cloud.splats.push_back(makeSplat(position, scale, tint));
             }
 
-    // Locality-control splat remains outside the coupled region and camera view.
-    result.cloud.splats.push_back(makeSplat({0.78, 0.58, -0.28}, 0.08, 0.5));
+    // Locality-control splat remains in the simulated world but is never sent
+    // to the renderer. It exists only to prove unaffected-region locality.
+    result.cloud.splats.push_back(makeSplat({5.0, 5.0, 5.0}, 0.08, 0.5));
     return result;
 }
 
@@ -153,6 +154,18 @@ render::GaussianRenderSettings renderSettings() {
     return settings;
 }
 
+gaussian::GaussianCloud appearanceOnly(const gaussian::GaussianCloud& world,
+                                       std::size_t activeCount) {
+    if (activeCount > world.size())
+        throw std::out_of_range("active appearance count exceeds Gaussian world size");
+    gaussian::GaussianCloud result;
+    result.shRestCoefficientsPerSplat = world.shRestCoefficientsPerSplat;
+    result.splats.assign(
+        world.splats.begin(),
+        world.splats.begin() + static_cast<std::ptrdiff_t>(activeCount));
+    return result;
+}
+
 } // namespace
 
 int deformableAnimationCommand(int argc, char** argv) {
@@ -170,6 +183,7 @@ int deformableAnimationCommand(int argc, char** argv) {
     const auto settings = renderSettings();
 
     auto dense = makeDenseWorld();
+    const std::size_t activeCount = dense.activeIndices.size();
     research::NonlinearDeformableWorldSettings physics;
     physics.steps = 240;
     physics.dt = 2.0e-4;
@@ -187,7 +201,9 @@ int deformableAnimationCommand(int argc, char** argv) {
     const auto observer = [&](const research::NonlinearDeformableWorldFrameEvidence& frame,
                               const gaussian::GaussianCloud& world) {
         if (frame.step % stride != 0 && frame.step != physics.steps) return;
-        const auto rendered = render::renderGaussianCloudHeadless(selectedBackend, world, settings);
+        const auto appearance = appearanceOnly(world, activeCount);
+        const auto rendered = render::renderGaussianCloudHeadless(
+            selectedBackend, appearance, settings);
         const std::string filename = frameName(frame.step);
         render::writePpm(rendered.image, (framesDirectory / filename).string());
         totalVisibleSplats += rendered.stats.visibleSplats;
@@ -208,7 +224,7 @@ int deformableAnimationCommand(int argc, char** argv) {
               << "Nonlinear Gaussian-world animation\n"
               << "  backend: " << backend::toString(selectedBackend) << '\n'
               << "  physics_particles: " << result.finalParticles.size() << '\n'
-              << "  appearance_gaussians: " << result.finalWorld.size() - 1U << '\n'
+              << "  appearance_gaussians: " << activeCount << '\n'
               << "  simulated_steps: " << result.frames.size() << '\n'
               << "  rendered_frames: " << renderedFrames << '\n'
               << "  stride: " << stride << '\n'
