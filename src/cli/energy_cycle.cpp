@@ -1,5 +1,6 @@
 #include "vulkax/cli/energy_cycle.hpp"
 
+#include "vulkax/research/affine_flip_sweep.hpp"
 #include "vulkax/research/energy_cycle.hpp"
 
 #include <cmath>
@@ -111,9 +112,63 @@ double parsePositiveDouble(std::string_view text, std::string_view label) {
     return value;
 }
 
+int hybridSweepCommand(int argc, char** argv) {
+    if (argc < 2 || std::string_view(argv[1]) != "deformable-transfer-hybrid") return -1;
+    if (argc < 3)
+        throw std::invalid_argument(
+            "usage: vulkax deformable-transfer-hybrid <output-dir> [physical-horizon] [dt]");
+
+    const double physicalHorizon =
+        argc >= 4 ? parsePositiveDouble(argv[3], "physical horizon") : 0.48;
+    const double dt = argc >= 5 ? parsePositiveDouble(argv[4], "timestep") : 5.0e-5;
+    constexpr double meaningfulPeakThreshold = 0.01;
+
+    auto dense = makeDenseWorld();
+    const auto result = research::runAffineFlipBlendSweep(
+        std::move(dense.cloud), dense.activeIndices, makeBody(), makeGrid(), physicsSettings(),
+        physicalHorizon, dt, {0.0, 0.25, 0.5, 0.75, 1.0}, meaningfulPeakThreshold);
+
+    const std::filesystem::path outputDirectory(argv[2]);
+    std::filesystem::create_directories(outputDirectory);
+    research::writeAffineFlipBlendSweepCsv(result, outputDirectory / "summary.csv");
+    research::writeAffineFlipBlendPeaksCsv(result, outputDirectory / "peaks.csv");
+
+    std::cout << std::setprecision(10)
+              << "Affine APIC-FLIP transfer sweep\n"
+              << "  physical_horizon: " << physicalHorizon << '\n'
+              << "  dt: " << dt << '\n'
+              << "  meaningful_peak_threshold_fraction: " << meaningfulPeakThreshold << '\n';
+    for (const auto& entry : result.entries) {
+        const auto& cycle = entry.cycle;
+        const auto& experiment = cycle.experiment;
+        std::cout << "  candidate: " << entry.label << '\n'
+                  << "    scheme: " << solvers::toString(entry.scheme) << '\n'
+                  << "    flip_blend: " << entry.flipBlend << '\n'
+                  << "    meaningful_cycles: " << cycle.completedMeaningfulCycles << '\n'
+                  << "    mean_cycle_period: " << cycle.meanMeaningfulCyclePeriod << '\n'
+                  << "    mean_total_energy_retention_per_cycle: "
+                  << cycle.meanMechanicalEnergyRetentionPerCycle << '\n'
+                  << "    mean_kinetic_retention_per_cycle: "
+                  << cycle.meanKineticAmplitudeRetentionPerCycle << '\n'
+                  << "    max_gaussian_displacement: " << experiment.maximumGaussianDisplacement << '\n'
+                  << "    max_mls_rms_residual: " << experiment.maximumMlsRmsResidual << '\n'
+                  << "    max_mls_residual: " << experiment.maximumMlsResidual << '\n'
+                  << "    min_J: " << experiment.minimumDeformationDeterminant << '\n'
+                  << "    max_J: " << experiment.maximumDeformationDeterminant << '\n'
+                  << "    particle_position_rms_to_apic: " << entry.particlePositionRmsToApic << '\n'
+                  << "    particle_velocity_rms_to_apic: " << entry.particleVelocityRmsToApic << '\n'
+                  << "    gaussian_position_rms_to_apic: " << entry.gaussianPositionRmsToApic << '\n';
+    }
+    std::cout << "  outputs: " << outputDirectory.string() << '\n';
+    return 0;
+}
+
 } // namespace
 
 int transferEnergyCycleCommand(int argc, char** argv) {
+    const int hybridResult = hybridSweepCommand(argc, argv);
+    if (hybridResult >= 0) return hybridResult;
+
     if (argc < 2 || std::string_view(argv[1]) != "deformable-transfer-cycle") return -1;
     if (argc < 3)
         throw std::invalid_argument(
