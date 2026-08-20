@@ -228,6 +228,8 @@ int problemCommand(int argc, char** argv) {
 int main(int argc, char** argv) {
     using namespace vulkax;
     try {
+        const int transferDiagnosticsResult = cli::transferDiagnosticsCommand(argc, argv);
+        if (transferDiagnosticsResult >= 0) return transferDiagnosticsResult;
         const int transferAblationResult = cli::transferAblationCommand(argc, argv);
         if (transferAblationResult >= 0) return transferAblationResult;
         const int backendCompareResult = cli::deformableBackendCompareCommand(argc, argv);
@@ -300,6 +302,7 @@ int main(int argc, char** argv) {
                   << "  vulkax deformable-backend-compare <output-dir> [stride]\n"
                   << "  vulkax deformable-timestep-sweep <output.csv>\n"
                   << "  vulkax deformable-transfer-ablation <output.csv>\n"
+                  << "  vulkax deformable-transfer-diagnostics <output-dir>\n"
                   << "  vulkax --probe-backends\n"
                   << "  vulkax --conformance Vulkan|Metal\n";
         return 0;
