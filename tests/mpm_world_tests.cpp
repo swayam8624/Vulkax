@@ -2,6 +2,7 @@
 #include "vulkax/solvers/mpm.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -9,13 +10,68 @@
 
 namespace {
 
-vulkax::math::Vec3 matVec(const vulkax::solvers::Matrix3& matrix,
+using Matrix3 = vulkax::solvers::Matrix3;
+
+vulkax::math::Vec3 matVec(const Matrix3& matrix,
                           vulkax::math::Vec3 vector) {
     return {
         matrix[0] * vector.x + matrix[1] * vector.y + matrix[2] * vector.z,
         matrix[3] * vector.x + matrix[4] * vector.y + matrix[5] * vector.z,
         matrix[6] * vector.x + matrix[7] * vector.y + matrix[8] * vector.z,
     };
+}
+
+Matrix3 transpose(const Matrix3& matrix) {
+    return {
+        matrix[0], matrix[3], matrix[6],
+        matrix[1], matrix[4], matrix[7],
+        matrix[2], matrix[5], matrix[8],
+    };
+}
+
+Matrix3 matMul(const Matrix3& lhs, const Matrix3& rhs) {
+    Matrix3 result{};
+    for (std::size_t row = 0; row < 3; ++row) {
+        for (std::size_t column = 0; column < 3; ++column) {
+            for (std::size_t inner = 0; inner < 3; ++inner) {
+                result[row * 3 + column] +=
+                    lhs[row * 3 + inner] * rhs[inner * 3 + column];
+            }
+        }
+    }
+    return result;
+}
+
+Matrix3 quaternionRotation(const std::array<double, 4>& quaternion) {
+    const double w = quaternion[0];
+    const double x = quaternion[1];
+    const double y = quaternion[2];
+    const double z = quaternion[3];
+    return {
+        1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w),
+        2.0 * (x * z + y * w),
+        2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z),
+        2.0 * (y * z - x * w),
+        2.0 * (x * z - y * w), 2.0 * (y * z + x * w),
+        1.0 - 2.0 * (x * x + y * y),
+    };
+}
+
+Matrix3 gaussianCovariance(const vulkax::gaussian::GaussianSplat& splat) {
+    const Matrix3 rotation = quaternionRotation(splat.rotation);
+    Matrix3 variance{};
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+        const double scale = std::exp(splat.logScale[axis]);
+        variance[axis * 3 + axis] = scale * scale;
+    }
+    return matMul(matMul(rotation, variance), transpose(rotation));
+}
+
+double maximumAbsoluteDifference(const Matrix3& lhs, const Matrix3& rhs) {
+    double maximum = 0.0;
+    for (std::size_t index = 0; index < lhs.size(); ++index)
+        maximum = std::max(maximum, std::abs(lhs[index] - rhs[index]));
+    return maximum;
 }
 
 std::vector<vulkax::solvers::MpmParticle> makeBlock() {
@@ -99,7 +155,7 @@ int main() {
         const math::Vec3 translationVelocity{0.10, -0.02, 0.03};
         const double dt = 0.02;
         const auto initialParticles = particles;
-        const auto initialScale = cloud.splats.front().linearScale();
+        const Matrix3 initialCovariance = gaussianCovariance(cloud.splats.front());
         for (auto& particle : particles) {
             particle.affineVelocity = affineVelocity;
             particle.velocity = translationVelocity + matVec(affineVelocity, particle.position);
@@ -124,10 +180,18 @@ int main() {
         const math::Vec3 expectedCenter = translationVelocity * dt;
         assert(math::length(cloud.splats.front().position - expectedCenter) < 1.0e-12);
 
-        const auto deformedScale = cloud.splats.front().linearScale();
-        assert(std::abs(deformedScale[0] - initialScale[0] * (1.0 + dt * 0.50)) < 1.0e-10);
-        assert(std::abs(deformedScale[1] - initialScale[1] * (1.0 - dt * 0.25)) < 1.0e-10);
-        assert(std::abs(deformedScale[2] - initialScale[2] * (1.0 + dt * 0.10)) < 1.0e-10);
+        // Gaussian scale-axis order is not a physical invariant: covariance
+        // eigendecomposition may permute principal axes while compensating in
+        // the stored quaternion. Compare the represented covariance instead.
+        const Matrix3 deformation{
+            1.0 + dt * 0.50, 0.0, 0.0,
+            0.0, 1.0 - dt * 0.25, 0.0,
+            0.0, 0.0, 1.0 + dt * 0.10,
+        };
+        const Matrix3 expectedCovariance =
+            matMul(matMul(deformation, initialCovariance), transpose(deformation));
+        const Matrix3 actualCovariance = gaussianCovariance(cloud.splats.front());
+        assert(maximumAbsoluteDifference(actualCovariance, expectedCovariance) < 1.0e-10);
     }
 
     {
