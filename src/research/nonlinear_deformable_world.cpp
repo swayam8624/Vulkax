@@ -17,10 +17,6 @@ using Matrix3 = solvers::Matrix3;
 using Vector4 = std::array<double, 4>;
 using Matrix4 = std::array<std::array<double, 4>, 4>;
 
-[[nodiscard]] constexpr std::size_t at(std::size_t row, std::size_t column) noexcept {
-    return row * 3U + column;
-}
-
 [[nodiscard]] math::Vec3 multiply(const Matrix3& matrix, math::Vec3 vector) noexcept {
     return {
         matrix[0] * vector.x + matrix[1] * vector.y + matrix[2] * vector.z,
