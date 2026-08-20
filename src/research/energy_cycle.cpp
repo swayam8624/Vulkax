@@ -31,6 +31,7 @@ namespace {
         case solvers::MpmTransferScheme::PIC: return "pic";
         case solvers::MpmTransferScheme::FLIP: return "flip";
         case solvers::MpmTransferScheme::APIC: return "apic";
+        case solvers::MpmTransferScheme::APIC_FLIP: return "apic_flip";
     }
     return "unknown";
 }
