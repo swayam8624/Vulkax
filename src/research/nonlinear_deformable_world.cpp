@@ -235,7 +235,8 @@ NonlinearDeformableWorldResult runNonlinearDeformableWorld(
         throw std::runtime_error("nonlinear deformable-world initial mechanical energy is invalid");
 
     for (std::size_t step = 1; step <= settings.steps; ++step) {
-        const auto mpm = solvers::stepMpm(particles, grid, settings.material, settings.dt, {});
+        const auto mpm = solvers::stepMpm(
+            particles, grid, settings.material, settings.dt, {}, settings.transferScheme);
         coupling::updateGaussianCloudFromMpm(binding, particles, activeCloud);
         for (std::size_t local = 0; local < activeGaussianIndices.size(); ++local)
             world.splats[activeGaussianIndices[local]] = activeCloud.splats[local];
