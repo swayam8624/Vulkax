@@ -89,14 +89,27 @@ void summarizeScheme(
     }
 
     if (scheme.meaningfulKineticPeakCount >= 2) {
-        if (scheme.firstMeaningfulPeakMechanicalEnergyFraction > 0.0)
+        scheme.completedMeaningfulCycles = scheme.meaningfulKineticPeakCount - 1;
+        const double cycleCount = static_cast<double>(scheme.completedMeaningfulCycles);
+        scheme.meanMeaningfulCyclePeriod =
+            (scheme.lastMeaningfulPeakTime - scheme.firstMeaningfulPeakTime) / cycleCount;
+
+        if (scheme.firstMeaningfulPeakMechanicalEnergyFraction > 0.0) {
             scheme.peakToPeakMechanicalEnergyRetention =
                 scheme.lastMeaningfulPeakMechanicalEnergyFraction /
                 scheme.firstMeaningfulPeakMechanicalEnergyFraction;
-        if (scheme.firstMeaningfulPeakKineticEnergyFraction > 0.0)
+            if (scheme.peakToPeakMechanicalEnergyRetention > 0.0)
+                scheme.meanMechanicalEnergyRetentionPerCycle = std::pow(
+                    scheme.peakToPeakMechanicalEnergyRetention, 1.0 / cycleCount);
+        }
+        if (scheme.firstMeaningfulPeakKineticEnergyFraction > 0.0) {
             scheme.peakToPeakKineticAmplitudeRetention =
                 scheme.lastMeaningfulPeakKineticEnergyFraction /
                 scheme.firstMeaningfulPeakKineticEnergyFraction;
+            if (scheme.peakToPeakKineticAmplitudeRetention > 0.0)
+                scheme.meanKineticAmplitudeRetentionPerCycle = std::pow(
+                    scheme.peakToPeakKineticAmplitudeRetention, 1.0 / cycleCount);
+        }
     }
 }
 
@@ -152,12 +165,12 @@ void writeTransferEnergyCycleSummaryCsv(
     if (!stream) throw std::runtime_error("failed to open energy-cycle summary CSV");
     stream << "scheme,dt,physical_horizon,steps,initial_energy,final_energy_fraction,"
               "min_energy_fraction,max_energy_fraction,peak_kinetic_fraction,all_kinetic_peak_count,"
-              "meaningful_kinetic_peak_count,first_peak_time,last_peak_time,"
-              "first_peak_total_energy_fraction,last_peak_total_energy_fraction,"
-              "peak_to_peak_total_energy_retention,first_peak_kinetic_fraction,"
-              "last_peak_kinetic_fraction,peak_to_peak_kinetic_retention,"
-              "max_gaussian_displacement,max_mls_rms_residual,max_mls_residual,min_J,max_J,"
-              "max_unaffected_region_drift\n";
+              "meaningful_kinetic_peak_count,completed_meaningful_cycles,first_peak_time,last_peak_time,"
+              "mean_cycle_period,first_peak_total_energy_fraction,last_peak_total_energy_fraction,"
+              "peak_to_peak_total_energy_retention,mean_total_energy_retention_per_cycle,"
+              "first_peak_kinetic_fraction,last_peak_kinetic_fraction,peak_to_peak_kinetic_retention,"
+              "mean_kinetic_retention_per_cycle,max_gaussian_displacement,max_mls_rms_residual,"
+              "max_mls_residual,min_J,max_J,max_unaffected_region_drift\n";
     stream << std::setprecision(17);
     for (const auto& scheme : result.schemes) {
         const auto& experiment = scheme.experiment;
@@ -166,14 +179,17 @@ void writeTransferEnergyCycleSummaryCsv(
                << experiment.initialMechanicalEnergy << ',' << scheme.finalMechanicalEnergyFraction << ','
                << scheme.minimumMechanicalEnergyFraction << ',' << scheme.maximumMechanicalEnergyFraction << ','
                << scheme.peakKineticEnergyFraction << ',' << scheme.kineticPeaks.size() << ','
-               << scheme.meaningfulKineticPeakCount << ','
+               << scheme.meaningfulKineticPeakCount << ',' << scheme.completedMeaningfulCycles << ','
                << scheme.firstMeaningfulPeakTime << ',' << scheme.lastMeaningfulPeakTime << ','
+               << scheme.meanMeaningfulCyclePeriod << ','
                << scheme.firstMeaningfulPeakMechanicalEnergyFraction << ','
                << scheme.lastMeaningfulPeakMechanicalEnergyFraction << ','
                << scheme.peakToPeakMechanicalEnergyRetention << ','
+               << scheme.meanMechanicalEnergyRetentionPerCycle << ','
                << scheme.firstMeaningfulPeakKineticEnergyFraction << ','
                << scheme.lastMeaningfulPeakKineticEnergyFraction << ','
                << scheme.peakToPeakKineticAmplitudeRetention << ','
+               << scheme.meanKineticAmplitudeRetentionPerCycle << ','
                << experiment.maximumGaussianDisplacement << ','
                << experiment.maximumMlsRmsResidual << ',' << experiment.maximumMlsResidual << ','
                << experiment.minimumDeformationDeterminant << ',' << experiment.maximumDeformationDeterminant << ','
