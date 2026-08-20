@@ -284,6 +284,7 @@ int main(int argc, char** argv) {
                   << "  vulkax gaussian-info <point_cloud.ply>\n"
                   << "  vulkax gaussian-render <point_cloud.ply> <output.ppm> [Vulkan|Metal]\n"
                   << "  vulkax deformable-reference <output.csv>\n"
+                  << "  vulkax deformable-nonlinear <output.csv>\n"
                   << "  vulkax --probe-backends\n"
                   << "  vulkax --conformance Vulkan|Metal\n";
         return 0;
