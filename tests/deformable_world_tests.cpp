@@ -4,6 +4,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <string>
 #include <vector>
 
 namespace {
@@ -48,7 +51,6 @@ vulkax::gaussian::GaussianCloud makeWorld() {
     vulkax::gaussian::GaussianCloud world;
     world.splats.push_back(makeSplat({0.0, 0.0, 0.0}, 0.12, 0.055, 0.08));
     world.splats.push_back(makeSplat({0.055, -0.035, 0.025}, 0.07, 0.045, 0.035));
-    // Locality control: deliberately outside the coupled MPM region.
     world.splats.push_back(makeSplat({0.72, 0.48, -0.22}, 0.09, 0.06, 0.04));
     return world;
 }
@@ -97,8 +99,6 @@ int main() {
     assert(result.maximumGaussianCovarianceError < 1.0e-9);
     assert(result.maximumForceTransferError < 1.0e-10);
     assert(result.maximumTorqueTransferError < 1.0e-10);
-
-    // The locality-control Gaussian must never be touched by the coupled region.
     assert(result.maximumUnaffectedRegionDrift == 0.0);
     assert(math::length(result.finalWorld.splats[2].position - initialWorld.splats[2].position) == 0.0);
 
@@ -116,6 +116,22 @@ int main() {
         assert(frame.maximumDeformationDeterminant > 0.0);
         assert(frame.unaffectedRegionDrift == 0.0);
     }
+
+    const auto csvPath = std::filesystem::temp_directory_path() / "vulkax-deformable-world-evidence.csv";
+    research::writeDeformableWorldEvidenceCsv(result, csvPath);
+    assert(std::filesystem::exists(csvPath));
+    assert(std::filesystem::file_size(csvPath) > 256U);
+
+    std::ifstream csv(csvPath);
+    assert(csv.good());
+    std::string line;
+    std::getline(csv, line);
+    assert(line.find("step,time,mass_error,momentum_error") == 0U);
+    std::size_t dataRows = 0;
+    while (std::getline(csv, line))
+        if (!line.empty()) ++dataRows;
+    assert(dataRows == settings.steps);
+    std::filesystem::remove(csvPath);
 
     return 0;
 }
