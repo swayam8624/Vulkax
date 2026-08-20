@@ -88,9 +88,23 @@ int main() {
     settings.material = {1000.0, 1.5e4, 0.30};
     settings.couplingNeighborCount = 20;
 
-    const auto result = research::runNonlinearDeformableWorld(
-        initialWorld, {0, 1, 2, 3}, makeBody(), makeGrid(), settings);
+    std::size_t observerCalls = 0;
+    std::size_t lastObservedStep = 0;
+    const auto observer = [&](const research::NonlinearDeformableWorldFrameEvidence& frame,
+                              const gaussian::GaussianCloud& world) {
+        ++observerCalls;
+        lastObservedStep = frame.step;
+        assert(world.size() == initialWorld.size());
+        assert(frame.step == observerCalls);
+        assert(std::isfinite(world.splats.front().position.x));
+        assert(frame.unaffectedRegionDrift == 0.0);
+    };
 
+    const auto result = research::runNonlinearDeformableWorld(
+        initialWorld, {0, 1, 2, 3}, makeBody(), makeGrid(), settings, observer);
+
+    assert(observerCalls == settings.steps);
+    assert(lastObservedStep == settings.steps);
     assert(result.frames.size() == settings.steps);
     assert(result.finalParticles.size() == 64);
     assert(result.finalWorld.size() == initialWorld.size());
