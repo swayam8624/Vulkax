@@ -4,6 +4,7 @@
 #include "vulkax/solvers/mpm.hpp"
 
 #include <cstddef>
+#include <filesystem>
 #include <vector>
 
 namespace vulkax::research {
@@ -66,5 +67,11 @@ struct DeformableWorldExperimentResult {
     std::vector<solvers::MpmParticle> particles,
     const solvers::MpmGridSettings& grid,
     const AffineDeformableWorldSettings& settings = {});
+
+// Writes one row per experiment frame using stable column names intended for
+// plotting, regression dashboards, and paper-artifact analysis.
+void writeDeformableWorldEvidenceCsv(
+    const DeformableWorldExperimentResult& result,
+    const std::filesystem::path& path);
 
 } // namespace vulkax::research
