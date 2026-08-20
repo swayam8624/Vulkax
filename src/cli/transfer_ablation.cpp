@@ -1,10 +1,12 @@
 #include "vulkax/cli/transfer_ablation.hpp"
 
 #include "vulkax/research/transfer_ablation.hpp"
+#include "vulkax/research/transfer_diagnostics.hpp"
 
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
@@ -136,6 +138,49 @@ int transferAblationCommand(int argc, char** argv) {
                   << entry.timestepSweep.observedGaussianPositionOrder << '\n';
     }
     std::cout << "  csv: " << argv[2] << '\n';
+    return 0;
+}
+
+int transferDiagnosticsCommand(int argc, char** argv) {
+    if (argc < 2 || std::string_view(argv[1]) != "deformable-transfer-diagnostics") return -1;
+    if (argc < 3)
+        throw std::invalid_argument("usage: vulkax deformable-transfer-diagnostics <output-dir>");
+
+    const std::filesystem::path outputDirectory(argv[2]);
+    std::filesystem::create_directories(outputDirectory);
+    auto dense = makeDenseWorld();
+    constexpr double physicalHorizon = 0.048;
+    const auto result = research::runMpmTransferDiagnostics(
+        std::move(dense.cloud), dense.activeIndices, makeBody(), makeGrid(), physicsSettings(),
+        physicalHorizon, {2.0e-4, 1.0e-4, 5.0e-5, 2.5e-5});
+    research::writeMpmTransferAblationCsv(result.ablation, outputDirectory / "ablation.csv");
+    research::writeMpmTransferDiagnosticsSummaryCsv(result, outputDirectory / "scheme_summary.csv");
+    research::writeMpmTransferDiagnosticsPairCsv(result, outputDirectory / "scheme_pairs.csv");
+
+    std::cout << std::setprecision(10)
+              << "MPM transfer diagnostics\n"
+              << "  physical_horizon: " << physicalHorizon << '\n';
+    for (const auto& scheme : result.schemes) {
+        std::cout << "  scheme: " << solvers::toString(scheme.scheme) << '\n'
+                  << "    finest_dt: " << scheme.finestDt << '\n'
+                  << "    finest_energy_drift: " << scheme.finestRelativeEnergyDrift << '\n'
+                  << "    peak_kinetic_fraction: " << scheme.peakKineticEnergyFraction << '\n'
+                  << "    final_kinetic_fraction: " << scheme.finalKineticEnergyFraction << '\n'
+                  << "    final_elastic_fraction: " << scheme.finalElasticEnergyFraction << '\n'
+                  << "    max_gaussian_displacement: " << scheme.finestGaussianDisplacement << '\n'
+                  << "    coarse_energy_floor: "
+                  << (scheme.coarseFloor.valid ? scheme.coarseFloor.asymptoticRelativeEnergyDrift : 0.0) << '\n'
+                  << "    fine_energy_floor: "
+                  << (scheme.fineFloor.valid ? scheme.fineFloor.asymptoticRelativeEnergyDrift : 0.0) << '\n'
+                  << "    floor_estimate_difference: " << scheme.floorEstimateDifference << '\n';
+    }
+    std::cout << "  finest scheme-pair RMS differences:\n";
+    for (const auto& pair : result.finestPairDifferences)
+        std::cout << "    " << solvers::toString(pair.first) << " vs " << solvers::toString(pair.second)
+                  << " | particle_pos=" << pair.particlePositionRms
+                  << " | particle_vel=" << pair.particleVelocityRms
+                  << " | gaussian_pos=" << pair.gaussianPositionRms << '\n';
+    std::cout << "  outputs: " << outputDirectory.string() << '\n';
     return 0;
 }
 
