@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -132,8 +134,6 @@ DeformableWorldExperimentResult runAffineDeformableWorldReference(
     result.frames.reserve(settings.steps);
 
     for (std::size_t step = 1; step <= settings.steps; ++step) {
-        // Reimpose the controlled affine field each frame. This makes the experiment
-        // a transfer/coupling oracle rather than a constitutive-material benchmark.
         for (auto& particle : particles) {
             particle.affineVelocity = settings.velocityGradient;
             particle.velocity = settings.translationVelocity +
@@ -198,7 +198,6 @@ DeformableWorldExperimentResult runAffineDeformableWorldReference(
         frame.unaffectedRegionDrift = std::max(
             frame.unaffectedPositionDrift, frame.unaffectedCovarianceDrift);
 
-        // Probe the reverse coupling without perturbing the controlled trajectory.
         const auto probe = coupling::applyGaussianForceToMpm(
             binding, 0, settings.interactionProbeForce, activeCloud, particles);
         frame.forceTransferError = probe.forceConservationError;
@@ -221,6 +220,37 @@ DeformableWorldExperimentResult runAffineDeformableWorldReference(
     result.finalWorld = std::move(world);
     result.finalParticles = std::move(particles);
     return result;
+}
+
+void writeDeformableWorldEvidenceCsv(
+    const DeformableWorldExperimentResult& result,
+    const std::filesystem::path& path) {
+    std::ofstream stream(path);
+    if (!stream) throw std::runtime_error("failed to open deformable-world CSV output");
+    stream << "step,time,mass_error,momentum_error,force_balance_error,momentum_balance_error,"
+              "min_J,max_J,expected_J,J_error,gaussian_position_error,gaussian_covariance_error,"
+              "force_transfer_error,torque_transfer_error,unaffected_position_drift,"
+              "unaffected_covariance_drift,unaffected_region_drift\n";
+    stream << std::setprecision(17);
+    for (const auto& frame : result.frames) {
+        stream << frame.step << ',' << frame.time << ','
+               << frame.massConservationError << ','
+               << frame.momentumConservationError << ','
+               << frame.forceBalanceError << ','
+               << frame.momentumBalanceError << ','
+               << frame.minimumDeformationDeterminant << ','
+               << frame.maximumDeformationDeterminant << ','
+               << frame.expectedDeformationDeterminant << ','
+               << frame.deformationDeterminantError << ','
+               << frame.maximumGaussianPositionError << ','
+               << frame.maximumGaussianCovarianceError << ','
+               << frame.forceTransferError << ','
+               << frame.torqueTransferError << ','
+               << frame.unaffectedPositionDrift << ','
+               << frame.unaffectedCovarianceDrift << ','
+               << frame.unaffectedRegionDrift << '\n';
+    }
+    if (!stream) throw std::runtime_error("failed while writing deformable-world CSV output");
 }
 
 } // namespace vulkax::research
