@@ -17,6 +17,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace vulkax::cli {
@@ -52,7 +53,7 @@ std::vector<solvers::MpmParticle> makeBody() {
     return particles;
 }
 
-gausian::GaussianSplat makeSplat(math::Vec3 position, double scale, double tint) {
+gaussian::GaussianSplat makeSplat(math::Vec3 position, double scale, double tint) {
     gaussian::GaussianSplat splat;
     splat.position = position;
     splat.logScale = {std::log(scale), std::log(scale * 0.82), std::log(scale * 0.66)};
