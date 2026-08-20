@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 
 namespace vulkax::research {
 namespace {
