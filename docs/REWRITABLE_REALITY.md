@@ -24,12 +24,12 @@ Appearance world   <->   Semantic world   <->   Physical world
 ```
 
 The coupling object is the **World Correspondence Graph (WCG)**. It records which appearance primitives
-belong to semantic entities and which physical degrees of freedom represent those entities. State transfer
-algorithms will be evaluated independently of the renderer and solver.
+belong to semantic entities and which physical degrees of freedom represent those entities. State-transfer
+algorithms are evaluated independently of renderer and solver.
 
 ## Rewriting, not merely editing
 
-An edit changes appearance. A rewrite changes the executable world state. Examples include geometry,
+An edit changes appearance. A rewrite changes executable world state. Examples include geometry,
 material parameters, physical constraints, topology, lighting, observations and solver-relevant metadata.
 Each rewrite is a transaction with provenance and an explicit affected support.
 
@@ -57,7 +57,10 @@ changes outside the requested region.
 ### H3 — Bidirectional state transfer
 
 Appearance-to-physics interaction and physics-to-appearance deformation can be implemented with bounded
-transfer error. Later work must test conservation of momentum/energy where those quantities are meaningful.
+transfer error and explicit conservation evidence. The current affine MLS reference implementation enforces
+partition of unity and affine reproduction, transports Gaussian covariance through the fitted deformation,
+and tests force and torque conservation for point interactions. These are implementation invariants, not yet
+a cross-scene research result.
 
 ### H4 — Real-to-verified-sim identification
 
@@ -78,6 +81,7 @@ No paper or project page should report only PSNR or screenshots. Depending on th
 - displacement, velocity, force and stress error for mechanics;
 - conservation residuals where applicable;
 - correspondence/state-transfer error;
+- covariance/deformation-transfer error;
 - unaffected-region drift;
 - edit latency and recompile/re-solve cost;
 - inverse-parameter error and confidence/identifiability;
@@ -85,9 +89,9 @@ No paper or project page should report only PSNR or screenshots. Depending on th
 - runtime, memory and scaling with Gaussian count / physical DOF;
 - failure cases and the operating region where approximations remain valid.
 
-## Current implementation boundary — Vulkax 0.18
+## Current implementation boundary — Vulkax 0.20 development head
 
-The first research slice provides:
+### Captured-world representation
 
 - renderer-independent `GaussianCloud`;
 - ASCII and binary-little-endian 3DGS PLY ingestion;
@@ -95,22 +99,63 @@ The first research slice provides:
 - `WorldCorrespondenceGraph` linking Gaussians, entities and generic physical handles;
 - transactional rigid translations and material-parameter rewrites;
 - rollback receipts;
-- explicit unaffected-region drift measurement;
-- tests for Gaussian ingestion, correspondence integrity and local rewrite invariance.
+- explicit unaffected-region drift measurement.
 
-This does **not** yet claim Gaussian rendering, MPM coupling, topology editing, learned semantics, inverse material
-identification from video, XR interaction or publishable novelty.
+### Reference Gaussian rendering
 
-## Immediate next research milestones
+- projection of full 3D Gaussian covariance to oriented screen-space covariance;
+- real anisotropic ellipse raster support rather than point sprites;
+- spherical-harmonic evaluation through degree 3 when coefficients are available;
+- back-to-front alpha compositing;
+- native Vulkan and Metal raster/compositing paths;
+- CPU projection/covariance/SH/depth-order reference path retained as an oracle;
+- tracked synthetic PLY scene, CLI renderer and regression tests.
 
-1. Native Vulkan Gaussian renderer with Metal parity on Apple.
-2. Hierarchical Gaussian IDs and entity selections suitable for million-splat scenes.
-3. Surface/MPM embedding and measurable bidirectional transfer operators.
-4. Captured deformable-object benchmark with known loading and held-out observations.
-5. Material-parameter identification through differentiable simulation + Gaussian observation loss.
-6. Local material/geometry rewrites with drift, transfer and physical-error measurements.
-7. Operator Influence visualization on the same captured object.
-8. XR only after the above mechanisms are quantitatively trustworthy.
+The reference renderer is an implementation milestone, not yet a performance contribution. GPU projection,
+tile binning, sorting and large-scene benchmarks remain future work.
+
+### Reference appearance/physics coupling
+
+- affine-reproducing MLS support from Gaussian centers to independent physical points;
+- partition-of-unity and affine-reproduction error measurements;
+- non-accumulating center transfer from a captured/rest state;
+- local weighted affine deformation fit;
+- full Gaussian covariance transport `Sigma' = F Sigma F^T`;
+- eigendecomposition back to Gaussian rotation/log-scale parameters;
+- Gaussian-point force transfer back to physical DOFs;
+- explicit net-force and net-torque conservation evidence;
+- tests using a general affine transform with rotation/stretch/shear.
+
+### Integrity controls
+
+Release tests keep assertions enabled. Doing so exposed previously hidden adaptivity and voxelization failures;
+both were fixed rather than suppressing their checks. CI builds Linux/macOS/Windows and explicitly smoke-tests
+the tracked Gaussian scene through Vulkan on Linux and Metal on macOS.
+
+## Non-claims
+
+Vulkax does **not** yet claim:
+
+- production-scale or state-of-the-art Gaussian rendering performance;
+- MPM/FEM simulation of a captured real object;
+- topology rewriting;
+- automatic semantic reconstruction;
+- inverse material identification from real video;
+- XR interaction;
+- superiority over PhysGaussian, VR-GS, GS-Verse, Real2Sim or other related methods;
+- publishable novelty from integration alone.
+
+## Immediate research milestones
+
+1. Validate the current native renderer and covariance-coupling head on CI and Apple M2 Pro.
+2. Move projection, tile binning and depth ordering to GPU while retaining the CPU oracle.
+3. Add hierarchical Gaussian IDs and entity selection suitable for million-splat scenes.
+4. Build an independent MPM/FEM representation for a captured deformable-object benchmark.
+5. Measure bidirectional transfer error, conservation, unaffected drift, runtime and memory across resolution changes.
+6. Add observation loss and identify material parameters from captured loading data; validate on held-out observations.
+7. Add local material/geometry rewrites and quantify physical and visual side effects.
+8. Apply Operator Influence Fields to the same captured object and validate predictions by full counterfactual reruns.
+9. Add XR only after the above mechanisms are quantitatively trustworthy.
 
 ## Research discipline
 
