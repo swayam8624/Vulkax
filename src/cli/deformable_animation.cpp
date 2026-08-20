@@ -189,7 +189,7 @@ int deformableAnimationCommand(int argc, char** argv) {
         if (frame.step % stride != 0 && frame.step != physics.steps) return;
         const auto rendered = render::renderGaussianCloudHeadless(selectedBackend, world, settings);
         const std::string filename = frameName(frame.step);
-        render::writePpm(rendered.image, framesDirectory / filename);
+        render::writePpm(rendered.image, (framesDirectory / filename).string());
         totalVisibleSplats += rendered.stats.visibleSplats;
         manifest << renderedFrames << ',' << frame.step << ',' << frame.time << ',' << filename << ','
                  << frame.relativeMechanicalEnergyDrift << ',' << frame.maximumMlsRmsResidual << ','
