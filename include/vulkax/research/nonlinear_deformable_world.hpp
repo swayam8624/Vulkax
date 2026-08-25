@@ -19,6 +19,7 @@ struct NonlinearDeformableWorldSettings {
         0.01, 0.97, 0.02,
         0.00, 0.01, 1.02,
     };
+    math::Vec3 initialTranslation{};
     std::size_t couplingNeighborCount{20};
     solvers::MpmTransferScheme transferScheme{solvers::MpmTransferScheme::APIC};
     double flipBlend{0.0};
@@ -71,20 +72,30 @@ using NonlinearDeformableWorldObserver = std::function<void(
     const NonlinearDeformableWorldFrameEvidence& frame,
     const gaussian::GaussianCloud& world)>;
 
+// Optional scientific-state observer. This leaves the renderer-facing observer
+// unchanged while allowing validation/inverse problems to compare tracked real
+// measurements against the physical MPM state at exactly the same solver step.
+using NonlinearDeformableWorldStateObserver = std::function<void(
+    const NonlinearDeformableWorldFrameEvidence& frame,
+    const gaussian::GaussianCloud& world,
+    const std::vector<solvers::MpmParticle>& particles)>;
+
 // Free nonlinear elastic relaxation. Particles are initialized in a finite
-// deformation and then evolved only by compressible Neo-Hookean internal
-// forces. There is no gravity, no external force and no boundary contact.
-// This makes momentum, center-of-mass and locality errors meaningful while
-// energy drift exposes transfer and time-integration behavior. APIC remains
-// the default; PIC, FLIP and APIC_FLIP are available for controlled transfer
-// experiments. flipBlend is used only by APIC_FLIP.
+// deformation plus an optional rigid translation and then evolved only by
+// compressible Neo-Hookean internal forces. There is no gravity, no external
+// force and no boundary contact. This makes momentum, center-of-mass and
+// locality errors meaningful while energy drift exposes transfer and
+// time-integration behavior. APIC remains the default; PIC, FLIP and APIC_FLIP
+// are available for controlled transfer experiments. flipBlend is used only by
+// APIC_FLIP.
 [[nodiscard]] NonlinearDeformableWorldResult runNonlinearDeformableWorld(
     gaussian::GaussianCloud world,
     const std::vector<std::size_t>& activeGaussianIndices,
     std::vector<solvers::MpmParticle> particles,
     const solvers::MpmGridSettings& grid,
     const NonlinearDeformableWorldSettings& settings = {},
-    const NonlinearDeformableWorldObserver& observer = {});
+    const NonlinearDeformableWorldObserver& observer = {},
+    const NonlinearDeformableWorldStateObserver& stateObserver = {});
 
 void writeNonlinearDeformableWorldEvidenceCsv(
     const NonlinearDeformableWorldResult& result,
