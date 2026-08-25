@@ -1,5 +1,6 @@
 #include "vulkax/research/captured_operator_influence.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
