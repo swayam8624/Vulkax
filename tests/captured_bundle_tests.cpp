@@ -1,6 +1,7 @@
 #include "vulkax/capture/deformable_bundle.hpp"
 #include "vulkax/core/sha256.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <filesystem>
@@ -153,6 +154,32 @@ int main() {
     assert(bundle.dataset.observations.size() == 8U);
     assert(bundle.uncertainty.size() == 8U);
     assert(bundle.manifest.sourceKind == capture::CapturedSourceKind::Synthetic);
+    capture::validateCapturedObservationTrajectoryContract(bundle.dataset);
+
+    {
+        auto incompleteTrajectory = bundle.dataset;
+        incompleteTrajectory.observations.erase(
+            std::remove_if(
+                incompleteTrajectory.observations.begin(),
+                incompleteTrajectory.observations.end(),
+                [](const auto& observation) {
+                    return observation.markerId == "m3" && observation.time > 0.0;
+                }),
+            incompleteTrajectory.observations.end());
+        expectThrow([&] {
+            capture::validateCapturedObservationTrajectoryContract(incompleteTrajectory);
+        });
+    }
+
+    {
+        auto inconsistentSplit = bundle.dataset;
+        inconsistentSplit.observations.push_back({
+            "m0", 1U, 0.2, {0.02, 0.0, 0.0}, capture::ObservationSplit::Validation,
+        });
+        expectThrow([&] {
+            capture::validateCapturedObservationTrajectoryContract(inconsistentSplit);
+        });
+    }
 
     {
         std::ofstream stream(observationsPath, std::ios::app);
