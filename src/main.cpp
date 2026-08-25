@@ -1,5 +1,6 @@
 #include "vulkax/backend/backend.hpp"
 #include "vulkax/backend/probe.hpp"
+#include "vulkax/cli/captured_deformable.hpp"
 #include "vulkax/cli/deformable_animation.hpp"
 #include "vulkax/cli/deformable_reference.hpp"
 #include "vulkax/cli/energy_cycle.hpp"
@@ -229,6 +230,8 @@ int problemCommand(int argc, char** argv) {
 int main(int argc, char** argv) {
     using namespace vulkax;
     try {
+        const int capturedResult = cli::capturedDeformableCommand(argc, argv);
+        if (capturedResult >= 0) return capturedResult;
         const int transferCycleResult = cli::transferEnergyCycleCommand(argc, argv);
         if (transferCycleResult >= 0) return transferCycleResult;
         const int transferDiagnosticsResult = cli::transferDiagnosticsCommand(argc, argv);
@@ -299,6 +302,7 @@ int main(int argc, char** argv) {
                   << "  vulkax plan <problem.vkx>\n"
                   << "  vulkax gaussian-info <point_cloud.ply>\n"
                   << "  vulkax gaussian-render <point_cloud.ply> <output.ppm> [Vulkan|Metal]\n"
+                  << "  vulkax captured-deformable-evaluate <object.ply> <particles.csv> <observations.csv> <output-dir> [dt] [young-modulus] [poisson-ratio] [cell-size]\n"
                   << "  vulkax deformable-reference <output.csv>\n"
                   << "  vulkax deformable-nonlinear <output.csv>\n"
                   << "  vulkax deformable-nonlinear-render <output-dir> [Metal|Vulkan] [stride]\n"
@@ -306,7 +310,8 @@ int main(int argc, char** argv) {
                   << "  vulkax deformable-timestep-sweep <output.csv>\n"
                   << "  vulkax deformable-transfer-ablation <output.csv>\n"
                   << "  vulkax deformable-transfer-diagnostics <output-dir>\n"
-                  << "  vulkax deformable-transfer-cycle <output-dir>\n"
+                  << "  vulkax deformable-transfer-cycle <output-dir> [physical-horizon] [dt]\n"
+                  << "  vulkax deformable-transfer-hybrid <output-dir> [physical-horizon] [dt]\n"
                   << "  vulkax --probe-backends\n"
                   << "  vulkax --conformance Vulkan|Metal\n";
         return 0;
