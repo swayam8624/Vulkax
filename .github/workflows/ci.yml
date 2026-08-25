@@ -25,6 +25,19 @@ jobs:
         run: cmake --build build --parallel 2
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: Captured deformable calibration end to end
+        run: |
+          ./build/vulkax captured-deformable-generate-example build/captured-example
+          ./build/vulkax captured-material-calibrate \
+            build/captured-example/object.ply \
+            build/captured-example/particles.csv \
+            build/captured-example/observations.csv \
+            build/captured-calibration \
+            1e-4 0.08
+          test -s build/captured-calibration/material_grid.csv
+          test -s build/captured-calibration/selected_summary.csv
+          awk -F, '$1 == 15000 && $2 > 0.299999 && $2 < 0.300001 && $12 == 1 { found = 1 } END { exit !found }' \
+            build/captured-calibration/material_grid.csv
       - name: Validate example problems
         run: |
           ./build/vulkax validate examples/rotating_mill.vkx
