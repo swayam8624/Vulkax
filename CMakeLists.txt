@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Vulkax VERSION 0.35.0 LANGUAGES CXX)
+project(Vulkax VERSION 0.36.0 LANGUAGES CXX)
 option(VULKAX_BUILD_TESTS "Build Vulkax tests" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
