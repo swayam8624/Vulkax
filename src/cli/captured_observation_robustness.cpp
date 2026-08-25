@@ -132,6 +132,8 @@ namespace {
     double initialNoise,
     double dynamicNoise,
     std::uint64_t baseSeed) {
+    if (baseSeed > std::numeric_limits<std::uint64_t>::max() - 5U)
+        throw std::invalid_argument("seed leaves no room for derived robustness scenario seeds");
     return {
         {"pose_half", 0.5 * initialNoise, 0.0, baseSeed + 1U},
         {"pose_full", initialNoise, 0.0, baseSeed + 2U},
