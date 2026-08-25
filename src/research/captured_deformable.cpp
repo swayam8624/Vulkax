@@ -239,7 +239,8 @@ CapturedFreeRelaxationResult runCapturedFreeRelaxationBenchmark(
     const std::vector<std::size_t>& activeGaussianIndices,
     const capture::CapturedDeformableDataset& dataset,
     const solvers::MpmGridSettings& grid,
-    NonlinearDeformableWorldSettings settings) {
+    NonlinearDeformableWorldSettings settings,
+    const std::unordered_map<std::uint64_t, double>& particleYoungModulusScales) {
     if (world.empty()) throw std::invalid_argument("captured benchmark Gaussian world is empty");
     if (dataset.particles.size() < 4U || dataset.observations.empty())
         throw std::invalid_argument("captured benchmark dataset is incomplete");
@@ -247,6 +248,13 @@ CapturedFreeRelaxationResult runCapturedFreeRelaxationBenchmark(
         throw std::invalid_argument("captured benchmark timestep must be positive");
 
     const auto particleIndices = particleIndexById(dataset.particles);
+    for (const auto& [particleId, scale] : particleYoungModulusScales) {
+        if (!particleIndices.contains(particleId))
+            throw std::invalid_argument("captured material scale references an unknown particle_id");
+        if (!std::isfinite(scale) || scale < 0.0)
+            throw std::invalid_argument("captured particle Young's modulus scale must be finite and non-negative");
+    }
+
     std::unordered_map<std::string, std::uint64_t> markerBindings;
     std::size_t maximumStep = 0;
     std::vector<std::size_t> observationSteps(dataset.observations.size(), 0);
@@ -326,8 +334,12 @@ CapturedFreeRelaxationResult runCapturedFreeRelaxationBenchmark(
         }
     };
 
+    auto mpmParticles = capture::makeMpmParticles(dataset.particles);
+    for (const auto& [particleId, scale] : particleYoungModulusScales)
+        mpmParticles.at(particleIndices.at(particleId)).youngModulusScale = scale;
+
     result.simulation = runNonlinearDeformableWorld(
-        std::move(world), activeGaussianIndices, capture::makeMpmParticles(dataset.particles),
+        std::move(world), activeGaussianIndices, std::move(mpmParticles),
         grid, settings, {}, physicalStateObserver);
     if (result.samples.size() != dataset.observations.size())
         throw std::runtime_error("captured replay did not evaluate every observation");

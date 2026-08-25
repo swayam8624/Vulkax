@@ -197,9 +197,13 @@ MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles,
     for (const auto& particle : particles) {
         if (!std::isfinite(particle.mass) || particle.mass <= 0.0 || !std::isfinite(particle.restVolume) || particle.restVolume <= 0.0)
             throw std::invalid_argument("MPM particle mass and rest volume must be positive");
+        if (!std::isfinite(particle.youngModulusScale) || particle.youngModulusScale < 0.0)
+            throw std::invalid_argument("MPM particle Young's modulus scale must be finite and non-negative");
         evidence.appliedExternalForce += particle.externalForce;
         const ParticleStencil stencil = stencilFor(particle, settings);
-        const Matrix3 firstPiola = firstPiolaNeoHookean(particle.deformationGradient, material);
+        MpmMaterial localMaterial = material;
+        localMaterial.youngModulus *= particle.youngModulusScale;
+        const Matrix3 firstPiola = firstPiolaNeoHookean(particle.deformationGradient, localMaterial);
         const Matrix3 kirchhoff = multiply(firstPiola, transpose(particle.deformationGradient));
         visitStencil(particle, settings, stencil,
             [&](std::size_t x, std::size_t y, std::size_t z, double weight, math::Vec3 gradient, math::Vec3 nodeOffset) {

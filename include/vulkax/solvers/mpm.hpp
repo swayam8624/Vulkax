@@ -51,6 +51,10 @@ struct MpmParticle {
     Matrix3 deformationGradient{identityMatrix3()};
     Matrix3 affineVelocity{};
     math::Vec3 externalForce{};
+    // Multiplies the global material Young's modulus for this particle's
+    // constitutive contribution. Kept last so existing aggregate initialization
+    // of the historical particle state remains source-compatible.
+    double youngModulusScale{1.0};
 };
 
 struct MpmGridSettings {

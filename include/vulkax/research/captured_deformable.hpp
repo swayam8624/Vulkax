@@ -4,8 +4,10 @@
 #include "vulkax/research/nonlinear_deformable_world.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace vulkax::research {
@@ -46,12 +48,18 @@ struct CapturedFreeRelaxationResult {
 // active Gaussian object is inverse-warped into rest space with MLS before the
 // simulation, and appearanceRoundtrip* measures whether rest->captured mapping
 // reconstructs the supplied t=0 Gaussian centers.
+//
+// particleYoungModulusScales optionally multiplies the global Young's modulus
+// for selected stable particle IDs. Omitting the map preserves the homogeneous
+// material path exactly. This explicit coefficient field is used by nonlinear
+// local material / Operator Influence counterfactuals.
 [[nodiscard]] CapturedFreeRelaxationResult runCapturedFreeRelaxationBenchmark(
     gaussian::GaussianCloud world,
     const std::vector<std::size_t>& activeGaussianIndices,
     const capture::CapturedDeformableDataset& dataset,
     const solvers::MpmGridSettings& grid,
-    NonlinearDeformableWorldSettings settings);
+    NonlinearDeformableWorldSettings settings,
+    const std::unordered_map<std::uint64_t, double>& particleYoungModulusScales = {});
 
 void writeCapturedReplaySamplesCsv(
     const CapturedFreeRelaxationResult& result,
