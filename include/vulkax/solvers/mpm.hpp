@@ -48,6 +48,11 @@ struct MpmParticle {
     math::Vec3 velocity{};
     double mass{1.0};
     double restVolume{1.0};
+    // Multiplies the global material Young's modulus for this particle's
+    // constitutive contribution. The default preserves the homogeneous solver;
+    // local deviations provide an explicit coefficient field for material
+    // counterfactuals and Operator Influence experiments.
+    double youngModulusScale{1.0};
     Matrix3 deformationGradient{identityMatrix3()};
     Matrix3 affineVelocity{};
     math::Vec3 externalForce{};
