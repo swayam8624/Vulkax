@@ -1,11 +1,11 @@
 #include "vulkax/research/deformable_world.hpp"
 
-#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -66,7 +66,18 @@ vulkax::solvers::MpmGridSettings makeGrid() {
     return grid;
 }
 
+bool check(bool condition, const char* expression) {
+    if (condition) return true;
+    std::cerr << "deformable_world regression failed: " << expression << '\n';
+    return false;
+}
+
 } // namespace
+
+#define VULKAX_CHECK(expression) \
+    do { \
+        if (!check(static_cast<bool>(expression), #expression)) return 1; \
+    } while (false)
 
 int main() {
     using namespace vulkax;
@@ -86,52 +97,54 @@ int main() {
     const auto result = research::runAffineDeformableWorldReference(
         initialWorld, {0, 1}, makeBlock(), makeGrid(), settings);
 
-    assert(result.frames.size() == settings.steps);
-    assert(result.finalParticles.size() == 8);
-    assert(result.finalWorld.size() == initialWorld.size());
+    VULKAX_CHECK(result.frames.size() == settings.steps);
+    VULKAX_CHECK(result.finalParticles.size() == 8);
+    VULKAX_CHECK(result.finalWorld.size() == initialWorld.size());
 
-    assert(result.maximumMassConservationError < 1.0e-10);
-    assert(result.maximumMomentumConservationError < 1.0e-10);
-    assert(result.maximumForceBalanceError < 1.0e-10);
-    assert(result.maximumMomentumBalanceError < 1.0e-10);
-    assert(result.maximumDeformationDeterminantError < 1.0e-9);
-    assert(result.maximumGaussianPositionError < 1.0e-9);
-    assert(result.maximumGaussianCovarianceError < 1.0e-9);
-    assert(result.maximumForceTransferError < 1.0e-10);
-    assert(result.maximumTorqueTransferError < 1.0e-10);
-    assert(result.maximumUnaffectedRegionDrift == 0.0);
-    assert(math::length(result.finalWorld.splats[2].position - initialWorld.splats[2].position) == 0.0);
+    VULKAX_CHECK(result.maximumMassConservationError < 1.0e-10);
+    VULKAX_CHECK(result.maximumMomentumConservationError < 1.0e-10);
+    VULKAX_CHECK(result.maximumForceBalanceError < 1.0e-10);
+    VULKAX_CHECK(result.maximumMomentumBalanceError < 1.0e-10);
+    VULKAX_CHECK(result.maximumDeformationDeterminantError < 1.0e-9);
+    VULKAX_CHECK(result.maximumGaussianPositionError < 1.0e-9);
+    VULKAX_CHECK(result.maximumGaussianCovarianceError < 1.0e-9);
+    VULKAX_CHECK(result.maximumForceTransferError < 1.0e-10);
+    VULKAX_CHECK(result.maximumTorqueTransferError < 1.0e-10);
+    VULKAX_CHECK(result.maximumUnaffectedRegionDrift == 0.0);
+    VULKAX_CHECK(math::length(result.finalWorld.splats[2].position - initialWorld.splats[2].position) == 0.0);
 
-    assert(std::abs(result.frames.front().time - settings.dt) < 1.0e-15);
-    assert(std::abs(result.frames.back().time -
-                    static_cast<double>(settings.steps) * settings.dt) < 1.0e-15);
+    VULKAX_CHECK(std::abs(result.frames.front().time - settings.dt) < 1.0e-15);
+    VULKAX_CHECK(std::abs(result.frames.back().time -
+                          static_cast<double>(settings.steps) * settings.dt) < 1.0e-15);
 
-    assert(math::length(result.finalWorld.splats[0].position - initialWorld.splats[0].position) > 1.0e-3);
-    assert(math::length(result.finalWorld.splats[1].position - initialWorld.splats[1].position) > 1.0e-3);
+    VULKAX_CHECK(math::length(result.finalWorld.splats[0].position - initialWorld.splats[0].position) > 1.0e-3);
+    VULKAX_CHECK(math::length(result.finalWorld.splats[1].position - initialWorld.splats[1].position) > 1.0e-3);
 
     for (const auto& frame : result.frames) {
-        assert(std::isfinite(frame.expectedDeformationDeterminant));
-        assert(frame.expectedDeformationDeterminant > 0.0);
-        assert(frame.minimumDeformationDeterminant > 0.0);
-        assert(frame.maximumDeformationDeterminant > 0.0);
-        assert(frame.unaffectedRegionDrift == 0.0);
+        VULKAX_CHECK(std::isfinite(frame.expectedDeformationDeterminant));
+        VULKAX_CHECK(frame.expectedDeformationDeterminant > 0.0);
+        VULKAX_CHECK(frame.minimumDeformationDeterminant > 0.0);
+        VULKAX_CHECK(frame.maximumDeformationDeterminant > 0.0);
+        VULKAX_CHECK(frame.unaffectedRegionDrift == 0.0);
     }
 
     const auto csvPath = std::filesystem::temp_directory_path() / "vulkax-deformable-world-evidence.csv";
     research::writeDeformableWorldEvidenceCsv(result, csvPath);
-    assert(std::filesystem::exists(csvPath));
-    assert(std::filesystem::file_size(csvPath) > 256U);
+    VULKAX_CHECK(std::filesystem::exists(csvPath));
+    VULKAX_CHECK(std::filesystem::file_size(csvPath) > 256U);
 
     std::ifstream csv(csvPath);
-    assert(csv.good());
+    VULKAX_CHECK(csv.good());
     std::string line;
     std::getline(csv, line);
-    assert(line.find("step,time,mass_error,momentum_error") == 0U);
+    VULKAX_CHECK(line.find("step,time,mass_error,momentum_error") == 0U);
     std::size_t dataRows = 0;
     while (std::getline(csv, line))
         if (!line.empty()) ++dataRows;
-    assert(dataRows == settings.steps);
+    VULKAX_CHECK(dataRows == settings.steps);
     std::filesystem::remove(csvPath);
 
     return 0;
 }
+
+#undef VULKAX_CHECK
