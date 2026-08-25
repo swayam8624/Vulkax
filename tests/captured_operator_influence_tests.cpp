@@ -180,22 +180,38 @@ int main() {
 
     const auto influence = research::computeCapturedMaterialInfluenceReference(
         capturedWorld, active, dataset, makeGrid(), settings, regions, influenceSettings);
+    const auto adjoint = research::computeCapturedMaterialInfluenceAdjoint(
+        capturedWorld, active, dataset, makeGrid(), settings, regions, influenceSettings);
+    const auto comparison = research::compareCapturedMaterialInfluenceDerivatives(influence, adjoint);
 
     assert(influence.field.size() == 8U);
     assert(influence.verification.size() == 8U);
+    assert(adjoint.field.size() == 8U);
+    assert(adjoint.particleScaleGradient.size() == 64U);
+    assert(comparison.size() == 8U);
+    assert(adjoint.minimumStencilKnotMargin > 1.0e-4);
     assert(influence.baselineReplay.validation.rmsPositionError < 1.0e-10);
+    assert(std::abs(adjoint.baselineObservable - influence.baselineObservable) < 1.0e-12);
     assert(std::isfinite(influence.baselineObservable));
 
     double maximumDerivative = 0.0;
     double maximumActualChange = 0.0;
+    double maximumAdjointRelativeError = 0.0;
     for (std::size_t index = 0; index < influence.field.size(); ++index) {
         const auto& field = influence.field[index];
         const auto& verification = influence.verification[index];
+        const auto& derivativeComparison = comparison[index];
         assert(field.particleCount == 8U);
         assert(std::isfinite(field.derivative));
         assert(std::isfinite(verification.actualObservable));
         assert(std::isfinite(verification.predictedObservable));
+        assert(std::isfinite(derivativeComparison.adjointDerivative));
         assert(verification.absoluteError < 1.0e-7);
+        assert(derivativeComparison.absoluteError < 1.0e-8);
+        if (std::abs(derivativeComparison.referenceDerivative) > 1.0e-7)
+            assert(derivativeComparison.relativeError < 5.0e-3);
+        maximumAdjointRelativeError = std::max(
+            maximumAdjointRelativeError, derivativeComparison.relativeError);
         const double actualChange = std::abs(verification.actualObservable - influence.baselineObservable);
         if (actualChange > 1.0e-9)
             assert(verification.relativeLinearizationError < 0.25);
@@ -207,5 +223,6 @@ int main() {
     // marker, otherwise a numerically finite but physically empty field could pass.
     assert(maximumDerivative > 1.0e-7);
     assert(maximumActualChange > 1.0e-9);
+    assert(maximumAdjointRelativeError < 0.05);
     return 0;
 }
