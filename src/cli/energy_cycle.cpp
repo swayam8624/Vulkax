@@ -132,13 +132,15 @@ int hybridSweepCommand(int argc, char** argv) {
     std::filesystem::create_directories(outputDirectory);
     research::writeAffineFlipBlendSweepCsv(result, outputDirectory / "summary.csv");
     research::writeAffineFlipBlendPeaksCsv(result, outputDirectory / "peaks.csv");
+    research::writeAffineFlipBlendParetoCsv(result, outputDirectory / "pareto.csv");
 
     std::cout << std::setprecision(10)
               << "Affine APIC-FLIP transfer sweep\n"
               << "  physical_horizon: " << physicalHorizon << '\n'
               << "  dt: " << dt << '\n'
               << "  meaningful_peak_threshold_fraction: " << meaningfulPeakThreshold << '\n';
-    for (const auto& entry : result.entries) {
+    for (std::size_t index = 0; index < result.entries.size(); ++index) {
+        const auto& entry = result.entries[index];
         const auto& cycle = entry.cycle;
         const auto& experiment = cycle.experiment;
         std::cout << "  candidate: " << entry.label << '\n'
@@ -155,10 +157,29 @@ int hybridSweepCommand(int argc, char** argv) {
                   << "    max_mls_residual: " << experiment.maximumMlsResidual << '\n'
                   << "    min_J: " << experiment.minimumDeformationDeterminant << '\n'
                   << "    max_J: " << experiment.maximumDeformationDeterminant << '\n'
+                  << "    j_excursion: " << entry.jExcursion << '\n'
                   << "    particle_position_rms_to_apic: " << entry.particlePositionRmsToApic << '\n'
                   << "    particle_velocity_rms_to_apic: " << entry.particleVelocityRmsToApic << '\n'
-                  << "    gaussian_position_rms_to_apic: " << entry.gaussianPositionRmsToApic << '\n';
+                  << "    gaussian_position_rms_to_apic: " << entry.gaussianPositionRmsToApic << '\n'
+                  << "    pareto_eligible: " << (entry.paretoEligible ? "yes" : "no") << '\n'
+                  << "    pareto_frontier: " << (entry.onParetoFrontier ? "yes" : "no") << '\n'
+                  << "    dominates_apic: " << (entry.dominatesApic ? "yes" : "no") << '\n'
+                  << "    recommended: "
+                  << (result.recommendedIndex && *result.recommendedIndex == index ? "yes" : "no") << '\n';
     }
+    std::cout << "  pareto_frontier:";
+    bool printedFrontier = false;
+    for (const auto& entry : result.entries) {
+        if (!entry.onParetoFrontier) continue;
+        std::cout << (printedFrontier ? ", " : " ") << entry.label;
+        printedFrontier = true;
+    }
+    if (!printedFrontier) std::cout << " none";
+    std::cout << '\n';
+    if (result.recommendedIndex)
+        std::cout << "  recommendation: " << result.entries[*result.recommendedIndex].label << '\n';
+    else
+        std::cout << "  recommendation: none (no candidate Pareto-dominates APIC)\n";
     std::cout << "  outputs: " << outputDirectory.string() << '\n';
     return 0;
 }
