@@ -38,6 +38,22 @@ jobs:
           test -s build/captured-calibration/selected_summary.csv
           awk -F, '$1 == 15000 && $2 > 0.299999 && $2 < 0.300001 && $12 == 1 { found = 1 } END { exit !found }' \
             build/captured-calibration/material_grid.csv
+      - name: Captured material Operator Influence end to end
+        run: |
+          ./build/vulkax captured-material-influence \
+            build/captured-example/object.ply \
+            build/captured-example/particles.csv \
+            build/captured-example/observations.csv \
+            build/captured-influence \
+            m4 0.003 1 1 1 \
+            1e-4 15000 0.30 0.08 0.01 0.02
+          test -s build/captured-influence/influence.csv
+          test -s build/captured-influence/counterfactual.csv
+          test -s build/captured-influence/baseline_summary.csv
+          awk -F, 'NR > 1 { value=$10; if (value < 0) value=-value; if (value > 1e-7) found=1 } END { exit !found }' \
+            build/captured-influence/influence.csv
+          awk -F, 'NR > 1 { if ($7 > max) max=$7 } END { exit !(max < 0.25) }' \
+            build/captured-influence/counterfactual.csv
       - name: Validate example problems
         run: |
           ./build/vulkax validate examples/rotating_mill.vkx
