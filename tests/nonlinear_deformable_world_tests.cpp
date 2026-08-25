@@ -143,6 +143,7 @@ int main() {
     std::getline(stream, header);
     assert(header.find("relative_energy_drift") != std::string::npos);
     assert(header.find("max_mls_rms_residual") != std::string::npos);
+    stream.close();
     std::filesystem::remove(output);
 
     // The experiment must not have merely translated the entire body rigidly.
