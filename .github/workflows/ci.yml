@@ -99,7 +99,7 @@ jobs:
           cmp build/captured-robustness-a/robustness.csv build/captured-robustness-b/robustness.csv
           cmp build/captured-robustness-a/scenarios.csv build/captured-robustness-b/scenarios.csv
           test "$(wc -l < build/captured-robustness-a/robustness.csv)" -eq 7
-          ! grep -Eiq 'nan|inf' build/captured-robustness-a/robustness.csv
+          ! grep -Eiq '(^|,)(nan|-?inf)(,|$)' build/captured-robustness-a/robustness.csv
           awk -F, 'NR == 2 { exit !($1 == "baseline" && $5 == 15000 && $6 > 0.299999 && $6 < 0.300001 && $7 == 0 && $8 == 0 && $13 == 1 && $14 == 0 && $16 == 1 && $21 == 1) }' \
             build/captured-robustness-a/robustness.csv
           awk -F, 'NR > 2 && $14 > 0 { changed = 1 } END { exit !changed }' \
