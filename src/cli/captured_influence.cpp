@@ -201,6 +201,8 @@ int capturedInfluenceCommand(int argc, char** argv) {
     research::writeCapturedMaterialCounterfactualCsv(result, outputDirectory / "counterfactual.csv");
     research::writeCapturedMaterialAdjointInfluenceCsv(
         adjoint, outputDirectory / "adjoint_influence.csv");
+    research::writeCapturedMaterialParticleAdjointCsv(
+        adjoint, outputDirectory / "particle_adjoint.csv");
     research::writeCapturedMaterialInfluenceDerivativeComparisonCsv(
         derivativeComparison, outputDirectory / "derivative_comparison.csv");
     research::writeCapturedReplaySamplesCsv(result.baselineReplay, outputDirectory / "baseline_samples.csv");
@@ -212,6 +214,7 @@ int capturedInfluenceCommand(int argc, char** argv) {
     double maximumRelativeVerificationError = 0.0;
     double maximumAdjointAbsoluteError = 0.0;
     double maximumAdjointRelativeError = 0.0;
+    double maximumParticleAdjointDerivative = 0.0;
     for (const auto& field : result.field)
         maximumAbsoluteDerivative = std::max(maximumAbsoluteDerivative, std::abs(field.derivative));
     for (const auto& verification : result.verification)
@@ -221,6 +224,8 @@ int capturedInfluenceCommand(int argc, char** argv) {
         maximumAdjointAbsoluteError = std::max(maximumAdjointAbsoluteError, comparison.absoluteError);
         maximumAdjointRelativeError = std::max(maximumAdjointRelativeError, comparison.relativeError);
     }
+    for (const double derivative : adjoint.particleScaleGradient)
+        maximumParticleAdjointDerivative = std::max(maximumParticleAdjointDerivative, std::abs(derivative));
 
     std::cout << std::setprecision(10)
               << "Captured material Operator Influence reference + discrete adjoint\n"
@@ -242,6 +247,7 @@ int capturedInfluenceCommand(int argc, char** argv) {
               << "  max_abs_reference_derivative: " << maximumAbsoluteDerivative << '\n'
               << "  max_relative_counterfactual_error: " << maximumRelativeVerificationError << '\n'
               << "  adjoint_min_stencil_knot_margin: " << adjoint.minimumStencilKnotMargin << '\n'
+              << "  max_abs_particle_adjoint_derivative: " << maximumParticleAdjointDerivative << '\n'
               << "  max_adjoint_absolute_derivative_error: " << maximumAdjointAbsoluteError << '\n'
               << "  max_adjoint_relative_derivative_error: " << maximumAdjointRelativeError << '\n'
               << "  outputs: " << outputDirectory.string() << '\n';
