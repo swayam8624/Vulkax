@@ -13,9 +13,11 @@
 #include <iostream>
 #include <limits>
 #include <numeric>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace vulkax::cli {
@@ -101,6 +103,60 @@ namespace {
     return grid;
 }
 
+struct CapturePreflight {
+    std::size_t markerCount{};
+    std::size_t fitSamples{};
+    std::size_t validationSamples{};
+    std::size_t fitDynamicSamples{};
+    std::size_t validationDynamicSamples{};
+    std::size_t initializationSamples{};
+    double minimumTime{std::numeric_limits<double>::infinity()};
+    double maximumTime{};
+};
+
+[[nodiscard]] CapturePreflight summarizeCapture(
+    const capture::CapturedDeformableDataset& dataset) {
+    CapturePreflight result;
+    std::unordered_set<std::string> markers;
+    for (const auto& observation : dataset.observations) {
+        markers.insert(observation.markerId);
+        result.minimumTime = std::min(result.minimumTime, observation.time);
+        result.maximumTime = std::max(result.maximumTime, observation.time);
+        const bool dynamic = observation.time > 1.0e-12;
+        if (!dynamic) ++result.initializationSamples;
+        if (observation.split == capture::ObservationSplit::Fit) {
+            ++result.fitSamples;
+            if (dynamic) ++result.fitDynamicSamples;
+        } else {
+            ++result.validationSamples;
+            if (dynamic) ++result.validationDynamicSamples;
+        }
+    }
+    result.markerCount = markers.size();
+    if (!std::isfinite(result.minimumTime)) result.minimumTime = 0.0;
+    return result;
+}
+
+void requireCalibrationReady(
+    const capture::CapturedDeformableDataset& dataset,
+    const CapturePreflight& preflight) {
+    if (preflight.markerCount < 3U)
+        throw std::invalid_argument("captured material calibration requires observations from at least three markers");
+    if (preflight.initializationSamples < 3U)
+        throw std::invalid_argument("captured material calibration requires at least three t=0 observations to fit the initial affine state");
+    if (preflight.fitDynamicSamples == 0U)
+        throw std::invalid_argument("captured material calibration requires at least one nonzero-time fit observation");
+    if (preflight.validationDynamicSamples == 0U)
+        throw std::invalid_argument("captured material calibration requires at least one nonzero-time validation observation");
+
+    std::unordered_set<std::uint64_t> initializedParticles;
+    for (const auto& observation : dataset.observations) {
+        if (observation.time <= 1.0e-12) initializedParticles.insert(observation.particleId);
+    }
+    if (initializedParticles.size() < 3U)
+        throw std::invalid_argument("t=0 observations must cover at least three distinct physical particles");
+}
+
 [[nodiscard]] research::NonlinearDeformableWorldSettings baseSettings(
     const capture::CapturedDeformableDataset& dataset,
     double dt) {
@@ -113,6 +169,46 @@ namespace {
     return settings;
 }
 
+[[nodiscard]] int preflightCommand(int argc, char** argv) {
+    if (argc < 2 || std::string_view(argv[1]) != "captured-deformable-check") return -1;
+    if (argc < 5)
+        throw std::invalid_argument(
+            "usage: vulkax captured-deformable-check <object.ply> <particles.csv> "
+            "<observations.csv> [cell-size]");
+
+    const auto cloud = gaussian::load3dgsPly(argv[2]);
+    const auto dataset = capture::loadCapturedDeformableDataset(argv[3], argv[4]);
+    const auto preflight = summarizeCapture(dataset);
+    requireCalibrationReady(dataset, preflight);
+    const double spacing = characteristicParticleSpacing(dataset.particles);
+    const double cellSize = argc >= 6
+        ? parsePositiveDouble(argv[5], "cell size")
+        : spacing * (2.0 / 3.0);
+    const auto grid = makeGrid(dataset, cellSize);
+    const long double gridNodes = static_cast<long double>(grid.nx) *
+                                  static_cast<long double>(grid.ny) *
+                                  static_cast<long double>(grid.nz);
+
+    std::cout << std::setprecision(10)
+              << "Captured deformable dataset preflight\n"
+              << "  status: READY_FOR_CALIBRATION\n"
+              << "  appearance_gaussians: " << cloud.size() << '\n'
+              << "  physical_particles: " << dataset.particles.size() << '\n'
+              << "  markers: " << preflight.markerCount << '\n'
+              << "  observations: " << dataset.observations.size() << '\n'
+              << "  initialization_samples: " << preflight.initializationSamples << '\n'
+              << "  fit_samples: " << preflight.fitSamples << '\n'
+              << "  fit_dynamic_samples: " << preflight.fitDynamicSamples << '\n'
+              << "  validation_samples: " << preflight.validationSamples << '\n'
+              << "  validation_dynamic_samples: " << preflight.validationDynamicSamples << '\n'
+              << "  time_range_seconds: [" << preflight.minimumTime << ", " << preflight.maximumTime << "]\n"
+              << "  characteristic_particle_spacing: " << spacing << '\n'
+              << "  grid_cell_size: " << cellSize << '\n'
+              << "  grid_nodes: " << grid.nx << 'x' << grid.ny << 'x' << grid.nz
+              << " (" << static_cast<double>(gridNodes) << ")\n";
+    return 0;
+}
+
 [[nodiscard]] int materialCalibrationCommand(int argc, char** argv) {
     if (argc < 2 || std::string_view(argv[1]) != "captured-material-calibrate") return -1;
     if (argc < 6)
@@ -122,6 +218,8 @@ namespace {
 
     const auto cloud = gaussian::load3dgsPly(argv[2]);
     const auto dataset = capture::loadCapturedDeformableDataset(argv[3], argv[4]);
+    const auto preflight = summarizeCapture(dataset);
+    requireCalibrationReady(dataset, preflight);
     const std::filesystem::path outputDirectory(argv[5]);
     const double dt = argc >= 7 ? parsePositiveDouble(argv[6], "timestep") : 5.0e-5;
     const double cellSize = argc >= 8
@@ -172,6 +270,9 @@ namespace {
 } // namespace
 
 int capturedDeformableCommand(int argc, char** argv) {
+    const int preflight = preflightCommand(argc, argv);
+    if (preflight >= 0) return preflight;
+
     const int calibration = materialCalibrationCommand(argc, argv);
     if (calibration >= 0) return calibration;
 
