@@ -1,6 +1,6 @@
 #include "vulkax/cli/captured_example.hpp"
 
-#include "vulkax/capture/deformable_dataset.hpp"
+#include "vulkax/capture/deformable_bundle.hpp"
 #include "vulkax/gaussian/gaussian_cloud.hpp"
 #include "vulkax/research/nonlinear_deformable_world.hpp"
 
@@ -135,6 +135,21 @@ namespace {
     return dataset;
 }
 
+[[nodiscard]] std::vector<capture::CapturedObservationUncertainty> makeUncertainty(
+    const std::vector<capture::CapturedMarkerObservation>& observations) {
+    std::vector<capture::CapturedObservationUncertainty> result;
+    result.reserve(observations.size());
+    for (const auto& observation : observations) {
+        const double sigma = observation.time > 0.0 ? 1.0e-6 : 0.0;
+        result.push_back({
+            observation.markerId,
+            observation.time,
+            {sigma, sigma, sigma},
+        });
+    }
+    return result;
+}
+
 void writeGaussianPly(const gaussian::GaussianCloud& world, const std::filesystem::path& path) {
     std::ofstream stream(path);
     if (!stream) throw std::runtime_error("failed to open synthetic captured Gaussian PLY");
@@ -257,18 +272,53 @@ int capturedExampleCommand(int argc, char** argv) {
         splat.position = applyAffine(deformation, translation, splat.position);
     }
     const auto dataset = makeDataset(body, deformation, translation, trajectories);
+    const auto uncertainty = makeUncertainty(dataset.observations);
 
     std::filesystem::create_directories(outputDirectory);
     writeGaussianPly(capturedWorld, outputDirectory / "object.ply");
     writeParticlesCsv(dataset.particles, outputDirectory / "particles.csv");
     writeObservationsCsv(dataset.observations, outputDirectory / "observations.csv");
+    capture::writeCapturedObservationUncertaintyCsv(
+        uncertainty, outputDirectory / "uncertainty.csv");
     writeTruthCsv(outputDirectory / "truth.csv");
+
+    capture::CapturedDeformableBundleManifest manifest;
+    manifest.id = "vulkax-controlled-captured-deformable-v1";
+    manifest.appearanceFile = "object.ply";
+    manifest.particlesFile = "particles.csv";
+    manifest.observationsFile = "observations.csv";
+    manifest.uncertaintyFile = "uncertainty.csv";
+    manifest.lengthUnit = "m";
+    manifest.massUnit = "kg";
+    manifest.timeUnit = "s";
+    manifest.coordinateFrame = "controlled-world";
+    manifest.axisConvention = "right-handed-y-up";
+    manifest.timeStep = 1.0e-4;
+    manifest.sourceKind = capture::CapturedSourceKind::Synthetic;
+    manifest.sourceDescription =
+        "deterministic Vulkax controlled regression; nonzero-time rows declare 1e-6 m component uncertainty";
+    capture::refreshCapturedDeformableBundleHashes(manifest, outputDirectory);
+    capture::saveCapturedDeformableBundleManifest(
+        manifest, outputDirectory / "capture.vkcap");
+
+    // The generator is also the canonical schema example. Refuse to emit a
+    // bundle that the public loader would reject.
+    const auto validatedBundle = capture::loadAndValidateCapturedDeformableBundle(
+        outputDirectory / "capture.vkcap");
+    if (validatedBundle.dataset.particles.size() != dataset.particles.size() ||
+        validatedBundle.dataset.observations.size() != dataset.observations.size() ||
+        validatedBundle.uncertainty.size() != uncertainty.size()) {
+        throw std::runtime_error("generated captured bundle did not round-trip its payload counts");
+    }
 
     std::cout << "Generated deterministic captured-deformable calibration example\n"
               << "  output: " << outputDirectory.string() << '\n'
+              << "  bundle_manifest: capture.vkcap\n"
               << "  appearance_gaussians: " << capturedWorld.size() << '\n'
               << "  physical_particles: " << dataset.particles.size() << '\n'
               << "  observations: " << dataset.observations.size() << '\n'
+              << "  uncertainty_rows: " << uncertainty.size() << '\n'
+              << "  dynamic_component_sigma: 1e-6 m\n"
               << "  truth_young_modulus: 15000\n"
               << "  truth_poisson_ratio: 0.30\n"
               << "  truth_dt: 0.0001\n"
