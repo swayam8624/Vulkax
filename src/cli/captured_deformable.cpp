@@ -1,6 +1,7 @@
 #include "vulkax/cli/captured_deformable.hpp"
 
 #include "vulkax/capture/deformable_dataset.hpp"
+#include "vulkax/cli/captured_example.hpp"
 #include "vulkax/gaussian/gaussian_cloud.hpp"
 #include "vulkax/research/captured_deformable.hpp"
 #include "vulkax/research/captured_material_calibration.hpp"
@@ -172,6 +173,9 @@ namespace {
 } // namespace
 
 int capturedDeformableCommand(int argc, char** argv) {
+    const int example = capturedExampleCommand(argc, argv);
+    if (example >= 0) return example;
+
     const int calibration = materialCalibrationCommand(argc, argv);
     if (calibration >= 0) return calibration;
 

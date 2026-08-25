@@ -31,7 +31,7 @@ appearance <-> semantics <-> physical representation
 
 The research question is stronger than Gaussian editing: **can a reconstructed real scene be rewritten locally — geometry, material, constraints and eventually topology — while keeping appearance, physical state and provenance mutually consistent and quantitatively trustworthy?**
 
-## Current research implementation — 0.20 development head
+## Current research implementation — 0.35 development head
 
 ### Captured-world representation
 
@@ -44,14 +44,14 @@ The research question is stronger than Gaussian editing: **can a reconstructed r
 
 ### Native Gaussian rendering
 
-Vulkax now contains a first reference-quality anisotropic Gaussian renderer:
+Vulkax contains a first reference-quality anisotropic Gaussian renderer:
 
-- full 3D covariance is projected into a screen-space 2D covariance;
+- full 3D covariance is projected into screen-space 2D covariance;
 - each visible Gaussian becomes an oriented anisotropic ellipse, not a point sprite;
 - spherical harmonics up to degree 3 are evaluated from stored 3DGS coefficients;
 - splats are depth ordered and alpha composited;
-- projection/covariance/SH/sorting currently remain on CPU as the numerical reference;
-- raster/compositing has native Vulkan and Metal implementations;
+- projection/covariance/SH/sorting remain on CPU as the numerical reference;
+- raster/compositing have native Vulkan and Metal implementations;
 - a tracked synthetic Gaussian scene and renderer regression test are included.
 
 This is intentionally not yet the final high-throughput renderer. GPU projection, tile binning, radix sorting and scaling benchmarks come after the reference path is validated.
@@ -74,17 +74,64 @@ This is the first concrete implementation of the central Vulkax hypothesis:
 best representation for appearance != best representation for physics
 ```
 
+### Captured deformable replay and material identification
+
+Vulkax now has an end-to-end captured-object research path instead of only solver-internal synthetic state:
+
+- `particles.csv` defines stable physical particle IDs, rest positions, mass and rest volume;
+- `observations.csv` binds tracked marker IDs to physical particle IDs over time with explicit `fit` / `validation` splits;
+- the captured pose is initialized by fitting an affine map from **fit-split t=0 observations only**;
+- the active Gaussian object is inverse-warped into rest space through MLS before simulation;
+- an independent nonlinear APIC/MPM physical representation performs free elastic relaxation;
+- observed marker positions are compared against the physical state on the exact solver timestep lattice;
+- fit/validation RMS and maxima, initialization error, appearance round-trip error, conservation, energy drift, deformation determinant and MLS residuals are exported;
+- material calibration grid-searches Young's modulus and Poisson ratio using **nonzero-time fit rows only**;
+- held-out validation rows are reported after selection and cannot influence candidate ranking.
+
+A deterministic dataset generator makes the complete path reproducible. Its ground truth is `E = 15000 Pa`, `nu = 0.30`, `dt = 1e-4 s`, with held-out markers.
+
+```bash
+./build/vulkax captured-deformable-generate-example build/captured-example
+
+./build/vulkax captured-material-calibrate \
+  build/captured-example/object.ply \
+  build/captured-example/particles.csv \
+  build/captured-example/observations.csv \
+  build/captured-calibration \
+  1e-4 0.08
+```
+
+The generated bundle contains:
+
+```text
+object.ply
+particles.csv
+observations.csv
+truth.csv
+```
+
+Calibration writes:
+
+```text
+material_grid.csv
+selected_samples.csv
+selected_summary.csv
+selected_evidence.csv
+```
+
+This deterministic example is a controlled regression, **not evidence that real-world material identification has been solved**. Real captured observations with measurement noise, imperfect correspondences and model discrepancy are still required.
+
 ### Existing computational foundation
 
-The repository also contains typed SI dimensions, `ProblemIR`, operator graphs, solver/fidelity planning, numerical reference solvers, result certificates, goal-oriented adaptivity, inverse/optimization foundations, discrete adjoints, Operator Influence foundations, geometry/voxelization, scientific visualization, camera/capture, Vulkan/Metal probing and native compute conformance.
+The repository also contains typed SI dimensions, `ProblemIR`, operator graphs, solver/fidelity planning, numerical reference solvers, result certificates, goal-oriented adaptivity, inverse/optimization foundations, discrete adjoints, global and local Operator Influence foundations, geometry/voxelization, scientific visualization, camera/capture, Vulkan/Metal probing and native compute conformance.
 
 ## Research-integrity status
 
-Release tests are compiled with assertions active. Enabling them exposed two previously hidden failures: an incorrect goal-oriented refinement expectation and shared-edge degeneracy in mesh voxelization. Both are now fixed rather than suppressed.
+Release tests are compiled with assertions active. Enabling them exposed two previously hidden failures: an incorrect goal-oriented refinement expectation and shared-edge degeneracy in mesh voxelization. Both were fixed rather than suppressed.
 
-The latest native Gaussian renderer and covariance-coupling head must still pass the Linux/macOS/Windows matrix and real Metal/Vulkan smoke tests before being described as validated. CI explicitly renders the tracked Gaussian scene through Vulkan on Linux and Metal on macOS.
+The native Gaussian renderer and covariance-coupling path must continue to pass the Linux/macOS/Windows matrix and real Metal/Vulkan smoke tests before stronger validation claims are made. CI renders the tracked Gaussian scene through Vulkan on Linux and Metal on macOS.
 
-Vulkax does **not** yet claim production-scale Gaussian rendering, MPM/FEM simulation of captured objects, topology rewriting, automatic semantic reconstruction, inverse material identification from video, XR interaction or publishable novelty.
+The captured-deformable path has controlled synthetic replay and material-identification regressions, including held-out observations. It does **not** yet establish real-world material recovery, production-scale Gaussian rendering, topology rewriting, automatic semantic reconstruction, XR interaction, or publishable novelty.
 
 ## Build and test
 
@@ -147,13 +194,13 @@ Existing problem and backend commands remain:
 
 ## Immediate research sequence
 
-1. Validate the native Gaussian reference renderer and MLS covariance coupling on CI + Apple M2 Pro.
+1. Keep validating the native Gaussian reference renderer and MLS covariance coupling on CI + Apple M2 Pro.
 2. Move Gaussian projection/binning/sorting onto GPU while retaining the CPU oracle.
 3. Add hierarchical Gaussian IDs/entity selection for million-splat scenes.
-4. Couple a captured deformable object to an independent MPM/FEM physical representation.
-5. Benchmark visual transfer error, physical transfer error, conservation, unaffected-region drift, runtime and memory.
-6. Identify physical parameters from real held-out observations.
-7. Apply Operator Influence Fields to the same captured object.
-8. Add XR only once the underlying physical/coupling mechanisms are quantitatively trustworthy.
+4. **Captured deformable baseline: implemented** for controlled Gaussian + APIC/MPM replay with explicit correspondence and evidence export.
+5. **Transfer/conservation/error benchmarking: implemented foundation**, with real-capture evaluation still pending.
+6. **Material identification: implemented controlled fit/held-out grid-search regression**, with noisy real observations and uncertainty analysis still pending.
+7. Apply Operator Influence Fields to the same captured deformable object and verify local counterfactual predictions against reruns.
+8. Add XR only once the physical/coupling mechanisms are quantitatively trustworthy.
 
 See [`docs/REWRITABLE_REALITY.md`](docs/REWRITABLE_REALITY.md), [`docs/RESEARCH.md`](docs/RESEARCH.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and [`docs/VISION.md`](docs/VISION.md).
