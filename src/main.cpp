@@ -305,6 +305,7 @@ int main(int argc, char** argv) {
                   << "  vulkax captured-deformable-generate-example <output-dir>\n"
                   << "  vulkax captured-material-calibrate <object.ply> <particles.csv> <observations.csv> <output-dir> [dt] [cell-size]\n"
                   << "  vulkax captured-material-influence <object.ply> <particles.csv> <observations.csv> <output-dir> <marker-id> <time> <dir-x> <dir-y> <dir-z> [dt] [young-modulus] [poisson-ratio] [cell-size] [fd-scale-step] [verification-scale-delta]\n"
+                  << "  vulkax captured-observation-robustness <object.ply> <particles.csv> <observations.csv> <output-dir> <marker-id> <time> <dir-x> <dir-y> <dir-z> <initial-noise-rms> <dynamic-noise-rms> [seed] [dt] [cell-size]\n"
                   << "  vulkax captured-deformable-evaluate <object.ply> <particles.csv> <observations.csv> <output-dir> [dt] [young-modulus] [poisson-ratio] [cell-size]\n"
                   << "  vulkax deformable-reference <output.csv>\n"
                   << "  vulkax deformable-nonlinear <output.csv>\n"
