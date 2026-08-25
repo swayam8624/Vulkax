@@ -31,7 +31,7 @@ appearance <-> semantics <-> physical representation
 
 The research question is stronger than Gaussian editing: **can a reconstructed real scene be rewritten locally — geometry, material, constraints and eventually topology — while keeping appearance, physical state and provenance mutually consistent and quantitatively trustworthy?**
 
-## Current research implementation — 0.38 development head
+## Current research implementation — 0.39 development head
 
 ### Captured-world representation
 
@@ -218,6 +218,41 @@ baseline_evidence.csv
 
 The finite-difference path remains the **verification oracle**, not an implementation detail to delete after the adjoint passes. The adjoint establishes an efficient derivative path and a useful region-prioritization signal for this controlled APIC regime; none of these controlled results establishes real-world material influence experimentally, general differentiable MPM, production-scale performance, automatic semantic segmentation, or publishable novelty by itself.
 
+### Captured observation robustness
+
+Vulkax 0.39 adds a deterministic synthetic uncertainty-stress path around material identification and the downstream particle influence field. Initial-pose observations (`t = 0`) and dynamic observations (`t > 0`) can be perturbed independently with reproducible component-wise RMS scales and stable seeds. Every scenario reruns calibration, the selected-material adjoint and adaptive proposal analysis; validation observations remain held out from material ranking.
+
+The public command is:
+
+```bash
+./build/vulkax captured-observation-robustness \
+  build/captured-example/object.ply \
+  build/captured-example/particles.csv \
+  build/captured-example/observations.csv \
+  build/captured-robustness \
+  m4 0.003 1 1 1 \
+  1e-6 1e-6 12345 1e-4 0.08
+```
+
+The command writes `robustness.csv` plus `scenarios.csv`, keeps the physical grid fixed from the clean bundle, and evaluates five deterministic non-clean cases (`pose_half`, `pose_full`, `dynamic_half`, `dynamic_full`, `combined`) beside the clean baseline.
+
+For the controlled 64-particle regression at a maximum **1 micrometre component-noise scale** for both initial and dynamic observations, the Linux public-path evidence is:
+
+```text
+baseline E                                  15000 Pa
+baseline nu                                 0.30
+maximum E relative drift                    0
+maximum nu absolute drift                   0
+minimum particle-influence cosine           0.9999999994
+maximum particle-influence relative L2      0.0003332153535
+strongest-particle stability                5 / 5 scenarios
+minimum adaptive-particle Jaccard            1.0
+```
+
+So, for **this synthetic case and this perturbation only**, the discrete material choice stayed unchanged, the maximum particle-field change was about `0.0333%` in relative L2 norm, and both the strongest particle and adaptive selected-particle membership stayed stable. This is regression evidence, not a claim about real tracker/camera tolerance. The meaningful uncertainty scale for a measured object must come from that capture process.
+
+CI runs the robustness command twice with identical inputs and requires byte-identical evidence files, exact clean-baseline identity, finite numeric outputs and a measurable downstream response to nonzero observation perturbation. See [`docs/OBSERVATION_ROBUSTNESS_0_39.md`](docs/OBSERVATION_ROBUSTNESS_0_39.md) for the evidence contract and limitations.
+
 ### Existing computational foundation
 
 The repository also contains typed SI dimensions, `ProblemIR`, operator graphs, solver/fidelity planning, numerical reference solvers, result certificates, goal-oriented adaptivity, inverse/optimization foundations, generic discrete-adjoint foundations, global and local Operator Influence foundations, geometry/voxelization, scientific visualization, camera/capture, Vulkan/Metal probing and native compute conformance.
@@ -228,7 +263,9 @@ Release tests are compiled with assertions active. Enabling them exposed two pre
 
 The native Gaussian renderer and covariance-coupling path must continue to pass the Linux/macOS/Windows matrix and real Metal/Vulkan smoke tests before stronger validation claims are made. CI renders the tracked Gaussian scene through Vulkan on Linux and Metal on macOS.
 
-The captured-deformable path has controlled synthetic replay, material-identification and local-material influence regressions, including held-out observations. The material-influence path retains its nonlinear finite-difference/rerun oracle, checks the APIC material-scale adjoint against it region by region, and now verifies adjoint-proposed spatial material regions through fresh nonlinear reruns. CI requires a nonzero particle-level field, localized adaptive proposals retaining at least 90% of the controlled absolute-gradient mass, tight adjoint/reference agreement and bounded nonlinear counterfactual error. This is still controlled synthetic verification: it does **not** establish real-world material recovery/influence, derivative correctness through unimplemented FLIP/boundary branches, robustness to capture noise/model discrepancy, production-scale Gaussian rendering, topology rewriting, automatic semantic reconstruction, XR interaction, or publishable novelty.
+The captured-deformable path has controlled synthetic replay, material-identification, local-material influence and observation-robustness regressions, including held-out observations. The material-influence path retains its nonlinear finite-difference/rerun oracle, checks the APIC material-scale adjoint against it region by region, and verifies adjoint-proposed spatial material regions through fresh nonlinear reruns. The robustness path separately perturbs initialization and dynamic observations with deterministic noise and records calibration/influence/proposal stability while keeping the clean discretization fixed. CI requires a nonzero particle-level field, localized adaptive proposals retaining at least 90% of the controlled absolute-gradient mass, tight adjoint/reference agreement, bounded nonlinear counterfactual error, deterministic robustness evidence and exact clean-baseline identity.
+
+This is still controlled synthetic verification: it does **not** establish real-world material recovery/influence, real sensor/tracker robustness, derivative correctness through unimplemented FLIP/boundary branches, robustness to correspondence mistakes or model discrepancy, production-scale Gaussian rendering, topology rewriting, automatic semantic reconstruction, XR interaction, or publishable novelty.
 
 ## Build and test
 
@@ -291,15 +328,17 @@ Existing problem and backend commands remain:
 
 ## Immediate research sequence
 
-1. Keep validating the native Gaussian reference renderer and MLS covariance coupling on CI + Apple M2 Pro.
-2. Move Gaussian projection/binning/sorting onto GPU while retaining the CPU oracle.
-3. Add hierarchical Gaussian IDs/entity selection for million-splat scenes.
-4. **Captured deformable baseline: implemented** for controlled Gaussian + APIC/MPM replay with explicit correspondence and evidence export.
-5. **Transfer/conservation/error benchmarking: implemented foundation**, with real-capture evaluation still pending.
-6. **Material identification: implemented controlled fit/held-out grid-search regression**, with noisy real observations and uncertainty analysis still pending.
-7. **Captured local material Operator Influence: finite-difference oracle + controlled APIC discrete adjoint implemented**, with region-by-region derivative comparison and independent nonlinear counterfactual reruns.
-8. **Adjoint-guided adaptive material regions: implemented for the controlled captured regression**, with deterministic stable-ID selection, spatial component formation, explicit gradient-mass coverage and independent oracle verification.
-9. Run the same replay, identification and influence pipeline on a measured real captured deformable with uncertainty/noise and model-discrepancy analysis.
-10. Add XR only once the physical/coupling mechanisms are quantitatively trustworthy.
+The project is now scope-frozen to the path in [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md). The next core milestones are:
 
-See [`docs/REWRITABLE_REALITY.md`](docs/REWRITABLE_REALITY.md), [`docs/RESEARCH.md`](docs/RESEARCH.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and [`docs/VISION.md`](docs/VISION.md).
+1. **0.39 observation robustness — implemented on the controlled synthetic path**, with deterministic pose/dynamic perturbations and calibration/influence/adaptive-region evidence.
+2. **0.40 capture evidence contract and dataset validation** — add a versioned manifest, units/frame/time/uncertainty/provenance metadata, bundle validation and input hashes.
+3. **0.45 measured deformable benchmark** — run the same pipeline on one genuinely measured deformable sequence; this requires external measured data and must not be simulated away.
+4. **0.50 scalable Gaussian execution** — move projection/binning/order/compositing toward GPU scale while retaining the CPU image oracle and publishing scaling evidence.
+5. **0.60 unified verified rewrite transaction** — connect verified material/geometry/supported-constraint changes to provenance, rollback, physical rerun and Gaussian appearance propagation.
+6. **0.70 scale-safe identity and selection** — make stable correspondence survive large-cloud reorder/filter/serialization operations.
+7. **0.80 one-command captured-world research demo** — emit the complete evidence bundle, verified rewrite and before/after renders from one command.
+8. **0.90 release hardening**, followed by the exact **1.0** release gate.
+
+Topology surgery, XR, automatic semantic reconstruction, generalized differentiable MPM and broad multiphysics Operator Influence claims are explicitly deferred beyond 1.0 unless they replace, rather than expand, an existing core milestone.
+
+See [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md), [`docs/OBSERVATION_ROBUSTNESS_0_39.md`](docs/OBSERVATION_ROBUSTNESS_0_39.md), [`docs/REWRITABLE_REALITY.md`](docs/REWRITABLE_REALITY.md), [`docs/RESEARCH.md`](docs/RESEARCH.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and [`docs/VISION.md`](docs/VISION.md).
