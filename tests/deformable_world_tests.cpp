@@ -142,7 +142,12 @@ int main() {
     while (std::getline(csv, line))
         if (!line.empty()) ++dataRows;
     VULKAX_CHECK(dataRows == settings.steps);
-    std::filesystem::remove(csvPath);
+
+    // Windows does not permit deleting this path while the ifstream still owns
+    // an open handle. POSIX unlink semantics hid this lifecycle bug on Linux/macOS.
+    csv.close();
+    VULKAX_CHECK(!csv.fail());
+    VULKAX_CHECK(std::filesystem::remove(csvPath));
 
     return 0;
 }
