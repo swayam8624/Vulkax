@@ -46,6 +46,18 @@ then rerun the nonlinear simulation and compare against `Delta J_actual`. Report
 runtime, memory, and the region in which the first-order approximation is valid. Compare against finite
 differences and relevant adjoint/sensitivity baselines.
 
+Adjoint-guided region selection must follow the same discipline. A high-influence region selected from
+`|A|` is a **proposal**, not evidence that the proposed rewrite is correct. Region construction should
+record how much influence mass was retained or discarded, preserve stable physical IDs/provenance, and
+remain deterministic for fixed inputs. Every proposed intervention used as evidence must then be checked
+with a derivative oracle and an independent nonlinear rerun that was not used to select the region.
+
+The controlled captured-material regression currently exercises this protocol with particle-local
+Young's-modulus coefficients: a reverse APIC/MPM pass proposes spatial material regions from stable-ID
+particle gradients, while central finite differences and separate nonlinear counterfactual perturbations
+remain the verification oracle. This is a regression foundation only; the next evidence requirement is
+measured captured deformables with observation noise, correspondence error and model discrepancy.
+
 The first serious paper should demonstrate the formulation across more than one physics family rather
 than hide a CFD-specific method behind generic language.
 
