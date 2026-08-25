@@ -80,6 +80,13 @@ void refreshCapturedDeformableBundleHashes(
     CapturedDeformableBundleManifest& manifest,
     const std::filesystem::path& baseDirectory);
 
+// Requires each marker to have both an initialization observation and at least
+// one dynamic observation. A marker's nonzero-time fit/validation assignment
+// must remain stable across its trajectory. The t=0 split may differ because
+// initialization and held-out dynamic evaluation are separate roles.
+void validateCapturedObservationTrajectoryContract(
+    const CapturedDeformableDataset& dataset);
+
 // Loads and validates the complete bundle. V1 payload values are required to be
 // expressed directly in SI units (m, kg, s); no silent unit conversion occurs.
 // Validation includes hashes, payload syntax, stable marker->particle identity,
