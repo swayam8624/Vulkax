@@ -64,6 +64,28 @@ vulkax::solvers::MpmGridSettings makeGrid() {
     return grid;
 }
 
+vulkax::research::AffineFlipBlendEntry syntheticEntry(
+    const char* label,
+    vulkax::solvers::MpmTransferScheme scheme,
+    double blend,
+    double totalRetention,
+    double kineticRetention,
+    double mlsRms,
+    double minimumJ,
+    double maximumJ) {
+    vulkax::research::AffineFlipBlendEntry entry;
+    entry.label = label;
+    entry.scheme = scheme;
+    entry.flipBlend = blend;
+    entry.cycle.completedMeaningfulCycles = 2;
+    entry.cycle.meanMechanicalEnergyRetentionPerCycle = totalRetention;
+    entry.cycle.meanKineticAmplitudeRetentionPerCycle = kineticRetention;
+    entry.cycle.experiment.maximumMlsRmsResidual = mlsRms;
+    entry.cycle.experiment.minimumDeformationDeterminant = minimumJ;
+    entry.cycle.experiment.maximumDeformationDeterminant = maximumJ;
+    return entry;
+}
+
 } // namespace
 
 int main() {
@@ -102,6 +124,7 @@ int main() {
         assert(experiment.maximumUnaffectedRegionDrift == 0.0);
         assert(experiment.maximumMassConservationError < 1.0e-9);
         assert(experiment.maximumForceBalanceError < 1.0e-8);
+        assert(std::isfinite(entry.jExcursion));
     }
 
     // Intermediate affine-FLIP and pure FLIP must not silently collapse to APIC.
@@ -110,5 +133,32 @@ int main() {
     assert(result.entries.back().particlePositionRmsToApic > 1.0e-12);
 
     assert(solvers::toString(solvers::MpmTransferScheme::APIC_FLIP) == "APIC-FLIP");
+
+    // Test the Pareto decision machinery independently of whether the short
+    // nonlinear fixture happens to complete a meaningful oscillation cycle.
+    research::AffineFlipBlendSweepResult synthetic;
+    synthetic.entries.push_back(syntheticEntry(
+        "APIC", solvers::MpmTransferScheme::APIC, 0.0,
+        0.95, 0.90, 0.0020, 0.96, 1.04));
+    synthetic.entries.push_back(syntheticEntry(
+        "APIC-FLIP-0.25", solvers::MpmTransferScheme::APIC_FLIP, 0.25,
+        0.96, 0.92, 0.0015, 0.965, 1.035));
+    synthetic.entries.push_back(syntheticEntry(
+        "APIC-FLIP-0.75", solvers::MpmTransferScheme::APIC_FLIP, 0.75,
+        0.97, 0.95, 0.0040, 0.95, 1.05));
+    synthetic.entries.push_back(syntheticEntry(
+        "bad", solvers::MpmTransferScheme::APIC_FLIP, 0.50,
+        0.94, 0.89, 0.0030, 0.94, 1.06));
+
+    research::analyzeAffineFlipBlendSweep(synthetic);
+    assert(synthetic.entries[0].paretoEligible);
+    assert(!synthetic.entries[0].onParetoFrontier);
+    assert(synthetic.entries[1].onParetoFrontier);
+    assert(synthetic.entries[1].dominatesApic);
+    assert(synthetic.entries[2].onParetoFrontier);
+    assert(!synthetic.entries[2].dominatesApic);
+    assert(!synthetic.entries[3].onParetoFrontier);
+    assert(synthetic.recommendedIndex.has_value());
+    assert(*synthetic.recommendedIndex == 1);
     return 0;
 }
