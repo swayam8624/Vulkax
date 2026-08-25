@@ -25,9 +25,29 @@ jobs:
         run: cmake --build build --parallel 2
       - name: Test
         run: ctest --test-dir build --output-on-failure
-      - name: Captured deformable calibration end to end
+      - name: Captured bundle contract end to end
         run: |
           ./build/vulkax captured-deformable-generate-example build/captured-example
+          test -s build/captured-example/capture.vkcap
+          test -s build/captured-example/uncertainty.csv
+          ./build/vulkax captured-deformable-validate-bundle \
+            build/captured-example/capture.vkcap | tee build/captured-bundle-validation.txt
+          grep -q '^VALID captured deformable bundle$' build/captured-bundle-validation.txt
+          grep -q 'source_kind: synthetic' build/captured-bundle-validation.txt
+          grep -q 'physical_particles: 64' build/captured-bundle-validation.txt
+          grep -q 'observations: 20' build/captured-bundle-validation.txt
+          grep -q 'uncertainty_rows: 20' build/captured-bundle-validation.txt
+          cp -R build/captured-example build/captured-example-corrupt
+          echo '# CI hash mutation' >> build/captured-example-corrupt/observations.csv
+          if ./build/vulkax captured-deformable-validate-bundle \
+              build/captured-example-corrupt/capture.vkcap \
+              > build/captured-bundle-corrupt.txt 2>&1; then
+            echo 'corrupted captured bundle unexpectedly validated'
+            exit 1
+          fi
+          grep -q 'SHA-256 mismatch' build/captured-bundle-corrupt.txt
+      - name: Captured deformable calibration end to end
+        run: |
           ./build/vulkax captured-material-calibrate \
             build/captured-example/object.ply \
             build/captured-example/particles.csv \
