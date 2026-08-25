@@ -123,6 +123,7 @@ namespace {
             "usage: vulkax captured-deformable-validate-bundle <capture.vkcap>");
 
     const auto bundle = capture::loadAndValidateCapturedDeformableBundle(argv[2]);
+    capture::validateCapturedObservationTrajectoryContract(bundle.dataset);
     std::size_t fitSamples = 0U;
     std::size_t validationSamples = 0U;
     double maximumSigma = 0.0;
