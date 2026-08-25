@@ -2,6 +2,7 @@
 #include "vulkax/research/captured_deformable.hpp"
 #include "vulkax/research/nonlinear_deformable_world.hpp"
 
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
