@@ -146,7 +146,7 @@ int main() {
     // Windows does not permit deleting this path while the ifstream still owns
     // an open handle. POSIX unlink semantics hid this lifecycle bug on Linux/macOS.
     csv.close();
-    VULKAX_CHECK(!csv.fail());
+    VULKAX_CHECK(!csv.is_open());
     VULKAX_CHECK(std::filesystem::remove(csvPath));
 
     return 0;
