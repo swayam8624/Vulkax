@@ -188,13 +188,23 @@ int capturedInfluenceCommand(int argc, char** argv) {
     influenceSettings.verificationScaleDelta = verificationDelta;
 
     const auto regions = makeOctants(dataset);
+    const auto grid = makeGrid(dataset, cellSize);
     const auto result = research::computeCapturedMaterialInfluenceReference(
-        cloud, activeIndices, dataset, makeGrid(dataset, cellSize), settings,
-        regions, influenceSettings);
+        cloud, activeIndices, dataset, grid, settings, regions, influenceSettings);
+    const auto adjoint = research::computeCapturedMaterialInfluenceAdjoint(
+        cloud, activeIndices, dataset, grid, settings, regions, influenceSettings);
+    const auto derivativeComparison = research::compareCapturedMaterialInfluenceDerivatives(
+        result, adjoint);
 
     std::filesystem::create_directories(outputDirectory);
     research::writeCapturedMaterialInfluenceCsv(result, outputDirectory / "influence.csv");
     research::writeCapturedMaterialCounterfactualCsv(result, outputDirectory / "counterfactual.csv");
+    research::writeCapturedMaterialAdjointInfluenceCsv(
+        adjoint, outputDirectory / "adjoint_influence.csv");
+    research::writeCapturedMaterialParticleAdjointCsv(
+        adjoint, outputDirectory / "particle_adjoint.csv");
+    research::writeCapturedMaterialInfluenceDerivativeComparisonCsv(
+        derivativeComparison, outputDirectory / "derivative_comparison.csv");
     research::writeCapturedReplaySamplesCsv(result.baselineReplay, outputDirectory / "baseline_samples.csv");
     research::writeCapturedReplaySummaryCsv(result.baselineReplay, outputDirectory / "baseline_summary.csv");
     research::writeNonlinearDeformableWorldEvidenceCsv(
@@ -202,14 +212,23 @@ int capturedInfluenceCommand(int argc, char** argv) {
 
     double maximumAbsoluteDerivative = 0.0;
     double maximumRelativeVerificationError = 0.0;
+    double maximumAdjointAbsoluteError = 0.0;
+    double maximumAdjointRelativeError = 0.0;
+    double maximumParticleAdjointDerivative = 0.0;
     for (const auto& field : result.field)
         maximumAbsoluteDerivative = std::max(maximumAbsoluteDerivative, std::abs(field.derivative));
     for (const auto& verification : result.verification)
         maximumRelativeVerificationError = std::max(
             maximumRelativeVerificationError, verification.relativeLinearizationError);
+    for (const auto& comparison : derivativeComparison) {
+        maximumAdjointAbsoluteError = std::max(maximumAdjointAbsoluteError, comparison.absoluteError);
+        maximumAdjointRelativeError = std::max(maximumAdjointRelativeError, comparison.relativeError);
+    }
+    for (const double derivative : adjoint.particleScaleGradient)
+        maximumParticleAdjointDerivative = std::max(maximumParticleAdjointDerivative, std::abs(derivative));
 
     std::cout << std::setprecision(10)
-              << "Captured material Operator Influence reference\n"
+              << "Captured material Operator Influence reference + discrete adjoint\n"
               << "  appearance_gaussians: " << cloud.size() << '\n'
               << "  physical_particles: " << dataset.particles.size() << '\n'
               << "  regions: " << result.field.size() << '\n'
@@ -225,8 +244,12 @@ int capturedInfluenceCommand(int argc, char** argv) {
               << "  grid_cell_size: " << cellSize << '\n'
               << "  finite_difference_scale_step: " << finiteDifferenceStep << '\n'
               << "  verification_scale_delta: " << verificationDelta << '\n'
-              << "  max_abs_derivative: " << maximumAbsoluteDerivative << '\n'
-              << "  max_relative_verification_error: " << maximumRelativeVerificationError << '\n'
+              << "  max_abs_reference_derivative: " << maximumAbsoluteDerivative << '\n'
+              << "  max_relative_counterfactual_error: " << maximumRelativeVerificationError << '\n'
+              << "  adjoint_min_stencil_knot_margin: " << adjoint.minimumStencilKnotMargin << '\n'
+              << "  max_abs_particle_adjoint_derivative: " << maximumParticleAdjointDerivative << '\n'
+              << "  max_adjoint_absolute_derivative_error: " << maximumAdjointAbsoluteError << '\n'
+              << "  max_adjoint_relative_derivative_error: " << maximumAdjointRelativeError << '\n'
               << "  outputs: " << outputDirectory.string() << '\n';
     return 0;
 }

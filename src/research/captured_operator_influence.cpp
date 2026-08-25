@@ -1,5 +1,7 @@
 #include "vulkax/research/captured_operator_influence.hpp"
 
+#include "vulkax/autodiff/mpm_adjoint.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -49,12 +51,35 @@ namespace {
     return math::dot(target.predicted - initial.predicted, direction);
 }
 
+[[nodiscard]] math::Vec3 applyAffine(
+    const solvers::Matrix3& deformation,
+    math::Vec3 translation,
+    math::Vec3 position) noexcept {
+    return {
+        deformation[0] * position.x + deformation[1] * position.y + deformation[2] * position.z + translation.x,
+        deformation[3] * position.x + deformation[4] * position.y + deformation[5] * position.z + translation.y,
+        deformation[6] * position.x + deformation[7] * position.y + deformation[8] * position.z + translation.z,
+    };
+}
+
 [[nodiscard]] std::unordered_map<std::uint64_t, const capture::CapturedParticleSpec*> particleById(
     const capture::CapturedDeformableDataset& dataset) {
     std::unordered_map<std::uint64_t, const capture::CapturedParticleSpec*> result;
     result.reserve(dataset.particles.size());
     for (const auto& particle : dataset.particles) {
         if (particle.particleId == 0U || !result.emplace(particle.particleId, &particle).second)
+            throw std::invalid_argument("captured material influence requires unique non-zero particle IDs");
+    }
+    return result;
+}
+
+[[nodiscard]] std::unordered_map<std::uint64_t, std::size_t> particleIndexById(
+    const capture::CapturedDeformableDataset& dataset) {
+    std::unordered_map<std::uint64_t, std::size_t> result;
+    result.reserve(dataset.particles.size());
+    for (std::size_t index = 0; index < dataset.particles.size(); ++index) {
+        const auto id = dataset.particles[index].particleId;
+        if (id == 0U || !result.emplace(id, index).second)
             throw std::invalid_argument("captured material influence requires unique non-zero particle IDs");
     }
     return result;
@@ -77,6 +102,24 @@ namespace {
         centroid += iterator->second->restPosition;
     }
     return centroid / static_cast<double>(region.particleIds.size());
+}
+
+void validateRegions(const std::vector<CapturedMaterialInfluenceRegion>& regions) {
+    if (regions.empty())
+        throw std::invalid_argument("captured material influence requires at least one region");
+    std::unordered_set<std::string> regionIds;
+    regionIds.reserve(regions.size());
+    for (const auto& region : regions) {
+        if (region.id.empty() || !regionIds.insert(region.id).second)
+            throw std::invalid_argument("captured material influence region IDs must be unique and non-empty");
+    }
+}
+
+void validateObjectiveSettings(const CapturedMaterialInfluenceSettings& influenceSettings) {
+    if (influenceSettings.objectiveMarkerId.empty())
+        throw std::invalid_argument("captured material influence objective marker ID is empty");
+    if (!std::isfinite(influenceSettings.objectiveTime) || influenceSettings.objectiveTime <= 0.0)
+        throw std::invalid_argument("captured material influence objective time must be positive");
 }
 
 [[nodiscard]] std::unordered_map<std::uint64_t, double> regionScales(
@@ -113,12 +156,8 @@ CapturedMaterialInfluenceResult computeCapturedMaterialInfluenceReference(
     NonlinearDeformableWorldSettings settings,
     const std::vector<CapturedMaterialInfluenceRegion>& regions,
     const CapturedMaterialInfluenceSettings& influenceSettings) {
-    if (regions.empty())
-        throw std::invalid_argument("captured material influence requires at least one region");
-    if (influenceSettings.objectiveMarkerId.empty())
-        throw std::invalid_argument("captured material influence objective marker ID is empty");
-    if (!std::isfinite(influenceSettings.objectiveTime) || influenceSettings.objectiveTime <= 0.0)
-        throw std::invalid_argument("captured material influence objective time must be positive");
+    validateRegions(regions);
+    validateObjectiveSettings(influenceSettings);
     if (!std::isfinite(influenceSettings.finiteDifferenceScaleStep) ||
         influenceSettings.finiteDifferenceScaleStep <= 0.0 ||
         influenceSettings.finiteDifferenceScaleStep >= 1.0)
@@ -126,13 +165,6 @@ CapturedMaterialInfluenceResult computeCapturedMaterialInfluenceReference(
     if (!std::isfinite(influenceSettings.verificationScaleDelta) ||
         influenceSettings.verificationScaleDelta <= -1.0)
         throw std::invalid_argument("captured material influence verification scale delta must exceed -1");
-
-    std::unordered_set<std::string> regionIds;
-    regionIds.reserve(regions.size());
-    for (const auto& region : regions) {
-        if (region.id.empty() || !regionIds.insert(region.id).second)
-            throw std::invalid_argument("captured material influence region IDs must be unique and non-empty");
-    }
 
     const auto direction = normalizedDirection(influenceSettings.objectiveDirection);
     const auto particles = particleById(dataset);
@@ -190,6 +222,131 @@ CapturedMaterialInfluenceResult computeCapturedMaterialInfluenceReference(
     return result;
 }
 
+CapturedMaterialAdjointInfluenceResult computeCapturedMaterialInfluenceAdjoint(
+    gaussian::GaussianCloud world,
+    const std::vector<std::size_t>& activeGaussianIndices,
+    const capture::CapturedDeformableDataset& dataset,
+    const solvers::MpmGridSettings& grid,
+    NonlinearDeformableWorldSettings settings,
+    const std::vector<CapturedMaterialInfluenceRegion>& regions,
+    const CapturedMaterialInfluenceSettings& influenceSettings) {
+    validateRegions(regions);
+    validateObjectiveSettings(influenceSettings);
+    if (settings.transferScheme != solvers::MpmTransferScheme::APIC || settings.flipBlend != 0.0)
+        throw std::invalid_argument("captured material adjoint currently requires pure APIC transfer");
+    if (grid.boundaryCells != 0U)
+        throw std::invalid_argument("captured material adjoint currently requires boundaryCells == 0");
+
+    const auto direction = normalizedDirection(influenceSettings.objectiveDirection);
+    const auto particles = particleById(dataset);
+    const auto particleIndices = particleIndexById(dataset);
+    for (const auto& region : regions) (void)regionCentroid(region, particles);
+
+    const auto baseline = runCapturedFreeRelaxationBenchmark(
+        world, activeGaussianIndices, dataset, grid, settings);
+    const double baselineObservable = observable(baseline, influenceSettings, direction);
+    const auto& objectiveSample = findSample(
+        baseline, influenceSettings.objectiveMarkerId, influenceSettings.objectiveTime);
+    const auto objectiveIterator = particleIndices.find(objectiveSample.particleId);
+    if (objectiveIterator == particleIndices.end())
+        throw std::runtime_error("captured material adjoint objective particle is missing");
+
+    const double exactSteps = influenceSettings.objectiveTime / settings.dt;
+    const auto roundedSteps = static_cast<long long>(std::llround(exactSteps));
+    if (roundedSteps <= 0 ||
+        std::abs(static_cast<double>(roundedSteps) * settings.dt - influenceSettings.objectiveTime) >
+            std::max(1.0e-12, influenceSettings.objectiveTime * 1.0e-10))
+        throw std::invalid_argument("captured material adjoint objective time is off the solver lattice");
+
+    auto mpmParticles = capture::makeMpmParticles(dataset.particles);
+    for (auto& particle : mpmParticles) {
+        particle.position = applyAffine(
+            baseline.fittedInitialDeformation,
+            baseline.fittedInitialTranslation,
+            particle.restPosition);
+        particle.deformationGradient = baseline.fittedInitialDeformation;
+        particle.velocity = {};
+        particle.affineVelocity = {};
+        particle.externalForce = {};
+        particle.youngModulusScale = 1.0;
+    }
+
+    const auto adjoint = autodiff::differentiateMpmApicMaterialScales(
+        std::move(mpmParticles),
+        grid,
+        settings.material,
+        settings.dt,
+        static_cast<std::size_t>(roundedSteps),
+        objectiveIterator->second,
+        direction);
+    if (std::abs(adjoint.objective - baselineObservable) >
+        std::max(1.0e-12, std::abs(baselineObservable) * 1.0e-9))
+        throw std::runtime_error("captured material adjoint forward objective does not match captured replay");
+
+    CapturedMaterialAdjointInfluenceResult result;
+    result.objectiveMarkerId = influenceSettings.objectiveMarkerId;
+    result.objectiveTime = influenceSettings.objectiveTime;
+    result.objectiveDirection = direction;
+    result.baselineObservable = baselineObservable;
+    result.minimumStencilKnotMargin = adjoint.minimumStencilKnotMargin;
+    result.particleIds.reserve(dataset.particles.size());
+    for (const auto& particle : dataset.particles) result.particleIds.push_back(particle.particleId);
+    result.particleScaleGradient = adjoint.particleScaleGradient;
+    if (result.particleIds.size() != result.particleScaleGradient.size())
+        throw std::runtime_error("captured material adjoint particle field size mismatch");
+    result.field.reserve(regions.size());
+
+    for (const auto& region : regions) {
+        CapturedMaterialAdjointInfluenceFieldSample field;
+        field.regionId = region.id;
+        field.particleCount = region.particleIds.size();
+        field.restCentroid = regionCentroid(region, particles);
+        for (const auto particleId : region.particleIds)
+            field.derivative += result.particleScaleGradient.at(particleIndices.at(particleId));
+        if (!std::isfinite(field.derivative))
+            throw std::runtime_error("captured material adjoint derivative is non-finite");
+        result.field.push_back(field);
+    }
+    return result;
+}
+
+std::vector<CapturedMaterialInfluenceDerivativeComparison>
+compareCapturedMaterialInfluenceDerivatives(
+    const CapturedMaterialInfluenceResult& reference,
+    const CapturedMaterialAdjointInfluenceResult& adjoint) {
+    if (reference.objectiveMarkerId != adjoint.objectiveMarkerId ||
+        !sameTime(reference.objectiveTime, adjoint.objectiveTime))
+        throw std::invalid_argument("captured influence derivative comparison objective mismatch");
+    std::unordered_map<std::string, double> adjointByRegion;
+    adjointByRegion.reserve(adjoint.field.size());
+    for (const auto& field : adjoint.field) {
+        if (!adjointByRegion.emplace(field.regionId, field.derivative).second)
+            throw std::invalid_argument("captured adjoint influence contains duplicate region IDs");
+    }
+    std::vector<CapturedMaterialInfluenceDerivativeComparison> result;
+    result.reserve(reference.field.size());
+    for (const auto& field : reference.field) {
+        const auto iterator = adjointByRegion.find(field.regionId);
+        if (iterator == adjointByRegion.end())
+            throw std::invalid_argument("captured adjoint influence is missing a reference region");
+        CapturedMaterialInfluenceDerivativeComparison sample;
+        sample.regionId = field.regionId;
+        sample.referenceDerivative = field.derivative;
+        sample.adjointDerivative = iterator->second;
+        sample.absoluteError = std::abs(sample.adjointDerivative - sample.referenceDerivative);
+        const double scale = std::max({
+            1.0e-12,
+            std::abs(sample.referenceDerivative),
+            std::abs(sample.adjointDerivative),
+        });
+        sample.relativeError = sample.absoluteError / scale;
+        result.push_back(sample);
+    }
+    if (adjointByRegion.size() != result.size())
+        throw std::invalid_argument("captured adjoint influence has regions absent from the reference");
+    return result;
+}
+
 void writeCapturedMaterialInfluenceCsv(
     const CapturedMaterialInfluenceResult& result,
     const std::filesystem::path& path) {
@@ -222,6 +379,49 @@ void writeCapturedMaterialCounterfactualCsv(
                << verification.relativeLinearizationError << '\n';
     }
     if (!stream) throw std::runtime_error("failed while writing captured material counterfactual CSV");
+}
+
+void writeCapturedMaterialAdjointInfluenceCsv(
+    const CapturedMaterialAdjointInfluenceResult& result,
+    const std::filesystem::path& path) {
+    std::ofstream stream(path);
+    if (!stream) throw std::runtime_error("failed to open captured material adjoint influence CSV");
+    stream << "region_id,particle_count,centroid_x,centroid_y,centroid_z,adjoint_derivative\n";
+    stream << std::setprecision(17);
+    for (const auto& field : result.field) {
+        stream << field.regionId << ',' << field.particleCount << ','
+               << field.restCentroid.x << ',' << field.restCentroid.y << ',' << field.restCentroid.z << ','
+               << field.derivative << '\n';
+    }
+    if (!stream) throw std::runtime_error("failed while writing captured material adjoint influence CSV");
+}
+
+void writeCapturedMaterialParticleAdjointCsv(
+    const CapturedMaterialAdjointInfluenceResult& result,
+    const std::filesystem::path& path) {
+    if (result.particleIds.size() != result.particleScaleGradient.size())
+        throw std::invalid_argument("captured material particle adjoint field size mismatch");
+    std::ofstream stream(path);
+    if (!stream) throw std::runtime_error("failed to open captured material particle adjoint CSV");
+    stream << "particle_id,adjoint_derivative\n";
+    stream << std::setprecision(17);
+    for (std::size_t index = 0; index < result.particleIds.size(); ++index)
+        stream << result.particleIds[index] << ',' << result.particleScaleGradient[index] << '\n';
+    if (!stream) throw std::runtime_error("failed while writing captured material particle adjoint CSV");
+}
+
+void writeCapturedMaterialInfluenceDerivativeComparisonCsv(
+    const std::vector<CapturedMaterialInfluenceDerivativeComparison>& comparison,
+    const std::filesystem::path& path) {
+    std::ofstream stream(path);
+    if (!stream) throw std::runtime_error("failed to open captured influence derivative comparison CSV");
+    stream << "region_id,reference_derivative,adjoint_derivative,absolute_error,relative_error\n";
+    stream << std::setprecision(17);
+    for (const auto& sample : comparison) {
+        stream << sample.regionId << ',' << sample.referenceDerivative << ',' << sample.adjointDerivative << ','
+               << sample.absoluteError << ',' << sample.relativeError << '\n';
+    }
+    if (!stream) throw std::runtime_error("failed while writing captured influence derivative comparison CSV");
 }
 
 } // namespace vulkax::research

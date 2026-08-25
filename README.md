@@ -31,7 +31,7 @@ appearance <-> semantics <-> physical representation
 
 The research question is stronger than Gaussian editing: **can a reconstructed real scene be rewritten locally — geometry, material, constraints and eventually topology — while keeping appearance, physical state and provenance mutually consistent and quantitatively trustworthy?**
 
-## Current research implementation — 0.36 development head
+## Current research implementation — 0.37 development head
 
 ### Captured-world representation
 
@@ -121,19 +121,25 @@ selected_evidence.csv
 
 This deterministic example is a controlled regression, **not evidence that real-world material identification has been solved**. Real captured observations with measurement noise, imperfect correspondences and model discrepancy are still required.
 
-### Captured material Operator Influence reference
+### Captured material Operator Influence: reference + discrete adjoint
 
-The same captured deformable representation now supports a first nonlinear local-material influence oracle:
+The captured deformable representation now has both a nonlinear finite-difference material-influence oracle and a reverse-mode APIC/MPM derivative implementation:
 
 - every MPM particle carries an optional Young's-modulus scale keyed by its stable particle ID; the default is exactly `1.0`, preserving the homogeneous solver path;
 - constitutive forces and elastic-energy evidence use the same local stiffness coefficient field;
 - the scalar observable is the displacement of a selected tracked marker from `t=0` to a selected observation time, projected onto a requested direction;
-- the public CLI currently partitions the rest-space physical body into non-empty octants;
-- each region is perturbed independently with a central finite difference to estimate `dJ / d(scale)`;
-- every region is then rerun at a **different** perturbation magnitude so first-order counterfactual predictions are checked against an independent nonlinear simulation rather than the derivative samples themselves;
-- the controlled regression uses the synthetic captured object and a held-out tracked marker.
+- the public CLI partitions the rest-space physical body into non-empty octants for the reference comparison;
+- each reference region is perturbed independently with a central finite difference to estimate `dJ / d(scale)`;
+- every reference region is then rerun at a **different** perturbation magnitude so first-order counterfactual predictions are checked against an independent nonlinear simulation rather than the derivative samples themselves;
+- the discrete adjoint differentiates the actual controlled APIC path in reverse through P2G, grid mass normalization/update, APIC G2P, quadratic B-spline weight/gradient dependence, affine-velocity update, deformation-gradient evolution and Neo-Hookean Kirchhoff stress;
+- the constitutive derivative with respect to each particle-local Young's-modulus scale is analytic;
+- one reverse trajectory produces `dJ/ds_p` for every physical particle, preserving stable particle IDs in the exported field;
+- an octant adjoint derivative is the sum of its constituent particle gradients and is compared directly against the finite-difference oracle;
+- the adjoint exports the minimum distance of the baseline trajectory from a quadratic B-spline stencil knot so the current piecewise-smooth derivative assumption is explicit rather than hidden.
 
-Reproduce the reference field after generating the captured example:
+The current reverse kernel deliberately matches the controlled captured benchmark: **pure APIC, zero external/gravity forcing and `boundaryCells == 0`**. Reverse rules for FLIP blending, boundary clamps and general forcing have not yet been claimed or validated.
+
+Reproduce both fields after generating the captured example:
 
 ```bash
 ./build/vulkax captured-material-influence \
@@ -161,18 +167,21 @@ The influence command writes:
 ```text
 influence.csv
 counterfactual.csv
+adjoint_influence.csv
+particle_adjoint.csv
+derivative_comparison.csv
 baseline_samples.csv
 baseline_summary.csv
 baseline_evidence.csv
 ```
 
-`influence.csv` contains the rest-space region centroid and local derivative. `counterfactual.csv` records baseline, first-order prediction, independent rerun result, absolute error and relative linearization error for each region.
+`influence.csv` remains the nonlinear finite-difference region oracle. `counterfactual.csv` records baseline, first-order prediction, independent rerun result, absolute error and relative linearization error. `particle_adjoint.csv` exposes the stable-ID particle-local reverse-mode field, `adjoint_influence.csv` aggregates that field onto the requested regions, and `derivative_comparison.csv` records reference derivative, adjoint derivative, absolute error and relative error for every region.
 
-This path is deliberately called a **finite-difference reference/oracle**. It establishes the semantics and verification target for captured-object Operator Influence; it is not yet the scalable discrete-adjoint implementation and is not a claim that real captured material influence has been validated experimentally.
+The finite-difference path remains the **verification oracle**, not an implementation detail to delete after the adjoint passes. The adjoint establishes an efficient derivative path for this controlled APIC regime; neither path establishes real-world material influence experimentally, general differentiable MPM, production-scale performance, or publishable novelty by itself.
 
 ### Existing computational foundation
 
-The repository also contains typed SI dimensions, `ProblemIR`, operator graphs, solver/fidelity planning, numerical reference solvers, result certificates, goal-oriented adaptivity, inverse/optimization foundations, discrete adjoints, global and local Operator Influence foundations, geometry/voxelization, scientific visualization, camera/capture, Vulkan/Metal probing and native compute conformance.
+The repository also contains typed SI dimensions, `ProblemIR`, operator graphs, solver/fidelity planning, numerical reference solvers, result certificates, goal-oriented adaptivity, inverse/optimization foundations, generic discrete-adjoint foundations, global and local Operator Influence foundations, geometry/voxelization, scientific visualization, camera/capture, Vulkan/Metal probing and native compute conformance.
 
 ## Research-integrity status
 
@@ -180,7 +189,7 @@ Release tests are compiled with assertions active. Enabling them exposed two pre
 
 The native Gaussian renderer and covariance-coupling path must continue to pass the Linux/macOS/Windows matrix and real Metal/Vulkan smoke tests before stronger validation claims are made. CI renders the tracked Gaussian scene through Vulkan on Linux and Metal on macOS.
 
-The captured-deformable path has controlled synthetic replay, material-identification and local-material influence regressions, including held-out observations. The influence implementation is currently a nonlinear finite-difference reference with rerun verification, not the final adjoint field solver. None of these controlled cases establishes real-world material recovery, production-scale Gaussian rendering, topology rewriting, automatic semantic reconstruction, XR interaction, or publishable novelty.
+The captured-deformable path has controlled synthetic replay, material-identification and local-material influence regressions, including held-out observations. The material-influence path retains its nonlinear finite-difference/rerun oracle and now checks the APIC material-scale adjoint against it region by region. CI also requires a nonzero particle-level adjoint field. This is still controlled synthetic verification: it does **not** establish real-world material recovery/influence, derivative correctness through unimplemented FLIP/boundary branches, production-scale Gaussian rendering, topology rewriting, automatic semantic reconstruction, XR interaction, or publishable novelty.
 
 ## Build and test
 
@@ -249,8 +258,9 @@ Existing problem and backend commands remain:
 4. **Captured deformable baseline: implemented** for controlled Gaussian + APIC/MPM replay with explicit correspondence and evidence export.
 5. **Transfer/conservation/error benchmarking: implemented foundation**, with real-capture evaluation still pending.
 6. **Material identification: implemented controlled fit/held-out grid-search regression**, with noisy real observations and uncertainty analysis still pending.
-7. **Captured local material Operator Influence: finite-difference reference implemented with independent rerun verification.** Next replace the expensive oracle with a discrete-adjoint field and compare it quantitatively against this reference.
-8. Run the same replay, identification and influence pipeline on a measured real captured deformable with uncertainty/noise analysis.
-9. Add XR only once the physical/coupling mechanisms are quantitatively trustworthy.
+7. **Captured local material Operator Influence: finite-difference oracle + controlled APIC discrete adjoint implemented**, with region-by-region derivative comparison and independent nonlinear counterfactual reruns.
+8. Use the particle-level adjoint field to propose adaptive/material regions and verify those proposed rewrites against the retained nonlinear oracle.
+9. Run the same replay, identification and influence pipeline on a measured real captured deformable with uncertainty/noise analysis.
+10. Add XR only once the physical/coupling mechanisms are quantitatively trustworthy.
 
 See [`docs/REWRITABLE_REALITY.md`](docs/REWRITABLE_REALITY.md), [`docs/RESEARCH.md`](docs/RESEARCH.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and [`docs/VISION.md`](docs/VISION.md).
