@@ -61,8 +61,14 @@ using Matrix4 = std::array<std::array<double, 4>, 4>;
     const std::vector<solvers::MpmParticle>& particles,
     const solvers::MpmMaterial& material) {
     double result = 0.0;
-    for (const auto& particle : particles)
-        result += particle.restVolume * neoHookeanEnergyDensity(particle.deformationGradient, material);
+    for (const auto& particle : particles) {
+        if (!std::isfinite(particle.youngModulusScale) || particle.youngModulusScale < 0.0)
+            throw std::invalid_argument("nonlinear experiment particle Young's modulus scale must be finite and non-negative");
+        auto localMaterial = material;
+        localMaterial.youngModulus *= particle.youngModulusScale;
+        result += particle.restVolume * neoHookeanEnergyDensity(
+            particle.deformationGradient, localMaterial);
+    }
     return result;
 }
 
