@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-#include <limits>
 #include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 
 namespace vulkax::capture {
 namespace {
@@ -43,6 +43,9 @@ namespace {
 }
 
 [[nodiscard]] std::uint64_t parseId(const std::string& text, const char* label, std::size_t lineNumber) {
+    if (text.empty() || text.front() == '-')
+        throw std::invalid_argument(std::string(label) + " is not an unsigned integer at CSV line " +
+                                    std::to_string(lineNumber));
     std::size_t consumed = 0;
     unsigned long long value = 0;
     try {
@@ -50,7 +53,7 @@ namespace {
     } catch (const std::exception&) {
         throw std::invalid_argument(std::string(label) + " is not an unsigned integer at CSV line " + std::to_string(lineNumber));
     }
-    if (consumed != text.size() || value == 0ULL || value > std::numeric_limits<std::uint64_t>::max())
+    if (consumed != text.size() || value == 0ULL)
         throw std::invalid_argument(std::string(label) + " is invalid at CSV line " + std::to_string(lineNumber));
     return static_cast<std::uint64_t>(value);
 }
