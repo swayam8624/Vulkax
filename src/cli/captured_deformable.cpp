@@ -3,6 +3,7 @@
 #include "vulkax/capture/deformable_dataset.hpp"
 #include "vulkax/gaussian/gaussian_cloud.hpp"
 #include "vulkax/research/captured_deformable.hpp"
+#include "vulkax/research/captured_material_calibration.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -100,9 +101,80 @@ namespace {
     return grid;
 }
 
+[[nodiscard]] research::NonlinearDeformableWorldSettings baseSettings(
+    const capture::CapturedDeformableDataset& dataset,
+    double dt) {
+    research::NonlinearDeformableWorldSettings settings;
+    settings.dt = dt;
+    settings.material.density = 1000.0;
+    settings.couplingNeighborCount = std::min<std::size_t>(20U, dataset.particles.size());
+    settings.transferScheme = solvers::MpmTransferScheme::APIC;
+    settings.flipBlend = 0.0;
+    return settings;
+}
+
+[[nodiscard]] int materialCalibrationCommand(int argc, char** argv) {
+    if (argc < 2 || std::string_view(argv[1]) != "captured-material-calibrate") return -1;
+    if (argc < 6)
+        throw std::invalid_argument(
+            "usage: vulkax captured-material-calibrate <object.ply> <particles.csv> "
+            "<observations.csv> <output-dir> [dt] [cell-size]");
+
+    const auto cloud = gaussian::load3dgsPly(argv[2]);
+    const auto dataset = capture::loadCapturedDeformableDataset(argv[3], argv[4]);
+    const std::filesystem::path outputDirectory(argv[5]);
+    const double dt = argc >= 7 ? parsePositiveDouble(argv[6], "timestep") : 5.0e-5;
+    const double cellSize = argc >= 8
+        ? parsePositiveDouble(argv[7], "cell size")
+        : characteristicParticleSpacing(dataset.particles) * (2.0 / 3.0);
+
+    std::vector<std::size_t> activeIndices(cloud.size());
+    std::iota(activeIndices.begin(), activeIndices.end(), 0U);
+    const std::vector<double> youngCandidates{
+        5.0e3, 7.5e3, 1.0e4, 1.5e4, 2.2e4, 3.3e4, 5.0e4,
+    };
+    const std::vector<double> poissonCandidates{0.20, 0.30, 0.40, 0.45};
+
+    const auto result = research::calibrateCapturedMaterialGrid(
+        cloud, activeIndices, dataset, makeGrid(dataset, cellSize), baseSettings(dataset, dt),
+        youngCandidates, poissonCandidates);
+    const auto& selected = result.candidates.at(result.selectedIndex);
+
+    std::filesystem::create_directories(outputDirectory);
+    research::writeCapturedMaterialCalibrationCsv(result, outputDirectory / "material_grid.csv");
+    research::writeCapturedReplaySamplesCsv(result.selectedReplay, outputDirectory / "selected_samples.csv");
+    research::writeCapturedReplaySummaryCsv(result.selectedReplay, outputDirectory / "selected_summary.csv");
+    research::writeNonlinearDeformableWorldEvidenceCsv(
+        result.selectedReplay.simulation, outputDirectory / "selected_evidence.csv");
+
+    std::cout << std::setprecision(10)
+              << "Captured deformable material calibration\n"
+              << "  appearance_gaussians: " << cloud.size() << '\n'
+              << "  physical_particles: " << dataset.particles.size() << '\n'
+              << "  observations: " << dataset.observations.size() << '\n'
+              << "  candidates: " << result.candidates.size() << '\n'
+              << "  selection_data: fit split, t > 0 only\n"
+              << "  transfer: APIC\n"
+              << "  dt: " << dt << '\n'
+              << "  grid_cell_size: " << cellSize << '\n'
+              << "  selected_young_modulus: " << selected.youngModulus << '\n'
+              << "  selected_poisson_ratio: " << selected.poissonRatio << '\n'
+              << "  fit_dynamic_samples: " << selected.fitDynamicSamples << '\n'
+              << "  fit_dynamic_rms: " << selected.fitDynamicRms << '\n'
+              << "  validation_dynamic_samples: " << selected.validationDynamicSamples << '\n'
+              << "  validation_dynamic_rms: " << selected.validationDynamicRms << '\n'
+              << "  initialization_fit_rms: " << selected.initializationFitRms << '\n'
+              << "  appearance_roundtrip_rms: " << selected.appearanceRoundtripRms << '\n'
+              << "  outputs: " << outputDirectory.string() << '\n';
+    return 0;
+}
+
 } // namespace
 
 int capturedDeformableCommand(int argc, char** argv) {
+    const int calibration = materialCalibrationCommand(argc, argv);
+    if (calibration >= 0) return calibration;
+
     if (argc < 2 || std::string_view(argv[1]) != "captured-deformable-evaluate") return -1;
     if (argc < 6)
         throw std::invalid_argument(
@@ -124,12 +196,9 @@ int capturedDeformableCommand(int argc, char** argv) {
     std::vector<std::size_t> activeIndices(cloud.size());
     std::iota(activeIndices.begin(), activeIndices.end(), 0U);
 
-    research::NonlinearDeformableWorldSettings settings;
-    settings.dt = dt;
-    settings.material = {1000.0, young, poisson};
-    settings.couplingNeighborCount = std::min<std::size_t>(20U, dataset.particles.size());
-    settings.transferScheme = solvers::MpmTransferScheme::APIC;
-    settings.flipBlend = 0.0;
+    auto settings = baseSettings(dataset, dt);
+    settings.material.youngModulus = young;
+    settings.material.poissonRatio = poisson;
 
     const auto grid = makeGrid(dataset, cellSize);
     const auto result = research::runCapturedFreeRelaxationBenchmark(
