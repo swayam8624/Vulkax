@@ -68,8 +68,10 @@ struct CapturedMaterialAdjointInfluenceResult {
     math::Vec3 objectiveDirection{};
     double baselineObservable{};
     double minimumStencilKnotMargin{};
-    // Ordered exactly like dataset.particles. This is dJ/ds_p for each stable
-    // particle-local Young's-modulus coefficient.
+    // Both vectors are ordered exactly like dataset.particles. particleIds
+    // preserves the stable correspondence needed to export and reuse the
+    // particle-local dJ/ds_p field without relying on transient array indices.
+    std::vector<std::uint64_t> particleIds;
     std::vector<double> particleScaleGradient;
     std::vector<CapturedMaterialAdjointInfluenceFieldSample> field;
 };
@@ -127,6 +129,10 @@ void writeCapturedMaterialCounterfactualCsv(
     const std::filesystem::path& path);
 
 void writeCapturedMaterialAdjointInfluenceCsv(
+    const CapturedMaterialAdjointInfluenceResult& result,
+    const std::filesystem::path& path);
+
+void writeCapturedMaterialParticleAdjointCsv(
     const CapturedMaterialAdjointInfluenceResult& result,
     const std::filesystem::path& path);
 
