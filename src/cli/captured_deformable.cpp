@@ -3,6 +3,7 @@
 #include "vulkax/capture/deformable_dataset.hpp"
 #include "vulkax/cli/captured_example.hpp"
 #include "vulkax/cli/captured_influence.hpp"
+#include "vulkax/cli/captured_observation_robustness.hpp"
 #include "vulkax/gaussian/gaussian_cloud.hpp"
 #include "vulkax/research/captured_deformable.hpp"
 #include "vulkax/research/captured_material_calibration.hpp"
@@ -179,6 +180,9 @@ int capturedDeformableCommand(int argc, char** argv) {
 
     const int influence = capturedInfluenceCommand(argc, argv);
     if (influence >= 0) return influence;
+
+    const int robustness = capturedObservationRobustnessCommand(argc, argv);
+    if (robustness >= 0) return robustness;
 
     const int calibration = materialCalibrationCommand(argc, argv);
     if (calibration >= 0) return calibration;
