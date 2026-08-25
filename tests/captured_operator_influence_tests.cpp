@@ -1,3 +1,4 @@
+#include "vulkax/research/adaptive_material_influence.hpp"
 #include "vulkax/research/captured_operator_influence.hpp"
 
 #include <algorithm>
@@ -8,6 +9,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace {
@@ -224,5 +226,70 @@ int main() {
     assert(maximumDerivative > 1.0e-7);
     assert(maximumActualChange > 1.0e-9);
     assert(maximumAdjointRelativeError < 0.05);
+
+    // 0.38: use only the particle adjoint field to propose spatial regions,
+    // then verify those regions independently through the retained nonlinear
+    // finite-difference/rerun oracle.
+    research::CapturedMaterialAdaptiveRegionSettings adaptiveSettings;
+    adaptiveSettings.cumulativeAbsoluteGradientFraction = 0.90;
+    adaptiveSettings.relativeParticleGradientThreshold = 0.05;
+    adaptiveSettings.adjacencyRadiusMultiplier = 1.05;
+    adaptiveSettings.maximumRegions = 8U;
+    const auto proposal = research::proposeCapturedMaterialInfluenceRegions(
+        dataset, adjoint, adaptiveSettings);
+    assert(!proposal.regions.empty());
+    assert(proposal.regions.size() <= adaptiveSettings.maximumRegions);
+    assert(proposal.candidateParticleCount > 0U);
+    assert(proposal.proposedParticleCount > 0U);
+    assert(proposal.proposedParticleCount <= proposal.candidateParticleCount);
+    assert(proposal.candidateAbsoluteGradientFraction + 1.0e-12 >=
+           adaptiveSettings.cumulativeAbsoluteGradientFraction);
+    assert(proposal.proposedAbsoluteGradientFraction > 0.0);
+    assert(std::abs(proposal.characteristicSpacing - 0.12) < 1.0e-12);
+    assert(proposal.adjacencyRadius > proposal.characteristicSpacing);
+
+    std::unordered_set<std::uint64_t> proposedIds;
+    for (const auto& region : proposal.regions) {
+        assert(!region.particleIds.empty());
+        for (const auto id : region.particleIds) {
+            assert(id >= 1U && id <= 64U);
+            assert(proposedIds.insert(id).second);
+        }
+    }
+    assert(proposedIds.size() == proposal.proposedParticleCount);
+
+    const auto adaptiveAdjoint = research::aggregateCapturedMaterialInfluenceAdjoint(
+        dataset, adjoint, proposal.regions);
+    assert(adaptiveAdjoint.field.size() == proposal.regions.size());
+    for (std::size_t regionIndex = 0; regionIndex < proposal.regions.size(); ++regionIndex) {
+        double expectedDerivative = 0.0;
+        for (const auto id : proposal.regions[regionIndex].particleIds)
+            expectedDerivative += adjoint.particleScaleGradient.at(static_cast<std::size_t>(id - 1U));
+        assert(std::abs(adaptiveAdjoint.field[regionIndex].derivative - expectedDerivative) < 1.0e-15);
+    }
+
+    const auto adaptiveReference = research::computeCapturedMaterialInfluenceReference(
+        capturedWorld, active, dataset, makeGrid(), settings, proposal.regions, influenceSettings);
+    const auto adaptiveComparison = research::compareCapturedMaterialInfluenceDerivatives(
+        adaptiveReference, adaptiveAdjoint);
+    assert(adaptiveReference.field.size() == proposal.regions.size());
+    assert(adaptiveReference.verification.size() == proposal.regions.size());
+    assert(adaptiveComparison.size() == proposal.regions.size());
+
+    double maximumAdaptiveActualChange = 0.0;
+    for (std::size_t index = 0; index < adaptiveReference.field.size(); ++index) {
+        const auto& verification = adaptiveReference.verification[index];
+        const auto& derivativeComparison = adaptiveComparison[index];
+        assert(verification.absoluteError < 1.0e-7);
+        assert(derivativeComparison.absoluteError < 1.0e-8);
+        if (std::abs(derivativeComparison.referenceDerivative) > 1.0e-7)
+            assert(derivativeComparison.relativeError < 5.0e-3);
+        const double actualChange = std::abs(
+            verification.actualObservable - adaptiveReference.baselineObservable);
+        maximumAdaptiveActualChange = std::max(maximumAdaptiveActualChange, actualChange);
+        if (actualChange > 1.0e-9)
+            assert(verification.relativeLinearizationError < 0.25);
+    }
+    assert(maximumAdaptiveActualChange > 1.0e-9);
     return 0;
 }

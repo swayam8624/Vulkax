@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Vulkax VERSION 0.37.0 LANGUAGES CXX)
+project(Vulkax VERSION 0.38.0 LANGUAGES CXX)
 option(VULKAX_BUILD_TESTS "Build Vulkax tests" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +11,7 @@ add_library(vulkax_core STATIC
     src/numerics/dense.cpp src/numerics/grid.cpp src/operators/operator_graph.cpp src/optimize/optimizer.cpp
     src/planning/solver_plan.cpp src/problem/document.cpp src/problem/problem_ir.cpp src/problem/validation.cpp
     src/render/camera.cpp src/render/capture.cpp src/render/gaussian.cpp src/render/gaussian_tiles.cpp src/render/headless.cpp src/render/image_metrics.cpp
-    src/research/affine_flip_sweep.cpp src/research/captured_deformable.cpp src/research/captured_material_calibration.cpp src/research/captured_operator_influence.cpp src/research/deformable_world.cpp src/research/energy_cycle.cpp src/research/nonlinear_deformable_world.cpp src/research/timestep_convergence.cpp src/research/transfer_ablation.cpp src/research/transfer_diagnostics.cpp src/research/operator_influence.cpp src/research/local_operator_influence.cpp
+    src/research/adaptive_material_influence.cpp src/research/affine_flip_sweep.cpp src/research/captured_deformable.cpp src/research/captured_material_calibration.cpp src/research/captured_operator_influence.cpp src/research/deformable_world.cpp src/research/energy_cycle.cpp src/research/nonlinear_deformable_world.cpp src/research/timestep_convergence.cpp src/research/transfer_ablation.cpp src/research/transfer_diagnostics.cpp src/research/operator_influence.cpp src/research/local_operator_influence.cpp
     src/solvers/dem.cpp src/solvers/dem_broadphase.cpp src/solvers/diffusion.cpp src/solvers/fem.cpp
     src/solvers/hyperelastic_fem.cpp src/solvers/incompressible2d.cpp src/solvers/mac3d.cpp src/solvers/mpm.cpp src/solvers/rotating_drum.cpp
     src/verify/convergence.cpp src/verify/result_certificate.cpp src/visualization/scientific.cpp

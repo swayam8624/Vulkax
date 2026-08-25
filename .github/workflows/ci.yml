@@ -52,6 +52,11 @@ jobs:
           test -s build/captured-influence/adjoint_influence.csv
           test -s build/captured-influence/particle_adjoint.csv
           test -s build/captured-influence/derivative_comparison.csv
+          test -s build/captured-influence/adaptive_proposal_summary.csv
+          test -s build/captured-influence/adaptive_influence.csv
+          test -s build/captured-influence/adaptive_counterfactual.csv
+          test -s build/captured-influence/adaptive_adjoint_influence.csv
+          test -s build/captured-influence/adaptive_derivative_comparison.csv
           test -s build/captured-influence/baseline_summary.csv
           awk -F, 'NR > 1 { value=$10; if (value < 0) value=-value; if (value > 1e-7) found=1 } END { exit !found }' \
             build/captured-influence/influence.csv
@@ -63,6 +68,16 @@ jobs:
             build/captured-influence/derivative_comparison.csv
           awk -F, 'NR > 1 { ref=$2; if (ref < 0) ref=-ref; if (ref > 1e-7 && $5 > max) max=$5 } END { exit !(max < 0.005) }' \
             build/captured-influence/derivative_comparison.csv
+          awk -F, 'NR == 2 { exit !($1 >= 1 && $3 > 0 && $3 < 64 && $6 >= 0.90 && $8 >= 0.90) }' \
+            build/captured-influence/adaptive_proposal_summary.csv
+          awk -F, 'NR > 1 { value=$10; if (value < 0) value=-value; if (value > 1e-7) found=1 } END { exit !found }' \
+            build/captured-influence/adaptive_influence.csv
+          awk -F, 'NR > 1 { if ($7 > max) max=$7 } END { exit !(max < 0.25) }' \
+            build/captured-influence/adaptive_counterfactual.csv
+          awk -F, 'NR > 1 { if ($4 > max) max=$4 } END { exit !(max < 1e-8) }' \
+            build/captured-influence/adaptive_derivative_comparison.csv
+          awk -F, 'NR > 1 { ref=$2; if (ref < 0) ref=-ref; if (ref > 1e-7 && $5 > max) max=$5 } END { exit !(max < 0.005) }' \
+            build/captured-influence/adaptive_derivative_comparison.csv
       - name: Validate example problems
         run: |
           ./build/vulkax validate examples/rotating_mill.vkx
