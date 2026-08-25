@@ -44,6 +44,10 @@ namespace {
 
 [[nodiscard]] std::size_t parsePositiveSize(std::string_view text, const char* label) {
     const std::string owned(text);
+    if (owned.empty() || !std::all_of(owned.begin(), owned.end(), [](char character) {
+            return character >= '0' && character <= '9';
+        }))
+        throw std::invalid_argument(std::string(label) + " must be a positive integer");
     std::size_t consumed = 0;
     unsigned long long value = 0;
     try {
