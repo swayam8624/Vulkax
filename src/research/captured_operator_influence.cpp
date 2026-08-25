@@ -289,7 +289,11 @@ CapturedMaterialAdjointInfluenceResult computeCapturedMaterialInfluenceAdjoint(
     result.objectiveDirection = direction;
     result.baselineObservable = baselineObservable;
     result.minimumStencilKnotMargin = adjoint.minimumStencilKnotMargin;
+    result.particleIds.reserve(dataset.particles.size());
+    for (const auto& particle : dataset.particles) result.particleIds.push_back(particle.particleId);
     result.particleScaleGradient = adjoint.particleScaleGradient;
+    if (result.particleIds.size() != result.particleScaleGradient.size())
+        throw std::runtime_error("captured material adjoint particle field size mismatch");
     result.field.reserve(regions.size());
 
     for (const auto& region : regions) {
@@ -390,6 +394,20 @@ void writeCapturedMaterialAdjointInfluenceCsv(
                << field.derivative << '\n';
     }
     if (!stream) throw std::runtime_error("failed while writing captured material adjoint influence CSV");
+}
+
+void writeCapturedMaterialParticleAdjointCsv(
+    const CapturedMaterialAdjointInfluenceResult& result,
+    const std::filesystem::path& path) {
+    if (result.particleIds.size() != result.particleScaleGradient.size())
+        throw std::invalid_argument("captured material particle adjoint field size mismatch");
+    std::ofstream stream(path);
+    if (!stream) throw std::runtime_error("failed to open captured material particle adjoint CSV");
+    stream << "particle_id,adjoint_derivative\n";
+    stream << std::setprecision(17);
+    for (std::size_t index = 0; index < result.particleIds.size(); ++index)
+        stream << result.particleIds[index] << ',' << result.particleScaleGradient[index] << '\n';
+    if (!stream) throw std::runtime_error("failed while writing captured material particle adjoint CSV");
 }
 
 void writeCapturedMaterialInfluenceDerivativeComparisonCsv(
