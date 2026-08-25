@@ -78,6 +78,32 @@ jobs:
             build/captured-influence/adaptive_derivative_comparison.csv
           awk -F, 'NR > 1 { ref=$2; if (ref < 0) ref=-ref; if (ref > 1e-7 && $5 > max) max=$5 } END { exit !(max < 0.005) }' \
             build/captured-influence/adaptive_derivative_comparison.csv
+      - name: Captured observation robustness end to end
+        run: |
+          ./build/vulkax captured-observation-robustness \
+            build/captured-example/object.ply \
+            build/captured-example/particles.csv \
+            build/captured-example/observations.csv \
+            build/captured-robustness-a \
+            m4 0.003 1 1 1 \
+            1e-6 1e-6 12345 1e-4 0.08
+          ./build/vulkax captured-observation-robustness \
+            build/captured-example/object.ply \
+            build/captured-example/particles.csv \
+            build/captured-example/observations.csv \
+            build/captured-robustness-b \
+            m4 0.003 1 1 1 \
+            1e-6 1e-6 12345 1e-4 0.08
+          test -s build/captured-robustness-a/robustness.csv
+          test -s build/captured-robustness-a/scenarios.csv
+          cmp build/captured-robustness-a/robustness.csv build/captured-robustness-b/robustness.csv
+          cmp build/captured-robustness-a/scenarios.csv build/captured-robustness-b/scenarios.csv
+          test "$(wc -l < build/captured-robustness-a/robustness.csv)" -eq 7
+          ! grep -Eiq 'nan|inf' build/captured-robustness-a/robustness.csv
+          awk -F, 'NR == 2 { exit !($1 == "baseline" && $5 == 15000 && $6 > 0.299999 && $6 < 0.300001 && $7 == 0 && $8 == 0 && $13 == 1 && $14 == 0 && $16 == 1 && $21 == 1) }' \
+            build/captured-robustness-a/robustness.csv
+          awk -F, 'NR > 2 && $14 > 0 { changed = 1 } END { exit !changed }' \
+            build/captured-robustness-a/robustness.csv
       - name: Validate example problems
         run: |
           ./build/vulkax validate examples/rotating_mill.vkx
