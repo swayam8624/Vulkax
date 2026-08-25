@@ -55,6 +55,33 @@ struct CapturedMaterialInfluenceResult {
     std::vector<CapturedMaterialCounterfactualVerification> verification;
 };
 
+struct CapturedMaterialAdjointInfluenceFieldSample {
+    std::string regionId;
+    std::size_t particleCount{};
+    math::Vec3 restCentroid{};
+    double derivative{};
+};
+
+struct CapturedMaterialAdjointInfluenceResult {
+    std::string objectiveMarkerId;
+    double objectiveTime{};
+    math::Vec3 objectiveDirection{};
+    double baselineObservable{};
+    double minimumStencilKnotMargin{};
+    // Ordered exactly like dataset.particles. This is dJ/ds_p for each stable
+    // particle-local Young's-modulus coefficient.
+    std::vector<double> particleScaleGradient;
+    std::vector<CapturedMaterialAdjointInfluenceFieldSample> field;
+};
+
+struct CapturedMaterialInfluenceDerivativeComparison {
+    std::string regionId;
+    double referenceDerivative{};
+    double adjointDerivative{};
+    double absoluteError{};
+    double relativeError{};
+};
+
 // Nonlinear finite-difference reference for local material Operator Influence.
 // The scalar observable is the projected displacement of objectiveMarkerId from
 // t=0 to objectiveTime. Each region perturbs a coefficient field multiplying
@@ -71,12 +98,40 @@ struct CapturedMaterialInfluenceResult {
     const std::vector<CapturedMaterialInfluenceRegion>& regions,
     const CapturedMaterialInfluenceSettings& influenceSettings);
 
+// Reverse-mode APIC/MPM material Operator Influence for the same captured
+// free-relaxation objective. The adjoint produces particle-local scale
+// gradients in one reverse trajectory; each region derivative is the sum over
+// its listed particle gradients. The current reverse kernel intentionally has
+// the same explicit scope as the controlled benchmark: APIC, zero external
+// forcing/gravity, and no boundary clamping.
+[[nodiscard]] CapturedMaterialAdjointInfluenceResult computeCapturedMaterialInfluenceAdjoint(
+    gaussian::GaussianCloud world,
+    const std::vector<std::size_t>& activeGaussianIndices,
+    const capture::CapturedDeformableDataset& dataset,
+    const solvers::MpmGridSettings& grid,
+    NonlinearDeformableWorldSettings settings,
+    const std::vector<CapturedMaterialInfluenceRegion>& regions,
+    const CapturedMaterialInfluenceSettings& influenceSettings);
+
+[[nodiscard]] std::vector<CapturedMaterialInfluenceDerivativeComparison>
+compareCapturedMaterialInfluenceDerivatives(
+    const CapturedMaterialInfluenceResult& reference,
+    const CapturedMaterialAdjointInfluenceResult& adjoint);
+
 void writeCapturedMaterialInfluenceCsv(
     const CapturedMaterialInfluenceResult& result,
     const std::filesystem::path& path);
 
 void writeCapturedMaterialCounterfactualCsv(
     const CapturedMaterialInfluenceResult& result,
+    const std::filesystem::path& path);
+
+void writeCapturedMaterialAdjointInfluenceCsv(
+    const CapturedMaterialAdjointInfluenceResult& result,
+    const std::filesystem::path& path);
+
+void writeCapturedMaterialInfluenceDerivativeComparisonCsv(
+    const std::vector<CapturedMaterialInfluenceDerivativeComparison>& comparison,
     const std::filesystem::path& path);
 
 } // namespace vulkax::research
