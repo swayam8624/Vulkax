@@ -140,21 +140,22 @@ struct CapturePreflight {
 void requireCalibrationReady(
     const capture::CapturedDeformableDataset& dataset,
     const CapturePreflight& preflight) {
-    if (preflight.markerCount < 3U)
-        throw std::invalid_argument("captured material calibration requires observations from at least three markers");
-    if (preflight.initializationSamples < 3U)
-        throw std::invalid_argument("captured material calibration requires at least three t=0 observations to fit the initial affine state");
+    if (preflight.markerCount < 4U)
+        throw std::invalid_argument("captured material calibration requires observations from at least four markers");
     if (preflight.fitDynamicSamples == 0U)
         throw std::invalid_argument("captured material calibration requires at least one nonzero-time fit observation");
     if (preflight.validationDynamicSamples == 0U)
         throw std::invalid_argument("captured material calibration requires at least one nonzero-time validation observation");
 
-    std::unordered_set<std::uint64_t> initializedParticles;
+    std::size_t fitInitializationSamples = 0;
+    std::unordered_set<std::uint64_t> initializedFitParticles;
     for (const auto& observation : dataset.observations) {
-        if (observation.time <= 1.0e-12) initializedParticles.insert(observation.particleId);
+        if (observation.split != capture::ObservationSplit::Fit || observation.time > 1.0e-12) continue;
+        ++fitInitializationSamples;
+        initializedFitParticles.insert(observation.particleId);
     }
-    if (initializedParticles.size() < 3U)
-        throw std::invalid_argument("t=0 observations must cover at least three distinct physical particles");
+    if (fitInitializationSamples < 4U || initializedFitParticles.size() < 4U)
+        throw std::invalid_argument("captured material calibration requires at least four distinct t=0 fit particles");
 }
 
 [[nodiscard]] research::NonlinearDeformableWorldSettings baseSettings(
