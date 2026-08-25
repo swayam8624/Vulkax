@@ -108,6 +108,7 @@ int main() {
     std::getline(stream, header);
     assert(header.find("particle_position_rms_to_finest") != std::string::npos);
     assert(header.find("observed_particle_position_order") != std::string::npos);
+    stream.close();
     std::filesystem::remove(output);
     return 0;
 }
