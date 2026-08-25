@@ -30,6 +30,8 @@ struct CapturedFreeRelaxationResult {
     solvers::Matrix3 fittedInitialDeformation{solvers::identityMatrix3()};
     math::Vec3 fittedInitialTranslation{};
     double initializationFitRms{};
+    double appearanceRoundtripRms{};
+    double appearanceRoundtripMaximum{};
     CapturedReplayErrorMetrics fit;
     CapturedReplayErrorMetrics validation;
     std::vector<CapturedReplaySample> samples;
@@ -40,7 +42,10 @@ struct CapturedFreeRelaxationResult {
 // runs a free APIC/MPM-compatible nonlinear relaxation. Every later observation
 // is compared against the particle with the explicitly supplied particle_id.
 // Observation times must lie exactly on solver timesteps so the benchmark never
-// hides temporal interpolation error inside the replay metric.
+// hides temporal interpolation error inside the replay metric. The captured
+// active Gaussian object is inverse-warped into rest space with MLS before the
+// simulation, and appearanceRoundtrip* measures whether rest->captured mapping
+// reconstructs the supplied t=0 Gaussian centers.
 [[nodiscard]] CapturedFreeRelaxationResult runCapturedFreeRelaxationBenchmark(
     gaussian::GaussianCloud world,
     const std::vector<std::size_t>& activeGaussianIndices,
