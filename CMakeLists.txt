@@ -15,7 +15,7 @@ add_library(vulkax_core STATIC
     src/solvers/dem.cpp src/solvers/dem_broadphase.cpp src/solvers/diffusion.cpp src/solvers/fem.cpp
     src/solvers/hyperelastic_fem.cpp src/solvers/incompressible2d.cpp src/solvers/mac3d.cpp src/solvers/mpm.cpp src/solvers/rotating_drum.cpp
     src/verify/convergence.cpp src/verify/result_certificate.cpp src/visualization/scientific.cpp
-    src/world/correspondence_graph.cpp src/world/transaction.cpp src/world/world_ir.cpp)
+    src/world/correspondence_graph.cpp src/world/transaction.cpp src/world/verified_rewrite.cpp src/world/world_ir.cpp)
 target_include_directories(vulkax_core PUBLIC include)
 target_compile_features(vulkax_core PUBLIC cxx_std_20)
 find_package(Vulkan QUIET)
@@ -74,7 +74,7 @@ target_link_libraries(vulkax_gaussian_scaling PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute coupling visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render geometry camera_capture mac3d autodiff mpm_adjoint world_gaussian gaussian_render gaussian_scaling gaussian_projection gaussian_scaling_evidence mpm_world deformable_world nonlinear_deformable_world timestep_convergence transfer_ablation transfer_diagnostics energy_cycle affine_flip_sweep captured_deformable captured_material captured_operator_influence captured_observation_robustness captured_bundle captured_bundle_authoring)
+    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute coupling visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render geometry camera_capture mac3d autodiff mpm_adjoint world_gaussian verified_rewrite gaussian_render gaussian_scaling gaussian_projection gaussian_scaling_evidence mpm_world deformable_world nonlinear_deformable_world timestep_convergence transfer_ablation transfer_diagnostics energy_cycle affine_flip_sweep captured_deformable captured_material captured_operator_influence captured_observation_robustness captured_bundle captured_bundle_authoring)
         add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
         target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
         if(MSVC)
