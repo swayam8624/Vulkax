@@ -14,10 +14,12 @@
 #include <iostream>
 #include <limits>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -172,7 +174,7 @@ void writeSummary(const std::filesystem::path& path,
 
 int main(int argc, char** argv) {
     try {
-        if (argc < 10) {
+        if (argc < 9) {
             std::cerr
                 << "usage: vulkax_captured_rewrite <capture.vkcap> <output-dir> <marker-id> <time> "
                    "<dir-x> <dir-y> <dir-z> <particle-ids-csv> "
