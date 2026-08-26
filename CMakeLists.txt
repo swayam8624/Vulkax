@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_library(vulkax_core STATIC
-    src/adapt/goal_oriented.cpp src/autodiff/discrete_adjoint.cpp src/autodiff/mpm_adjoint.cpp src/backend/backend.cpp src/backend/probe.cpp src/capture/deformable_bundle.cpp src/capture/deformable_trajectory_contract.cpp src/capture/deformable_dataset.cpp src/cli/captured_deformable.cpp src/cli/captured_example.cpp src/cli/captured_influence.cpp src/cli/captured_observation_robustness.cpp src/cli/deformable_animation.cpp src/cli/deformable_reference.cpp src/cli/energy_cycle.cpp src/cli/research_validation.cpp src/cli/transfer_ablation.cpp src/compiler/expression.cpp src/compute/conformance.cpp src/core/sha256.cpp src/coupling/mls_embedding.cpp src/coupling/mpm_gaussian.cpp
+    src/adapt/goal_oriented.cpp src/autodiff/discrete_adjoint.cpp src/autodiff/mpm_adjoint.cpp src/backend/backend.cpp src/backend/probe.cpp src/capture/deformable_bundle.cpp src/capture/deformable_bundle_authoring.cpp src/capture/deformable_trajectory_contract.cpp src/capture/deformable_dataset.cpp src/cli/captured_deformable.cpp src/cli/captured_example.cpp src/cli/captured_influence.cpp src/cli/captured_observation_robustness.cpp src/cli/deformable_animation.cpp src/cli/deformable_reference.cpp src/cli/energy_cycle.cpp src/cli/research_validation.cpp src/cli/transfer_ablation.cpp src/compiler/expression.cpp src/compute/conformance.cpp src/core/sha256.cpp src/coupling/mls_embedding.cpp src/coupling/mpm_gaussian.cpp
     src/execution/experiment.cpp src/experiment/design.cpp src/gaussian/gaussian_cloud.cpp src/gaussian/hierarchy.cpp src/geometry/mesh.cpp src/geometry/voxelize.cpp src/inverse/hyperelastic.cpp
     src/numerics/dense.cpp src/numerics/grid.cpp src/operators/operator_graph.cpp src/optimize/optimizer.cpp
     src/planning/solver_plan.cpp src/problem/document.cpp src/problem/problem_ir.cpp src/problem/validation.cpp
@@ -70,7 +70,7 @@ target_link_libraries(vulkax PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
-    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute coupling visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render geometry camera_capture mac3d autodiff mpm_adjoint world_gaussian gaussian_render gaussian_scaling mpm_world deformable_world nonlinear_deformable_world timestep_convergence transfer_ablation transfer_diagnostics energy_cycle affine_flip_sweep captured_deformable captured_material captured_operator_influence captured_observation_robustness captured_bundle)
+    foreach(test_name IN ITEMS core numerics research local_influence compiler_inverse compute coupling visualization planning_fluid fem_dem_scale certificate execution drum_hyperelastic adapt document render geometry camera_capture mac3d autodiff mpm_adjoint world_gaussian gaussian_render gaussian_scaling mpm_world deformable_world nonlinear_deformable_world timestep_convergence transfer_ablation transfer_diagnostics energy_cycle affine_flip_sweep captured_deformable captured_material captured_operator_influence captured_observation_robustness captured_bundle captured_bundle_authoring)
         add_executable(vulkax_${test_name}_tests tests/${test_name}_tests.cpp)
         target_link_libraries(vulkax_${test_name}_tests PRIVATE vulkax_core)
         if(MSVC)

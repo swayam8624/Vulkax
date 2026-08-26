@@ -37,6 +37,26 @@ jobs:
           grep -q 'physical_particles: 64' build/captured-bundle-validation.txt
           grep -q 'observations: 20' build/captured-bundle-validation.txt
           grep -q 'uncertainty_rows: 20' build/captured-bundle-validation.txt
+
+          ./build/vulkax captured-deformable-author-bundle \
+            build/captured-example/authored.vkcap \
+            build/captured-example/object.ply \
+            build/captured-example/particles.csv \
+            build/captured-example/observations.csv \
+            build/captured-example/uncertainty.csv \
+            ci-re-authored-controlled 1e-4 controlled-world right-handed-y-up derived \
+            'CI re-authoring of deterministic synthetic payloads; no measurement claim' \
+            | tee build/captured-bundle-authoring.txt
+          test -s build/captured-example/authored.vkcap
+          grep -q '^AUTHORED captured deformable bundle$' build/captured-bundle-authoring.txt
+          grep -q 'source_kind: derived' build/captured-bundle-authoring.txt
+          grep -q 'payloads_modified: no' build/captured-bundle-authoring.txt
+          ./build/vulkax captured-deformable-validate-bundle \
+            build/captured-example/authored.vkcap | tee build/captured-bundle-authored-validation.txt
+          grep -q 'source_kind: derived' build/captured-bundle-authored-validation.txt
+          grep -q 'physical_particles: 64' build/captured-bundle-authored-validation.txt
+          grep -q 'observations: 20' build/captured-bundle-authored-validation.txt
+
           cp -R build/captured-example build/captured-example-corrupt
           echo '# CI hash mutation' >> build/captured-example-corrupt/observations.csv
           if ./build/vulkax captured-deformable-validate-bundle \
