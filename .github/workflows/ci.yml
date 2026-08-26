@@ -158,6 +158,13 @@ jobs:
           ./build/vulkax gaussian-info examples/synthetic_gaussian.ply
           ./build/vulkax gaussian-render examples/synthetic_gaussian.ply build/gaussian-vulkan.ppm Vulkan
           test -s build/gaussian-vulkan.ppm
+      - name: Gaussian scalable Vulkan evidence
+        run: |
+          ./build/vulkax_gaussian_scaling \
+            examples/synthetic_gaussian.ply \
+            build/gaussian-scaling-vulkan.csv \
+            Vulkan 64 256 3 16
+          python3 scripts/validate_gaussian_scaling.py build/gaussian-scaling-vulkan.csv
 
   macos:
     runs-on: macos-15
@@ -183,6 +190,13 @@ jobs:
           ./build/vulkax gaussian-info examples/synthetic_gaussian.ply
           ./build/vulkax gaussian-render examples/synthetic_gaussian.ply build/gaussian-metal.ppm Metal
           test -s build/gaussian-metal.ppm
+      - name: Gaussian scalable Metal evidence
+        run: |
+          ./build/vulkax_gaussian_scaling \
+            examples/synthetic_gaussian.ply \
+            build/gaussian-scaling-metal.csv \
+            Metal 64 256 3 16
+          python3 scripts/validate_gaussian_scaling.py build/gaussian-scaling-metal.csv
 
   windows:
     runs-on: windows-2025

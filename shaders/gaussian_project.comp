@@ -1,0 +1,183 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct GaussianInput {
+    vec4 positionOpacity;
+    vec4 scale;
+    vec4 rotation;
+    vec4 color;
+};
+
+struct GaussianOutput {
+    vec4 centerMajor;
+    vec4 minorDepth;
+    vec4 colorCull;
+    vec4 tileBounds;
+};
+
+layout(std430, binding = 0) readonly buffer InputBuffer {
+    GaussianInput values[];
+} inputs;
+
+layout(std430, binding = 1) writeonly buffer OutputBuffer {
+    GaussianOutput values[];
+} outputs;
+
+layout(push_constant) uniform ProjectionParameters {
+    vec4 cameraPosition;
+    vec4 right;
+    vec4 up;
+    vec4 forward;
+    vec4 imageFocalNear;
+    vec4 sigmaTile;
+} parameters;
+
+bool finiteFloat(float value) {
+    return !isnan(value) && !isinf(value);
+}
+
+void writeCull(uint index, float reason) {
+    outputs.values[index].centerMajor = vec4(0.0);
+    outputs.values[index].minorDepth = vec4(0.0);
+    outputs.values[index].colorCull = vec4(0.0, 0.0, 0.0, reason);
+    outputs.values[index].tileBounds = vec4(0.0);
+}
+
+float covarianceQuadratic(
+    vec3 a,
+    float c00, float c01, float c02,
+    float c11, float c12, float c22) {
+    return a.x * (c00 * a.x + c01 * a.y + c02 * a.z) +
+           a.y * (c01 * a.x + c11 * a.y + c12 * a.z) +
+           a.z * (c02 * a.x + c12 * a.y + c22 * a.z);
+}
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= inputs.values.length()) return;
+
+    GaussianInput inputValue = inputs.values[index];
+    float opacity = inputValue.positionOpacity.w;
+    if (!finiteFloat(opacity) || opacity < (1.0 / 255.0)) {
+        writeCull(index, 1.0);
+        return;
+    }
+
+    vec3 delta = inputValue.positionOpacity.xyz - parameters.cameraPosition.xyz;
+    float cameraX = dot(delta, parameters.right.xyz);
+    float cameraY = dot(delta, parameters.up.xyz);
+    float cameraZ = dot(delta, parameters.forward.xyz);
+    if (!finiteFloat(cameraZ) || cameraZ <= parameters.imageFocalNear.w) {
+        writeCull(index, 2.0);
+        return;
+    }
+
+    float w = inputValue.rotation.x;
+    float x = inputValue.rotation.y;
+    float y = inputValue.rotation.z;
+    float z = inputValue.rotation.w;
+    float r00 = 1.0 - 2.0 * (y * y + z * z);
+    float r01 = 2.0 * (x * y - z * w);
+    float r02 = 2.0 * (x * z + y * w);
+    float r10 = 2.0 * (x * y + z * w);
+    float r11 = 1.0 - 2.0 * (x * x + z * z);
+    float r12 = 2.0 * (y * z - x * w);
+    float r20 = 2.0 * (x * z - y * w);
+    float r21 = 2.0 * (y * z + x * w);
+    float r22 = 1.0 - 2.0 * (x * x + y * y);
+
+    vec3 axis0 = vec3(r00, r10, r20);
+    vec3 axis1 = vec3(r01, r11, r21);
+    vec3 axis2 = vec3(r02, r12, r22);
+    vec3 axisCamera0 = vec3(
+        dot(parameters.right.xyz, axis0),
+        dot(parameters.up.xyz, axis0),
+        dot(parameters.forward.xyz, axis0));
+    vec3 axisCamera1 = vec3(
+        dot(parameters.right.xyz, axis1),
+        dot(parameters.up.xyz, axis1),
+        dot(parameters.forward.xyz, axis1));
+    vec3 axisCamera2 = vec3(
+        dot(parameters.right.xyz, axis2),
+        dot(parameters.up.xyz, axis2),
+        dot(parameters.forward.xyz, axis2));
+
+    vec3 variance = inputValue.scale.xyz * inputValue.scale.xyz;
+    float c00 = variance.x * axisCamera0.x * axisCamera0.x +
+                variance.y * axisCamera1.x * axisCamera1.x +
+                variance.z * axisCamera2.x * axisCamera2.x;
+    float c01 = variance.x * axisCamera0.x * axisCamera0.y +
+                variance.y * axisCamera1.x * axisCamera1.y +
+                variance.z * axisCamera2.x * axisCamera2.y;
+    float c02 = variance.x * axisCamera0.x * axisCamera0.z +
+                variance.y * axisCamera1.x * axisCamera1.z +
+                variance.z * axisCamera2.x * axisCamera2.z;
+    float c11 = variance.x * axisCamera0.y * axisCamera0.y +
+                variance.y * axisCamera1.y * axisCamera1.y +
+                variance.z * axisCamera2.y * axisCamera2.y;
+    float c12 = variance.x * axisCamera0.y * axisCamera0.z +
+                variance.y * axisCamera1.y * axisCamera1.z +
+                variance.z * axisCamera2.y * axisCamera2.z;
+    float c22 = variance.x * axisCamera0.z * axisCamera0.z +
+                variance.y * axisCamera1.z * axisCamera1.z +
+                variance.z * axisCamera2.z * axisCamera2.z;
+
+    float width = parameters.imageFocalNear.x;
+    float height = parameters.imageFocalNear.y;
+    float focal = parameters.imageFocalNear.z;
+    float centerX = 0.5 * width + focal * cameraX / cameraZ;
+    float centerY = 0.5 * height - focal * cameraY / cameraZ;
+
+    float inverseZ = 1.0 / cameraZ;
+    float inverseZ2 = inverseZ * inverseZ;
+    vec3 jacobianX = vec3(focal * inverseZ, 0.0, -focal * cameraX * inverseZ2);
+    vec3 jacobianY = vec3(0.0, -focal * inverseZ, focal * cameraY * inverseZ2);
+    float minimumVariance = parameters.sigmaTile.y * parameters.sigmaTile.y;
+    float covarianceXX = covarianceQuadratic(jacobianX, c00, c01, c02, c11, c12, c22) + minimumVariance;
+    float covarianceXY =
+        jacobianX.x * (c00 * jacobianY.x + c01 * jacobianY.y + c02 * jacobianY.z) +
+        jacobianX.y * (c01 * jacobianY.x + c11 * jacobianY.y + c12 * jacobianY.z) +
+        jacobianX.z * (c02 * jacobianY.x + c12 * jacobianY.y + c22 * jacobianY.z);
+    float covarianceYY = covarianceQuadratic(jacobianY, c00, c01, c02, c11, c12, c22) + minimumVariance;
+
+    float trace = covarianceXX + covarianceYY;
+    float deltaCovariance = covarianceXX - covarianceYY;
+    float discriminant = sqrt(max(0.0, deltaCovariance * deltaCovariance + 4.0 * covarianceXY * covarianceXY));
+    float lambdaMajor = max(0.5 * (trace + discriminant), minimumVariance);
+    float lambdaMinor = max(0.5 * (trace - discriminant), minimumVariance);
+    float sigmaMajor = clamp(sqrt(lambdaMajor), parameters.sigmaTile.y, parameters.sigmaTile.z);
+    float sigmaMinor = clamp(sqrt(lambdaMinor), parameters.sigmaTile.y, parameters.sigmaTile.z);
+    float angle = 0.5 * atan(2.0 * covarianceXY, covarianceXX - covarianceYY);
+    float cosine = cos(angle);
+    float sine = sin(angle);
+
+    vec2 majorPixels = vec2(cosine, sine) * sigmaMajor * parameters.sigmaTile.x;
+    vec2 minorPixels = vec2(-sine, cosine) * sigmaMinor * parameters.sigmaTile.x;
+    float extentX = abs(majorPixels.x) + abs(minorPixels.x);
+    float extentY = abs(majorPixels.y) + abs(minorPixels.y);
+    if (centerX + extentX < 0.0 || centerX - extentX >= width ||
+        centerY + extentY < 0.0 || centerY - extentY >= height) {
+        writeCull(index, 3.0);
+        return;
+    }
+
+    vec2 centerNdc = vec2(2.0 * centerX / width - 1.0, 1.0 - 2.0 * centerY / height);
+    vec2 majorNdc = vec2(2.0 * majorPixels.x / width, -2.0 * majorPixels.y / height);
+    vec2 minorNdc = vec2(2.0 * minorPixels.x / width, -2.0 * minorPixels.y / height);
+
+    float pixelMinimumX = clamp(centerX - extentX, 0.0, width - 1.0);
+    float pixelMaximumX = clamp(centerX + extentX, 0.0, width - 1.0);
+    float pixelMinimumY = clamp(centerY - extentY, 0.0, height - 1.0);
+    float pixelMaximumY = clamp(centerY + extentY, 0.0, height - 1.0);
+    float tileSize = parameters.sigmaTile.w;
+
+    outputs.values[index].centerMajor = vec4(centerNdc, majorNdc);
+    outputs.values[index].minorDepth = vec4(minorNdc, cameraZ, opacity);
+    outputs.values[index].colorCull = vec4(inputValue.color.rgb, 0.0);
+    outputs.values[index].tileBounds = vec4(
+        floor(pixelMinimumX / tileSize),
+        floor(pixelMaximumX / tileSize),
+        floor(pixelMinimumY / tileSize),
+        floor(pixelMaximumY / tileSize));
+}
