@@ -54,6 +54,15 @@ struct GaussianRenderResult {
     const gaussian::GaussianCloud& cloud,
     const GaussianRenderSettings& settings = {});
 
+// Rasterizes an already projected, depth-ordered Gaussian batch through the
+// selected native backend. This keeps the established fragment/compositing
+// implementation reusable by both the CPU projection oracle and accelerated
+// projection paths.
+[[nodiscard]] GaussianRenderResult renderGaussianRasterBatchHeadless(
+    backend::BackendKind backend,
+    const GaussianRasterBatch& batch,
+    const RenderSettings& settings = {});
+
 [[nodiscard]] GaussianRenderResult renderGaussianCloudHeadless(
     backend::BackendKind backend,
     const gaussian::GaussianCloud& cloud,
