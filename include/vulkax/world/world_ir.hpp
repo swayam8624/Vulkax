@@ -17,6 +17,7 @@ struct Entity {
     std::string name;
     std::optional<EntityId> parent;
     std::unordered_map<std::string, double> materialParameters;
+    std::unordered_map<std::string, double> constraintParameters;
 };
 
 struct ProvenanceRecord {

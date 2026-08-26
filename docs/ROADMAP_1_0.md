@@ -130,28 +130,39 @@ Implementation boundary: final stable ordering and CSR tile-reference constructi
 
 Exit gate: satisfied on the controlled 64/128/256-splat CI sweep. Native projection is required. The combined image gate is maximum channel delta `<= 3`, normalized RGBA RMSE `< 1e-4`, and changed-pixel fraction `< 1e-4`. Timing is published but speedup is not a correctness requirement. See `docs/GAUSSIAN_SCALING_0_50.md`.
 
-### 0.60 — unified verified rewrite transaction
+### 0.60 — unified verified rewrite transaction — implemented
 
 Purpose: turn isolated research commands into the central product/research operation.
 
-Required rewrite classes for 1.0:
+Implemented transaction classes:
 
-- local material coefficient rewrite;
-- local geometric translation/deformation rewrite;
-- constraint/boundary-condition metadata rewrite where supported by the physical path.
+- local geometry translation/deformation metadata through `TranslateEntity`;
+- local material coefficient rewrites through `SetMaterialParameter`;
+- supported constraint/boundary-condition metadata rewrites through `SetConstraintParameter`.
 
-Transaction requirements:
+Implemented transaction/evidence semantics:
 
-- stable target IDs;
-- precondition validation;
-- provenance record;
-- affected/unaffected-region evidence;
-- rollback receipt;
-- physical rerun where the rewrite changes physics;
-- appearance propagation through correspondence;
-- verification status derived from evidence, never set manually.
+- stable semantic target IDs and physical/appearance correspondence preconditions;
+- expected-revision checking and duplicate transaction-ID rejection;
+- copy-then-commit atomicity so a later invalid edit cannot leave a partial world mutation;
+- provenance records and rollback receipts covering appearance positions, material maps, constraint maps, revision and provenance;
+- affected/unaffected-region locality evidence;
+- verification status derived from evidence rather than caller state;
+- automatic rollback when required physical, oracle, locality or appearance-propagation evidence fails;
+- a physical verifier interface used by geometry/material/constraint transactions according to their correspondence requirements;
+- machine-readable transaction evidence/summary CSV output.
 
-Topology surgery is explicitly deferred beyond 1.0.
+Concrete controlled physical adapter:
+
+- `makeCapturedMaterialRewriteVerifier` binds a local `young_modulus` transaction to stable MPM-particle IDs;
+- the requested rewrite magnitude must match the nonlinear verification perturbation exactly, preventing evidence reuse for a different material change;
+- the verifier runs the retained finite-difference derivative reference, separate nonlinear counterfactual, controlled APIC reverse material adjoint, and adjoint-vs-reference comparison;
+- the public `vulkax_captured_rewrite` command consumes the versioned captured bundle and emits transaction plus physical-oracle artifacts;
+- the controlled CI path verifies an eight-particle `15000 Pa -> 15300 Pa` (+2%) rewrite with no unaffected-position drift and no rollback.
+
+Implementation boundary: 0.60 establishes the generic geometry and constraint verifier/rollback semantics and controlled regression coverage, but only the captured **material** rewrite currently has a concrete solver-backed APIC/MPM verifier adapter. A captured solver-specific geometry or constraint verifier is not claimed. Topology surgery remains deferred beyond 1.0.
+
+Exit gate: satisfied for the central transaction semantics and controlled material path. The feature head passed 42 tests on Linux, macOS and Windows; Linux additionally passed the public manifest-to-solver-to-verified-transaction end-to-end gate. See `docs/VERIFIED_REWRITE_0_60.md`.
 
 ### 0.70 — scale-safe identity and selection
 
@@ -234,7 +245,7 @@ The following may be valuable research directions but are not allowed to block t
 ## Development rules until 1.0
 
 1. One milestone branch at a time.
-2. A milestone is not version-bumped until its exact candidate passes CI.
+2. A milestone is not version-bumped until its exact behavior/evidence candidate passes CI; release-only metadata is then validated again on the exact release head.
 3. Feature proposals and verification remain separate code/evidence paths.
 4. Synthetic robustness is labelled synthetic; measured evidence is labelled measured.
 5. Numerical thresholds come from explicit baselines or physical requirements, not convenient values chosen after failures.
