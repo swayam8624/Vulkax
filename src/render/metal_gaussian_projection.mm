@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -196,10 +197,10 @@ kernel void gaussian_project(
     outputs[index].minorDepth = float4(minorNdc, cameraZ, opacity);
     outputs[index].colorCull = float4(inputValue.color.rgb, 0.0f);
     outputs[index].tileBounds = float4(
-        floor(pixelMinimumX) / tileSize,
-        floor(pixelMaximumX) / tileSize,
-        floor(pixelMinimumY) / tileSize,
-        floor(pixelMaximumY) / tileSize);
+        floor(pixelMinimumX / tileSize),
+        floor(pixelMaximumX / tileSize),
+        floor(pixelMinimumY / tileSize),
+        floor(pixelMaximumY / tileSize));
 }
 )metal";
 
