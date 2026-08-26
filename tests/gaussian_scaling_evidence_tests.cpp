@@ -4,6 +4,8 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -49,7 +51,7 @@ void testTileReferenceOrdering() {
     assert(stream.maximumSplatsPerTile == 3U);
 
     for (std::size_t tile = 0U; tile + 1U < stream.offsets.size(); ++tile) {
-        float previousDepth = INFINITY;
+        float previousDepth = std::numeric_limits<float>::infinity();
         for (std::size_t offset = stream.offsets[tile]; offset < stream.offsets[tile + 1U]; ++offset) {
             const float depth = projection.projected[stream.splatIndices[offset]].minorDepth[2];
             assert(depth <= previousDepth);
@@ -100,13 +102,15 @@ void testScalingCsv() {
 
     const auto path = std::filesystem::temp_directory_path() / "vulkax_gaussian_scaling_evidence.csv";
     render::writeGaussianScalingCsv({sample}, path);
-    std::ifstream stream(path);
-    assert(stream.good());
-    const std::string content((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-    assert(content.find("input_splats,visible_splats") != std::string::npos);
-    assert(content.find("128,96,512,17") != std::string::npos);
-    assert(content.find(",1,\"\"") != std::string::npos);
-    std::filesystem::remove(path);
+    {
+        std::ifstream stream(path);
+        assert(stream.good());
+        const std::string content((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+        assert(content.find("input_splats,visible_splats") != std::string::npos);
+        assert(content.find("128,96,512,17") != std::string::npos);
+        assert(content.find(",1,\"\"") != std::string::npos);
+    }
+    assert(std::filesystem::remove(path));
 }
 
 } // namespace
