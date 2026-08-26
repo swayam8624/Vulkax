@@ -1,6 +1,7 @@
 #include "vulkax/render/gaussian.hpp"
 
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #ifndef VULKAX_HAS_VULKAN_RENDER
