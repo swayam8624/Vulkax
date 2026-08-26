@@ -4,8 +4,11 @@
 
 #include <array>
 #include <cstddef>
+#include <filesystem>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace vulkax::gaussian {
@@ -35,6 +38,17 @@ struct GaussianCloud {
 // are accepted. Stored scale and opacity values remain in their optimization
 // parameterization (log scale and logit); helpers expose physical values.
 [[nodiscard]] GaussianCloud load3dgsPly(const std::string& path);
+
+// std::filesystem::path does not portably convert to std::string (notably on
+// Windows, where its native character type differs). Keep the historical
+// string overload unambiguous for string literals/argv while accepting an exact
+// filesystem::path through this constrained forwarding overload.
+template <typename Path>
+requires std::is_same_v<std::remove_cvref_t<Path>, std::filesystem::path>
+[[nodiscard]] GaussianCloud load3dgsPly(Path&& path) {
+    return load3dgsPly(path.string());
+}
+
 [[nodiscard]] GaussianCloud parse3dgsPly(std::string_view bytes);
 
 } // namespace vulkax::gaussian

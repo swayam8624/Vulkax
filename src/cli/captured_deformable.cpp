@@ -1,6 +1,6 @@
 #include "vulkax/cli/captured_deformable.hpp"
 
-#include "vulkax/capture/deformable_dataset.hpp"
+#include "vulkax/capture/deformable_bundle.hpp"
 #include "vulkax/cli/captured_example.hpp"
 #include "vulkax/cli/captured_influence.hpp"
 #include "vulkax/cli/captured_observation_robustness.hpp"
@@ -116,6 +116,55 @@ namespace {
     return settings;
 }
 
+[[nodiscard]] int bundleValidationCommand(int argc, char** argv) {
+    if (argc < 2 || std::string_view(argv[1]) != "captured-deformable-validate-bundle") return -1;
+    if (argc != 3)
+        throw std::invalid_argument(
+            "usage: vulkax captured-deformable-validate-bundle <capture.vkcap>");
+
+    const auto bundle = capture::loadAndValidateCapturedDeformableBundle(argv[2]);
+    capture::validateCapturedObservationTrajectoryContract(bundle.dataset);
+    std::size_t fitSamples = 0U;
+    std::size_t validationSamples = 0U;
+    double maximumSigma = 0.0;
+    for (const auto& observation : bundle.dataset.observations) {
+        if (observation.split == capture::ObservationSplit::Fit) ++fitSamples;
+        else ++validationSamples;
+    }
+    for (const auto& sample : bundle.uncertainty) {
+        maximumSigma = std::max({
+            maximumSigma,
+            sample.positionSigma.x,
+            sample.positionSigma.y,
+            sample.positionSigma.z,
+        });
+    }
+
+    std::cout << std::setprecision(10)
+              << "VALID captured deformable bundle\n"
+              << "  schema_version: " << bundle.manifest.schemaVersion << '\n'
+              << "  id: " << bundle.manifest.id << '\n'
+              << "  source_kind: " << capture::toString(bundle.manifest.sourceKind) << '\n'
+              << "  source_description: " << bundle.manifest.sourceDescription << '\n'
+              << "  coordinate_frame: " << bundle.manifest.coordinateFrame << '\n'
+              << "  axis_convention: " << bundle.manifest.axisConvention << '\n'
+              << "  units: " << bundle.manifest.lengthUnit << ' ' << bundle.manifest.massUnit << ' '
+              << bundle.manifest.timeUnit << '\n'
+              << "  time_step: " << bundle.manifest.timeStep << '\n'
+              << "  appearance_gaussians: " << bundle.appearance.size() << '\n'
+              << "  physical_particles: " << bundle.dataset.particles.size() << '\n'
+              << "  observations: " << bundle.dataset.observations.size() << '\n'
+              << "  fit_observations: " << fitSamples << '\n'
+              << "  validation_observations: " << validationSamples << '\n'
+              << "  uncertainty_rows: " << bundle.uncertainty.size() << '\n'
+              << "  maximum_position_sigma: " << maximumSigma << '\n'
+              << "  appearance_sha256: " << bundle.manifest.appearanceSha256 << '\n'
+              << "  particles_sha256: " << bundle.manifest.particlesSha256 << '\n'
+              << "  observations_sha256: " << bundle.manifest.observationsSha256 << '\n'
+              << "  uncertainty_sha256: " << bundle.manifest.uncertaintySha256 << '\n';
+    return 0;
+}
+
 [[nodiscard]] int materialCalibrationCommand(int argc, char** argv) {
     if (argc < 2 || std::string_view(argv[1]) != "captured-material-calibrate") return -1;
     if (argc < 6)
@@ -175,6 +224,9 @@ namespace {
 } // namespace
 
 int capturedDeformableCommand(int argc, char** argv) {
+    const int bundleValidation = bundleValidationCommand(argc, argv);
+    if (bundleValidation >= 0) return bundleValidation;
+
     const int example = capturedExampleCommand(argc, argv);
     if (example >= 0) return example;
 

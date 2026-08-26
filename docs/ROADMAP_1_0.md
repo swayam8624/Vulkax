@@ -48,7 +48,7 @@ Vulkax 1.0 must satisfy all of the following.
 
 ## Milestone sequence
 
-### 0.39 — observation robustness
+### 0.39 — observation robustness — implemented
 
 Purpose: make clean synthetic calibration/influence results uncertainty-aware before using measured data.
 
@@ -64,22 +64,26 @@ Deliverables:
 - CSV evidence and a public CLI stress command;
 - controlled noise-sweep regression in CI.
 
-Exit gate: zero-noise identity must reproduce the clean baseline exactly; nonzero scenarios must remain finite, deterministic and evidence-producing. Quantitative tolerance claims are chosen only after observing the controlled sweep.
+Exit gate: satisfied on the controlled synthetic path. Zero-noise identity reproduces the clean baseline exactly; nonzero scenarios are finite, deterministic and evidence-producing. The controlled 1 micrometre result remains synthetic regression evidence rather than a measured tolerance claim.
 
-### 0.40 — capture evidence contract and dataset validation
+### 0.40 — capture evidence contract and dataset validation — implemented
 
 Purpose: remove assumptions hidden inside hand-authored CSV files.
 
-Deliverables:
+Implemented deliverables:
 
-- versioned captured-deformable manifest;
-- explicit units, coordinate frame, timestamps, marker uncertainty and source/provenance fields;
-- validation for duplicate IDs, missing marker trajectories, off-lattice timestamps, impossible masses/volumes and inconsistent splits;
-- observation uncertainty columns or sidecar metadata;
-- command that validates a bundle before simulation;
-- evidence manifest hashes so results can be traced to exact inputs.
+- versioned `vulkax_capture 1` captured-deformable manifest;
+- explicit SI units, coordinate frame, axis convention, solver timestep and source/provenance fields;
+- SHA-256 identities for appearance, particles, observations and uncertainty payloads;
+- one-row-per-observation position-uncertainty sidecar;
+- validation for duplicate/invalid IDs, missing marker trajectories, off-lattice timestamps, impossible masses/volumes, unknown particle references and inconsistent dynamic fit/validation assignments;
+- stable marker-to-particle correspondence checks across time;
+- initialization and dynamic fit/held-out-validation coverage requirements;
+- public `captured-deformable-validate-bundle` command that validates the bundle before simulation;
+- deterministic generator emission of the same manifest/payload contract intended for measured data;
+- Linux end-to-end corruption rejection plus the cross-platform captured-bundle regression.
 
-Exit gate: malformed bundles fail with actionable errors; the deterministic example is emitted in the same contract intended for real data.
+Exit gate: satisfied for the contract itself and the deterministic controlled bundle. Malformed bundles covered by the regression fail with actionable errors, payload mutation is rejected by SHA-256 identity, and the generator emits a schema-valid bundle before the existing simulation pipeline runs. This does **not** satisfy the 0.45 measured-data requirement.
 
 ### 0.45 — measured deformable benchmark
 

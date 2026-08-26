@@ -31,7 +31,7 @@ appearance <-> semantics <-> physical representation
 
 The research question is stronger than Gaussian editing: **can a reconstructed real scene be rewritten locally — geometry, material, constraints and eventually topology — while keeping appearance, physical state and provenance mutually consistent and quantitatively trustworthy?**
 
-## Current research implementation — 0.39 development head
+## Current research implementation — 0.40 development head
 
 ### Captured-world representation
 
@@ -93,6 +93,9 @@ A deterministic dataset generator makes the complete path reproducible. Its grou
 ```bash
 ./build/vulkax captured-deformable-generate-example build/captured-example
 
+./build/vulkax captured-deformable-validate-bundle \
+  build/captured-example/capture.vkcap
+
 ./build/vulkax captured-material-calibrate \
   build/captured-example/object.ply \
   build/captured-example/particles.csv \
@@ -101,14 +104,18 @@ A deterministic dataset generator makes the complete path reproducible. Its grou
   1e-4 0.08
 ```
 
-The generated bundle contains:
+The generated controlled directory contains:
 
 ```text
+capture.vkcap
 object.ply
 particles.csv
 observations.csv
+uncertainty.csv
 truth.csv
 ```
+
+`truth.csv` is synthetic regression truth and is deliberately outside the capture manifest. It is not a required measured-data payload.
 
 Calibration writes:
 
@@ -121,9 +128,28 @@ selected_evidence.csv
 
 This deterministic example is a controlled regression, **not evidence that real-world material identification has been solved**. Real captured observations with measurement noise, imperfect correspondences and model discrepancy are still required.
 
+### Versioned capture evidence contract
+
+Vulkax 0.40 wraps the existing captured-deformable payloads in a versioned evidence contract instead of relying on undocumented assumptions in hand-authored CSV files.
+
+`capture.vkcap` schema v1 records:
+
+- relative paths for appearance, physical particles, observations and observation uncertainty;
+- SHA-256 identity for each of those four payloads;
+- explicit SI payload units (`m`, `kg`, `s`);
+- coordinate-frame and axis-convention declarations;
+- the solver timestep used to interpret observation timestamps;
+- a `synthetic`, `measured` or `derived` source kind plus a human-readable provenance description.
+
+`uncertainty.csv` contains exactly one `marker_id,time,sigma_x,sigma_y,sigma_z` row for every observation. The public validator checks payload hashes and syntax, stable marker-to-particle identity, solver-lattice timestamps, physical mass/volume validity, initialization coverage, nonzero-time fit and held-out validation coverage, observation/uncertainty matching, complete marker trajectories and consistent nonzero-time fit/validation roles.
+
+The controlled generator emits the same schema intended for measured data and immediately round-trips it through the loader. Linux CI then validates it through the public command, deliberately mutates `observations.csv`, and requires the unchanged manifest to fail with a SHA-256 mismatch before the established calibration/influence/robustness pipeline proceeds.
+
+A valid hash establishes **exact input identity**, not measurement truth or authenticity. Source metadata are declarations; 0.40 does not prove that a tracker was calibrated correctly, that an internally consistent marker correspondence is physically correct, or that the current material model is adequate for a real object. See [`docs/CAPTURE_BUNDLE_0_40.md`](docs/CAPTURE_BUNDLE_0_40.md).
+
 ### Captured material Operator Influence: oracle + adjoint + adaptive proposals
 
-The captured deformable representation now combines a nonlinear finite-difference material-influence oracle, a reverse-mode APIC/MPM derivative implementation, and an adjoint-guided spatial proposal layer:
+The captured deformable representation combines a nonlinear finite-difference material-influence oracle, a reverse-mode APIC/MPM derivative implementation, and an adjoint-guided spatial proposal layer:
 
 - every MPM particle carries an optional Young's-modulus scale keyed by its stable particle ID; the default is exactly `1.0`, preserving the homogeneous solver path;
 - constitutive forces and elastic-energy evidence use the same local stiffness coefficient field;
@@ -141,7 +167,7 @@ The current reverse kernel deliberately matches the controlled captured benchmar
 
 #### Adjoint-guided adaptive material regions
 
-The 0.38 path removes the octant partition from *proposal selection* without removing it as a regression oracle:
+The adaptive path removes the octant partition from *proposal selection* without removing it as a regression oracle:
 
 1. rank stable-ID particles deterministically by `|dJ/ds_p|`;
 2. take the smallest ranked set reaching a requested cumulative absolute-gradient fraction;
@@ -263,9 +289,9 @@ Release tests are compiled with assertions active. Enabling them exposed two pre
 
 The native Gaussian renderer and covariance-coupling path must continue to pass the Linux/macOS/Windows matrix and real Metal/Vulkan smoke tests before stronger validation claims are made. CI renders the tracked Gaussian scene through Vulkan on Linux and Metal on macOS.
 
-The captured-deformable path has controlled synthetic replay, material-identification, local-material influence and observation-robustness regressions, including held-out observations. The material-influence path retains its nonlinear finite-difference/rerun oracle, checks the APIC material-scale adjoint against it region by region, and verifies adjoint-proposed spatial material regions through fresh nonlinear reruns. The robustness path separately perturbs initialization and dynamic observations with deterministic noise and records calibration/influence/proposal stability while keeping the clean discretization fixed. CI requires a nonzero particle-level field, localized adaptive proposals retaining at least 90% of the controlled absolute-gradient mass, tight adjoint/reference agreement, bounded nonlinear counterfactual error, deterministic robustness evidence and exact clean-baseline identity.
+The captured-deformable path has controlled synthetic replay, material-identification, local-material influence and observation-robustness regressions, including held-out observations. The material-influence path retains its nonlinear finite-difference/rerun oracle, checks the APIC material-scale adjoint against it region by region, and verifies adjoint-proposed spatial material regions through fresh nonlinear reruns. The robustness path separately perturbs initialization and dynamic observations with deterministic noise and records calibration/influence/proposal stability while keeping the clean discretization fixed. The 0.40 capture contract now hashes the exact appearance/particle/observation/uncertainty inputs and rejects malformed trajectory/evidence bundles through a public validator before simulation. CI requires a nonzero particle-level field, localized adaptive proposals retaining at least 90% of the controlled absolute-gradient mass, tight adjoint/reference agreement, bounded nonlinear counterfactual error, deterministic robustness evidence, exact clean-baseline identity and capture-bundle corruption rejection.
 
-This is still controlled synthetic verification: it does **not** establish real-world material recovery/influence, real sensor/tracker robustness, derivative correctness through unimplemented FLIP/boundary branches, robustness to correspondence mistakes or model discrepancy, production-scale Gaussian rendering, topology rewriting, automatic semantic reconstruction, XR interaction, or publishable novelty.
+This is still controlled synthetic verification: it does **not** establish real-world material recovery/influence, real sensor/tracker robustness, authenticated measurement provenance, physically correct correspondences merely because IDs are internally consistent, derivative correctness through unimplemented FLIP/boundary branches, robustness to model discrepancy, production-scale Gaussian rendering, topology rewriting, automatic semantic reconstruction, XR interaction, or publishable novelty.
 
 ## Build and test
 
@@ -328,11 +354,11 @@ Existing problem and backend commands remain:
 
 ## Immediate research sequence
 
-The project is now scope-frozen to the path in [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md). The next core milestones are:
+The project is scope-frozen to the path in [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md). The next core milestones are:
 
 1. **0.39 observation robustness — implemented on the controlled synthetic path**, with deterministic pose/dynamic perturbations and calibration/influence/adaptive-region evidence.
-2. **0.40 capture evidence contract and dataset validation** — add a versioned manifest, units/frame/time/uncertainty/provenance metadata, bundle validation and input hashes.
-3. **0.45 measured deformable benchmark** — run the same pipeline on one genuinely measured deformable sequence; this requires external measured data and must not be simulated away.
+2. **0.40 capture evidence contract and dataset validation — implemented**, with versioned manifest, SI/frame/time/provenance metadata, observation uncertainty, exact input hashes and pre-simulation bundle rejection.
+3. **0.45 measured deformable benchmark — external measured data required**; the synthetic generator cannot satisfy this milestone.
 4. **0.50 scalable Gaussian execution** — move projection/binning/order/compositing toward GPU scale while retaining the CPU image oracle and publishing scaling evidence.
 5. **0.60 unified verified rewrite transaction** — connect verified material/geometry/supported-constraint changes to provenance, rollback, physical rerun and Gaussian appearance propagation.
 6. **0.70 scale-safe identity and selection** — make stable correspondence survive large-cloud reorder/filter/serialization operations.
@@ -341,4 +367,4 @@ The project is now scope-frozen to the path in [`docs/ROADMAP_1_0.md`](docs/ROAD
 
 Topology surgery, XR, automatic semantic reconstruction, generalized differentiable MPM and broad multiphysics Operator Influence claims are explicitly deferred beyond 1.0 unless they replace, rather than expand, an existing core milestone.
 
-See [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md), [`docs/OBSERVATION_ROBUSTNESS_0_39.md`](docs/OBSERVATION_ROBUSTNESS_0_39.md), [`docs/REWRITABLE_REALITY.md`](docs/REWRITABLE_REALITY.md), [`docs/RESEARCH.md`](docs/RESEARCH.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and [`docs/VISION.md`](docs/VISION.md).
+See [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md), [`docs/CAPTURE_BUNDLE_0_40.md`](docs/CAPTURE_BUNDLE_0_40.md), [`docs/OBSERVATION_ROBUSTNESS_0_39.md`](docs/OBSERVATION_ROBUSTNESS_0_39.md), [`docs/REWRITABLE_REALITY.md`](docs/REWRITABLE_REALITY.md), [`docs/RESEARCH.md`](docs/RESEARCH.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and [`docs/VISION.md`](docs/VISION.md).
