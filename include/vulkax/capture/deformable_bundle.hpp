@@ -55,6 +55,20 @@ struct CapturedDeformableBundle {
     std::vector<CapturedObservationUncertainty> uncertainty;
 };
 
+struct CapturedDeformableBundleAuthoringRequest {
+    std::filesystem::path manifestPath;
+    std::filesystem::path appearancePath;
+    std::filesystem::path particlesPath;
+    std::filesystem::path observationsPath;
+    std::filesystem::path uncertaintyPath;
+    std::string id;
+    double timeStep{};
+    std::string coordinateFrame{"world"};
+    std::string axisConvention{"right-handed-y-up"};
+    CapturedSourceKind sourceKind{CapturedSourceKind::Measured};
+    std::string sourceDescription;
+};
+
 [[nodiscard]] const char* toString(CapturedSourceKind value) noexcept;
 [[nodiscard]] CapturedSourceKind capturedSourceKindFromString(const std::string& value);
 
@@ -73,6 +87,12 @@ void saveCapturedDeformableBundleManifest(
 void writeCapturedObservationUncertaintyCsv(
     const std::vector<CapturedObservationUncertainty>& uncertainty,
     const std::filesystem::path& path);
+
+// Builds a schema-v1 manifest from payloads already present inside the manifest
+// directory tree. Payload bytes are never copied or modified. The returned
+// manifest stores portable relative paths and fresh SHA-256 identities.
+[[nodiscard]] CapturedDeformableBundleManifest makeCapturedDeformableBundleManifest(
+    const CapturedDeformableBundleAuthoringRequest& request);
 
 // Recomputes hashes for the four manifest payloads relative to baseDirectory.
 // Paths must be portable relative paths contained by that directory.
