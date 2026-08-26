@@ -40,6 +40,12 @@ public:
     [[nodiscard]] const std::vector<gaussian::GaussianId>& gaussiansForEntity(EntityId entity) const noexcept;
     [[nodiscard]] const std::vector<PhysicalBinding>& physicalBindings(EntityId entity) const noexcept;
     [[nodiscard]] std::size_t gaussianBindingCount() const noexcept { return gaussianToEntity_.size(); }
+
+    // Drops only appearance bindings whose stable Gaussian IDs are absent from
+    // the supplied filtered cloud. Entity and physical bindings remain intact.
+    // Returns the number of removed Gaussian bindings.
+    std::size_t pruneMissingGaussians(const gaussian::GaussianCloud& cloud);
+
     [[nodiscard]] CorrespondenceValidation validate(const WorldIR& world) const;
 
 private:

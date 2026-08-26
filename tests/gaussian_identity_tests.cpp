@@ -1,6 +1,8 @@
 #include "vulkax/gaussian/gaussian_cloud.hpp"
 #include "vulkax/gaussian/hierarchy.hpp"
 #include "vulkax/gaussian/selection.hpp"
+#include "vulkax/world/correspondence_graph.hpp"
+#include "vulkax/world/world_ir.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -9,6 +11,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -138,6 +141,39 @@ void testSelectionFilteringAndReorder() {
     parsed.validate(filtered);
 }
 
+void testCorrespondencePruneAfterFilter() {
+    using namespace vulkax;
+    const auto cloud = makeCloud();
+    const std::vector<gaussian::GaussianId> keep{
+        cloud.splats[0].id,
+        cloud.splats[2].id,
+        cloud.splats[4].id,
+    };
+    world::WorldIR worldState;
+    worldState.id = "filtered-identity-world";
+    worldState.appearance = gaussian::filterGaussianCloudByIds(cloud, keep);
+    worldState.entities.push_back({10U, "kept-entity", std::nullopt, {}, {}});
+
+    world::WorldCorrespondenceGraph graph;
+    graph.bindGaussian(cloud.splats[0].id, 10U);
+    graph.bindGaussian(cloud.splats[1].id, 10U);
+    graph.bindGaussian(cloud.splats[2].id, 10U);
+    graph.bindPhysical(10U, {world::PhysicalKind::MpmParticle, 42U, 1.0});
+    check(!graph.validate(worldState).valid,
+          "filtered cloud must expose stale correspondence before explicit prune");
+    const auto removed = graph.pruneMissingGaussians(worldState.appearance);
+    check(removed == 1U && graph.gaussianBindingCount() == 2U,
+          "correspondence prune must remove exactly absent Gaussian IDs");
+    check(graph.validate(worldState).valid,
+          "correspondence must validate after pruning absent filtered IDs");
+    check(graph.entityForGaussian(cloud.splats[0].id) == 10U &&
+          graph.entityForGaussian(cloud.splats[2].id) == 10U &&
+          !graph.entityForGaussian(cloud.splats[1].id).has_value(),
+          "correspondence prune must preserve retained stable-ID mappings only");
+    check(graph.physicalBindings(10U).size() == 1U,
+          "appearance filtering must not erase physical bindings");
+}
+
 void testHierarchyStableIdQueryAfterReorder() {
     using namespace vulkax;
     auto cloud = makeCloud();
@@ -166,6 +202,7 @@ int main() {
     testExplicitIdentityRoundTrip();
     testMalformedIdentityRejected();
     testSelectionFilteringAndReorder();
+    testCorrespondencePruneAfterFilter();
     testHierarchyStableIdQueryAfterReorder();
 
     if (failures != 0) {

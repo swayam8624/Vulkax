@@ -25,6 +25,14 @@ jobs:
         run: cmake --build build --parallel 2
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: Gaussian stable identity scaling evidence
+        run: |
+          ./build/vulkax_gaussian_identity_benchmark \
+            build/gaussian-identity-scaling.csv \
+            4096 65536 3 32
+          python3 scripts/validate_gaussian_identity.py \
+            build/gaussian-identity-scaling.csv
+          cat build/gaussian-identity-scaling.csv
       - name: Captured bundle contract end to end
         run: |
           ./build/vulkax captured-deformable-generate-example build/captured-example

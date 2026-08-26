@@ -49,6 +49,26 @@ const std::vector<PhysicalBinding>& WorldCorrespondenceGraph::physicalBindings(E
     return it == entityToPhysical_.end() ? emptyPhysicalBindings : it->second;
 }
 
+std::size_t WorldCorrespondenceGraph::pruneMissingGaussians(const gaussian::GaussianCloud& cloud) {
+    const gaussian::GaussianIndexView view(cloud);
+    const std::size_t before = gaussianToEntity_.size();
+    for (auto it = gaussianToEntity_.begin(); it != gaussianToEntity_.end();) {
+        if (!view.contains(it->first)) it = gaussianToEntity_.erase(it);
+        else ++it;
+    }
+
+    entityToGaussians_.clear();
+    for (const auto& [id, entity] : gaussianToEntity_)
+        entityToGaussians_[entity].push_back(id);
+    for (auto& [entity, ids] : entityToGaussians_) {
+        (void)entity;
+        std::sort(ids.begin(), ids.end(), [](gaussian::GaussianId lhs, gaussian::GaussianId rhs) {
+            return lhs.packed() < rhs.packed();
+        });
+    }
+    return before - gaussianToEntity_.size();
+}
+
 CorrespondenceValidation WorldCorrespondenceGraph::validate(const WorldIR& world) const {
     CorrespondenceValidation report;
     std::optional<gaussian::GaussianIndexView> indexView;
