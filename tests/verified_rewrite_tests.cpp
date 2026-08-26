@@ -31,6 +31,9 @@ vulkax::world::WorldIR makeWorld() {
     world.entities.push_back({10, "deformable", std::nullopt, {{"young_modulus", 1.0e6}}, {}});
     world.entities.push_back({20, "background", std::nullopt, {}, {}});
     world.appearance.splats.resize(3);
+    world.appearance.splats[0].id = {11U, 1U};
+    world.appearance.splats[1].id = {11U, 2U};
+    world.appearance.splats[2].id = {11U, 3U};
     world.appearance.splats[0].position = {0.0, 0.0, 0.0};
     world.appearance.splats[1].position = {1.0, 0.0, 0.0};
     world.appearance.splats[2].position = {10.0, 0.0, 0.0};
@@ -40,9 +43,9 @@ vulkax::world::WorldIR makeWorld() {
 vulkax::world::WorldCorrespondenceGraph makeGraph() {
     using namespace vulkax;
     world::WorldCorrespondenceGraph graph;
-    graph.bindGaussian(0, 10);
-    graph.bindGaussian(1, 10);
-    graph.bindGaussian(2, 20);
+    graph.bindGaussian({11U, 1U}, 10);
+    graph.bindGaussian({11U, 2U}, 10);
+    graph.bindGaussian({11U, 3U}, 20);
     graph.bindPhysical(10, {world::PhysicalKind::MpmParticle, 42, 0.65});
     graph.bindPhysical(10, {world::PhysicalKind::MpmParticle, 43, 0.35});
     return graph;
@@ -233,13 +236,14 @@ void testVerifiedGeometryRewrite() {
           "geometry rewrite with physical support must verify after rerun evidence");
     check(result.evidence.appearancePropagationRequired && result.evidence.appearancePropagationChecked,
           "geometry rewrite must derive and check appearance propagation");
+    const gaussian::GaussianIndexView view(world.appearance);
     check(near(result.evidence.unaffectedPositionDrift, 0.0),
           "local geometry rewrite must report zero unaffected drift");
-    check(near(world.appearance.splats[0].position.y, 2.0) &&
-          near(world.appearance.splats[1].position.y, 2.0),
+    check(near(world.appearance.splats[view.requireIndex({11U, 1U})].position.y, 2.0) &&
+          near(world.appearance.splats[view.requireIndex({11U, 2U})].position.y, 2.0),
           "verified geometry rewrite must move mapped appearance");
-    check(near(world.appearance.splats[2].position.x, 10.0) &&
-          near(world.appearance.splats[2].position.y, 0.0),
+    check(near(world.appearance.splats[view.requireIndex({11U, 3U})].position.x, 10.0) &&
+          near(world.appearance.splats[view.requireIndex({11U, 3U})].position.y, 0.0),
           "verified geometry rewrite must preserve unrelated appearance");
 }
 

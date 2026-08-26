@@ -3,7 +3,6 @@
 #include "vulkax/core/math.hpp"
 #include "vulkax/world/correspondence_graph.hpp"
 
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -46,12 +45,12 @@ struct TransactionValidation {
     bool requiresPhysicalRerun{};
     bool requiresIndependentOracle{};
     std::vector<std::string> errors;
-    std::vector<std::size_t> touchedGaussians;
+    std::vector<gaussian::GaussianId> touchedGaussians;
     std::vector<EntityId> touchedEntities;
 };
 
 struct GaussianPositionSnapshot {
-    std::size_t index{};
+    gaussian::GaussianId id{};
     math::Vec3 position{};
 };
 
@@ -68,7 +67,7 @@ struct EntityConstraintSnapshot {
 struct TransactionReceipt {
     std::uint64_t revisionBefore{};
     std::uint64_t revisionAfter{};
-    std::vector<std::size_t> touchedGaussians;
+    std::vector<gaussian::GaussianId> touchedGaussians;
     std::vector<EntityId> touchedEntities;
     std::vector<GaussianPositionSnapshot> previousPositions;
     std::vector<EntityMaterialSnapshot> previousMaterials;
@@ -83,10 +82,11 @@ struct TransactionReceipt {
                                                   const WorldTransaction& transaction);
 void rollbackTransaction(WorldIR& world, const TransactionReceipt& receipt);
 
-// Measures the maximum positional change outside a transaction's touched set.
-// A perfectly local rewrite therefore has zero unaffected-region drift.
-[[nodiscard]] double unaffectedPositionDrift(const gaussian::GaussianCloud& before,
-                                             const gaussian::GaussianCloud& after,
-                                             const std::vector<std::size_t>& touchedGaussians);
+// Measures the maximum positional change outside a transaction's stable-ID
+// touched set. Cloud storage order may differ between before/after.
+[[nodiscard]] double unaffectedPositionDrift(
+    const gaussian::GaussianCloud& before,
+    const gaussian::GaussianCloud& after,
+    const std::vector<gaussian::GaussianId>& touchedGaussians);
 
 } // namespace vulkax::world

@@ -16,6 +16,8 @@
 namespace vulkax::gaussian {
 namespace {
 
+constexpr std::uint32_t fallbackGaussianNamespace = 1U;
+
 enum class PlyFormat { Ascii, BinaryLittleEndian };
 enum class ScalarType { Int8, UInt8, Int16, UInt16, Int32, UInt32, Float32, Float64 };
 
@@ -107,6 +109,8 @@ struct Header {
 
     if (!sawPly) throw std::runtime_error("not a PLY file");
     if (header.vertexCount == 0) throw std::runtime_error("PLY contains no vertices");
+    if (header.vertexCount > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
+        throw std::runtime_error("PLY contains more vertices than the fallback Gaussian ID space supports");
     if (header.properties.empty()) throw std::runtime_error("PLY vertex element has no scalar properties");
     header.dataOffset = dataOffset;
     return header;
@@ -202,7 +206,45 @@ void normalizeQuaternion(std::array<double, 4>& rotation) {
     return count;
 }
 
+void assignFallbackId(GaussianSplat& splat, std::size_t vertex) {
+    splat.id = {fallbackGaussianNamespace, static_cast<std::uint32_t>(vertex + 1U)};
+}
+
 } // namespace
+
+std::size_t GaussianIdHash::operator()(GaussianId id) const noexcept {
+    return std::hash<std::uint64_t>{}(id.packed());
+}
+
+std::string toString(GaussianId id) {
+    return std::to_string(id.namespaceId) + ":" + std::to_string(id.localId);
+}
+
+GaussianIndexView::GaussianIndexView(const GaussianCloud& cloud) {
+    idToIndex_.reserve(cloud.size());
+    for (std::size_t index = 0; index < cloud.size(); ++index) {
+        const auto id = cloud.splats[index].id;
+        if (!id.valid())
+            throw std::invalid_argument("Gaussian cloud contains invalid stable ID at storage index " +
+                                        std::to_string(index));
+        const auto [it, inserted] = idToIndex_.emplace(id, index);
+        if (!inserted)
+            throw std::invalid_argument("Gaussian cloud contains duplicate stable ID " + toString(id));
+        (void)it;
+    }
+}
+
+std::optional<std::size_t> GaussianIndexView::index(GaussianId id) const noexcept {
+    const auto it = idToIndex_.find(id);
+    if (it == idToIndex_.end()) return std::nullopt;
+    return it->second;
+}
+
+std::size_t GaussianIndexView::requireIndex(GaussianId id) const {
+    const auto value = index(id);
+    if (!value.has_value()) throw std::out_of_range("Gaussian stable ID is absent from the current cloud: " + toString(id));
+    return *value;
+}
 
 std::array<double, 3> GaussianSplat::linearScale() const noexcept {
     return {std::exp(logScale[0]), std::exp(logScale[1]), std::exp(logScale[2])};
@@ -239,7 +281,9 @@ GaussianCloud parse3dgsPly(std::string_view bytes) {
             for (double& value : values) {
                 if (!(input >> value)) throw std::runtime_error("unexpected end of ASCII PLY vertex data");
             }
-            cloud.splats.push_back(buildSplat(header.properties, values, restCount));
+            auto splat = buildSplat(header.properties, values, restCount);
+            assignFallbackId(splat, vertex);
+            cloud.splats.push_back(std::move(splat));
         }
         return cloud;
     }
@@ -257,7 +301,9 @@ GaussianCloud parse3dgsPly(std::string_view bytes) {
             values[property] = readScalar(type, bytes.data() + cursor);
             cursor += typeSize(type);
         }
-        cloud.splats.push_back(buildSplat(header.properties, values, restCount));
+        auto splat = buildSplat(header.properties, values, restCount);
+        assignFallbackId(splat, vertex);
+        cloud.splats.push_back(std::move(splat));
     }
     return cloud;
 }

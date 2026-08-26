@@ -45,11 +45,15 @@ void snapshotEntityConstraints(const WorldIR& world, TransactionReceipt& receipt
     receipt.previousConstraints.push_back({entityId, entity->constraintParameters});
 }
 
-void snapshotGaussian(const WorldIR& world, TransactionReceipt& receipt, std::size_t index) {
-    if (index >= world.appearance.size()) throw std::runtime_error("transaction correspondence references invalid Gaussian index");
+void snapshotGaussian(const WorldIR& world,
+                      const gaussian::GaussianIndexView& indexView,
+                      TransactionReceipt& receipt,
+                      gaussian::GaussianId id) {
     if (std::find_if(receipt.previousPositions.begin(), receipt.previousPositions.end(),
-                     [index](const GaussianPositionSnapshot& snapshot) { return snapshot.index == index; }) == receipt.previousPositions.end())
-        receipt.previousPositions.push_back({index, world.appearance.splats[index].position});
+                     [id](const GaussianPositionSnapshot& snapshot) { return snapshot.id == id; }) != receipt.previousPositions.end())
+        return;
+    const auto index = indexView.requireIndex(id);
+    receipt.previousPositions.push_back({id, world.appearance.splats[index].position});
 }
 
 } // namespace
@@ -76,6 +80,13 @@ TransactionValidation validateTransaction(const WorldIR& world,
             validation.errors.push_back("correspondence graph: " + error);
     }
 
+    std::optional<gaussian::GaussianIndexView> indexView;
+    try {
+        indexView.emplace(world.appearance);
+    } catch (const std::exception& error) {
+        validation.errors.push_back(std::string("appearance identity: ") + error.what());
+    }
+
     for (const auto& edit : transaction.edits) {
         std::visit(
             [&](const auto& operation) {
@@ -92,17 +103,18 @@ TransactionValidation validateTransaction(const WorldIR& world,
                         validation.errors.push_back("geometry rewrite requires a finite translation delta");
                         return;
                     }
-                    const auto& indices = graph.gaussiansForEntity(operation.entity);
-                    if (indices.empty()) {
+                    const auto& ids = graph.gaussiansForEntity(operation.entity);
+                    if (ids.empty()) {
                         validation.errors.push_back("geometry rewrite requires appearance correspondence");
                         return;
                     }
-                    for (const auto index : indices) {
-                        if (index >= world.appearance.size()) {
-                            validation.errors.push_back("geometry rewrite correspondence references invalid Gaussian index");
+                    for (const auto id : ids) {
+                        if (!indexView.has_value() || !indexView->contains(id)) {
+                            validation.errors.push_back("geometry rewrite correspondence references missing Gaussian ID " +
+                                                        gaussian::toString(id));
                             continue;
                         }
-                        appendUnique(validation.touchedGaussians, index);
+                        appendUnique(validation.touchedGaussians, id);
                     }
                     validation.requiresAppearancePropagation = true;
                     if (!graph.physicalBindings(operation.entity).empty()) validation.requiresPhysicalRerun = true;
@@ -148,10 +160,8 @@ TransactionReceipt applyTransaction(WorldIR& world,
     receipt.touchedGaussians = validation.touchedGaussians;
     receipt.touchedEntities = validation.touchedEntities;
 
-    // Snapshot everything before mutation. The actual edits are applied to a copy and
-    // committed with one move assignment so ordinary validation/application failures
-    // cannot leave a partially rewritten world behind.
-    for (const auto index : validation.touchedGaussians) snapshotGaussian(world, receipt, index);
+    const gaussian::GaussianIndexView worldIndex(world.appearance);
+    for (const auto id : validation.touchedGaussians) snapshotGaussian(world, worldIndex, receipt, id);
     for (const auto& edit : transaction.edits) {
         std::visit(
             [&](const auto& operation) {
@@ -165,6 +175,7 @@ TransactionReceipt applyTransaction(WorldIR& world,
     }
 
     WorldIR candidate = world;
+    const gaussian::GaussianIndexView candidateIndex(candidate.appearance);
     for (const auto& edit : transaction.edits) {
         std::visit(
             [&](const auto& operation) {
@@ -173,8 +184,8 @@ TransactionReceipt applyTransaction(WorldIR& world,
                 if (entity == nullptr) throw std::runtime_error("validated transaction lost its target entity");
 
                 if constexpr (std::is_same_v<Operation, TranslateEntity>) {
-                    for (const auto index : graph.gaussiansForEntity(operation.entity))
-                        candidate.appearance.splats[index].position += operation.delta;
+                    for (const auto id : graph.gaussiansForEntity(operation.entity))
+                        candidate.appearance.splats[candidateIndex.requireIndex(id)].position += operation.delta;
                 } else if constexpr (std::is_same_v<Operation, SetMaterialParameter>) {
                     entity->materialParameters[operation.name] = operation.value;
                 } else if constexpr (std::is_same_v<Operation, SetConstraintParameter>) {
@@ -194,10 +205,9 @@ void rollbackTransaction(WorldIR& world, const TransactionReceipt& receipt) {
     if (world.revision != receipt.revisionAfter)
         throw std::runtime_error("transaction rollback requires the receipt to match the current world revision");
 
-    for (const auto& snapshot : receipt.previousPositions) {
-        if (snapshot.index >= world.appearance.size()) throw std::runtime_error("rollback Gaussian index is out of range");
-        world.appearance.splats[snapshot.index].position = snapshot.position;
-    }
+    const gaussian::GaussianIndexView indexView(world.appearance);
+    for (const auto& snapshot : receipt.previousPositions)
+        world.appearance.splats[indexView.requireIndex(snapshot.id)].position = snapshot.position;
     for (const auto& snapshot : receipt.previousMaterials) {
         auto* entity = world.findEntity(snapshot.entity);
         if (entity == nullptr) throw std::runtime_error("rollback references missing material entity");
@@ -214,13 +224,24 @@ void rollbackTransaction(WorldIR& world, const TransactionReceipt& receipt) {
 
 double unaffectedPositionDrift(const gaussian::GaussianCloud& before,
                                const gaussian::GaussianCloud& after,
-                               const std::vector<std::size_t>& touchedGaussians) {
-    if (before.size() != after.size()) throw std::invalid_argument("unaffected-region drift requires clouds with equal splat counts");
-    std::unordered_set<std::size_t> touched(touchedGaussians.begin(), touchedGaussians.end());
+                               const std::vector<gaussian::GaussianId>& touchedGaussians) {
+    if (before.size() != after.size())
+        throw std::invalid_argument("unaffected-region drift requires clouds with equal stable-ID cardinality");
+    const gaussian::GaussianIndexView beforeIndex(before);
+    const gaussian::GaussianIndexView afterIndex(after);
+    std::unordered_set<gaussian::GaussianId, gaussian::GaussianIdHash> touched(
+        touchedGaussians.begin(), touchedGaussians.end());
     double maximum = 0.0;
-    for (std::size_t index = 0; index < before.size(); ++index) {
-        if (touched.contains(index)) continue;
-        maximum = std::max(maximum, math::length(after.splats[index].position - before.splats[index].position));
+    for (const auto& splat : before.splats) {
+        if (touched.contains(splat.id)) continue;
+        const auto afterStorageIndex = afterIndex.index(splat.id);
+        if (!afterStorageIndex.has_value())
+            throw std::invalid_argument("unaffected-region drift found a missing Gaussian ID " +
+                                        gaussian::toString(splat.id));
+        const auto beforeStorageIndex = beforeIndex.requireIndex(splat.id);
+        maximum = std::max(
+            maximum,
+            math::length(after.splats[*afterStorageIndex].position - before.splats[beforeStorageIndex].position));
     }
     return maximum;
 }
