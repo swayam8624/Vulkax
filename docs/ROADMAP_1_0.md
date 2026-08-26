@@ -111,21 +111,24 @@ Evaluation:
 
 Exit gate: repository language may claim only what the measured evidence actually supports.
 
-### 0.50 — scalable Gaussian execution
+### 0.50 — scalable Gaussian execution — implemented
 
 Purpose: remove the largest remaining graphics-system gap while retaining the CPU numerical oracle.
 
-Deliverables:
+Implemented deliverables:
 
-- GPU projection of Gaussian means/covariances;
-- tile/bin assignment;
-- deterministic or validated depth ordering strategy;
-- GPU-friendly compositing path;
-- CPU-vs-GPU image regression metrics;
-- timing and memory benchmarks across increasing splat counts;
-- graceful fallback to the reference renderer.
+- native Vulkan and Metal projection of Gaussian means/covariances and projected extents;
+- native projected tile bounds plus deterministic CSR-style tile-reference evidence;
+- stable far-to-near depth ordering of the returned projected stream;
+- native Vulkan and Metal Gaussian raster/compositing paths;
+- CPU-vs-native image regression metrics;
+- public `vulkax_gaussian_scaling` timing/memory benchmark across increasing splat counts;
+- explicit native/fallback evidence, with the public benchmark refusing to call a fallback run native;
+- schema-aware CSV validator used by Linux and macOS CI.
 
-Exit gate: GPU output remains within documented image-error tolerances of the reference path and scaling evidence is published in machine-readable form.
+Implementation boundary: final stable ordering and CSR tile-reference construction remain CPU-side. 0.50 does not claim GPU radix sorting or a fully GPU-resident tile/bin/sort/composite pipeline.
+
+Exit gate: satisfied on the controlled 64/128/256-splat CI sweep. Native projection is required. The combined image gate is maximum channel delta `<= 3`, normalized RGBA RMSE `< 1e-4`, and changed-pixel fraction `< 1e-4`. Timing is published but speedup is not a correctness requirement. See `docs/GAUSSIAN_SCALING_0_50.md`.
 
 ### 0.60 — unified verified rewrite transaction
 
