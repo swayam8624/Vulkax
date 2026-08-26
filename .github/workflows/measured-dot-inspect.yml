@@ -20,11 +20,50 @@ jobs:
             'https://dataverse.orc.gmu.edu/api/access/datafile/:persistentId/?persistentId=doi:10.13021/orc2020/XXLVXM/ZVZHVR' \
             -o build/dot-source/C02.zip
           echo '0f347c3f95ed2def9fd81ba5236955b1  build/dot-source/C02.zip' | md5sum -c -
-      - name: Inspect source contract
+          unzip -q build/dot-source/C02.zip -d build/dot-source/unpacked
+      - name: Probe measured coordinates and surface
         run: |
-          echo '===== DOT A_Read_Me.txt ====='
-          cat build/dot-source/A_Read_Me.txt
-          echo '===== C02 archive ====='
-          unzip -l build/dot-source/C02.zip
-          echo '===== extension counts ====='
-          unzip -Z1 build/dot-source/C02.zip | sed 's/.*\.//' | sort | uniq -c | sort -nr
+          echo '===== calib_info.txt ====='
+          sed -n '1,40p' build/dot-source/unpacked/C2/cam_info/calib_info.txt
+          for f in 000001 000002 000107; do
+            echo "===== 3D frame $f ====="
+            wc -l build/dot-source/unpacked/C2/coordinates/3d/frame${f}_cam001.txt
+            sed -n '1,15p' build/dot-source/unpacked/C2/coordinates/3d/frame${f}_cam001.txt
+          done
+          echo '===== frame 1 PLY header ====='
+          sed -n '1,80p' build/dot-source/unpacked/C2/template/frame000001_cam001.ply
+          echo '===== image metadata ====='
+          file build/dot-source/unpacked/C2/images/normal_view/frame000001_cam001.jpg
+          identify build/dot-source/unpacked/C2/images/normal_view/frame000001_cam001.jpg 2>/dev/null || true
+      - name: Compute observable geometry statistics
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import math
+          root=Path('build/dot-source/unpacked/C2')
+          def pts(path):
+              out=[]
+              for line in path.read_text().splitlines():
+                  vals=line.split()
+                  if len(vals) < 3: continue
+                  try: out.append(tuple(map(float, vals[:3])))
+                  except ValueError: pass
+              return out
+          for frame in (1,2,107):
+              p=pts(root/'coordinates/3d'/f'frame{frame:06d}_cam001.txt')
+              print('frame',frame,'rows',len(p))
+              if p:
+                  for axis,name in enumerate('xyz'):
+                      v=[q[axis] for q in p]
+                      print(name,'min',min(v),'max',max(v),'extent',max(v)-min(v))
+                  if frame != 1:
+                      p0=pts(root/'coordinates/3d'/'frame000001_cam001.txt')
+                      n=min(len(p0),len(p))
+                      ds=[math.dist(p0[i],p[i]) for i in range(n)]
+                      print('from_frame1_rms',math.sqrt(sum(d*d for d in ds)/n),'max',max(ds))
+          p1=pts(root/'coordinates/3d'/'frame000001_cam001.txt')
+          p2=pts(root/'coordinates/3d'/'frame000002_cam001.txt')
+          if len(p1)==len(p2):
+              steps=[math.dist(a,b) for a,b in zip(p1,p2)]
+              print('frame1_to_2_rms', math.sqrt(sum(d*d for d in steps)/len(steps)), 'max', max(steps))
+          PY
