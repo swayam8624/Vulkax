@@ -164,19 +164,29 @@ Implementation boundary: 0.60 establishes the generic geometry and constraint ve
 
 Exit gate: satisfied for the central transaction semantics and controlled material path. The feature head passed 42 tests on Linux, macOS and Windows; Linux additionally passed the public manifest-to-solver-to-verified-transaction end-to-end gate. See `docs/VERIFIED_REWRITE_0_60.md`.
 
-### 0.70 — scale-safe identity and selection
+### 0.70 — scale-safe identity and selection — implemented
 
-Purpose: make the world/correspondence layer usable beyond tiny tracked examples.
+Purpose: make appearance identity, selection and correspondence independent of transient Gaussian vector order.
 
-Deliverables:
+Implemented deliverables:
 
-- hierarchical Gaussian/entity IDs;
-- selection groups independent of transient array order;
-- correspondence lookup tests under reorder/filter operations;
-- scalable bounding hierarchy or equivalent spatial lookup;
-- benchmark of selection/correspondence operations on large synthetic clouds.
+- composite 32-bit namespace + 32-bit local `GaussianId` stored on each splat;
+- transient `GaussianIndexView` for stable-ID to current-index resolution, with invalid/duplicate-ID rejection;
+- deterministic source-order fallback IDs for legacy PLY files without Vulkax identity properties;
+- explicit `vulkax_id_namespace` / `vulkax_id_local` PLY persistence for durable Vulkax identity;
+- `WorldCorrespondenceGraph` appearance bindings migrated from vector indices to stable Gaussian IDs;
+- transaction touched sets, position snapshots, rollback and unaffected-position drift migrated to stable IDs;
+- durable named selection groups containing stable IDs only;
+- ID-preserving filtering plus explicit `pruneMissingGaussians` for correspondence graphs after filtering;
+- stable-ID AABB query results reusing the existing `GaussianHierarchy` rather than adding a second BVH;
+- reorder/filter/serialization/rewrite regressions;
+- public `vulkax_gaussian_identity_benchmark` plus schema validator.
 
-Exit gate: stable identity survives serialization, filtering and rewrite transactions.
+Controlled scale evidence: Linux CI validates 4,096, 16,384 and 65,536 synthetic splats. At each size it requires identity lookup, selection membership, semantic correspondence and hierarchy-query membership to survive a complete storage reversal. The validator also checks nonempty bounded query/selection counts, exactly 8 bytes of explicit stable-ID payload per splat, increasing sample sizes/payload and finite non-negative timing fields. Timing is evidence-only; no performance threshold is used.
+
+Implementation boundary: fallback IDs for legacy PLY are deterministic only relative to that file's source vertex order and are not a global uniqueness guarantee across unrelated legacy clouds. 0.70 does not add a distributed/UUID identity service or replace the existing semantic `EntityId` scheme.
+
+Exit gate: satisfied on the controlled path. The functional candidate passed 43 tests on Linux, macOS and Windows, Linux passed the public 4K→65K identity benchmark validator, and existing captured-world/Vulkan/Metal gates remained green. See `docs/GAUSSIAN_IDENTITY_0_70.md`.
 
 ### 0.80 — one-command end-to-end research demo
 

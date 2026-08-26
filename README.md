@@ -31,19 +31,45 @@ appearance <-> semantics <-> physical representation
 
 The central research question is stronger than Gaussian editing: **can a reconstructed scene be rewritten locally — geometry, material and supported constraints — while keeping appearance, physical state and provenance mutually consistent and quantitatively trustworthy?**
 
-## Current implementation — Vulkax 0.60
+## Current implementation — Vulkax 0.70
 
 ### Captured-world representation
 
 - renderer-independent `GaussianCloud`;
 - ASCII and binary-little-endian 3DGS PLY ingestion;
 - 3DGS log-scale, opacity-logit, quaternion and spherical-harmonic data;
+- composite stable `GaussianId` values separated from transient vector indices;
 - semantic `WorldIR` entities, revisions and provenance;
 - bidirectional `WorldCorrespondenceGraph` linking Gaussian support, semantic entities and generic physical DOFs;
 - copy-then-commit world transactions with expected-revision, duplicate-ID and edit-precondition checks;
 - typed local geometry, material and supported constraint-metadata rewrites;
 - rollback receipts preserving appearance positions, material/constraint metadata, world revision and provenance;
 - evidence-derived verified rewrite execution with affected/unaffected-region locality checks.
+
+### Scale-safe Gaussian identity and selection
+
+Vulkax 0.70 removes transient Gaussian array position from the persistent appearance/correspondence contract. Each splat has a composite 32-bit namespace + 32-bit local ID. Algorithms that need storage indices use a transient `GaussianIndexView`, which is rebuilt after reorder/filter operations and rejects invalid or duplicate IDs.
+
+Vulkax-authored PLY files persist IDs through `vulkax_id_namespace` and `vulkax_id_local`. Legacy PLY files without those properties still load through deterministic source-order fallback IDs, but that fallback is **not** a global uniqueness guarantee across unrelated legacy clouds.
+
+Named `GaussianSelectionSet` groups store stable IDs only. Selection resolution, world correspondence, transaction snapshots/rollback and unaffected-region locality are therefore independent of current vector order. Filtering preserves selected IDs and requires explicit `pruneMissingGaussians` when removed appearance bindings should be dropped from a correspondence graph.
+
+The existing `GaussianHierarchy` remains the spatial accelerator. A stable-ID AABB wrapper returns deterministic ID membership without replacing the historical index-returning query path.
+
+Run the public identity/selection scale benchmark:
+
+```bash
+./build/vulkax_gaussian_identity_benchmark \
+  build/gaussian-identity-scaling.csv \
+  4096 65536 3 32
+
+python3 scripts/validate_gaussian_identity.py \
+  build/gaussian-identity-scaling.csv
+```
+
+The controlled Linux CI sweep validates 4,096, 16,384 and 65,536 synthetic splats. At each size it requires stable identity lookup, selection membership, semantic correspondence and hierarchy-query membership to survive complete storage reversal. Timing is recorded in the CSV but **no speed threshold or production-performance claim is used**.
+
+See [`docs/GAUSSIAN_IDENTITY_0_70.md`](docs/GAUSSIAN_IDENTITY_0_70.md) for the exact identity contract, persistence/filter semantics, benchmark schema and limitations.
 
 ### Unified verified rewrite transactions
 
@@ -266,7 +292,7 @@ cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-The project remains C++20. The 0.60 milestone does not change the language standard.
+The project remains C++20. The 0.70 milestone does not change the language standard.
 
 ## Useful graphics commands
 
@@ -317,14 +343,19 @@ What is currently supported by controlled evidence:
 - native Vulkan/Metal Gaussian projection with CPU-oracle image regression;
 - machine-readable Gaussian scaling/memory/timing evidence;
 - atomic unified rewrite transactions with evidence-derived verification and automatic rollback;
-- one solver-backed controlled captured-material rewrite path that consumes fresh finite-difference, nonlinear and adjoint evidence.
+- one solver-backed controlled captured-material rewrite path that consumes fresh finite-difference, nonlinear and adjoint evidence;
+- persistent composite Gaussian IDs with explicit PLY round-trip support;
+- reorder-safe selection, correspondence, transactions and hierarchy-query membership;
+- controlled structural scale evidence through 65,536 synthetic splats.
 
 What is **not** established yet:
 
 - real measured deformable validation for the 0.45 milestone;
 - real measured rewrite verification;
 - captured solver-specific geometry and constraint verification beyond the generic transaction/verifier interface and controlled tests;
-- production-scale Gaussian rendering performance;
+- globally allocated UUID identity across unrelated legacy Gaussian clouds;
+- distributed identity/selection infrastructure;
+- production-scale Gaussian rendering or identity-selection performance;
 - full GPU tile/bin/radix-sort/composite execution;
 - general differentiable MPM through FLIP blending, boundary clamps and arbitrary forcing;
 - automatic material segmentation from the adjoint field;
@@ -337,10 +368,9 @@ The measured-deformable milestone remains **external-data-blocked** until a genu
 
 The scoped roadmap is in [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md).
 
-After 0.60, the code-completable sequence is:
+After 0.70, the code-completable sequence is:
 
 ```text
-0.70  scale-safe identity and selection
 0.80  one-command controlled captured-world research demo
 0.90  release hardening and documentation/performance audit
 1.0   stable verified-rewritable-reality baseline
