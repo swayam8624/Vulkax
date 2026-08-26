@@ -161,11 +161,21 @@ int main(int argc, char** argv) {
             samples.push_back(sample);
             std::cout << "splats=" << sample.inputSplats
                       << " visible=" << sample.visibleSplats
+                      << " tile_refs=" << sample.tileReferences
+                      << " max_splats_per_tile=" << sample.maximumSplatsPerTile
+                      << " projection_input_bytes=" << sample.projectionInputBytes
+                      << " projection_output_bytes=" << sample.projectionOutputBytes
+                      << " tile_reference_bytes=" << sample.tileReferenceBytes
                       << " cpu_projection_ms=" << sample.cpuProjectionMilliseconds
                       << " native_projection_ms=" << sample.nativeProjectionMilliseconds
                       << " scalable_total_ms=" << sample.scalableTotalMilliseconds
+                      << " max_channel_difference="
+                      << static_cast<unsigned>(sample.imageComparison.maximumChannelDifference)
                       << " rmse=" << sample.imageComparison.rootMeanSquareError
-                      << " tile_refs=" << sample.tileReferences << '\n';
+                      << " psnr_db=" << sample.imageComparison.psnrDb
+                      << " changed_pixel_fraction=" << sample.imageComparison.changedPixelFraction
+                      << " used_native_projection=" << (sample.usedNativeProjection ? 1 : 0)
+                      << '\n';
         }
 
         vulkax::render::writeGaussianScalingCsv(samples, argv[2]);
