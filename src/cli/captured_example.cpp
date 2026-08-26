@@ -21,6 +21,66 @@
 namespace vulkax::cli {
 namespace {
 
+[[nodiscard]] double parsePositiveDouble(std::string_view text, const char* label) {
+    const std::string owned(text);
+    std::size_t consumed = 0U;
+    double value = 0.0;
+    try {
+        value = std::stod(owned, &consumed);
+    } catch (const std::exception&) {
+        throw std::invalid_argument(std::string(label) + " must be numeric");
+    }
+    if (consumed != owned.size() || !std::isfinite(value) || !(value > 0.0))
+        throw std::invalid_argument(std::string(label) + " must be finite and positive");
+    return value;
+}
+
+[[nodiscard]] int authorBundleCommand(int argc, char** argv) {
+    if (argc < 2 || std::string_view(argv[1]) != "captured-deformable-author-bundle") return -1;
+    if (argc != 13) {
+        throw std::invalid_argument(
+            "usage: vulkax captured-deformable-author-bundle <capture.vkcap> <object.ply> "
+            "<particles.csv> <observations.csv> <uncertainty.csv> <bundle-id> <time-step> "
+            "<coordinate-frame> <axis-convention> <synthetic|measured|derived> <source-description>");
+    }
+
+    capture::CapturedDeformableBundleAuthoringRequest request;
+    request.manifestPath = argv[2];
+    request.appearancePath = argv[3];
+    request.particlesPath = argv[4];
+    request.observationsPath = argv[5];
+    request.uncertaintyPath = argv[6];
+    request.id = argv[7];
+    request.timeStep = parsePositiveDouble(argv[8], "time step");
+    request.coordinateFrame = argv[9];
+    request.axisConvention = argv[10];
+    request.sourceKind = capture::capturedSourceKindFromString(argv[11]);
+    request.sourceDescription = argv[12];
+
+    const auto manifest = capture::makeCapturedDeformableBundleManifest(request);
+    capture::saveCapturedDeformableBundleManifest(manifest, request.manifestPath);
+
+    const auto bundle = capture::loadAndValidateCapturedDeformableBundle(request.manifestPath);
+    capture::validateCapturedObservationTrajectoryContract(bundle.dataset);
+
+    std::cout << std::setprecision(10)
+              << "AUTHORED captured deformable bundle\n"
+              << "  manifest: " << request.manifestPath.string() << '\n'
+              << "  id: " << bundle.manifest.id << '\n'
+              << "  source_kind: " << capture::toString(bundle.manifest.sourceKind) << '\n'
+              << "  source_description: " << bundle.manifest.sourceDescription << '\n'
+              << "  coordinate_frame: " << bundle.manifest.coordinateFrame << '\n'
+              << "  axis_convention: " << bundle.manifest.axisConvention << '\n'
+              << "  time_step: " << bundle.manifest.timeStep << '\n'
+              << "  appearance_gaussians: " << bundle.appearance.size() << '\n'
+              << "  physical_particles: " << bundle.dataset.particles.size() << '\n'
+              << "  observations: " << bundle.dataset.observations.size() << '\n'
+              << "  uncertainty_rows: " << bundle.uncertainty.size() << '\n'
+              << "  payloads_modified: no\n"
+              << "  source_authenticity: caller-declared, not inferred by Vulkax\n";
+    return 0;
+}
+
 [[nodiscard]] std::vector<solvers::MpmParticle> makeBody() {
     std::vector<solvers::MpmParticle> particles;
     std::uint64_t id = 1;
@@ -225,6 +285,9 @@ void writeTruthCsv(const std::filesystem::path& path) {
 } // namespace
 
 int capturedExampleCommand(int argc, char** argv) {
+    const int authored = authorBundleCommand(argc, argv);
+    if (authored >= 0) return authored;
+
     if (argc < 2 || std::string_view(argv[1]) != "captured-deformable-generate-example") return -1;
     if (argc != 3) {
         throw std::invalid_argument(
