@@ -132,9 +132,12 @@ int main(int argc, char** argv) {
         }
 
         const auto source = vulkax::gaussian::load3dgsPly(argv[1]);
-        const auto backend = argc >= 4
-            ? parseBackend(argv[3]).value_or(throw std::invalid_argument("backend must be Vulkan or Metal"))
-            : defaultBackend();
+        vulkax::backend::BackendKind backend = defaultBackend();
+        if (argc >= 4) {
+            const auto parsed = parseBackend(argv[3]);
+            if (!parsed) throw std::invalid_argument("backend must be Vulkan or Metal");
+            backend = *parsed;
+        }
         const std::size_t minimum = argc >= 5 ? parsePositiveSize(argv[4], "minimum splat count") : 64U;
         const std::size_t maximum = argc >= 6 ? parsePositiveSize(argv[5], "maximum splat count") : 4096U;
         const std::size_t levels = argc >= 7 ? parsePositiveSize(argv[6], "benchmark levels") : 5U;
