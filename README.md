@@ -31,7 +31,7 @@ appearance <-> semantics <-> physical representation
 
 The central research question is stronger than Gaussian editing: **can a reconstructed scene be rewritten locally — geometry, material and supported constraints — while keeping appearance, physical state and provenance mutually consistent and quantitatively trustworthy?**
 
-## Current implementation — Vulkax 0.50
+## Current implementation — Vulkax 0.60
 
 ### Captured-world representation
 
@@ -40,13 +40,37 @@ The central research question is stronger than Gaussian editing: **can a reconst
 - 3DGS log-scale, opacity-logit, quaternion and spherical-harmonic data;
 - semantic `WorldIR` entities, revisions and provenance;
 - bidirectional `WorldCorrespondenceGraph` linking Gaussian support, semantic entities and generic physical DOFs;
-- transactional local translation/material rewrites with rollback receipts and unaffected-region drift evidence.
+- copy-then-commit world transactions with expected-revision, duplicate-ID and edit-precondition checks;
+- typed local geometry, material and supported constraint-metadata rewrites;
+- rollback receipts preserving appearance positions, material/constraint metadata, world revision and provenance;
+- evidence-derived verified rewrite execution with affected/unaffected-region locality checks.
 
-The transaction system is functional but not yet the final unified verified-rewrite operation. That is the 0.60 roadmap milestone.
+### Unified verified rewrite transactions
+
+Vulkax 0.60 makes `verified` an evidence result rather than a caller-controlled flag. A transaction is structurally validated before mutation, applied to a candidate world, and committed atomically. If required post-commit evidence is absent or fails, the verified executor restores the prior world automatically.
+
+Physical rewrites require a verifier that supplies a traceable artifact, a completed/passed physical rerun, and finite scalar error/tolerance evidence with `error <= tolerance`. Material rewrites additionally require a completed/passed independent oracle. Geometry rewrites must satisfy appearance-propagation and unaffected-region locality policy; entities with physical bindings also require a physical rerun.
+
+0.60 includes one concrete solver-backed adapter for the controlled captured APIC/MPM Young's-modulus path. It derives the selected region from stable MPM-particle bindings and runs the retained finite-difference derivative reference, exact-magnitude nonlinear counterfactual, APIC reverse material adjoint and derivative comparison before the central transaction can commit.
+
+Reproduce the public controlled transaction after generating the deterministic captured bundle:
+
+```bash
+./build/vulkax_captured_rewrite \
+  build/captured-example/capture.vkcap \
+  build/captured-verified-rewrite \
+  m4 0.003 1 1 1 \
+  43,44,47,48,59,60,63,64 \
+  15000 0.30 0.08 0.01 0.02
+```
+
+The controlled CI case rewrites eight stable particles from `15000 Pa` to `15300 Pa` (+2%). On the Linux public gate the derived physical error is `6.52454608162e-05` against the controlled tolerance `0.25`, unaffected Gaussian positional drift is `0`, and the transaction commits without rollback. This is deterministic synthetic verification evidence, **not a measured real-object rewrite claim**.
+
+See [`docs/VERIFIED_REWRITE_0_60.md`](docs/VERIFIED_REWRITE_0_60.md) for the evidence contract, rollback semantics and implementation boundary. Geometry and constraint transactions have the central verifier interface and regression coverage, but 0.60 does not yet claim a captured solver-specific geometry or constraint verifier.
 
 ## Scalable Gaussian execution
 
-Vulkax retains a CPU numerical oracle and now also contains native Gaussian projection paths for Vulkan and Metal.
+Vulkax retains a CPU numerical oracle and also contains native Gaussian projection paths for Vulkan and Metal.
 
 The renderer currently provides:
 
@@ -61,7 +85,7 @@ The renderer currently provides:
 - CPU-vs-native image comparison;
 - public timing and memory scaling evidence.
 
-The implementation boundary matters: **native projection is GPU-backed, while final stable ordering and the current CSR tile-reference construction remain CPU-side.** Vulkax 0.50 does not claim GPU radix sorting or a fully GPU-resident tile/bin/sort/composite pipeline.
+The implementation boundary matters: **native projection is GPU-backed, while final stable ordering and the current CSR tile-reference construction remain CPU-side.** The 0.50 renderer milestone does not claim GPU radix sorting or a fully GPU-resident tile/bin/sort/composite pipeline.
 
 Run the public scaling benchmark with:
 
@@ -242,7 +266,7 @@ cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-The project remains C++20. The 0.50 milestone does not change the language standard.
+The project remains C++20. The 0.60 milestone does not change the language standard.
 
 ## Useful graphics commands
 
@@ -291,11 +315,15 @@ What is currently supported by controlled evidence:
 - deterministic synthetic observation-noise stress evidence;
 - versioned capture bundle identity/validation contract;
 - native Vulkan/Metal Gaussian projection with CPU-oracle image regression;
-- machine-readable Gaussian scaling/memory/timing evidence.
+- machine-readable Gaussian scaling/memory/timing evidence;
+- atomic unified rewrite transactions with evidence-derived verification and automatic rollback;
+- one solver-backed controlled captured-material rewrite path that consumes fresh finite-difference, nonlinear and adjoint evidence.
 
 What is **not** established yet:
 
 - real measured deformable validation for the 0.45 milestone;
+- real measured rewrite verification;
+- captured solver-specific geometry and constraint verification beyond the generic transaction/verifier interface and controlled tests;
 - production-scale Gaussian rendering performance;
 - full GPU tile/bin/radix-sort/composite execution;
 - general differentiable MPM through FLIP blending, boundary clamps and arbitrary forcing;
@@ -309,10 +337,9 @@ The measured-deformable milestone remains **external-data-blocked** until a genu
 
 The scoped roadmap is in [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md).
 
-After 0.50, the code-completable sequence is:
+After 0.60, the code-completable sequence is:
 
 ```text
-0.60  unified verified rewrite transaction
 0.70  scale-safe identity and selection
 0.80  one-command controlled captured-world research demo
 0.90  release hardening and documentation/performance audit
