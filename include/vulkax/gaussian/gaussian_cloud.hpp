@@ -77,9 +77,10 @@ private:
 // are accepted. Stored scale and opacity values remain in their optimization
 // parameterization (log scale and logit); helpers expose physical values.
 //
-// External PLY files without Vulkax identity metadata receive deterministic
-// fallback IDs in namespace 1, local IDs 1..N, in source vertex order. The IDs
-// then travel with the splats through in-memory reorder/filter operations.
+// External PLY files without Vulkax identity properties receive deterministic
+// fallback IDs in namespace 1, local IDs 1..N, in source vertex order. Vulkax
+// PLY serialization writes explicit `vulkax_id_namespace` and
+// `vulkax_id_local` properties so IDs survive filtering and serialization.
 [[nodiscard]] GaussianCloud load3dgsPly(const std::string& path);
 
 // std::filesystem::path does not portably convert to std::string (notably on
@@ -93,5 +94,10 @@ requires std::is_same_v<std::remove_cvref_t<Path>, std::filesystem::path>
 }
 
 [[nodiscard]] GaussianCloud parse3dgsPly(std::string_view bytes);
+
+// Writes a deterministic ASCII PLY containing the numerical Gaussian fields
+// represented by GaussianCloud plus explicit Vulkax stable-ID properties.
+[[nodiscard]] std::string serialize3dgsPly(const GaussianCloud& cloud);
+void write3dgsPly(const GaussianCloud& cloud, const std::filesystem::path& path);
 
 } // namespace vulkax::gaussian

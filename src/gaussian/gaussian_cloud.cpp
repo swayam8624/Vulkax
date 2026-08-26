@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <functional>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -160,6 +162,14 @@ void normalizeQuaternion(std::array<double, 4>& rotation) {
     for (double& value : rotation) value *= inv;
 }
 
+[[nodiscard]] std::uint32_t stableIdComponent(double value, const char* name) {
+    if (!std::isfinite(value) || value < 1.0 ||
+        value > static_cast<double>(std::numeric_limits<std::uint32_t>::max()) ||
+        std::floor(value) != value)
+        throw std::runtime_error(std::string("invalid ") + name + " Gaussian stable-ID component");
+    return static_cast<std::uint32_t>(value);
+}
+
 [[nodiscard]] GaussianSplat buildSplat(const std::vector<Property>& properties,
                                         const std::vector<double>& values,
                                         std::size_t restCount) {
@@ -168,6 +178,8 @@ void normalizeQuaternion(std::array<double, 4>& rotation) {
     bool haveX = false;
     bool haveY = false;
     bool haveZ = false;
+    bool haveNamespace = false;
+    bool haveLocalId = false;
 
     for (std::size_t index = 0; index < properties.size(); ++index) {
         const auto& name = properties[index].name;
@@ -186,13 +198,21 @@ void normalizeQuaternion(std::array<double, 4>& rotation) {
         else if (name == "f_dc_0") splat.shDC[0] = value;
         else if (name == "f_dc_1") splat.shDC[1] = value;
         else if (name == "f_dc_2") splat.shDC[2] = value;
-        else {
+        else if (name == "vulkax_id_namespace") {
+            splat.id.namespaceId = stableIdComponent(value, "namespace");
+            haveNamespace = true;
+        } else if (name == "vulkax_id_local") {
+            splat.id.localId = stableIdComponent(value, "local");
+            haveLocalId = true;
+        } else {
             const auto rest = numberedSuffix(name, "f_rest_");
             if (rest < splat.shRest.size()) splat.shRest[rest] = value;
         }
     }
 
     if (!haveX || !haveY || !haveZ) throw std::runtime_error("3DGS PLY must contain x, y and z properties");
+    if (haveNamespace != haveLocalId)
+        throw std::runtime_error("Vulkax Gaussian identity requires both namespace and local PLY properties");
     normalizeQuaternion(splat.rotation);
     return splat;
 }
@@ -207,7 +227,18 @@ void normalizeQuaternion(std::array<double, 4>& rotation) {
 }
 
 void assignFallbackId(GaussianSplat& splat, std::size_t vertex) {
-    splat.id = {fallbackGaussianNamespace, static_cast<std::uint32_t>(vertex + 1U)};
+    if (!splat.id.valid())
+        splat.id = {fallbackGaussianNamespace, static_cast<std::uint32_t>(vertex + 1U)};
+}
+
+void validateSerializableCloud(const GaussianCloud& cloud) {
+    const GaussianIndexView indexView(cloud);
+    (void)indexView;
+    for (std::size_t index = 0; index < cloud.size(); ++index) {
+        if (cloud.splats[index].shRest.size() != cloud.shRestCoefficientsPerSplat)
+            throw std::invalid_argument("Gaussian cloud has inconsistent SH-rest coefficient count at stable ID " +
+                                        toString(cloud.splats[index].id));
+    }
 }
 
 } // namespace
@@ -285,6 +316,8 @@ GaussianCloud parse3dgsPly(std::string_view bytes) {
             assignFallbackId(splat, vertex);
             cloud.splats.push_back(std::move(splat));
         }
+        const GaussianIndexView indexView(cloud);
+        (void)indexView;
         return cloud;
     }
 
@@ -305,7 +338,47 @@ GaussianCloud parse3dgsPly(std::string_view bytes) {
         assignFallbackId(splat, vertex);
         cloud.splats.push_back(std::move(splat));
     }
+    const GaussianIndexView indexView(cloud);
+    (void)indexView;
     return cloud;
+}
+
+std::string serialize3dgsPly(const GaussianCloud& cloud) {
+    validateSerializableCloud(cloud);
+    std::ostringstream output;
+    output << "ply\nformat ascii 1.0\n"
+           << "comment Vulkax stable Gaussian identity\n"
+           << "element vertex " << cloud.size() << '\n'
+           << "property double x\nproperty double y\nproperty double z\n"
+           << "property double f_dc_0\nproperty double f_dc_1\nproperty double f_dc_2\n"
+           << "property double opacity\n"
+           << "property double scale_0\nproperty double scale_1\nproperty double scale_2\n"
+           << "property double rot_0\nproperty double rot_1\nproperty double rot_2\nproperty double rot_3\n";
+    for (std::size_t coefficient = 0; coefficient < cloud.shRestCoefficientsPerSplat; ++coefficient)
+        output << "property double f_rest_" << coefficient << '\n';
+    output << "property uint vulkax_id_namespace\n"
+           << "property uint vulkax_id_local\n"
+           << "end_header\n"
+           << std::setprecision(17);
+
+    for (const auto& splat : cloud.splats) {
+        output << splat.position.x << ' ' << splat.position.y << ' ' << splat.position.z << ' '
+               << splat.shDC[0] << ' ' << splat.shDC[1] << ' ' << splat.shDC[2] << ' '
+               << splat.opacityLogit << ' '
+               << splat.logScale[0] << ' ' << splat.logScale[1] << ' ' << splat.logScale[2] << ' '
+               << splat.rotation[0] << ' ' << splat.rotation[1] << ' '
+               << splat.rotation[2] << ' ' << splat.rotation[3];
+        for (const double coefficient : splat.shRest) output << ' ' << coefficient;
+        output << ' ' << splat.id.namespaceId << ' ' << splat.id.localId << '\n';
+    }
+    return output.str();
+}
+
+void write3dgsPly(const GaussianCloud& cloud, const std::filesystem::path& path) {
+    std::ofstream output(path, std::ios::binary);
+    if (!output) throw std::runtime_error("failed to write 3DGS PLY: " + path.string());
+    output << serialize3dgsPly(cloud);
+    if (!output) throw std::runtime_error("failed while writing 3DGS PLY: " + path.string());
 }
 
 } // namespace vulkax::gaussian

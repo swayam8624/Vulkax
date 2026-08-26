@@ -48,7 +48,17 @@ struct GaussianHierarchyStats {
 [[nodiscard]] GaussianHierarchyStats summarizeGaussianHierarchy(
     const GaussianHierarchy& hierarchy);
 
+// Transient-storage form retained for rendering/spatial algorithms that operate
+// immediately on the supplied cloud. Do not persist these indices as identity.
 [[nodiscard]] std::vector<std::size_t> queryGaussianHierarchyAabb(
+    const GaussianHierarchy& hierarchy,
+    const GaussianCloud& cloud,
+    math::Vec3 minimum,
+    math::Vec3 maximum);
+
+// Stable-identity form for correspondence, selection and evidence. Returned IDs
+// are sorted by packed stable ID so the result is independent of storage order.
+[[nodiscard]] std::vector<GaussianId> queryGaussianHierarchyAabbIds(
     const GaussianHierarchy& hierarchy,
     const GaussianCloud& cloud,
     math::Vec3 minimum,
