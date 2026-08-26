@@ -176,8 +176,8 @@ void main() {
     outputs.values[index].minorDepth = vec4(minorNdc, cameraZ, opacity);
     outputs.values[index].colorCull = vec4(inputValue.color.rgb, 0.0);
     outputs.values[index].tileBounds = vec4(
-        floor(pixelMinimumX) / tileSize,
-        floor(pixelMaximumX) / tileSize,
-        floor(pixelMinimumY) / tileSize,
-        floor(pixelMaximumY) / tileSize);
+        floor(pixelMinimumX / tileSize),
+        floor(pixelMaximumX / tileSize),
+        floor(pixelMinimumY / tileSize),
+        floor(pixelMaximumY / tileSize));
 }
