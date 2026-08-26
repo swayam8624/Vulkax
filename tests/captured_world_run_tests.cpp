@@ -80,16 +80,18 @@ int main() {
     for (const auto& path : required) assert(fs::is_regular_file(path));
     assert(!fs::exists(outputDirectory / "render"));
 
-    std::ifstream certificateStream(outputDirectory / "certificate.json");
-    assert(certificateStream);
-    const std::string certificate{
-        std::istreambuf_iterator<char>(certificateStream), std::istreambuf_iterator<char>()};
-    assert(certificate.find("\"schema\": \"vulkax_captured_world_run\"") != std::string::npos);
-    assert(certificate.find("\"status\": \"verified\"") != std::string::npos);
-    assert(certificate.find("\"source_kind\": \"synthetic\"") != std::string::npos);
-    assert(certificate.find("appearance/rewritten.ply") != std::string::npos);
-    assert(certificate.find("rewrite/transaction_evidence.csv") != std::string::npos);
-    assert(certificate.find("certificate.json\"") == std::string::npos);
+    {
+        std::ifstream certificateStream(outputDirectory / "certificate.json");
+        assert(certificateStream);
+        const std::string certificate{
+            std::istreambuf_iterator<char>(certificateStream), std::istreambuf_iterator<char>()};
+        assert(certificate.find("\"schema\": \"vulkax_captured_world_run\"") != std::string::npos);
+        assert(certificate.find("\"status\": \"verified\"") != std::string::npos);
+        assert(certificate.find("\"source_kind\": \"synthetic\"") != std::string::npos);
+        assert(certificate.find("appearance/rewritten.ply") != std::string::npos);
+        assert(certificate.find("rewrite/transaction_evidence.csv") != std::string::npos);
+        assert(certificate.find("certificate.json\"") == std::string::npos);
+    }
 
     bool rejectedNonEmptyOutput = false;
     try {
