@@ -1,0 +1,30 @@
+name: DOT measured source inspection
+
+on:
+  push:
+    branches: ["feat/measured-deformable-benchmark"]
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download pinned DOT metadata and C02 sequence
+        run: |
+          mkdir -p build/dot-source
+          curl -L --fail --retry 3 \
+            'https://dataverse.orc.gmu.edu/api/access/datafile/:persistentId/?persistentId=doi:10.13021/orc2020/XXLVXM/IMQ9BK' \
+            -o build/dot-source/A_Read_Me.txt
+          curl -L --fail --retry 3 \
+            'https://dataverse.orc.gmu.edu/api/access/datafile/:persistentId/?persistentId=doi:10.13021/orc2020/XXLVXM/ZVZHVR' \
+            -o build/dot-source/C02.zip
+          echo '0f347c3f95ed2def9fd81ba5236955b1  build/dot-source/C02.zip' | md5sum -c -
+      - name: Inspect source contract
+        run: |
+          echo '===== DOT A_Read_Me.txt ====='
+          cat build/dot-source/A_Read_Me.txt
+          echo '===== C02 archive ====='
+          unzip -l build/dot-source/C02.zip
+          echo '===== extension counts ====='
+          unzip -Z1 build/dot-source/C02.zip | sed 's/.*\.//' | sort | uniq -c | sort -nr
