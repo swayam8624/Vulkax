@@ -155,4 +155,21 @@ std::vector<std::size_t> queryGaussianHierarchyAabb(
     return result;
 }
 
+std::vector<GaussianId> queryGaussianHierarchyAabbIds(
+    const GaussianHierarchy& hierarchy,
+    const GaussianCloud& cloud,
+    math::Vec3 minimum,
+    math::Vec3 maximum) {
+    const GaussianIndexView identityValidation(cloud);
+    (void)identityValidation;
+    const auto indices = queryGaussianHierarchyAabb(hierarchy, cloud, minimum, maximum);
+    std::vector<GaussianId> result;
+    result.reserve(indices.size());
+    for (const auto index : indices) result.push_back(cloud.splats[index].id);
+    std::sort(result.begin(), result.end(), [](GaussianId lhs, GaussianId rhs) {
+        return lhs.packed() < rhs.packed();
+    });
+    return result;
+}
+
 } // namespace vulkax::gaussian

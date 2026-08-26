@@ -58,6 +58,8 @@ gaussian::GaussianCloud makeWorld() {
     world.splats.push_back(makeSplat({-0.03, 0.10, -0.06}));
     world.splats.push_back(makeSplat({0.04, 0.06, 0.09}));
     world.splats.push_back(makeSplat({0.00, 0.00, 0.00}));
+    for (std::size_t index = 0; index < world.splats.size(); ++index)
+        world.splats[index].id = {17U, static_cast<std::uint32_t>(index + 1U)};
     return world;
 }
 

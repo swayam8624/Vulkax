@@ -2,40 +2,44 @@
 
 #include <algorithm>
 #include <cmath>
-#include <sstream>
+#include <exception>
+#include <optional>
+#include <stdexcept>
+#include <string>
 
 namespace vulkax::world {
 namespace {
 
-const std::vector<std::size_t> emptyGaussianBindings;
+const std::vector<gaussian::GaussianId> emptyGaussianBindings;
 const std::vector<PhysicalBinding> emptyPhysicalBindings;
 
 } // namespace
 
-void WorldCorrespondenceGraph::bindGaussian(std::size_t gaussianIndex, EntityId entity) {
-    const auto existing = gaussianToEntity_.find(gaussianIndex);
+void WorldCorrespondenceGraph::bindGaussian(gaussian::GaussianId gaussianId, EntityId entity) {
+    if (!gaussianId.valid()) throw std::invalid_argument("Gaussian correspondence requires a valid stable ID");
+    const auto existing = gaussianToEntity_.find(gaussianId);
     if (existing != gaussianToEntity_.end()) {
         if (existing->second == entity) return;
         auto& previous = entityToGaussians_[existing->second];
-        previous.erase(std::remove(previous.begin(), previous.end(), gaussianIndex), previous.end());
+        previous.erase(std::remove(previous.begin(), previous.end(), gaussianId), previous.end());
     }
 
-    gaussianToEntity_[gaussianIndex] = entity;
+    gaussianToEntity_[gaussianId] = entity;
     auto& reverse = entityToGaussians_[entity];
-    if (std::find(reverse.begin(), reverse.end(), gaussianIndex) == reverse.end()) reverse.push_back(gaussianIndex);
+    if (std::find(reverse.begin(), reverse.end(), gaussianId) == reverse.end()) reverse.push_back(gaussianId);
 }
 
 void WorldCorrespondenceGraph::bindPhysical(EntityId entity, PhysicalBinding binding) {
     entityToPhysical_[entity].push_back(binding);
 }
 
-std::optional<EntityId> WorldCorrespondenceGraph::entityForGaussian(std::size_t gaussianIndex) const {
-    const auto it = gaussianToEntity_.find(gaussianIndex);
+std::optional<EntityId> WorldCorrespondenceGraph::entityForGaussian(gaussian::GaussianId gaussianId) const {
+    const auto it = gaussianToEntity_.find(gaussianId);
     if (it == gaussianToEntity_.end()) return std::nullopt;
     return it->second;
 }
 
-const std::vector<std::size_t>& WorldCorrespondenceGraph::gaussiansForEntity(EntityId entity) const noexcept {
+const std::vector<gaussian::GaussianId>& WorldCorrespondenceGraph::gaussiansForEntity(EntityId entity) const noexcept {
     const auto it = entityToGaussians_.find(entity);
     return it == entityToGaussians_.end() ? emptyGaussianBindings : it->second;
 }
@@ -45,13 +49,41 @@ const std::vector<PhysicalBinding>& WorldCorrespondenceGraph::physicalBindings(E
     return it == entityToPhysical_.end() ? emptyPhysicalBindings : it->second;
 }
 
+std::size_t WorldCorrespondenceGraph::pruneMissingGaussians(const gaussian::GaussianCloud& cloud) {
+    const gaussian::GaussianIndexView view(cloud);
+    const std::size_t before = gaussianToEntity_.size();
+    for (auto it = gaussianToEntity_.begin(); it != gaussianToEntity_.end();) {
+        if (!view.contains(it->first)) it = gaussianToEntity_.erase(it);
+        else ++it;
+    }
+
+    entityToGaussians_.clear();
+    for (const auto& [id, entity] : gaussianToEntity_)
+        entityToGaussians_[entity].push_back(id);
+    for (auto& [entity, ids] : entityToGaussians_) {
+        (void)entity;
+        std::sort(ids.begin(), ids.end(), [](gaussian::GaussianId lhs, gaussian::GaussianId rhs) {
+            return lhs.packed() < rhs.packed();
+        });
+    }
+    return before - gaussianToEntity_.size();
+}
+
 CorrespondenceValidation WorldCorrespondenceGraph::validate(const WorldIR& world) const {
     CorrespondenceValidation report;
+    std::optional<gaussian::GaussianIndexView> indexView;
+    try {
+        indexView.emplace(world.appearance);
+    } catch (const std::exception& error) {
+        report.valid = false;
+        report.errors.push_back(std::string("appearance identity: ") + error.what());
+    }
 
-    for (const auto& [gaussianIndex, entityId] : gaussianToEntity_) {
-        if (gaussianIndex >= world.appearance.size()) {
+    for (const auto& [gaussianId, entityId] : gaussianToEntity_) {
+        if (!indexView.has_value() || !indexView->contains(gaussianId)) {
             report.valid = false;
-            report.errors.push_back("Gaussian binding index " + std::to_string(gaussianIndex) + " is outside the appearance cloud");
+            report.errors.push_back("Gaussian binding ID " + gaussian::toString(gaussianId) +
+                                    " is absent from the appearance cloud");
         }
         if (world.findEntity(entityId) == nullptr) {
             report.valid = false;
@@ -59,16 +91,17 @@ CorrespondenceValidation WorldCorrespondenceGraph::validate(const WorldIR& world
         }
     }
 
-    for (const auto& [entityId, indices] : entityToGaussians_) {
+    for (const auto& [entityId, ids] : entityToGaussians_) {
         if (world.findEntity(entityId) == nullptr) {
             report.valid = false;
             report.errors.push_back("Reverse Gaussian map references missing entity " + std::to_string(entityId));
         }
-        for (const auto index : indices) {
-            const auto forward = gaussianToEntity_.find(index);
+        for (const auto id : ids) {
+            const auto forward = gaussianToEntity_.find(id);
             if (forward == gaussianToEntity_.end() || forward->second != entityId) {
                 report.valid = false;
-                report.errors.push_back("Forward/reverse Gaussian correspondence is inconsistent at index " + std::to_string(index));
+                report.errors.push_back("Forward/reverse Gaussian correspondence is inconsistent at ID " +
+                                        gaussian::toString(id));
             }
         }
     }
