@@ -9,6 +9,8 @@ on:
       - "scripts/**"
       - "assets/demo/**"
       - "schemas/**"
+      - "docs/**"
+      - "README.md"
       - "CMakeLists.txt"
       - ".github/workflows/**"
   pull_request:
@@ -19,6 +21,8 @@ on:
       - "scripts/**"
       - "assets/demo/**"
       - "schemas/**"
+      - "docs/**"
+      - "README.md"
       - "CMakeLists.txt"
       - ".github/workflows/**"
   workflow_dispatch:
