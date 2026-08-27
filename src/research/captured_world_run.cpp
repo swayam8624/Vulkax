@@ -406,8 +406,8 @@ void writeCertificate(
     output << std::setprecision(17);
     output << "{\n"
            << "  \"schema\": \"vulkax_captured_world_run\",\n"
-           << "  \"schema_version\": 1,\n"
-           << "  \"status\": \"" << world::toString(summary.rewriteStatus) << "\",\n"
+           << "  \"schema_version\": 2,\n"
+           << "  \"run_status\": \"completed\",\n"
            << "  \"bundle_id\": \"" << jsonEscape(summary.bundleId) << "\",\n"
            << "  \"source_kind\": \"" << capture::toString(summary.sourceKind) << "\",\n"
            << "  \"source_manifest_sha256\": \"" << core::sha256FileHex(manifestPath) << "\",\n"
@@ -429,7 +429,8 @@ void writeCertificate(
            << "  \"adaptive_proposal\": {\"region_count\": " << summary.adaptiveRegionCount
            << ", \"particle_count\": " << summary.adaptiveParticleCount
            << ", \"absolute_gradient_fraction\": " << summary.adaptiveAbsoluteGradientFraction << "},\n"
-           << "  \"rewrite\": {\"region_id\": \"" << jsonEscape(summary.rewriteRegionId)
+           << "  \"rewrite\": {\"status\": \"" << world::toString(summary.rewriteStatus)
+           << "\", \"region_id\": \"" << jsonEscape(summary.rewriteRegionId)
            << "\", \"particle_count\": " << summary.rewriteParticleCount
            << ", \"rollback_performed\": " << (summary.rollbackPerformed ? "true" : "false")
            << ", \"physical_error\": " << summary.physicalObservableError
@@ -442,7 +443,7 @@ void writeCertificate(
                << ", \"rmse\": " << summary.renderComparison.rootMeanSquareError
                << ", \"changed_pixel_fraction\": " << summary.renderComparison.changedPixelFraction;
     output << "},\n"
-           << "  \"research_integrity\": \"source kind is manifest-declared; synthetic data do not become measured evidence\",\n"
+           << "  \"research_integrity\": \"run completion is independent of rewrite acceptance; source kind is manifest-declared; synthetic data do not become measured evidence\",\n"
            << "  \"artifacts\": [\n";
     for (std::size_t index = 0; index < artifacts.size(); ++index) {
         const auto& artifact = artifacts[index];
@@ -655,9 +656,6 @@ CapturedWorldRunSummary runCapturedWorldResearchDemo(
     summary.artifactCount = artifacts.size();
     writeCertificate(
         outputDirectory / "certificate.json", manifestPath, bundle, settings, summary, artifacts);
-
-    if (rewrite.status != world::RewriteVerificationStatus::Verified)
-        throw std::runtime_error("captured-world-run rewrite was rejected: " + rewrite.evidence.rejectionReason);
     return summary;
 }
 
