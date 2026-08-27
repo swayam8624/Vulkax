@@ -3,6 +3,7 @@
 #include "vulkax/backend/backend.hpp"
 #include "vulkax/capture/deformable_bundle.hpp"
 #include "vulkax/render/image_metrics.hpp"
+#include "vulkax/render/showcase.hpp"
 #include "vulkax/research/adaptive_material_influence.hpp"
 #include "vulkax/world/verified_rewrite.hpp"
 
@@ -35,6 +36,7 @@ struct CapturedWorldRunSettings {
     std::optional<backend::BackendKind> renderBackend;
     std::uint32_t renderWidth{1280U};
     std::uint32_t renderHeight{720U};
+    render::GaussianShowcaseSettings showcase{};
 };
 
 struct CapturedWorldRunSummary {
@@ -64,13 +66,18 @@ struct CapturedWorldRunSummary {
     bool renderProduced{};
     std::optional<backend::BackendKind> renderBackend;
     render::ImageComparison renderComparison{};
+    bool showcaseProduced{};
+    std::size_t showcaseTurntableFrames{};
+    std::string showcaseScenePreset;
     std::size_t artifactCount{};
 };
 
 // Executes the complete controlled captured-world research path through library
 // APIs rather than shelling out to existing CLI commands. The output directory
 // must be absent or empty so the result certificate can index exactly the
-// artifacts produced by this run.
+// artifacts produced by this run. A rejected rewrite is a valid completed run
+// when rollback/evidence are complete; run completion and rewrite acceptance are
+// reported separately in certificate schema v2.
 [[nodiscard]] CapturedWorldRunSummary runCapturedWorldResearchDemo(
     const std::filesystem::path& manifestPath,
     const std::filesystem::path& outputDirectory,
