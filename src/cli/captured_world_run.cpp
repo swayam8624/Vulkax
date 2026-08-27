@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
-#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -38,20 +37,21 @@ namespace {
     return value;
 }
 
-[[nodiscard]] std::uint64_t parseSeed(std::string_view text) {
+[[nodiscard]] std::uint64_t parseUnsigned(std::string_view text, const char* label) {
     if (text.empty() || !std::all_of(text.begin(), text.end(), [](char character) {
             return character >= '0' && character <= '9';
         }))
-        throw std::invalid_argument("robustness seed must be an unsigned integer");
+        throw std::invalid_argument(std::string(label) + " must be an unsigned integer");
     const std::string owned(text);
     std::size_t consumed = 0U;
     unsigned long long value = 0U;
     try {
         value = std::stoull(owned, &consumed);
     } catch (const std::exception&) {
-        throw std::invalid_argument("robustness seed is outside the supported integer range");
+        throw std::invalid_argument(std::string(label) + " is outside the supported integer range");
     }
-    if (consumed != owned.size()) throw std::invalid_argument("robustness seed must be an unsigned integer");
+    if (consumed != owned.size())
+        throw std::invalid_argument(std::string(label) + " must be an unsigned integer");
     return static_cast<std::uint64_t>(value);
 }
 
@@ -62,6 +62,24 @@ namespace {
     return std::nullopt;
 }
 
+[[nodiscard]] bool isFlag(std::string_view text) {
+    return text.starts_with("--");
+}
+
+void parseResolution(
+    std::string_view text,
+    std::uint32_t& width,
+    std::uint32_t& height) {
+    const auto separator = text.find('x');
+    if (separator == std::string_view::npos) throw std::invalid_argument("showcase resolution must be WIDTHxHEIGHT");
+    const auto widthValue = parseUnsigned(text.substr(0, separator), "showcase width");
+    const auto heightValue = parseUnsigned(text.substr(separator + 1U), "showcase height");
+    if (widthValue == 0U || heightValue == 0U || widthValue > 8192U || heightValue > 8192U)
+        throw std::invalid_argument("showcase dimensions must lie in [1,8192]");
+    width = static_cast<std::uint32_t>(widthValue);
+    height = static_cast<std::uint32_t>(heightValue);
+}
+
 } // namespace
 
 int capturedWorldRunCommand(int argc, char** argv) {
@@ -70,7 +88,10 @@ int capturedWorldRunCommand(int argc, char** argv) {
         throw std::invalid_argument(
             "usage: vulkax captured-world-run <capture.vkcap> <output-dir> <marker-id> <time> "
             "<dir-x> <dir-y> <dir-z> [auto|none|Vulkan|Metal|OpenGL] "
-            "[cell-size] [fd-scale-step] [rewrite-scale-delta] [robustness-seed]");
+            "[cell-size] [fd-scale-step] [rewrite-scale-delta] [robustness-seed] "
+            "[--showcase studio_pedestal|cloth_showcase] [--showcase-assets <dir>] "
+            "[--showcase-asset-lock <file>] [--showcase-resolution WIDTHxHEIGHT] "
+            "[--turntable N] [--no-closeup] [--no-summary-card]");
     }
 
     research::CapturedWorldRunSettings settings;
@@ -82,8 +103,9 @@ int capturedWorldRunCommand(int argc, char** argv) {
         parseFiniteDouble(argv[8], "direction z"),
     };
 
-    if (argc >= 10) {
-        const std::string_view backendName(argv[9]);
+    int cursor = 9;
+    if (cursor < argc && !isFlag(argv[cursor])) {
+        const std::string_view backendName(argv[cursor++]);
         if (backendName == "none") {
             settings.render = false;
         } else if (backendName != "auto") {
@@ -91,17 +113,53 @@ int capturedWorldRunCommand(int argc, char** argv) {
             if (!settings.renderBackend) throw std::invalid_argument("unknown captured-world-run render backend");
         }
     }
-    if (argc >= 11) settings.cellSize = parsePositiveDouble(argv[10], "cell size");
-    if (argc >= 12) settings.finiteDifferenceScaleStep = parsePositiveDouble(argv[11], "finite-difference scale step");
-    if (argc >= 13) settings.rewriteScaleDelta = parseFiniteDouble(argv[12], "rewrite scale delta");
-    if (argc >= 14) settings.robustnessSeed = parseSeed(argv[13]);
-    if (argc > 14) throw std::invalid_argument("captured-world-run received too many arguments");
+    if (cursor < argc && !isFlag(argv[cursor]))
+        settings.cellSize = parsePositiveDouble(argv[cursor++], "cell size");
+    if (cursor < argc && !isFlag(argv[cursor]))
+        settings.finiteDifferenceScaleStep = parsePositiveDouble(argv[cursor++], "finite-difference scale step");
+    if (cursor < argc && !isFlag(argv[cursor]))
+        settings.rewriteScaleDelta = parseFiniteDouble(argv[cursor++], "rewrite scale delta");
+    if (cursor < argc && !isFlag(argv[cursor]))
+        settings.robustnessSeed = parseUnsigned(argv[cursor++], "robustness seed");
+
+    while (cursor < argc) {
+        const std::string_view flag(argv[cursor++]);
+        const auto requireValue = [&](const char* label) -> std::string_view {
+            if (cursor >= argc) throw std::invalid_argument(std::string(flag) + " requires " + label);
+            return argv[cursor++];
+        };
+        if (flag == "--showcase") {
+            settings.showcase.enabled = true;
+            settings.showcase.scenePreset = std::string(requireValue("a scene preset"));
+        } else if (flag == "--showcase-assets") {
+            settings.showcase.assetRoot = std::filesystem::path(requireValue("an asset directory"));
+        } else if (flag == "--showcase-asset-lock") {
+            settings.showcase.assetLock = std::filesystem::path(requireValue("an asset lock file"));
+        } else if (flag == "--showcase-resolution") {
+            parseResolution(
+                requireValue("WIDTHxHEIGHT"),
+                settings.showcase.width,
+                settings.showcase.height);
+        } else if (flag == "--turntable") {
+            const auto frames = parseUnsigned(requireValue("a frame count"), "turntable frame count");
+            if (frames == 0U || frames > 72U)
+                throw std::invalid_argument("turntable frame count must lie in [1,72]");
+            settings.showcase.turntableFrames = static_cast<std::uint32_t>(frames);
+        } else if (flag == "--no-closeup") {
+            settings.showcase.closeup = false;
+        } else if (flag == "--no-summary-card") {
+            settings.showcase.summaryCard = false;
+        } else {
+            throw std::invalid_argument("unknown captured-world-run option: " + std::string(flag));
+        }
+    }
 
     const auto summary = research::runCapturedWorldResearchDemo(
         std::filesystem::path(argv[2]), std::filesystem::path(argv[3]), settings);
 
     std::cout << std::setprecision(12)
               << "Vulkax captured-world-run\n"
+              << "  run_status: completed\n"
               << "  bundle: " << summary.bundleId << '\n'
               << "  source_kind: " << capture::toString(summary.sourceKind) << '\n'
               << "  selected_young_modulus: " << summary.selectedYoungModulus << '\n'
@@ -121,6 +179,10 @@ int capturedWorldRunCommand(int argc, char** argv) {
     if (summary.renderBackend)
         std::cout << "  render_backend: " << backend::toString(*summary.renderBackend) << '\n'
                   << "  render_rmse: " << summary.renderComparison.rootMeanSquareError << '\n';
+    std::cout << "  showcase_produced: " << (summary.showcaseProduced ? "yes" : "no") << '\n';
+    if (summary.showcaseProduced)
+        std::cout << "  showcase_scene: " << summary.showcaseScenePreset << '\n'
+                  << "  showcase_turntable_frames: " << summary.showcaseTurntableFrames << '\n';
     std::cout << "  artifacts_indexed: " << summary.artifactCount << '\n'
               << "  certificate: " << (std::filesystem::path(argv[3]) / "certificate.json").string() << '\n';
     return 0;
