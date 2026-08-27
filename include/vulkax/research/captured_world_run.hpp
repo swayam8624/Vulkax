@@ -24,6 +24,10 @@ struct CapturedWorldRunSettings {
     double finiteDifferenceScaleStep{0.01};
     double rewriteScaleDelta{0.02};
     std::uint64_t robustnessSeed{12345U};
+    // The capture manifest remains on its measured/source time lattice while
+    // the APIC/MPM integrator may take smaller deterministic substeps. A value
+    // of one preserves the historical controlled-demo path exactly.
+    std::size_t integrationSubstepsPerCaptureStep{1U};
 
     std::vector<double> youngModulusCandidates{
         5.0e3, 7.5e3, 1.0e4, 1.5e4, 2.2e4, 3.3e4, 5.0e4,
@@ -67,10 +71,12 @@ struct CapturedWorldRunSummary {
     std::size_t artifactCount{};
 };
 
-// Executes the complete controlled captured-world research path through library
-// APIs rather than shelling out to existing CLI commands. The output directory
-// must be absent or empty so the result certificate can index exactly the
-// artifacts produced by this run.
+// Executes the complete captured-world research path through library APIs rather
+// than shelling out to existing CLI commands. The output directory must be
+// absent or empty so the result certificate can index exactly the artifacts
+// produced by this run. Captured-world-run remains a model-conditioned replay:
+// source provenance determines whether its fitted material is controlled truth,
+// a measured-data effective parameter, or another explicitly declared proxy.
 [[nodiscard]] CapturedWorldRunSummary runCapturedWorldResearchDemo(
     const std::filesystem::path& manifestPath,
     const std::filesystem::path& outputDirectory,
