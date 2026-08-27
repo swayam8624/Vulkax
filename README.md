@@ -194,6 +194,36 @@ Calibrate material parameters:
 
 The controlled generator uses known regression truth (`E = 15000 Pa`, `nu = 0.30`, `dt = 1e-4 s`). It is a deterministic verification fixture, **not evidence that material identification on real captured objects has been solved**.
 
+## Measured deformable benchmark — 0.45
+
+Vulkax now also has a reproducible measured-source benchmark using the public CC0 **DOT (Deformable Object Tracking) C2 cloth sequence**. The workflow pins the source archive by Dataverse identity and MD5, imports 225 stable measured 3D correspondences into SI units, and preserves explicit provenance for every quantity that is measured, derived, proxied or unavailable.
+
+The Vulkax bundle is deliberately classified as `derived`: the trajectory geometry is measured, while the physical reference state, mass/rest-volume model, neutral Gaussian photometry and uncertainty scale are explicit proxies. DOT does not provide material ground truth for C2, so the fitted parameters are described only as **model-conditioned effective parameters**.
+
+The reproducible measured-source result currently selects:
+
+```text
+model-conditioned effective E        7500 Pa
+model-conditioned nu                 0.45
+fit dynamic RMS                      0.004390821778 m
+held-out validation RMS              0.004417317099 m
+initialization affine-fit RMS        0.0009106961364 m
+```
+
+The measured-source robustness stress test uses deterministic perturbations at a literature-derived `0.26 mm` scale. The material grid candidate remains unchanged, the minimum particle-influence cosine is `0.9984812323`, strongest-particle identity is stable in `5/5` perturbations, and minimum adaptive-particle Jaccard is `0.9381443299`.
+
+The measured influence pass proposes 8 adaptive regions containing 182/225 particles and retaining about `94.80%` of absolute particle-gradient mass. A selected 31-particle `+2%` Young's-modulus rewrite passes the configured nonlinear linearization tolerance but fails the independent derivative-oracle contract. The central transaction therefore **rejects the edit and rolls it back**, with zero unaffected-position drift. That rejection is retained as evidence rather than converted into a passing result.
+
+The permanent validator independently recomputes the measured rewrite verdict from the nonlinear and adjoint-vs-finite-difference evidence:
+
+```bash
+python3 scripts/validate_measured_dot_c2.py \
+  build/dot-c2 \
+  build/dot-c2/measured_benchmark_summary.csv
+```
+
+See [`docs/MEASURED_BENCHMARK_0_45.md`](docs/MEASURED_BENCHMARK_0_45.md) for source provenance, exact settings, measured/proxy boundaries, observed results and limitations.
+
 ## Versioned capture evidence contract
 
 `capture.vkcap` schema v1 records:
@@ -266,7 +296,7 @@ The robustness command independently perturbs initial-pose and nonzero-time obse
   1e-6 1e-6 12345 1e-4 0.08
 ```
 
-This is explicitly a **synthetic stress test**. The meaningful uncertainty scale for measured data must come from the real tracking/capture process.
+This command generates deterministic bounded perturbations. On the controlled bundle it is explicitly a synthetic stress test; on the DOT benchmark the source trajectory is measured but the perturbation distribution and `0.26 mm` scale remain a literature-derived stress-test proxy rather than a measured per-C2 uncertainty distribution.
 
 See [`docs/OBSERVATION_ROBUSTNESS_0_39.md`](docs/OBSERVATION_ROBUSTNESS_0_39.md).
 
@@ -331,7 +361,7 @@ Use `Metal` on macOS.
 
 ## Research-integrity status
 
-What is currently supported by controlled evidence:
+What is currently supported by evidence:
 
 - captured/physical representations remain separate and explicitly coupled;
 - deterministic captured replay and held-out material-calibration regressions;
@@ -346,12 +376,19 @@ What is currently supported by controlled evidence:
 - one solver-backed controlled captured-material rewrite path that consumes fresh finite-difference, nonlinear and adjoint evidence;
 - persistent composite Gaussian IDs with explicit PLY round-trip support;
 - reorder-safe selection, correspondence, transactions and hierarchy-query membership;
-- controlled structural scale evidence through 65,536 synthetic splats.
+- controlled structural scale evidence through 65,536 synthetic splats;
+- a pinned real DOT C2 measured-source deformable benchmark with explicit measured/proxy provenance;
+- fit-only material selection and held-out replay on that measured trajectory;
+- measured-source influence/robustness evidence and a local rewrite that is independently rejected and rolled back when the full verification contract is not met.
 
 What is **not** established yet:
 
-- real measured deformable validation for the 0.45 milestone;
-- real measured rewrite verification;
+- true material-property recovery for DOT C2;
+- a certified stress-free DOT C2 reference shape, measured loads, density, thickness or mass;
+- a calibrated per-C2 measurement-noise distribution;
+- native 3DGS photometric reconstruction of the measured DOT object;
+- validated shell/cloth constitutive physics for the measured benchmark;
+- successful commitment of the currently selected measured DOT rewrite;
 - captured solver-specific geometry and constraint verification beyond the generic transaction/verifier interface and controlled tests;
 - globally allocated UUID identity across unrelated legacy Gaussian clouds;
 - distributed identity/selection infrastructure;
@@ -362,21 +399,17 @@ What is **not** established yet:
 - topology surgery;
 - publication novelty or broad real-world claims.
 
-The measured-deformable milestone remains **external-data-blocked** until a genuine captured sequence with known scale, marker correspondence and measurement uncertainty exists. Synthetic or re-authored synthetic payloads are not allowed to satisfy it.
-
 ## Road to 1.0
 
 The scoped roadmap is in [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md).
 
-After 0.70, the code-completable sequence is:
+With the measured 0.45 requirement now implemented, the remaining code-completable sequence is:
 
 ```text
-0.80  one-command controlled captured-world research demo
+0.80  one-command captured-world research + visual showcase demo
 0.90  release hardening and documentation/performance audit
 1.0   stable verified-rewritable-reality baseline
 ```
-
-0.45 measured validation remains an independent evidence requirement rather than a reason to fabricate data or block unrelated code-only milestones.
 
 ## Development rules
 
@@ -384,6 +417,7 @@ After 0.70, the code-completable sequence is:
 - Version bumps occur only after the behavior/evidence candidate is green.
 - Proposal and verification paths remain separate.
 - Synthetic evidence stays labelled synthetic.
+- Measured-source evidence keeps measured, derived and proxy quantities distinct.
 - Numerical gates are documented and tied to explicit baselines/requirements.
 - The finite-difference/nonlinear oracle remains available after efficient derivative paths exist.
 - Failed cases that expose genuine limitations are fixed or documented rather than silently suppressed.
