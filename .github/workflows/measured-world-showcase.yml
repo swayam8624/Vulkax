@@ -2,12 +2,23 @@ name: DOT C2 one-command visual showcase
 
 on:
   push:
-    branches: ["feat/captured-world-run"]
+    branches: ["main", "feat/captured-world-run", "feat/release-hardening-0-90"]
     paths:
       - "src/**"
       - "include/**"
       - "scripts/**"
       - "assets/demo/**"
+      - "schemas/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/measured-world-showcase.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "src/**"
+      - "include/**"
+      - "scripts/**"
+      - "assets/demo/**"
+      - "schemas/**"
       - "CMakeLists.txt"
       - ".github/workflows/measured-world-showcase.yml"
   workflow_dispatch:
