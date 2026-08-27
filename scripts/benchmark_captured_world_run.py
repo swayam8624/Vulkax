@@ -82,7 +82,7 @@ def main() -> int:
             "0.08",
             "0.01",
             "0.02",
-            str(12345 + iteration),
+            "12345",
         ]
         if args.showcase != "none":
             command += [
@@ -133,10 +133,11 @@ def main() -> int:
         "iterations": len(rows),
         "backend_requested": args.backend,
         "showcase_requested": args.showcase,
+        "robustness_seed": 12345,
         "minimum_seconds": min(elapsed_values),
         "maximum_seconds": max(elapsed_values),
         "mean_seconds": sum(elapsed_values) / len(elapsed_values),
-        "measurement": "wall-clock orchestration time measured by Python time.perf_counter; evidence-only, not a correctness threshold",
+        "measurement": "wall-clock orchestration time measured by Python time.perf_counter; identical deterministic inputs on every iteration; evidence-only, not a correctness threshold",
     }
     with (output_root / "captured_world_performance_summary.json").open("w", encoding="utf-8") as stream:
         json.dump(summary, stream, indent=2, sort_keys=True)
