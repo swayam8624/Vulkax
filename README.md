@@ -31,7 +31,7 @@ appearance <-> semantics <-> physical representation
 
 The central research question is stronger than Gaussian editing: **can a reconstructed scene be rewritten locally — geometry, material and supported constraints — while keeping appearance, physical state and provenance mutually consistent and quantitatively trustworthy?**
 
-## Current implementation — Vulkax 0.80
+## Current implementation — Vulkax 0.90
 
 ### Captured-world representation
 
@@ -389,7 +389,7 @@ Use `Metal` on macOS.
 
 ## Release hardening
 
-The 0.90 milestone freezes new research scope and hardens the 0.80 baseline. The hardening branch adds a release-facing schema registry, documentation claim audit, cross-platform CLI failure regression and deterministic principal-path timing report.
+Vulkax 0.90 is the release-hardened baseline for the implemented 0.80 captured-world pipeline. It adds a release-facing schema registry, documentation claim audit, cross-platform CLI failure regression, deterministic principal-path timing evidence, platform-specific install/build instructions, and release-gate coverage for the controlled and measured paths.
 
 ```bash
 python3 scripts/validate_evidence_registry.py .
@@ -398,7 +398,7 @@ python3 scripts/test_release_cli_failures.py --executable build/vulkax
 python3 scripts/benchmark_captured_world_run.py --executable build/vulkax --iterations 3 --backend none
 ```
 
-Timing is evidence-only and is not used as a correctness threshold. See [`docs/RELEASE_HARDENING_0_90.md`](docs/RELEASE_HARDENING_0_90.md).
+Timing is evidence-only and is not used as a correctness threshold. See [`docs/RELEASE_HARDENING_0_90.md`](docs/RELEASE_HARDENING_0_90.md) for the release contract and [`docs/PERFORMANCE_0_90.md`](docs/PERFORMANCE_0_90.md) for the recorded three-OS principal-path evidence.
 
 ## Research-integrity status
 
@@ -446,10 +446,9 @@ What is **not** established yet:
 
 The scoped roadmap is in [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md).
 
-With the measured 0.45 requirement and 0.80 one-command path now implemented, the remaining code-completable sequence is:
+With the measured 0.45 requirement, 0.80 one-command path and 0.90 release-hardening milestone implemented, the remaining code-completable sequence is:
 
 ```text
-0.90  release hardening and documentation/performance audit
 1.0   stable verified-rewritable-reality baseline
 ```
 
