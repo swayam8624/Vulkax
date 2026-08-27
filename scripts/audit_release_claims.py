@@ -28,9 +28,15 @@ def main() -> int:
     parser.add_argument(
         "--expected-project-version",
         default="0.80.0",
-        help="Expected CMake version while 0.90 is a behavior candidate. Change to 0.90.0 only for the release-head recheck.",
+        help="Expected CMake version. Use 0.80.0 for the behavior candidate and 0.90.0 for the release-head recheck.",
     )
     args = parser.parse_args()
+
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.expected_project_version):
+        parser.error("--expected-project-version must be MAJOR.MINOR.PATCH")
+    current_release = ".".join(args.expected_project_version.split(".")[:2])
+    if current_release not in {"0.80", "0.90"}:
+        parser.error("0.90 hardening audit supports only the 0.80 behavior candidate and 0.90 release head")
 
     root = Path(args.repo_root).resolve()
     readme = (root / "README.md").read_text(encoding="utf-8")
@@ -43,7 +49,7 @@ def main() -> int:
     if match.group(1) != args.expected_project_version:
         fail(f"expected project version {args.expected_project_version}, found {match.group(1)}")
 
-    require_contains(readme, "## Current implementation — Vulkax 0.80", "README")
+    require_contains(readme, f"## Current implementation — Vulkax {current_release}", "README")
     require_contains(readme, "## One-command captured-world research + showcase — 0.80", "README")
     require_contains(readme, "docs/CAPTURED_WORLD_RUN_0_80.md", "README")
     require_contains(readme, "docs/INSTALL_0_90.md", "README")
@@ -57,6 +63,8 @@ def main() -> int:
         "0.80  one-command captured-world research + visual showcase demo\n0.90",
         "README remaining-milestone list",
     )
+    if current_release == "0.90":
+        require_absent(readme, "## Current implementation — Vulkax 0.80", "README release-head current label")
 
     require_contains(roadmap, "### 0.90 — release hardening", "roadmap")
     require_contains(roadmap, "warning/error cleanup in code touched by the 1.0 path", "roadmap")
@@ -78,7 +86,7 @@ def main() -> int:
 
     print(
         "PASS release claim audit: "
-        f"project_version={args.expected_project_version} current_documented_release=0.80 hardening_target=0.90"
+        f"project_version={args.expected_project_version} current_documented_release={current_release} hardening_target=0.90"
     )
     return 0
 
