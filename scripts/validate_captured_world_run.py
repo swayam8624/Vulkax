@@ -29,7 +29,12 @@ def finite_number(value, label: str) -> float:
     return result
 
 
-def validate(root: Path, expected_backend: str | None, expected_rewrite: str | None) -> dict:
+def validate(
+    root: Path,
+    expected_backend: str | None,
+    expected_rewrite: str | None,
+    expected_showcase: str | None,
+) -> dict:
     certificate_path = root / "certificate.json"
     if not certificate_path.is_file():
         fail("certificate.json is missing")
@@ -104,6 +109,28 @@ def validate(root: Path, expected_backend: str | None, expected_rewrite: str | N
         finite_number(render.get("rmse"), "render rmse")
         finite_number(render.get("changed_pixel_fraction"), "render changed_pixel_fraction")
 
+    showcase = certificate.get("showcase")
+    if not isinstance(showcase, dict) or not isinstance(showcase.get("produced"), bool):
+        fail("showcase evidence object is malformed")
+    showcase_produced = showcase["produced"]
+    showcase_scene = showcase.get("scene")
+    showcase_frames = showcase.get("turntable_frames")
+    if showcase_produced:
+        if showcase_scene not in {"studio_pedestal", "cloth_showcase"}:
+            fail("unexpected showcase scene preset")
+        if not isinstance(showcase_frames, int) or not (1 <= showcase_frames <= 72):
+            fail("invalid showcase turntable frame count")
+    else:
+        if showcase_frames not in {0, None}:
+            fail("disabled showcase reports turntable frames")
+    if expected_showcase == "none" and showcase_produced:
+        fail("showcase was produced but validator expected none")
+    if expected_showcase not in {None, "none"}:
+        if not showcase_produced:
+            fail("expected showcase was not produced")
+        if showcase_scene != expected_showcase:
+            fail(f"expected showcase {expected_showcase}, got {showcase_scene}")
+
     artifacts = certificate.get("artifacts")
     if not isinstance(artifacts, list) or not artifacts:
         fail("certificate artifact index is empty")
@@ -154,6 +181,46 @@ def validate(root: Path, expected_backend: str | None, expected_rewrite: str | N
     }
     if render["produced"]:
         required.update({"render/before.ppm", "render/after.ppm", "render/comparison.csv"})
+    if showcase_produced:
+        required.update({
+            "render/showcase/showcase_manifest.json",
+            "render/showcase/contact_sheet.ppm",
+            "render/showcase/summary_card.svg",
+        })
+        if rewrite_status == "verified":
+            required.update({
+                "render/showcase/hero_before.ppm",
+                "render/showcase/hero_after.ppm",
+                "render/showcase/closeup_before.ppm",
+                "render/showcase/closeup_after.ppm",
+            })
+        else:
+            required.update({
+                "render/showcase/hero_baseline.ppm",
+                "render/showcase/hero_rollback.ppm",
+                "render/showcase/closeup_baseline.ppm",
+                "render/showcase/closeup_rollback.ppm",
+            })
+        expected_turntable = {
+            f"render/showcase/turntable/frame_{frame:03d}.ppm"
+            for frame in range(showcase_frames)
+        }
+        required.update(expected_turntable)
+        with (root / "render/showcase/showcase_manifest.json").open("r", encoding="utf-8") as stream:
+            showcase_manifest = json.load(stream)
+        if showcase_manifest.get("schema") != "vulkax_showcase" or showcase_manifest.get("schema_version") != 1:
+            fail("unexpected showcase manifest schema/version")
+        if showcase_manifest.get("rewrite_status") != rewrite_status:
+            fail("showcase rewrite status disagrees with certificate")
+        if showcase_manifest.get("rollback_state_shown") is not (rewrite_status == "rejected"):
+            fail("showcase rollback visual semantics disagree with rewrite verdict")
+        if showcase_manifest.get("turntable_frames") != showcase_frames:
+            fail("showcase manifest turntable count disagrees with certificate")
+        locked_sha = showcase_manifest.get("asset_lock_sha256")
+        repository_lock = Path("assets/demo/showcase_assets.lock.json")
+        if locked_sha and repository_lock.is_file() and locked_sha != sha256_file(repository_lock):
+            fail("showcase asset-lock hash disagrees with repository lock")
+
     missing = sorted(required - paths)
     if missing:
         fail("certificate does not index required artifacts: " + ", ".join(missing))
@@ -165,6 +232,8 @@ def validate(root: Path, expected_backend: str | None, expected_rewrite: str | N
         "render_backend": render.get("backend", "none"),
         "rewrite_status": rewrite_status,
         "rollback_performed": rollback,
+        "showcase_scene": showcase_scene if showcase_produced else "none",
+        "showcase_frames": showcase_frames or 0,
         "adaptive_particle_count": adaptive["particle_count"],
         "adaptive_gradient_fraction": fraction,
         "physical_error": error,
@@ -191,12 +260,22 @@ def main() -> int:
         choices=["verified", "rejected"],
         help="require a particular rewrite verdict without conflating it with run success",
     )
+    parser.add_argument(
+        "--expected-showcase",
+        choices=["studio_pedestal", "cloth_showcase", "none"],
+        help="require a particular presentation showcase or no showcase",
+    )
     args = parser.parse_args()
     expected_backend = args.expected_backend or args.expected_backend_positional
     if args.expected_backend and args.expected_backend_positional:
         parser.error("use either positional expected backend or --expected-backend, not both")
     try:
-        result = validate(args.output_dir, expected_backend, args.expected_rewrite)
+        result = validate(
+            args.output_dir,
+            expected_backend,
+            args.expected_rewrite,
+            args.expected_showcase,
+        )
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"INVALID captured-world-run evidence: {error}", file=sys.stderr)
         return 1
@@ -205,6 +284,7 @@ def main() -> int:
         f"bundle={result['bundle_id']} source={result['source_kind']} "
         f"artifacts={result['artifact_count']} render={result['render_backend']} "
         f"rewrite={result['rewrite_status']} rollback={int(result['rollback_performed'])} "
+        f"showcase={result['showcase_scene']} frames={result['showcase_frames']} "
         f"adaptive_particles={result['adaptive_particle_count']} "
         f"adaptive_gradient_fraction={result['adaptive_gradient_fraction']:.12g} "
         f"physical_error={result['physical_error']:.12g} "
