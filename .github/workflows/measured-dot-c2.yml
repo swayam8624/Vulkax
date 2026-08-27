@@ -15,7 +15,7 @@ jobs:
     env:
       DOT_C02_URL: https://dataverse.orc.gmu.edu/api/access/datafile/:persistentId/?persistentId=doi:10.13021/orc2020/XXLVXM/ZVZHVR
       DOT_C02_MD5: 0f347c3f95ed2def9fd81ba5236955b1
-      SOLVER_DT: "0.0008333333333333334"
+      SOLVER_DT: "0.00020833333333333335"
       CELL_SIZE: "0.012"
       OBJECTIVE_MARKER: dot_c2_113
       OBJECTIVE_TIME: "0.16666666666666666"
