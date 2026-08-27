@@ -27,8 +27,8 @@ def main() -> int:
     parser.add_argument("repo_root", nargs="?", default=".")
     parser.add_argument(
         "--expected-project-version",
-        default="0.80.0",
-        help="Expected CMake version. Use 0.80.0 for the behavior candidate and 0.90.0 for the release-head recheck.",
+        default="0.90.0",
+        help="Expected CMake version. 0.80.0 is retained only for reproducing the frozen behavior-candidate audit; 0.90.0 is the release-head default.",
     )
     args = parser.parse_args()
 
@@ -53,7 +53,7 @@ def main() -> int:
     require_contains(readme, "## One-command captured-world research + showcase — 0.80", "README")
     require_contains(readme, "docs/CAPTURED_WORLD_RUN_0_80.md", "README")
     require_contains(readme, "docs/INSTALL_0_90.md", "README")
-    require_contains(readme, "0.90  release hardening and documentation/performance audit", "README")
+    require_contains(readme, "docs/PERFORMANCE_0_90.md", "README")
     require_contains(readme, "1.0   stable verified-rewritable-reality baseline", "README")
 
     require_absent(readme, "## Current implementation — Vulkax 0.70", "README")
@@ -65,8 +65,11 @@ def main() -> int:
     )
     if current_release == "0.90":
         require_absent(readme, "## Current implementation — Vulkax 0.80", "README release-head current label")
+        require_absent(readme, "0.90  release hardening and documentation/performance audit\n1.0", "README completed 0.90 milestone")
+        require_contains(readme, "Vulkax 0.90 is the release-hardened baseline", "README 0.90 release statement")
 
-    require_contains(roadmap, "### 0.90 — release hardening", "roadmap")
+    require_contains(roadmap, "### 0.80 — one-command end-to-end research demo — implemented", "roadmap")
+    require_contains(roadmap, "### 0.90 — release hardening — implemented", "roadmap")
     require_contains(roadmap, "warning/error cleanup in code touched by the 1.0 path", "roadmap")
     require_contains(roadmap, "performance report for the principal path", "roadmap")
     require_contains(roadmap, "installation/build instructions for macOS, Linux and Windows", "roadmap")
@@ -75,6 +78,7 @@ def main() -> int:
         "docs/CAPTURED_WORLD_RUN_0_80.md",
         "docs/INSTALL_0_90.md",
         "docs/RELEASE_HARDENING_0_90.md",
+        "docs/PERFORMANCE_0_90.md",
         "schemas/evidence_registry.json",
         "scripts/benchmark_captured_world_run.py",
         "scripts/test_release_cli_failures.py",
