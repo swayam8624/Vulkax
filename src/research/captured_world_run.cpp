@@ -196,6 +196,8 @@ void validateSettings(const CapturedWorldRunSettings& settings) {
             throw std::invalid_argument("captured-world-run Poisson-ratio candidates must lie in (-1, 0.5)");
     if (settings.render && (settings.renderWidth == 0U || settings.renderHeight == 0U))
         throw std::invalid_argument("captured-world-run render dimensions must be positive");
+    if (settings.showcase.enabled && !settings.render)
+        throw std::invalid_argument("captured-world-run showcase requires native research rendering to be enabled");
 }
 
 void prepareOutputDirectory(const std::filesystem::path& outputDirectory) {
@@ -377,7 +379,8 @@ void writeRunSummary(const std::filesystem::path& path, const CapturedWorldRunSu
               "selected_young_modulus,selected_poisson_ratio,fit_dynamic_rms,validation_dynamic_rms,"
               "robustness_scenarios,adaptive_regions,adaptive_particles,adaptive_abs_gradient_fraction,"
               "rewrite_region,rewrite_particles,rewrite_status,rollback_performed,physical_error,"
-              "physical_tolerance,render_produced,render_backend\n";
+              "physical_tolerance,render_produced,render_backend,showcase_produced,showcase_scene,"
+              "showcase_turntable_frames\n";
     output << std::setprecision(17)
            << summary.bundleId << ',' << capture::toString(summary.sourceKind) << ','
            << summary.appearanceGaussians << ',' << summary.physicalParticles << ',' << summary.observations << ','
@@ -391,7 +394,8 @@ void writeRunSummary(const std::filesystem::path& path, const CapturedWorldRunSu
            << (summary.renderProduced ? 1 : 0) << ',';
     if (summary.renderBackend) output << backend::toString(*summary.renderBackend);
     else output << "none";
-    output << '\n';
+    output << ',' << (summary.showcaseProduced ? 1 : 0) << ',' << summary.showcaseScenePreset << ','
+           << summary.showcaseTurntableFrames << '\n';
 }
 
 void writeCertificate(
@@ -443,7 +447,10 @@ void writeCertificate(
                << ", \"rmse\": " << summary.renderComparison.rootMeanSquareError
                << ", \"changed_pixel_fraction\": " << summary.renderComparison.changedPixelFraction;
     output << "},\n"
-           << "  \"research_integrity\": \"run completion is independent of rewrite acceptance; source kind is manifest-declared; synthetic data do not become measured evidence\",\n"
+           << "  \"showcase\": {\"produced\": " << (summary.showcaseProduced ? "true" : "false")
+           << ", \"scene\": \"" << jsonEscape(summary.showcaseScenePreset)
+           << "\", \"turntable_frames\": " << summary.showcaseTurntableFrames << "},\n"
+           << "  \"research_integrity\": \"run completion is independent of rewrite acceptance; showcase props/environment are presentation-only; source kind is manifest-declared\",\n"
            << "  \"artifacts\": [\n";
     for (std::size_t index = 0; index < artifacts.size(); ++index) {
         const auto& artifact = artifacts[index];
@@ -649,6 +656,21 @@ CapturedWorldRunSummary runCapturedWorldResearchDemo(
         writeRenderComparison(
             renderDirectory / "comparison.csv", renderBackend,
             beforeRender, afterRender, summary.renderComparison);
+    }
+
+    if (settings.showcase.enabled) {
+        if (!summary.renderBackend)
+            throw std::runtime_error("captured-world-run showcase has no native render backend");
+        const auto showcase = render::renderGaussianShowcase(
+            *summary.renderBackend,
+            bundle.appearance,
+            worldState.appearance,
+            world::toString(summary.rewriteStatus),
+            outputDirectory / "render" / "showcase",
+            settings.showcase);
+        summary.showcaseProduced = showcase.produced;
+        summary.showcaseTurntableFrames = showcase.turntableFrames;
+        summary.showcaseScenePreset = showcase.scenePreset;
     }
 
     writeRunSummary(outputDirectory / "run_summary.csv", summary);
