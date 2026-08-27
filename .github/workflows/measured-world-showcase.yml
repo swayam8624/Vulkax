@@ -1,0 +1,100 @@
+name: DOT C2 one-command visual showcase
+
+on:
+  push:
+    branches: ["feat/captured-world-run"]
+    paths:
+      - "src/**"
+      - "include/**"
+      - "scripts/**"
+      - "assets/demo/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/measured-world-showcase.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-dot-c2-world-showcase-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measured-world-showcase:
+    runs-on: ubuntu-24.04
+    env:
+      DOT_C02_URL: https://dataverse.orc.gmu.edu/api/access/datafile/:persistentId/?persistentId=doi:10.13021/orc2020/XXLVXM/ZVZHVR
+      DOT_C02_MD5: 0f347c3f95ed2def9fd81ba5236955b1
+      SOLVER_DT: "0.00020833333333333335"
+      CELL_SIZE: "0.012"
+      OBJECTIVE_MARKER: dot_c2_113
+      OBJECTIVE_TIME: "0.16666666666666666"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan runtime and shader compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers glslang-tools
+
+      - name: Build Vulkax
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+          cmake --build build --parallel 2
+
+      - name: Download and import pinned real DOT C2 source
+        run: |
+          mkdir -p build/dot-download
+          curl -L --fail --retry 3 "$DOT_C02_URL" -o build/dot-download/C02.zip
+          echo "$DOT_C02_MD5  build/dot-download/C02.zip" | md5sum -c -
+          python3 scripts/import_dot_c2.py build/dot-download/C02.zip build/dot-c2
+          python3 scripts/validate_dot_c2_import.py build/dot-c2
+
+      - name: Author measured-derived capture bundle
+        run: |
+          ./build/vulkax captured-deformable-author-bundle \
+            build/dot-c2/capture.vkcap \
+            build/dot-c2/object.ply \
+            build/dot-c2/particles.csv \
+            build/dot-c2/observations.csv \
+            build/dot-c2/uncertainty.csv \
+            dot-c2-vulkax-measured-proxy-v1 \
+            "$SOLVER_DT" \
+            DOT-C2-cam001 \
+            source-camera-cartesian \
+            derived \
+            'Vulkax physical/Gaussian proxy derived from real DOT C2 measured 3D correspondences; trajectory geometry is measured, while reference state, mass, volume, neutral photometry and uncertainty scale are explicit proxies; no material-ground-truth claim'
+          ./build/vulkax captured-deformable-validate-bundle build/dot-c2/capture.vkcap
+
+      - name: Fetch pinned CC0 visual asset pack
+        run: |
+          python3 scripts/fetch_demo_assets.py assets/demo/showcase_assets.lock.json build/demo-assets
+          python3 scripts/validate_demo_assets.py assets/demo/showcase_assets.lock.json build/demo-assets
+
+      - name: Run measured source through the one-command research + cloth showcase
+        run: |
+          ./build/vulkax captured-world-run \
+            build/dot-c2/capture.vkcap \
+            build/dot-c2-world-run \
+            "$OBJECTIVE_MARKER" "$OBJECTIVE_TIME" 0 0 1 \
+            Vulkan "$CELL_SIZE" 0.01 0.02 20260827 \
+            --showcase cloth_showcase \
+            --showcase-assets build/demo-assets \
+            --showcase-resolution 960x540 \
+            --turntable 8 \
+            | tee build/dot-c2-world-run.txt
+          grep -q 'run_status: completed' build/dot-c2-world-run.txt
+          grep -q 'source_kind: derived' build/dot-c2-world-run.txt
+          grep -q 'render_backend: Vulkan' build/dot-c2-world-run.txt
+          grep -q 'showcase_scene: cloth_showcase' build/dot-c2-world-run.txt
+          python3 scripts/validate_captured_world_run.py \
+            build/dot-c2-world-run \
+            --expected-backend Vulkan \
+            --expected-showcase cloth_showcase
+
+      - name: Upload complete measured one-command evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dot-c2-one-command-showcase-${{ github.sha }}
+          path: |
+            build/dot-c2-world-run
+            build/dot-c2-world-run.txt
+          if-no-files-found: error
+          retention-days: 30
