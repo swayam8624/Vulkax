@@ -19,6 +19,10 @@ EXPECTED_ARCHIVE_MD5 = "0f347c3f95ed2def9fd81ba5236955b1"
 EXPECTED_PARTICLES = 225
 EXPECTED_OBSERVATIONS = 675
 EXPECTED_ROBUSTNESS_ROWS = 6
+MAX_REWRITE_LINEARIZATION_ERROR = 0.25
+MAX_REWRITE_ADJOINT_ABSOLUTE_ERROR = 1.0e-8
+MAX_REWRITE_ADJOINT_RELATIVE_ERROR = 5.0e-3
+MIN_REWRITE_REFERENCE_DERIVATIVE_FOR_RELATIVE_CHECK = 1.0e-7
 
 
 def fail(message: str) -> "None":
@@ -221,19 +225,52 @@ def validate(root: Path) -> dict[str, str]:
     )
     if rewrite_error < 0.0 or rewrite_tolerance < 0.0:
         fail("rewrite error/tolerance must be non-negative")
+    if abs(rewrite_tolerance - MAX_REWRITE_LINEARIZATION_ERROR) > 1.0e-12:
+        fail("rewrite nonlinear tolerance no longer matches the published verifier contract")
+
+    require_file(root / "rewrite" / "transaction_evidence.csv")
+    require_file(root / "rewrite" / "physical_evidence" / "reference.csv")
+    require_file(root / "rewrite" / "physical_evidence" / "adjoint.csv")
+    rewrite_counterfactual = read_csv(
+        root / "rewrite" / "physical_evidence" / "counterfactual.csv"
+    )
+    rewrite_derivative = read_csv(
+        root / "rewrite" / "physical_evidence" / "derivative_comparison.csv"
+    )
+    if len(rewrite_counterfactual) != 1 or len(rewrite_derivative) != 1:
+        fail("verified rewrite evidence must contain exactly one selected region")
+
+    nonlinear_error = finite(
+        rewrite_counterfactual[0]["relative_linearization_error"],
+        "rewrite nonlinear relative linearization error",
+    )
+    reference_derivative = finite(
+        rewrite_derivative[0]["reference_derivative"], "rewrite reference derivative"
+    )
+    rewrite_adjoint_absolute_error = finite(
+        rewrite_derivative[0]["absolute_error"], "rewrite adjoint absolute error"
+    )
+    rewrite_adjoint_relative_error = finite(
+        rewrite_derivative[0]["relative_error"], "rewrite adjoint relative error"
+    )
+    nonlinear_passed = nonlinear_error <= MAX_REWRITE_LINEARIZATION_ERROR
+    derivative_passed = rewrite_adjoint_absolute_error <= MAX_REWRITE_ADJOINT_ABSOLUTE_ERROR
+    if abs(reference_derivative) > MIN_REWRITE_REFERENCE_DERIVATIVE_FOR_RELATIVE_CHECK:
+        derivative_passed = (
+            derivative_passed
+            and rewrite_adjoint_relative_error <= MAX_REWRITE_ADJOINT_RELATIVE_ERROR
+        )
+    expected_status = "verified" if nonlinear_passed and derivative_passed else "rejected"
+    if status != expected_status:
+        fail(
+            "transaction status disagrees with independently recomputed nonlinear/adjoint oracle verdict"
+        )
+    if abs(rewrite_error - nonlinear_error) > 1.0e-12:
+        fail("transaction summary physical error disagrees with nonlinear counterfactual evidence")
     if status == "verified" and rollback != 0:
         fail("verified rewrite cannot be rolled back")
     if status == "rejected" and rollback != 1:
         fail("rejected rewrite must be rolled back")
-
-    for relative in (
-        "rewrite/transaction_evidence.csv",
-        "rewrite/physical_evidence/reference.csv",
-        "rewrite/physical_evidence/counterfactual.csv",
-        "rewrite/physical_evidence/adjoint.csv",
-        "rewrite/physical_evidence/derivative_comparison.csv",
-    ):
-        require_file(root / relative)
 
     return {
         "source": "DOT C2 real measured correspondences; Vulkax physical/appearance bundle is derived",
@@ -250,8 +287,12 @@ def validate(root: Path) -> dict[str, str]:
         "max_adjoint_absolute_error": format(max_adjoint_absolute_error, ".17g"),
         "max_adjoint_relative_error": format(max_adjoint_relative_error, ".17g"),
         "rewrite_status": status,
+        "rewrite_nonlinear_passed": "1" if nonlinear_passed else "0",
+        "rewrite_independent_oracle_passed": "1" if derivative_passed else "0",
         "rewrite_physical_observable_error": format(rewrite_error, ".17g"),
         "rewrite_physical_observable_tolerance": format(rewrite_tolerance, ".17g"),
+        "rewrite_adjoint_absolute_error": format(rewrite_adjoint_absolute_error, ".17g"),
+        "rewrite_adjoint_relative_error": format(rewrite_adjoint_relative_error, ".17g"),
         "rewrite_rollback_performed": str(rollback),
         "material_ground_truth": "not_available",
     }
@@ -284,6 +325,11 @@ def main() -> None:
     print(f"  validation_dynamic_rms_m: {summary['validation_dynamic_rms_m']}")
     print(f"  adaptive_particles: {summary['adaptive_proposed_particle_count']}")
     print(f"  rewrite_status: {summary['rewrite_status']}")
+    print(f"  rewrite_nonlinear_passed: {summary['rewrite_nonlinear_passed']}")
+    print(
+        "  rewrite_independent_oracle_passed: "
+        f"{summary['rewrite_independent_oracle_passed']}"
+    )
     print(f"  rewrite_rollback_performed: {summary['rewrite_rollback_performed']}")
     print(f"  summary: {output}")
 
