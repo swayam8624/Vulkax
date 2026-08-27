@@ -2,9 +2,9 @@ name: DOT C2 measured-source benchmark
 
 on:
   push:
-    branches: ["feat/measured-deformable-benchmark"]
+    branches: ["main", "feat/captured-world-run", "feat/measured-deformable-benchmark"]
   pull_request:
-    branches: ["feat/captured-world-run"]
+    branches: ["main", "feat/captured-world-run"]
   workflow_dispatch:
 
 concurrency:
