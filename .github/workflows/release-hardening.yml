@@ -19,7 +19,7 @@ jobs:
       - name: Validate evidence schema registry
         run: python3 scripts/validate_evidence_registry.py .
       - name: Audit release-facing claims
-        run: python3 scripts/audit_release_claims.py . --expected-project-version 0.80.0
+        run: python3 scripts/audit_release_claims.py . --expected-project-version 0.90.0
 
   linux-cli:
     runs-on: ubuntu-24.04
