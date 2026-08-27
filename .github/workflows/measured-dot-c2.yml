@@ -1,0 +1,177 @@
+name: DOT C2 measured-source benchmark
+
+on:
+  push:
+    branches: ["main", "feat/captured-world-run", "feat/measured-deformable-benchmark"]
+  pull_request:
+    branches: ["main", "feat/captured-world-run"]
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-dot-c2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measured-dot-c2:
+    runs-on: ubuntu-24.04
+    env:
+      DOT_C02_URL: https://dataverse.orc.gmu.edu/api/access/datafile/:persistentId/?persistentId=doi:10.13021/orc2020/XXLVXM/ZVZHVR
+      DOT_C02_MD5: 0f347c3f95ed2def9fd81ba5236955b1
+      SOLVER_DT: "0.00020833333333333335"
+      CELL_SIZE: "0.012"
+      OBJECTIVE_MARKER: dot_c2_113
+      OBJECTIVE_TIME: "0.16666666666666666"
+      FD_STEP: "0.01"
+      REWRITE_DELTA: "0.02"
+      ROBUSTNESS_SCALE: "0.00026"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure and build Vulkax
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+          cmake --build build --parallel 2
+
+      - name: Download pinned real DOT C2 source
+        run: |
+          mkdir -p build/dot-download
+          curl -L --fail --retry 3 "$DOT_C02_URL" -o build/dot-download/C02.zip
+          echo "$DOT_C02_MD5  build/dot-download/C02.zip" | md5sum -c -
+
+      - name: Import measured correspondences with explicit proxies
+        run: |
+          python3 scripts/import_dot_c2.py build/dot-download/C02.zip build/dot-c2
+          python3 scripts/validate_dot_c2_import.py build/dot-c2
+          cat build/dot-c2/source/geometry_metrics.csv
+          cat build/dot-c2/source/provenance.csv
+
+      - name: Author and validate Vulkax capture bundle
+        run: |
+          ./build/vulkax captured-deformable-author-bundle \
+            build/dot-c2/capture.vkcap \
+            build/dot-c2/object.ply \
+            build/dot-c2/particles.csv \
+            build/dot-c2/observations.csv \
+            build/dot-c2/uncertainty.csv \
+            dot-c2-vulkax-measured-proxy-v1 \
+            "$SOLVER_DT" \
+            DOT-C2-cam001 \
+            source-camera-cartesian \
+            derived \
+            'Vulkax physical/Gaussian proxy derived from real DOT C2 measured 3D correspondences; trajectory geometry is measured, while reference state, mass, volume, neutral photometry and uncertainty scale are explicit proxies; no material-ground-truth claim' \
+            | tee build/dot-c2/bundle-authoring.txt
+          ./build/vulkax captured-deformable-validate-bundle build/dot-c2/capture.vkcap \
+            | tee build/dot-c2/bundle-validation.txt
+          grep -q '^VALID captured deformable bundle$' build/dot-c2/bundle-validation.txt
+          grep -q 'source_kind: derived' build/dot-c2/bundle-validation.txt
+          grep -q 'physical_particles: 225' build/dot-c2/bundle-validation.txt
+          grep -q 'observations: 675' build/dot-c2/bundle-validation.txt
+          grep -q 'uncertainty_rows: 675' build/dot-c2/bundle-validation.txt
+
+      - name: Calibrate model-conditioned effective stiffness
+        run: |
+          ./build/vulkax captured-material-calibrate \
+            build/dot-c2/object.ply \
+            build/dot-c2/particles.csv \
+            build/dot-c2/observations.csv \
+            build/dot-c2/calibration \
+            "$SOLVER_DT" "$CELL_SIZE" \
+            | tee build/dot-c2/calibration.txt
+          test -s build/dot-c2/calibration/material_grid.csv
+          test -s build/dot-c2/calibration/selected_samples.csv
+          test -s build/dot-c2/calibration/selected_summary.csv
+          ! grep -Eiq '(^|,)(nan|-?inf)(,|$)' build/dot-c2/calibration/material_grid.csv
+          SELECTED=$(awk -F, 'NR > 1 && $12 == 1 {print $1 " " $2 " " $5 " " $7}' \
+            build/dot-c2/calibration/material_grid.csv)
+          test -n "$SELECTED"
+          read -r YOUNG POISSON FIT_RMS VALIDATION_RMS <<< "$SELECTED"
+          echo "SELECTED_YOUNG=$YOUNG" >> "$GITHUB_ENV"
+          echo "SELECTED_POISSON=$POISSON" >> "$GITHUB_ENV"
+          echo "FIT_RMS=$FIT_RMS" >> "$GITHUB_ENV"
+          echo "VALIDATION_RMS=$VALIDATION_RMS" >> "$GITHUB_ENV"
+          echo "selected_effective_young=$YOUNG selected_poisson=$POISSON fit_rms=$FIT_RMS validation_rms=$VALIDATION_RMS"
+
+      - name: Stress measured observations at literature-derived alignment scale
+        run: |
+          ./build/vulkax captured-observation-robustness \
+            build/dot-c2/object.ply \
+            build/dot-c2/particles.csv \
+            build/dot-c2/observations.csv \
+            build/dot-c2/robustness \
+            "$OBJECTIVE_MARKER" "$OBJECTIVE_TIME" 0 0 1 \
+            "$ROBUSTNESS_SCALE" "$ROBUSTNESS_SCALE" \
+            20260827 "$SOLVER_DT" "$CELL_SIZE" \
+            | tee build/dot-c2/robustness.txt
+          test -s build/dot-c2/robustness/robustness.csv
+          test -s build/dot-c2/robustness/scenarios.csv
+          ! grep -Eiq '(^|,)(nan|-?inf)(,|$)' build/dot-c2/robustness/robustness.csv
+          test "$(wc -l < build/dot-c2/robustness/robustness.csv)" -eq 7
+
+      - name: Compute measured-object material influence and adaptive proposal
+        run: |
+          ./build/vulkax captured-material-influence \
+            build/dot-c2/object.ply \
+            build/dot-c2/particles.csv \
+            build/dot-c2/observations.csv \
+            build/dot-c2/influence \
+            "$OBJECTIVE_MARKER" "$OBJECTIVE_TIME" 0 0 1 \
+            "$SOLVER_DT" "$SELECTED_YOUNG" "$SELECTED_POISSON" "$CELL_SIZE" \
+            "$FD_STEP" "$REWRITE_DELTA" \
+            | tee build/dot-c2/influence.txt
+          for file in influence.csv counterfactual.csv adjoint_influence.csv particle_adjoint.csv \
+                      derivative_comparison.csv adaptive_proposal_summary.csv adaptive_influence.csv \
+                      adaptive_counterfactual.csv adaptive_adjoint_influence.csv \
+                      adaptive_derivative_comparison.csv baseline_summary.csv; do
+            test -s "build/dot-c2/influence/$file"
+          done
+          ! grep -Eiq '(^|,)(nan|-?inf)(,|$)' build/dot-c2/influence/influence.csv
+          ! grep -Eiq '(^|,)(nan|-?inf)(,|$)' build/dot-c2/influence/particle_adjoint.csv
+          python3 scripts/select_captured_influence_region.py \
+            build/dot-c2/particles.csv \
+            build/dot-c2/influence/influence.csv \
+            build/dot-c2/rewrite-selection
+          test -s build/dot-c2/rewrite-selection/particle_ids.txt
+          cat build/dot-c2/rewrite-selection/selection.csv
+
+      - name: Check one local material rewrite by nonlinear rerun
+        shell: bash
+        run: |
+          PARTICLE_IDS=$(cat build/dot-c2/rewrite-selection/particle_ids.txt)
+          set +e
+          ./build/vulkax_captured_rewrite \
+            build/dot-c2/capture.vkcap \
+            build/dot-c2/rewrite \
+            "$OBJECTIVE_MARKER" "$OBJECTIVE_TIME" 0 0 1 \
+            "$PARTICLE_IDS" \
+            "$SELECTED_YOUNG" "$SELECTED_POISSON" "$CELL_SIZE" \
+            "$FD_STEP" "$REWRITE_DELTA" \
+            2>&1 | tee build/dot-c2/rewrite.txt
+          REWRITE_CODE=${PIPESTATUS[0]}
+          set -e
+          if [[ "$REWRITE_CODE" -ne 0 && "$REWRITE_CODE" -ne 3 ]]; then
+            echo "rewrite tool failed before producing a scientific verdict: $REWRITE_CODE"
+            exit "$REWRITE_CODE"
+          fi
+          echo "$REWRITE_CODE" > build/dot-c2/rewrite/exit_code.txt
+          test -s build/dot-c2/rewrite/transaction_evidence.csv
+          test -s build/dot-c2/rewrite/transaction_summary.csv
+          test -s build/dot-c2/rewrite/physical_evidence/reference.csv
+          test -s build/dot-c2/rewrite/physical_evidence/counterfactual.csv
+          test -s build/dot-c2/rewrite/physical_evidence/adjoint.csv
+          test -s build/dot-c2/rewrite/physical_evidence/derivative_comparison.csv
+          cat build/dot-c2/rewrite/transaction_summary.csv
+
+      - name: Validate and summarize measured benchmark evidence
+        run: |
+          python3 scripts/validate_measured_dot_c2.py \
+            build/dot-c2 \
+            build/dot-c2/measured_benchmark_summary.csv
+          cat build/dot-c2/measured_benchmark_summary.csv
+
+      - name: Upload measured benchmark evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dot-c2-measured-benchmark-${{ github.sha }}
+          path: build/dot-c2
+          if-no-files-found: error
+          retention-days: 30

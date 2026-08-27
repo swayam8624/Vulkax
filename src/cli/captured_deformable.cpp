@@ -4,6 +4,7 @@
 #include "vulkax/cli/captured_example.hpp"
 #include "vulkax/cli/captured_influence.hpp"
 #include "vulkax/cli/captured_observation_robustness.hpp"
+#include "vulkax/cli/captured_world_run.hpp"
 #include "vulkax/gaussian/gaussian_cloud.hpp"
 #include "vulkax/research/captured_deformable.hpp"
 #include "vulkax/research/captured_material_calibration.hpp"
@@ -224,6 +225,9 @@ namespace {
 } // namespace
 
 int capturedDeformableCommand(int argc, char** argv) {
+    const int worldRun = capturedWorldRunCommand(argc, argv);
+    if (worldRun >= 0) return worldRun;
+
     const int bundleValidation = bundleValidationCommand(argc, argv);
     if (bundleValidation >= 0) return bundleValidation;
 

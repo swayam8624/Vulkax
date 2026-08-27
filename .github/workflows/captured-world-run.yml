@@ -1,0 +1,129 @@
+name: Captured world one-command demo
+
+on:
+  push:
+    branches: ["main", "feat/captured-world-run"]
+  pull_request:
+    branches: ["main", "feat/captured-world-run"]
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-captured-world-run-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-vulkan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan runtime and shader compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers glslang-tools
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+          cmake --build build --parallel 2
+          ctest --test-dir build -R vulkax_captured_world_run --output-on-failure
+      - name: Fetch pinned CC0 showcase assets
+        run: |
+          python3 scripts/fetch_demo_assets.py assets/demo/showcase_assets.lock.json build/demo-assets
+          python3 scripts/validate_demo_assets.py assets/demo/showcase_assets.lock.json build/demo-assets
+      - name: Run the public one-command research + showcase path
+        run: |
+          ./build/vulkax captured-deformable-generate-example build/captured-example
+          ./build/vulkax captured-world-run \
+            build/captured-example/capture.vkcap \
+            build/captured-world-run \
+            m4 0.003 1 1 1 \
+            Vulkan 0.08 0.01 0.02 12345 \
+            --showcase studio_pedestal \
+            --showcase-assets build/demo-assets \
+            --showcase-resolution 640x360 \
+            --turntable 4 \
+            | tee build/captured-world-run.txt
+          grep -q 'run_status: completed' build/captured-world-run.txt
+          grep -q 'rewrite_status: verified' build/captured-world-run.txt
+          grep -q 'render_backend: Vulkan' build/captured-world-run.txt
+          grep -q 'showcase_produced: yes' build/captured-world-run.txt
+          python3 scripts/validate_captured_world_run.py \
+            build/captured-world-run \
+            --expected-backend Vulkan \
+            --expected-rewrite verified \
+            --expected-showcase studio_pedestal
+      - name: Upload controlled evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: captured-world-run-linux-${{ github.sha }}
+          path: build/captured-world-run
+          if-no-files-found: error
+          retention-days: 14
+
+  macos-metal:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+          cmake --build build --parallel 2
+          ctest --test-dir build -R vulkax_captured_world_run --output-on-failure
+      - name: Fetch pinned CC0 showcase assets
+        run: |
+          python3 scripts/fetch_demo_assets.py assets/demo/showcase_assets.lock.json build/demo-assets
+          python3 scripts/validate_demo_assets.py assets/demo/showcase_assets.lock.json build/demo-assets
+      - name: Run the public one-command research + showcase path
+        run: |
+          ./build/vulkax captured-deformable-generate-example build/captured-example
+          ./build/vulkax captured-world-run \
+            build/captured-example/capture.vkcap \
+            build/captured-world-run \
+            m4 0.003 1 1 1 \
+            Metal 0.08 0.01 0.02 12345 \
+            --showcase studio_pedestal \
+            --showcase-assets build/demo-assets \
+            --showcase-resolution 640x360 \
+            --turntable 4 \
+            | tee build/captured-world-run.txt
+          grep -q 'run_status: completed' build/captured-world-run.txt
+          grep -q 'rewrite_status: verified' build/captured-world-run.txt
+          grep -q 'render_backend: Metal' build/captured-world-run.txt
+          grep -q 'showcase_produced: yes' build/captured-world-run.txt
+          python3 scripts/validate_captured_world_run.py \
+            build/captured-world-run \
+            --expected-backend Metal \
+            --expected-rewrite verified \
+            --expected-showcase studio_pedestal
+      - name: Upload controlled evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: captured-world-run-macos-${{ github.sha }}
+          path: build/captured-world-run
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-no-render:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          cmake -S . -B build -DVULKAX_BUILD_TESTS=ON
+          cmake --build build --config Release --parallel 2
+          ctest --test-dir build -C Release -R vulkax_captured_world_run --output-on-failure
+      - name: Run the public one-command path without a native render dependency
+        shell: pwsh
+        run: |
+          .\build\Release\vulkax.exe captured-deformable-generate-example build\captured-example
+          .\build\Release\vulkax.exe captured-world-run build\captured-example\capture.vkcap build\captured-world-run m4 0.003 1 1 1 none 0.08 0.01 0.02 12345 | Tee-Object -FilePath build\captured-world-run.txt
+          Select-String -Path build\captured-world-run.txt -Pattern 'run_status: completed'
+          Select-String -Path build\captured-world-run.txt -Pattern 'rewrite_status: verified'
+          Select-String -Path build\captured-world-run.txt -Pattern 'render_produced: no'
+          python scripts\validate_captured_world_run.py build\captured-world-run --expected-backend none --expected-rewrite verified --expected-showcase none
+      - name: Upload controlled evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: captured-world-run-windows-${{ github.sha }}
+          path: build/captured-world-run
+          if-no-files-found: error
+          retention-days: 14

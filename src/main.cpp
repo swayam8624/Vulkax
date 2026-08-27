@@ -1,6 +1,7 @@
 #include "vulkax/backend/backend.hpp"
 #include "vulkax/backend/probe.hpp"
 #include "vulkax/cli/captured_deformable.hpp"
+#include "vulkax/cli/captured_world_run.hpp"
 #include "vulkax/cli/deformable_animation.hpp"
 #include "vulkax/cli/deformable_reference.hpp"
 #include "vulkax/cli/energy_cycle.hpp"
@@ -230,6 +231,8 @@ int problemCommand(int argc, char** argv) {
 int main(int argc, char** argv) {
     using namespace vulkax;
     try {
+        const int capturedWorldRunResult = cli::capturedWorldRunCommand(argc, argv);
+        if (capturedWorldRunResult >= 0) return capturedWorldRunResult;
         const int capturedResult = cli::capturedDeformableCommand(argc, argv);
         if (capturedResult >= 0) return capturedResult;
         const int transferCycleResult = cli::transferEnergyCycleCommand(argc, argv);
@@ -302,6 +305,7 @@ int main(int argc, char** argv) {
                   << "  vulkax plan <problem.vkx>\n"
                   << "  vulkax gaussian-info <point_cloud.ply>\n"
                   << "  vulkax gaussian-render <point_cloud.ply> <output.ppm> [Vulkan|Metal]\n"
+                  << "  vulkax captured-world-run <capture.vkcap> <output-dir> <marker-id> <time> <dir-x> <dir-y> <dir-z> [auto|none|Vulkan|Metal|OpenGL] [cell-size] [fd-scale-step] [rewrite-scale-delta] [robustness-seed]\n"
                   << "  vulkax captured-deformable-generate-example <output-dir>\n"
                   << "  vulkax captured-deformable-validate-bundle <capture.vkcap>\n"
                   << "  vulkax captured-material-calibrate <object.ply> <particles.csv> <observations.csv> <output-dir> [dt] [cell-size]\n"

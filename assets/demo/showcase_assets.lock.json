@@ -1,0 +1,19 @@
+{
+  "schema": "vulkax_showcase_assets",
+  "version": 1,
+  "assets": [
+    {
+      "id": "studio_small_03_1k",
+      "kind": "hdri",
+      "source": "Poly Haven",
+      "source_page": "https://polyhaven.com/a/studio_small_03",
+      "download_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_03_1k.hdr",
+      "license": "CC0-1.0",
+      "author": "Greg Zaal",
+      "sha256": "30933d55e45f0795daf49f3cbefbe0e5ebcb821ee04fb0a2818c02ffc3938817",
+      "bytes": 1686299,
+      "destination": "hdri/studio_small_03_1k.hdr",
+      "role": "studio showcase lighting reference/environment; not physical evidence and not used by the Gaussian verification renderer"
+    }
+  ]
+}

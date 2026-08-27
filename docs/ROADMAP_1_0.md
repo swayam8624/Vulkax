@@ -85,31 +85,42 @@ Implemented deliverables:
 
 Exit gate: satisfied for the contract itself and the deterministic controlled bundle. Malformed bundles covered by the regression fail with actionable errors, payload mutation is rejected by SHA-256 identity, and the generator emits a schema-valid bundle before the existing simulation pipeline runs. This does **not** satisfy the 0.45 measured-data requirement.
 
-### 0.45 — measured deformable benchmark
+### 0.45 — measured deformable benchmark — implemented
 
 Purpose: cross the boundary from controlled synthetic verification to actual captured evidence.
 
-External requirement: a measured deformable sequence is required. Code alone cannot satisfy this milestone.
+Implemented measured-source experiment:
 
-Minimum experiment:
+- public CC0 DOT deformable-object dataset, sequence C2;
+- pinned dataset/file identity and `C02.zip` MD5 checksum;
+- 225 stable measured 3D correspondences converted explicitly into SI units;
+- frame 11 as the measured initialization state and frames 16/21 as later measured checkpoints;
+- 675 observations with 585 fit and 90 held-out validation rows;
+- measured Gaussian center geometry with neutral proxy photometry;
+- explicit provenance classes separating measured, derived, model-proxy, literature-proxy and limitation fields;
+- fit-only 28-candidate material calibration;
+- held-out replay error;
+- deterministic perturbation stress sweep around the measured trajectory using a literature-derived `0.26 mm` scale;
+- finite-difference and APIC-adjoint material influence on the measured-source proxy;
+- adaptive local material proposal;
+- one +2% local material rewrite checked by a separate nonlinear rerun and independent derivative oracle;
+- automatic rollback when the measured rewrite does not satisfy the full verification contract;
+- permanent `validate_measured_dot_c2.py` evidence validator plus a machine-readable measured-benchmark summary;
+- CI artifact containing the complete generated evidence tree.
 
-- one soft/deformable object;
-- known spatial scale and coordinate frame;
-- Gaussian/point-based captured appearance;
-- at least four initialization markers and multiple dynamic markers;
-- explicit fit/validation marker split;
-- repeated or uncertainty-labelled measurements if practical.
+Controlled measured-source result:
 
-Evaluation:
+- selected **model-conditioned effective** Young's modulus `7500 Pa` and Poisson ratio `0.45`;
+- fit dynamic RMS `0.004390821778 m`;
+- held-out validation RMS `0.004417317099 m`;
+- initialization affine-fit RMS `0.0009106961364 m`;
+- robustness stress test keeps the selected material candidate unchanged, with minimum particle-influence cosine `0.9984812323`, strongest-particle stability `5/5`, and minimum adaptive-particle Jaccard `0.9381443299`;
+- adaptive proposal contains 8 regions / 182 particles and retains `0.9480125633` of absolute particle-gradient mass;
+- selected 31-particle +2% rewrite passes the `0.25` nonlinear-linearization tolerance but fails the independent derivative-oracle contract, so the central transaction is rejected and rolled back with zero unaffected-position drift.
 
-- replay error;
-- calibrated material stability;
-- held-out validation error;
-- observation-noise robustness sweep around measured uncertainty;
-- influence-field stability;
-- at least one proposed local material rewrite checked by a nonlinear rerun.
+Implementation boundary: DOT C2 supplies measured geometry/correspondence, not a certified stress-free state, loads, density, thickness, mass or material ground truth. Vulkax therefore labels the physical reference, volumetric particle quantities and material fit as proxies/model-conditioned values. The current zero-force volumetric APIC path is **not** claimed to be a validated cloth constitutive model. The `0.26 mm` perturbation scale is a literature proxy, not a measured C2 per-observation sigma. Neutral Gaussian photometry is a proxy and is not presented as a native 3DGS reconstruction.
 
-Exit gate: repository language may claim only what the measured evidence actually supports.
+Exit gate: satisfied for the measured-source benchmark. Real DOT C2 motion traverses reproducible import, bundle validation, fit-only calibration, held-out replay, robustness stress testing, influence analysis, adaptive proposal and independent rewrite verification. A rejected-and-rolled-back rewrite is accepted as the scientifically correct outcome because the permanent validator independently recomputes the verifier verdict from the physical evidence. See `docs/MEASURED_BENCHMARK_0_45.md`.
 
 ### 0.50 — scalable Gaussian execution — implemented
 
