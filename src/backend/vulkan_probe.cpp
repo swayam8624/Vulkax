@@ -72,14 +72,16 @@ std::vector<BackendCapabilities> probeVulkanBackends() {
     }
 #endif
 
-    VkApplicationInfo application{VK_STRUCTURE_TYPE_APPLICATION_INFO};
+    VkApplicationInfo application{};
+    application.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     application.pApplicationName = "Vulkax Next backend probe";
     application.applicationVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
     application.pEngineName = "Vulkax";
     application.engineVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
     application.apiVersion = VK_API_VERSION_1_0;
 
-    VkInstanceCreateInfo createInfo{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
+    VkInstanceCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.flags = flags;
     createInfo.pApplicationInfo = &application;
     createInfo.enabledExtensionCount = static_cast<std::uint32_t>(enabledExtensions.size());
