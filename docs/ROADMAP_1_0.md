@@ -199,46 +199,59 @@ Implementation boundary: fallback IDs for legacy PLY are deterministic only rela
 
 Exit gate: satisfied on the controlled path. The functional candidate passed 43 tests on Linux, macOS and Windows, Linux passed the public 4K→65K identity benchmark validator, and existing captured-world/Vulkan/Metal gates remained green. See `docs/GAUSSIAN_IDENTITY_0_70.md`.
 
-### 0.80 — one-command end-to-end research demo
+### 0.80 — one-command end-to-end research demo — implemented
 
 Purpose: demonstrate the actual Vulkax thesis instead of a collection of subcommands.
 
-Target command concept:
+Implemented public command:
 
 ```text
-vulkax captured-world-run <bundle> <output-dir> [settings]
+vulkax captured-world-run <bundle> <output-dir> <marker-id> <time> <dir-x> <dir-y> <dir-z> [backend/settings]
 ```
 
-The run should produce:
+Implemented outputs and behavior:
 
-- validated input manifest;
+- validated input manifest and source identity;
 - calibration table and selected material;
 - held-out replay evidence;
 - robustness summary;
-- particle influence field;
-- adaptive proposals;
+- particle influence field and adaptive proposal;
 - independent verification for the selected rewrite;
-- transaction/provenance receipt;
+- transaction/provenance receipt and rollback evidence when required;
 - rewritten Gaussian scene;
-- before/after renders;
-- a concise result certificate indexing every artifact.
+- before/after native research renders when a backend is enabled;
+- deterministic presentation-only showcase outputs when requested;
+- schema-v2 result certificate indexing every artifact;
+- explicit separation between `run_status: completed` and rewrite status `verified` or `rejected`;
+- a rejected rewrite remains a successful research run when rollback and evidence are complete.
 
-Exit gate: a clean checkout can reproduce the controlled demo through one documented command.
+The controlled path is gated on Vulkan, Metal and Windows no-render. The real DOT C2 measured-derived bundle also traverses the one-command path and preserves its scientifically correct rejected-and-rolled-back rewrite outcome. The optional CC0 HDRI remains presentation/reference metadata and is not claimed to physically relight stored Gaussian SH appearance.
 
-### 0.90 — release hardening
+Exit gate: satisfied. A clean checkout reproduces the controlled research + showcase demo through the documented public command, and the measured DOT C2 path is also exercised in CI. See `docs/CAPTURED_WORLD_RUN_0_80.md`.
 
-Deliverables:
+### 0.90 — release hardening — implemented
 
-- warning/error cleanup in code touched by the 1.0 path;
-- CLI help and validation consistency;
-- reproducible benchmark scripts;
-- versioned evidence schemas;
+Purpose: harden the implemented 0.80 path without changing the research thesis or reinterpreting existing measured evidence.
+
+Implemented deliverables:
+
+- warning/error cleanup in code touched by the 1.0 path, limited to semantics-preserving changes where numerical risk is low;
+- CLI help and validation consistency, including explicit release-facing failure regression;
+- reproducible principal-path benchmark script with retained evidence directories;
+- versioned evidence schema registry and registry validator;
 - documentation audit against actual implementation;
 - performance report for the principal path;
-- failure-case tests;
-- installation/build instructions for macOS, Linux and Windows.
+- failure-case tests covering help/argument/backend/objective/showcase/output-directory misuse;
+- installation/build instructions for macOS, Linux and Windows;
+- release-hardening CI on Linux, macOS and Windows;
+- controlled one-command, canonical DOT C2, and measured DOT showcase workflows wired to 0.90 candidates and pull requests;
+- README/roadmap claim cleanup so implemented milestones are not presented as future work.
 
-Exit gate: no README claim depends on an unimplemented core mechanism.
+Frozen behavior/evidence candidate `dddaaae7008520fff7494e52700758dd280dfe23` passed normal Linux/macOS/Windows CI, the three-OS hardening contract, controlled one-command Vulkan/Metal/Windows-no-render gates, canonical DOT C2 measured benchmark, and measured DOT C2 Vulkan showcase. That green behavior candidate authorized the project version advance from `0.80.0` to `0.90.0`.
+
+Principal-path hosted-runner observations for that frozen candidate are recorded in `docs/PERFORMANCE_0_90.md`; they are evidence-only and are not used as cross-host performance claims or pass/fail speed thresholds.
+
+Exit gate: implemented behavior is complete. The exact `0.90.0` release head must still pass the same full gate set before merge to `main`, as required by the development rules below. See `docs/RELEASE_HARDENING_0_90.md` and `docs/INSTALL_0_90.md`.
 
 ### 1.0 — stable verified-rewritable-reality baseline
 
