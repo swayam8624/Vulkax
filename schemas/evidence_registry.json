@@ -1,0 +1,35 @@
+{
+  "schema": "vulkax_evidence_registry",
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "capture_bundle",
+      "artifact": "capture.vkcap",
+      "schema": "vulkax_capture",
+      "schema_version": 1,
+      "validator": "vulkax captured-deformable-validate-bundle <capture.vkcap>"
+    },
+    {
+      "id": "captured_world_run",
+      "artifact": "certificate.json",
+      "schema": "vulkax_captured_world_run",
+      "schema_version": 2,
+      "validator": "python3 scripts/validate_captured_world_run.py <output-dir>"
+    },
+    {
+      "id": "showcase_manifest",
+      "artifact": "render/showcase/showcase_manifest.json",
+      "schema": "vulkax_showcase",
+      "schema_version": 1,
+      "validator": "python3 scripts/validate_captured_world_run.py <output-dir>"
+    },
+    {
+      "id": "showcase_asset_lock",
+      "artifact": "assets/demo/showcase_assets.lock.json",
+      "schema": "vulkax_showcase_assets",
+      "schema_version": 1,
+      "version_field": "version",
+      "validator": "python3 scripts/validate_demo_assets.py assets/demo/showcase_assets.lock.json <asset-root>"
+    }
+  ]
+}

@@ -31,7 +31,7 @@ appearance <-> semantics <-> physical representation
 
 The central research question is stronger than Gaussian editing: **can a reconstructed scene be rewritten locally — geometry, material and supported constraints — while keeping appearance, physical state and provenance mutually consistent and quantitatively trustworthy?**
 
-## Current implementation — Vulkax 0.70
+## Current implementation — Vulkax 0.90
 
 ### Captured-world representation
 
@@ -45,6 +45,34 @@ The central research question is stronger than Gaussian editing: **can a reconst
 - typed local geometry, material and supported constraint-metadata rewrites;
 - rollback receipts preserving appearance positions, material/constraint metadata, world revision and provenance;
 - evidence-derived verified rewrite execution with affected/unaffected-region locality checks.
+
+## One-command captured-world research + showcase — 0.80
+
+Vulkax 0.80 integrates the captured-world thesis into one public command instead of requiring users to manually chain calibration, robustness, influence, rewrite, rendering and evidence bookkeeping:
+
+```bash
+./build/vulkax captured-world-run \
+  build/captured-example/capture.vkcap \
+  build/captured-world-run \
+  m4 0.003 1 1 1 \
+  Metal 0.08 0.01 0.02 12345 \
+  --showcase studio_pedestal \
+  --showcase-assets build/demo-assets \
+  --showcase-resolution 1280x720 \
+  --turntable 12
+```
+
+Use `Vulkan` on a Vulkan-capable build, or `none` when producing research evidence without a native render dependency.
+
+A successful command means the **research run completed** and its evidence bundle is internally consistent. It does **not** mean the proposed rewrite necessarily committed. The certificate separates `run_status` from `rewrite.status`: a rewrite may be `verified`, or it may be `rejected` and automatically rolled back while the overall run remains scientifically complete.
+
+The output directory contains the validated input/capture evidence, selected calibration result, held-out replay metrics, robustness evidence, adaptive influence/proposal artifacts, independent rewrite verification, transaction/rollback evidence, native render outputs when requested, deterministic showcase assets and a schema-v2 `certificate.json` indexing every artifact.
+
+The optional showcase produces deterministic hero/detail/turntable presentation images around the native Gaussian render. Presentation props and the pinned CC0 environment asset are excluded from research evidence. The stored Gaussian spherical-harmonic appearance is **not** claimed to be physically relit by the HDRI.
+
+The real DOT C2 measured-derived path also traverses this command. Its current local proposal is rejected by the complete verification contract and rolled back; that rejected result is preserved rather than converted into a passing rewrite claim.
+
+See [`docs/CAPTURED_WORLD_RUN_0_80.md`](docs/CAPTURED_WORLD_RUN_0_80.md) for the command contract, artifact tree, schema-v2 run semantics, showcase boundary and CI gates.
 
 ### Scale-safe Gaussian identity and selection
 
@@ -322,7 +350,7 @@ cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-The project remains C++20. The 0.70 milestone does not change the language standard.
+The project remains C++20. Detailed dependency, backend-probe and release-hardening commands for all three operating systems are in [`docs/INSTALL_0_90.md`](docs/INSTALL_0_90.md).
 
 ## Useful graphics commands
 
@@ -359,6 +387,19 @@ Check backend discovery/conformance:
 
 Use `Metal` on macOS.
 
+## Release hardening
+
+Vulkax 0.90 is the release-hardened baseline for the implemented 0.80 captured-world pipeline. It adds a release-facing schema registry, documentation claim audit, cross-platform CLI failure regression, deterministic principal-path timing evidence, platform-specific install/build instructions, and release-gate coverage for the controlled and measured paths.
+
+```bash
+python3 scripts/validate_evidence_registry.py .
+python3 scripts/audit_release_claims.py .
+python3 scripts/test_release_cli_failures.py --executable build/vulkax
+python3 scripts/benchmark_captured_world_run.py --executable build/vulkax --iterations 3 --backend none
+```
+
+Timing is evidence-only and is not used as a correctness threshold. See [`docs/RELEASE_HARDENING_0_90.md`](docs/RELEASE_HARDENING_0_90.md) for the release contract and [`docs/PERFORMANCE_0_90.md`](docs/PERFORMANCE_0_90.md) for the recorded three-OS principal-path evidence.
+
 ## Research-integrity status
 
 What is currently supported by evidence:
@@ -379,7 +420,9 @@ What is currently supported by evidence:
 - controlled structural scale evidence through 65,536 synthetic splats;
 - a pinned real DOT C2 measured-source deformable benchmark with explicit measured/proxy provenance;
 - fit-only material selection and held-out replay on that measured trajectory;
-- measured-source influence/robustness evidence and a local rewrite that is independently rejected and rolled back when the full verification contract is not met.
+- measured-source influence/robustness evidence and a local rewrite that is independently rejected and rolled back when the full verification contract is not met;
+- one-command captured-world orchestration with a versioned result certificate and explicit completed-run versus rewrite-verdict semantics;
+- deterministic native showcase artifacts that remain presentation-only and do not change research evidence.
 
 What is **not** established yet:
 
@@ -403,11 +446,9 @@ What is **not** established yet:
 
 The scoped roadmap is in [`docs/ROADMAP_1_0.md`](docs/ROADMAP_1_0.md).
 
-With the measured 0.45 requirement now implemented, the remaining code-completable sequence is:
+With the measured 0.45 requirement, 0.80 one-command path and 0.90 release-hardening milestone implemented, the remaining code-completable sequence is:
 
 ```text
-0.80  one-command captured-world research + visual showcase demo
-0.90  release hardening and documentation/performance audit
 1.0   stable verified-rewritable-reality baseline
 ```
 

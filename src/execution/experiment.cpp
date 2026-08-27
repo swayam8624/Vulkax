@@ -25,7 +25,9 @@ void hashU64(std::uint64_t& hash, std::uint64_t value) {
 }
 
 void hashString(std::uint64_t& hash, std::string_view value) {
-    for (unsigned char ch : value) hashByte(hash, ch);
+    for (char ch : value) {
+        hashByte(hash, static_cast<std::uint8_t>(static_cast<unsigned char>(ch)));
+    }
     hashByte(hash, 0xffu);
 }
 

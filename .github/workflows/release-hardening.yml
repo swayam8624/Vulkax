@@ -1,0 +1,82 @@
+name: Vulkax 0.90 release hardening
+
+on:
+  push:
+    branches: ["main", "feat/release-hardening-0-90"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-release-hardening-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate evidence schema registry
+        run: python3 scripts/validate_evidence_registry.py .
+      - name: Audit release-facing claims
+        run: python3 scripts/audit_release_claims.py . --expected-project-version 0.90.0
+
+  linux-cli:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release CLI
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+          cmake --build build --parallel 2
+      - name: Exercise CLI failure contract
+        run: python3 scripts/test_release_cli_failures.py --executable build/vulkax
+      - name: Produce principal-path timing evidence
+        run: python3 scripts/benchmark_captured_world_run.py --executable build/vulkax --iterations 1 --backend none
+      - name: Upload hardening evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-hardening-linux-${{ github.sha }}
+          path: build/release-hardening-performance
+          if-no-files-found: error
+          retention-days: 14
+
+  macos-cli:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release CLI
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+          cmake --build build --parallel 2
+      - name: Exercise CLI failure contract
+        run: python3 scripts/test_release_cli_failures.py --executable build/vulkax
+      - name: Produce principal-path timing evidence
+        run: python3 scripts/benchmark_captured_world_run.py --executable build/vulkax --iterations 1 --backend none
+      - name: Upload hardening evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-hardening-macos-${{ github.sha }}
+          path: build/release-hardening-performance
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-cli:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release CLI
+        run: |
+          cmake -S . -B build -DVULKAX_BUILD_TESTS=OFF
+          cmake --build build --config Release --parallel 2
+      - name: Exercise CLI failure contract
+        run: python scripts/test_release_cli_failures.py --executable build/Release/vulkax.exe
+      - name: Produce principal-path timing evidence
+        run: python scripts/benchmark_captured_world_run.py --executable build/Release/vulkax.exe --iterations 1 --backend none
+      - name: Upload hardening evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-hardening-windows-${{ github.sha }}
+          path: build/release-hardening-performance
+          if-no-files-found: error
+          retention-days: 14
