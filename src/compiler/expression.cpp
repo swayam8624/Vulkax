@@ -35,14 +35,14 @@ public:
         }
         const char ch = source_[position_];
         switch (ch) {
-        case '+': ++position_; return {TokenKind::Plus};
-        case '-': ++position_; return {TokenKind::Minus};
-        case '*': ++position_; return {TokenKind::Star};
-        case '/': ++position_; return {TokenKind::Slash};
-        case '^': ++position_; return {TokenKind::Caret};
-        case '(': ++position_; return {TokenKind::LeftParen};
-        case ')': ++position_; return {TokenKind::RightParen};
-        case ',': ++position_; return {TokenKind::Comma};
+        case '+': ++position_; return {TokenKind::Plus, 0.0, {}};
+        case '-': ++position_; return {TokenKind::Minus, 0.0, {}};
+        case '*': ++position_; return {TokenKind::Star, 0.0, {}};
+        case '/': ++position_; return {TokenKind::Slash, 0.0, {}};
+        case '^': ++position_; return {TokenKind::Caret, 0.0, {}};
+        case '(': ++position_; return {TokenKind::LeftParen, 0.0, {}};
+        case ')': ++position_; return {TokenKind::RightParen, 0.0, {}};
+        case ',': ++position_; return {TokenKind::Comma, 0.0, {}};
         default: break;
         }
         if (std::isdigit(static_cast<unsigned char>(ch)) != 0 || ch == '.') {
