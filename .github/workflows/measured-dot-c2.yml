@@ -3,6 +3,8 @@ name: DOT C2 measured-source benchmark
 on:
   push:
     branches: ["feat/measured-deformable-benchmark"]
+  pull_request:
+    branches: ["feat/captured-world-run"]
   workflow_dispatch:
 
 concurrency:
@@ -159,34 +161,17 @@ jobs:
           test -s build/dot-c2/rewrite/physical_evidence/derivative_comparison.csv
           cat build/dot-c2/rewrite/transaction_summary.csv
 
-      - name: Emit measured benchmark snapshot
+      - name: Validate and summarize measured benchmark evidence
         run: |
-          python3 - <<'PY'
-          import csv
-          from pathlib import Path
-          root=Path('build/dot-c2')
-          with (root/'calibration/material_grid.csv').open() as f:
-              rows=list(csv.DictReader(f))
-          selected=next(r for r in rows if r['selected']=='1')
-          with (root/'rewrite/transaction_summary.csv').open() as f:
-              rewrite=next(csv.DictReader(f))
-          with (root/'influence/adaptive_proposal_summary.csv').open() as f:
-              adaptive=next(csv.DictReader(f))
-          with (root/'robustness/robustness.csv').open() as f:
-              robust=list(csv.DictReader(f))
-          print('MEASURED DOT C2 SNAPSHOT')
-          print('source=real DOT C2 measured correspondences; Vulkax bundle=derived proxy')
-          print('effective_young=',selected['young_modulus'])
-          print('poisson=',selected['poisson_ratio'])
-          print('fit_dynamic_rms_m=',selected['fit_dynamic_rms'])
-          print('validation_dynamic_rms_m=',selected['validation_dynamic_rms'])
-          print('initialization_fit_rms_m=',selected['initialization_fit_rms'])
-          print('adaptive_regions=',adaptive['region_count'])
-          print('adaptive_particles=',adaptive['proposed_particle_count'])
-          print('adaptive_gradient_fraction=',adaptive['proposed_absolute_gradient_fraction'])
-          print('rewrite_status=',rewrite['status'])
-          print('rewrite_physical_error=',rewrite['physical_observable_error'])
-          print('rewrite_tolerance=',rewrite['physical_observable_tolerance'])
-          print('rewrite_rollback=',rewrite['rollback_performed'])
-          print('robustness_rows=',len(robust))
-          PY
+          python3 scripts/validate_measured_dot_c2.py \
+            build/dot-c2 \
+            build/dot-c2/measured_benchmark_summary.csv
+          cat build/dot-c2/measured_benchmark_summary.csv
+
+      - name: Upload measured benchmark evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dot-c2-measured-benchmark-${{ github.sha }}
+          path: build/dot-c2
+          if-no-files-found: error
+          retention-days: 30
