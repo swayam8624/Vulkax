@@ -10,7 +10,7 @@ on:
       - "assets/demo/**"
       - "schemas/**"
       - "CMakeLists.txt"
-      - ".github/workflows/measured-world-showcase.yml"
+      - ".github/workflows/**"
   pull_request:
     branches: ["main"]
     paths:
@@ -20,7 +20,7 @@ on:
       - "assets/demo/**"
       - "schemas/**"
       - "CMakeLists.txt"
-      - ".github/workflows/measured-world-showcase.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 concurrency:
