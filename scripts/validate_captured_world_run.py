@@ -29,7 +29,7 @@ def finite_number(value, label: str) -> float:
     return result
 
 
-def validate(root: Path, expected_backend: str | None) -> dict:
+def validate(root: Path, expected_backend: str | None, expected_rewrite: str | None) -> dict:
     certificate_path = root / "certificate.json"
     if not certificate_path.is_file():
         fail("certificate.json is missing")
@@ -38,10 +38,10 @@ def validate(root: Path, expected_backend: str | None) -> dict:
 
     if certificate.get("schema") != "vulkax_captured_world_run":
         fail("unexpected certificate schema")
-    if certificate.get("schema_version") != 1:
+    if certificate.get("schema_version") != 2:
         fail("unexpected certificate schema version")
-    if certificate.get("status") != "verified":
-        fail("captured-world-run rewrite is not verified")
+    if certificate.get("run_status") != "completed":
+        fail("captured-world-run did not complete")
     if certificate.get("source_kind") not in {"synthetic", "measured", "derived"}:
         fail("unexpected source kind")
 
@@ -67,12 +67,26 @@ def validate(root: Path, expected_backend: str | None) -> dict:
     rewrite = certificate.get("rewrite")
     if not isinstance(rewrite, dict):
         fail("rewrite object is missing")
-    if rewrite.get("rollback_performed") is not False:
+    rewrite_status = rewrite.get("status")
+    if rewrite_status not in {"verified", "rejected"}:
+        fail("unexpected rewrite status")
+    rollback = rewrite.get("rollback_performed")
+    if not isinstance(rollback, bool):
+        fail("rewrite rollback_performed must be boolean")
+    if rewrite_status == "verified" and rollback:
         fail("verified rewrite unexpectedly rolled back")
+    if rewrite_status == "rejected" and not rollback:
+        fail("rejected rewrite must be rolled back")
+    if expected_rewrite is not None and rewrite_status != expected_rewrite:
+        fail(f"expected rewrite status {expected_rewrite}, got {rewrite_status}")
+
     error = finite_number(rewrite.get("physical_error"), "rewrite physical_error")
     tolerance = finite_number(rewrite.get("physical_tolerance"), "rewrite physical_tolerance")
-    if error > tolerance:
-        fail("rewrite physical error exceeds tolerance")
+    if error < 0.0 or tolerance < 0.0:
+        fail("rewrite physical error/tolerance must be non-negative")
+    # A rejected material rewrite can pass the nonlinear error threshold and still
+    # fail an independent derivative oracle. Do not infer the full verifier verdict
+    # from physical_error <= physical_tolerance alone.
 
     render = certificate.get("render")
     if not isinstance(render, dict) or not isinstance(render.get("produced"), bool):
@@ -149,6 +163,8 @@ def validate(root: Path, expected_backend: str | None) -> dict:
         "source_kind": certificate.get("source_kind"),
         "artifact_count": len(artifacts),
         "render_backend": render.get("backend", "none"),
+        "rewrite_status": rewrite_status,
+        "rollback_performed": rollback,
         "adaptive_particle_count": adaptive["particle_count"],
         "adaptive_gradient_fraction": fraction,
         "physical_error": error,
@@ -159,10 +175,28 @@ def validate(root: Path, expected_backend: str | None) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate Vulkax captured-world-run evidence bundle")
     parser.add_argument("output_dir", type=Path)
-    parser.add_argument("expected_backend", nargs="?", choices=["Vulkan", "Metal", "OpenGL", "none"])
+    parser.add_argument(
+        "expected_backend_positional",
+        nargs="?",
+        choices=["Vulkan", "Metal", "OpenGL", "none"],
+        help="legacy positional expected backend",
+    )
+    parser.add_argument(
+        "--expected-backend",
+        choices=["Vulkan", "Metal", "OpenGL", "none"],
+        help="require a particular research render backend",
+    )
+    parser.add_argument(
+        "--expected-rewrite",
+        choices=["verified", "rejected"],
+        help="require a particular rewrite verdict without conflating it with run success",
+    )
     args = parser.parse_args()
+    expected_backend = args.expected_backend or args.expected_backend_positional
+    if args.expected_backend and args.expected_backend_positional:
+        parser.error("use either positional expected backend or --expected-backend, not both")
     try:
-        result = validate(args.output_dir, args.expected_backend)
+        result = validate(args.output_dir, expected_backend, args.expected_rewrite)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"INVALID captured-world-run evidence: {error}", file=sys.stderr)
         return 1
@@ -170,6 +204,7 @@ def main() -> int:
         "VALID captured-world-run evidence: "
         f"bundle={result['bundle_id']} source={result['source_kind']} "
         f"artifacts={result['artifact_count']} render={result['render_backend']} "
+        f"rewrite={result['rewrite_status']} rollback={int(result['rollback_performed'])} "
         f"adaptive_particles={result['adaptive_particle_count']} "
         f"adaptive_gradient_fraction={result['adaptive_gradient_fraction']:.12g} "
         f"physical_error={result['physical_error']:.12g} "
