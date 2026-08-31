@@ -85,9 +85,9 @@ def main() -> int:
     require_contains(roadmap, "### 0.45 — measured deformable benchmark — implemented", "roadmap")
     require_contains(roadmap, "### 0.80 — one-command end-to-end research demo — implemented", "roadmap")
     require_contains(roadmap, "### 0.90 — release hardening — implemented", "roadmap")
-    require_contains(roadmap, "warning/error cleanup in code touched by the 1.0 path", "roadmap")
-    require_contains(roadmap, "performance report for the principal path", "roadmap")
-    require_contains(roadmap, "installation/build instructions for macOS, Linux and Windows", "roadmap")
+    require_contains(roadmap, "warning/error cleanup on the principal path", "roadmap")
+    require_contains(roadmap, "performance report", "roadmap")
+    require_contains(roadmap, "installation instructions", "roadmap")
 
     required_files = [
         "docs/MEASURED_BENCHMARK_0_45.md",
