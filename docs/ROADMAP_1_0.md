@@ -1,6 +1,6 @@
 # Vulkax roadmap to 1.0
 
-This roadmap freezes the core project scope. Vulkax 1.0 is complete when one captured deformable object can move through the entire verified-rewritable-reality pipeline reproducibly:
+This roadmap freezes the 1.0 scope. Vulkax 1.0 is the stable baseline for a captured deformable object to traverse:
 
 ```text
 captured appearance + measured observations
@@ -9,280 +9,171 @@ captured appearance + measured observations
 stable appearance <-> physical correspondence
             |
             v
-material calibration + uncertainty / robustness evidence
+fit-only material calibration + held-out replay
             |
             v
-particle-level Operator Influence
+robustness + particle Operator Influence
             |
             v
 adaptive local rewrite proposal
             |
             v
-independent nonlinear verification
+independent nonlinear / derivative verification
             |
             v
-appearance update + provenance-preserving transaction
+atomic commit or rollback + provenance
             |
             v
-rendered result + machine-readable evidence bundle
+Gaussian output + native render + certificate
+            |
+            v
+presentation-only visual showcase
 ```
 
 The objective is a coherent, quantitatively defensible research system, not an unlimited simulation engine.
 
 ## Definition of done for 1.0
 
-Vulkax 1.0 must satisfy all of the following.
-
-1. **Captured input** — ingest a Gaussian appearance object, a stable physical-particle representation, and measured marker observations through a documented data contract.
-2. **Correspondence** — preserve stable IDs from capture through physical replay, influence analysis, adaptive selection and rewrite evidence.
-3. **Physical replay** — run the controlled APIC/MPM deformable path with explicit numerical evidence and deterministic regression coverage.
-4. **Material identification** — calibrate material parameters using fit observations only and report held-out validation separately.
-5. **Robustness** — quantify calibration and influence-field sensitivity to observation uncertainty instead of presenting one clean-fit number.
-6. **Operator Influence** — expose particle-local material sensitivity and adaptive spatial proposals.
-7. **Independent verification** — retain finite-difference and nonlinear counterfactual reruns as oracles for proposed material rewrites.
-8. **Local rewrite transaction** — apply a verified local material/geometry/constraint rewrite through the world/correspondence representation with provenance and rollback evidence.
-9. **Appearance consistency** — propagate verified physical changes back to Gaussian position/covariance without accumulating deformation error.
-10. **Rendering** — render the rewritten Gaussian scene through the validated reference renderer and GPU-backed raster path.
-11. **Benchmarkability** — provide deterministic benchmark commands plus at least one measured captured-object evidence bundle when external data is available.
-12. **Release quality** — Linux, macOS and Windows CI green; assertions active in release tests; no known failing core tests; documentation states limitations precisely.
+1. **Captured input** — versioned Gaussian/particle/observation/uncertainty contract with stable identity and provenance.
+2. **Correspondence** — stable Gaussian and physical IDs survive reorder/filter/rewrite operations.
+3. **Physical replay** — deterministic APIC/MPM captured replay with explicit numerical evidence.
+4. **Material identification** — fit-only material selection with held-out validation reported separately.
+5. **Robustness** — observation perturbation stress evidence without relabelling synthetic perturbations as measured noise.
+6. **Operator Influence** — particle-local sensitivity and adaptive proposals.
+7. **Independent verification** — finite-difference, nonlinear counterfactual and controlled adjoint comparison remain separate from proposal generation.
+8. **Local rewrite transaction** — atomic evidence-derived commit/rollback with provenance.
+9. **Appearance consistency** — verified physical state changes can propagate through appearance correspondence without identity drift.
+10. **Rendering** — CPU oracle plus native Vulkan/Metal Gaussian paths.
+11. **Measured evidence** — at least one real measured deformable trajectory traverses the benchmark with measured/proxy boundaries explicit.
+12. **Presentation** — reproducible visual showcase remains separate from research evidence.
+13. **Release quality** — Linux/macOS/Windows release gates, release-facing schema audit, controlled benchmark, measured benchmark, showcase and tag smoke.
 
 ## Milestone sequence
 
 ### 0.39 — observation robustness — implemented
 
-Purpose: make clean synthetic calibration/influence results uncertainty-aware before using measured data.
+Established deterministic observation-perturbation stress evidence, calibration drift metrics, particle-influence stability and adaptive-region overlap on the controlled captured fixture. The controlled perturbation distribution remains synthetic.
 
-Deliverables:
-
-- deterministic t=0 pose-noise and dynamic-observation-noise perturbations;
-- repeated material calibration without validation leakage;
-- Young's-modulus and Poisson-ratio selection drift;
-- fit, held-out validation, initialization and appearance-roundtrip error;
-- particle-adjoint cosine similarity and relative L2 field error;
-- strongest-particle stability;
-- adaptive-region particle overlap and retained absolute-gradient mass;
-- CSV evidence and a public CLI stress command;
-- controlled noise-sweep regression in CI.
-
-Exit gate: satisfied on the controlled synthetic path. Zero-noise identity reproduces the clean baseline exactly; nonzero scenarios are finite, deterministic and evidence-producing. The controlled 1 micrometre result remains synthetic regression evidence rather than a measured tolerance claim.
+See `docs/OBSERVATION_ROBUSTNESS_0_39.md`.
 
 ### 0.40 — capture evidence contract and dataset validation — implemented
 
-Purpose: remove assumptions hidden inside hand-authored CSV files.
+Established `vulkax_capture` schema v1, SHA-256 payload identity, SI units, coordinate-frame metadata, source classification, uncertainty sidecars and pre-simulation trajectory/data validation. Hash identity is not measurement-authenticity proof.
 
-Implemented deliverables:
-
-- versioned `vulkax_capture 1` captured-deformable manifest;
-- explicit SI units, coordinate frame, axis convention, solver timestep and source/provenance fields;
-- SHA-256 identities for appearance, particles, observations and uncertainty payloads;
-- one-row-per-observation position-uncertainty sidecar;
-- validation for duplicate/invalid IDs, missing marker trajectories, off-lattice timestamps, impossible masses/volumes, unknown particle references and inconsistent dynamic fit/validation assignments;
-- stable marker-to-particle correspondence checks across time;
-- initialization and dynamic fit/held-out-validation coverage requirements;
-- public `captured-deformable-validate-bundle` command that validates the bundle before simulation;
-- deterministic generator emission of the same manifest/payload contract intended for measured data;
-- Linux end-to-end corruption rejection plus the cross-platform captured-bundle regression.
-
-Exit gate: satisfied for the contract itself and the deterministic controlled bundle. Malformed bundles covered by the regression fail with actionable errors, payload mutation is rejected by SHA-256 identity, and the generator emits a schema-valid bundle before the existing simulation pipeline runs. This does **not** satisfy the 0.45 measured-data requirement.
+See `docs/CAPTURE_BUNDLE_0_40.md`.
 
 ### 0.45 — measured deformable benchmark — implemented
 
-Purpose: cross the boundary from controlled synthetic verification to actual captured evidence.
+Integrated the public CC0 DOT C2 sequence as a reproducible real measured-source benchmark:
 
-Implemented measured-source experiment:
-
-- public CC0 DOT deformable-object dataset, sequence C2;
-- pinned dataset/file identity and `C02.zip` MD5 checksum;
-- 225 stable measured 3D correspondences converted explicitly into SI units;
-- frame 11 as the measured initialization state and frames 16/21 as later measured checkpoints;
-- 675 observations with 585 fit and 90 held-out validation rows;
-- measured Gaussian center geometry with neutral proxy photometry;
-- explicit provenance classes separating measured, derived, model-proxy, literature-proxy and limitation fields;
+- 225 stable measured 3D correspondences;
+- 675 observations, with 585 fit and 90 held-out validation rows;
+- explicit measured / derived / model-proxy / literature-proxy / limitation provenance;
 - fit-only 28-candidate material calibration;
 - held-out replay error;
-- deterministic perturbation stress sweep around the measured trajectory using a literature-derived `0.26 mm` scale;
-- finite-difference and APIC-adjoint material influence on the measured-source proxy;
-- adaptive local material proposal;
-- one +2% local material rewrite checked by a separate nonlinear rerun and independent derivative oracle;
-- automatic rollback when the measured rewrite does not satisfy the full verification contract;
-- permanent `validate_measured_dot_c2.py` evidence validator plus a machine-readable measured-benchmark summary;
-- CI artifact containing the complete generated evidence tree.
+- measured-source perturbation stress analysis;
+- finite-difference and APIC-adjoint material influence;
+- adaptive local proposal;
+- one +2% local material rewrite checked by nonlinear and independent derivative evidence;
+- automatic rollback when the complete verifier contract is not met;
+- permanent measured-evidence validator and CI artifact.
 
-Controlled measured-source result:
+Recorded result:
 
-- selected **model-conditioned effective** Young's modulus `7500 Pa` and Poisson ratio `0.45`;
-- fit dynamic RMS `0.004390821778 m`;
-- held-out validation RMS `0.004417317099 m`;
-- initialization affine-fit RMS `0.0009106961364 m`;
-- robustness stress test keeps the selected material candidate unchanged, with minimum particle-influence cosine `0.9984812323`, strongest-particle stability `5/5`, and minimum adaptive-particle Jaccard `0.9381443299`;
-- adaptive proposal contains 8 regions / 182 particles and retains `0.9480125633` of absolute particle-gradient mass;
-- selected 31-particle +2% rewrite passes the `0.25` nonlinear-linearization tolerance but fails the independent derivative-oracle contract, so the central transaction is rejected and rolled back with zero unaffected-position drift.
+```text
+model-conditioned effective E        7500 Pa
+model-conditioned nu                 0.45
+fit dynamic RMS                      0.004390821778 m
+held-out validation RMS              0.004417317099 m
+adaptive regions                     8
+adaptive particles                   182 / 225
+retained absolute-gradient mass      0.9480125633
+selected measured rewrite            rejected
+rollback                             performed
+```
 
-Implementation boundary: DOT C2 supplies measured geometry/correspondence, not a certified stress-free state, loads, density, thickness, mass or material ground truth. Vulkax therefore labels the physical reference, volumetric particle quantities and material fit as proxies/model-conditioned values. The current zero-force volumetric APIC path is **not** claimed to be a validated cloth constitutive model. The `0.26 mm` perturbation scale is a literature proxy, not a measured C2 per-observation sigma. Neutral Gaussian photometry is a proxy and is not presented as a native 3DGS reconstruction.
+DOT does not provide the stress-free state, loads, density, thickness, mass or material ground truth required to call those fitted values true cloth properties. The current zero-force volumetric APIC proxy is not claimed to be a validated cloth constitutive model.
 
-Exit gate: satisfied for the measured-source benchmark. Real DOT C2 motion traverses reproducible import, bundle validation, fit-only calibration, held-out replay, robustness stress testing, influence analysis, adaptive proposal and independent rewrite verification. A rejected-and-rolled-back rewrite is accepted as the scientifically correct outcome because the permanent validator independently recomputes the verifier verdict from the physical evidence. See `docs/MEASURED_BENCHMARK_0_45.md`.
+See `docs/MEASURED_BENCHMARK_0_45.md`.
 
 ### 0.50 — scalable Gaussian execution — implemented
 
-Purpose: remove the largest remaining graphics-system gap while retaining the CPU numerical oracle.
+Established native Vulkan/Metal Gaussian projection and raster/compositing, deterministic projected ordering/tile evidence, CPU-vs-native image regression, and public timing/memory scaling evidence. Final stable ordering and current CSR tile construction remain CPU-side; no fully GPU-resident radix-sort/tile pipeline is claimed.
 
-Implemented deliverables:
-
-- native Vulkan and Metal projection of Gaussian means/covariances and projected extents;
-- native projected tile bounds plus deterministic CSR-style tile-reference evidence;
-- stable far-to-near depth ordering of the returned projected stream;
-- native Vulkan and Metal Gaussian raster/compositing paths;
-- CPU-vs-native image regression metrics;
-- public `vulkax_gaussian_scaling` timing/memory benchmark across increasing splat counts;
-- explicit native/fallback evidence, with the public benchmark refusing to call a fallback run native;
-- schema-aware CSV validator used by Linux and macOS CI.
-
-Implementation boundary: final stable ordering and CSR tile-reference construction remain CPU-side. 0.50 does not claim GPU radix sorting or a fully GPU-resident tile/bin/sort/composite pipeline.
-
-Exit gate: satisfied on the controlled 64/128/256-splat CI sweep. Native projection is required. The combined image gate is maximum channel delta `<= 3`, normalized RGBA RMSE `< 1e-4`, and changed-pixel fraction `< 1e-4`. Timing is published but speedup is not a correctness requirement. See `docs/GAUSSIAN_SCALING_0_50.md`.
+See `docs/GAUSSIAN_SCALING_0_50.md`.
 
 ### 0.60 — unified verified rewrite transaction — implemented
 
-Purpose: turn isolated research commands into the central product/research operation.
+Established atomic copy-then-commit transactions, expected-revision and duplicate-ID guards, material/geometry/constraint-metadata edit types, provenance/rollback receipts, locality checks, and verification status derived from evidence. The concrete captured solver-backed verifier is the APIC/MPM local Young's-modulus path; captured solver-specific geometry/constraint verification is not claimed.
 
-Implemented transaction classes:
-
-- local geometry translation/deformation metadata through `TranslateEntity`;
-- local material coefficient rewrites through `SetMaterialParameter`;
-- supported constraint/boundary-condition metadata rewrites through `SetConstraintParameter`.
-
-Implemented transaction/evidence semantics:
-
-- stable semantic target IDs and physical/appearance correspondence preconditions;
-- expected-revision checking and duplicate transaction-ID rejection;
-- copy-then-commit atomicity so a later invalid edit cannot leave a partial world mutation;
-- provenance records and rollback receipts covering appearance positions, material maps, constraint maps, revision and provenance;
-- affected/unaffected-region locality evidence;
-- verification status derived from evidence rather than caller state;
-- automatic rollback when required physical, oracle, locality or appearance-propagation evidence fails;
-- a physical verifier interface used by geometry/material/constraint transactions according to their correspondence requirements;
-- machine-readable transaction evidence/summary CSV output.
-
-Concrete controlled physical adapter:
-
-- `makeCapturedMaterialRewriteVerifier` binds a local `young_modulus` transaction to stable MPM-particle IDs;
-- the requested rewrite magnitude must match the nonlinear verification perturbation exactly, preventing evidence reuse for a different material change;
-- the verifier runs the retained finite-difference derivative reference, separate nonlinear counterfactual, controlled APIC reverse material adjoint, and adjoint-vs-reference comparison;
-- the public `vulkax_captured_rewrite` command consumes the versioned captured bundle and emits transaction plus physical-oracle artifacts;
-- the controlled CI path verifies an eight-particle `15000 Pa -> 15300 Pa` (+2%) rewrite with no unaffected-position drift and no rollback.
-
-Implementation boundary: 0.60 establishes the generic geometry and constraint verifier/rollback semantics and controlled regression coverage, but only the captured **material** rewrite currently has a concrete solver-backed APIC/MPM verifier adapter. A captured solver-specific geometry or constraint verifier is not claimed. Topology surgery remains deferred beyond 1.0.
-
-Exit gate: satisfied for the central transaction semantics and controlled material path. The feature head passed 42 tests on Linux, macOS and Windows; Linux additionally passed the public manifest-to-solver-to-verified-transaction end-to-end gate. See `docs/VERIFIED_REWRITE_0_60.md`.
+See `docs/VERIFIED_REWRITE_0_60.md`.
 
 ### 0.70 — scale-safe identity and selection — implemented
 
-Purpose: make appearance identity, selection and correspondence independent of transient Gaussian vector order.
+Established composite stable Gaussian IDs, transient ID→index views, explicit ID-bearing PLY persistence, reorder-safe correspondence/transactions/rollback, durable selections, ID-preserving filtering, explicit correspondence pruning and stable-ID hierarchy queries. Controlled structural evidence reaches 65,536 synthetic splats.
 
-Implemented deliverables:
-
-- composite 32-bit namespace + 32-bit local `GaussianId` stored on each splat;
-- transient `GaussianIndexView` for stable-ID to current-index resolution, with invalid/duplicate-ID rejection;
-- deterministic source-order fallback IDs for legacy PLY files without Vulkax identity properties;
-- explicit `vulkax_id_namespace` / `vulkax_id_local` PLY persistence for durable Vulkax identity;
-- `WorldCorrespondenceGraph` appearance bindings migrated from vector indices to stable Gaussian IDs;
-- transaction touched sets, position snapshots, rollback and unaffected-position drift migrated to stable IDs;
-- durable named selection groups containing stable IDs only;
-- ID-preserving filtering plus explicit `pruneMissingGaussians` for correspondence graphs after filtering;
-- stable-ID AABB query results reusing the existing `GaussianHierarchy` rather than adding a second BVH;
-- reorder/filter/serialization/rewrite regressions;
-- public `vulkax_gaussian_identity_benchmark` plus schema validator.
-
-Controlled scale evidence: Linux CI validates 4,096, 16,384 and 65,536 synthetic splats. At each size it requires identity lookup, selection membership, semantic correspondence and hierarchy-query membership to survive a complete storage reversal. The validator also checks nonempty bounded query/selection counts, exactly 8 bytes of explicit stable-ID payload per splat, increasing sample sizes/payload and finite non-negative timing fields. Timing is evidence-only; no performance threshold is used.
-
-Implementation boundary: fallback IDs for legacy PLY are deterministic only relative to that file's source vertex order and are not a global uniqueness guarantee across unrelated legacy clouds. 0.70 does not add a distributed/UUID identity service or replace the existing semantic `EntityId` scheme.
-
-Exit gate: satisfied on the controlled path. The functional candidate passed 43 tests on Linux, macOS and Windows, Linux passed the public 4K→65K identity benchmark validator, and existing captured-world/Vulkan/Metal gates remained green. See `docs/GAUSSIAN_IDENTITY_0_70.md`.
+See `docs/GAUSSIAN_IDENTITY_0_70.md`.
 
 ### 0.80 — one-command end-to-end research demo — implemented
 
-Purpose: demonstrate the actual Vulkax thesis instead of a collection of subcommands.
+Established public `vulkax captured-world-run`, schema-v2 certificates, controlled Vulkan/Metal/Windows-no-render execution, real DOT C2 one-command execution, and deterministic presentation-only `studio_pedestal` / `cloth_showcase` outputs with pinned/hash-validated CC0 assets.
 
-Implemented public command:
+A completed run remains distinct from a verified rewrite. The real DOT rewrite is rejected and rolled back while the overall measured run remains complete.
 
-```text
-vulkax captured-world-run <bundle> <output-dir> <marker-id> <time> <dir-x> <dir-y> <dir-z> [backend/settings]
-```
-
-Implemented outputs and behavior:
-
-- validated input manifest and source identity;
-- calibration table and selected material;
-- held-out replay evidence;
-- robustness summary;
-- particle influence field and adaptive proposal;
-- independent verification for the selected rewrite;
-- transaction/provenance receipt and rollback evidence when required;
-- rewritten Gaussian scene;
-- before/after native research renders when a backend is enabled;
-- deterministic presentation-only showcase outputs when requested;
-- schema-v2 result certificate indexing every artifact;
-- explicit separation between `run_status: completed` and rewrite status `verified` or `rejected`;
-- a rejected rewrite remains a successful research run when rollback and evidence are complete.
-
-The controlled path is gated on Vulkan, Metal and Windows no-render. The real DOT C2 measured-derived bundle also traverses the one-command path and preserves its scientifically correct rejected-and-rolled-back rewrite outcome. The optional CC0 HDRI remains presentation/reference metadata and is not claimed to physically relight stored Gaussian SH appearance.
-
-Exit gate: satisfied. A clean checkout reproduces the controlled research + showcase demo through the documented public command, and the measured DOT C2 path is also exercised in CI. See `docs/CAPTURED_WORLD_RUN_0_80.md`.
+See `docs/CAPTURED_WORLD_RUN_0_80.md`.
 
 ### 0.90 — release hardening — implemented
 
-Purpose: harden the implemented 0.80 path without changing the research thesis or reinterpreting existing measured evidence.
+Established release-facing CLI failure regressions, evidence schema registry, documentation claim audit, cross-platform principal-path timing evidence, installation instructions, performance report, warning/error cleanup on the principal path, and release-gate wiring for controlled, measured and showcase workflows.
 
-Implemented deliverables:
+Required hardening artifacts include:
 
-- warning/error cleanup in code touched by the 1.0 path, limited to semantics-preserving changes where numerical risk is low;
-- CLI help and validation consistency, including explicit release-facing failure regression;
-- reproducible principal-path benchmark script with retained evidence directories;
-- versioned evidence schema registry and registry validator;
-- documentation audit against actual implementation;
-- performance report for the principal path;
-- failure-case tests covering help/argument/backend/objective/showcase/output-directory misuse;
-- installation/build instructions for macOS, Linux and Windows;
-- release-hardening CI on Linux, macOS and Windows;
-- controlled one-command, canonical DOT C2, and measured DOT showcase workflows wired to 0.90 candidates and pull requests;
-- README/roadmap claim cleanup so implemented milestones are not presented as future work.
+- `docs/INSTALL_0_90.md`;
+- `docs/RELEASE_HARDENING_0_90.md`;
+- `docs/PERFORMANCE_0_90.md`;
+- `schemas/evidence_registry.json`;
+- `scripts/benchmark_captured_world_run.py`;
+- `scripts/test_release_cli_failures.py`;
+- `scripts/validate_evidence_registry.py`.
 
-Frozen behavior/evidence candidate `dddaaae7008520fff7494e52700758dd280dfe23` passed normal Linux/macOS/Windows CI, the three-OS hardening contract, controlled one-command Vulkan/Metal/Windows-no-render gates, canonical DOT C2 measured benchmark, and measured DOT C2 Vulkan showcase. That green behavior candidate authorized the project version advance from `0.80.0` to `0.90.0`.
+### 1.0 — stable verified-rewritable-reality baseline — implemented
 
-Principal-path hosted-runner observations for that frozen candidate are recorded in `docs/PERFORMANCE_0_90.md`; they are evidence-only and are not used as cross-host performance claims or pass/fail speed thresholds.
+1.0 freezes the implemented research, measured-evidence, rendering, showcase and release-hardening contracts above. It does not add a new constitutive model or reinterpret the DOT result.
 
-Exit gate: implemented behavior is complete. The exact `0.90.0` release head must still pass the same full gate set before merge to `main`, as required by the development rules below. See `docs/RELEASE_HARDENING_0_90.md` and `docs/INSTALL_0_90.md`.
+Release candidate gates:
 
-### 1.0 — stable verified-rewritable-reality baseline
+- exact release SHA passes normal Linux/macOS/Windows CI;
+- release claim audit and evidence registry validation pass;
+- CLI failure contract and principal-path evidence generation pass on all three OSes;
+- controlled one-command Vulkan/Metal/Windows-no-render gates pass;
+- canonical DOT C2 measured benchmark passes;
+- DOT C2 one-command Vulkan cloth showcase passes;
+- dedicated 1.0 release smoke passes.
 
-Release only after:
+After merge, the exact `main` SHA must pass the applicable gates. The `v1.0.0` tag must then trigger and pass the tag smoke before release closure is declared complete.
 
-- exact release commit passes the full OS matrix;
-- post-tag/release smoke test passes;
-- controlled benchmark artifacts are reproducible;
-- measured benchmark status is clearly reported (completed if data exists, otherwise explicitly external-data-blocked rather than simulated away);
-- limitations and deferred work are explicit.
+See `docs/RELEASE_1_0.md`.
 
 ## Explicitly deferred beyond 1.0
 
-The following may be valuable research directions but are not allowed to block the core release:
-
-- topology cutting/fracture/remeshing as a rewrite primitive;
+- topology cutting, fracture and remeshing;
 - XR interaction;
 - automatic semantic reconstruction;
 - generalized differentiable MPM through FLIP blending, boundary clamps and arbitrary forcing;
 - broad multiphysics Operator Influence claims;
 - production-scale distributed reconstruction;
+- distributed/global UUID allocation for unrelated legacy Gaussian clouds;
+- fully GPU-resident Gaussian tile/bin/radix-sort/composite execution;
 - automatic material segmentation claims from adjoints alone;
+- validated shell/cloth constitutive recovery from DOT C2;
 - publication/novelty claims unsupported by comparative experiments.
 
-## Development rules until 1.0
+## Development and release rules
 
-1. One milestone branch at a time.
-2. A milestone is not version-bumped until its exact behavior/evidence candidate passes CI; release-only metadata is then validated again on the exact release head.
-3. Feature proposals and verification remain separate code/evidence paths.
-4. Synthetic robustness is labelled synthetic; measured evidence is labelled measured.
-5. Numerical thresholds come from explicit baselines or physical requirements, not convenient values chosen after failures.
-6. The finite-difference/nonlinear oracle remains available even after efficient adjoint paths exist.
-7. Failed cases stay visible as evidence or tests when they reveal a real limitation.
-8. New features outside this roadmap require replacing an existing 1.0 item rather than silently expanding scope.
+1. Proposal and verification remain separate paths.
+2. Synthetic evidence stays labelled synthetic; measured, derived and proxy quantities stay distinct.
+3. Numerical thresholds are documented and tied to explicit baselines/requirements.
+4. Finite-difference/nonlinear oracles remain available after efficient derivative paths exist.
+5. Failed meaningful cases remain visible as evidence.
+6. Release version changes are validated on their exact SHA.
+7. A Git tag is not treated as successful until the tag-triggered smoke workflow passes.

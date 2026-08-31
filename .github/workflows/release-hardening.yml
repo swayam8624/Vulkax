@@ -1,8 +1,8 @@
-name: Vulkax 0.90 release hardening
+name: Vulkax release hardening
 
 on:
   push:
-    branches: ["main", "feat/release-hardening-0-90"]
+    branches: ["main", "feat/release-hardening-0-90", "release/1.0.0"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
       - name: Validate evidence schema registry
         run: python3 scripts/validate_evidence_registry.py .
       - name: Audit release-facing claims
-        run: python3 scripts/audit_release_claims.py . --expected-project-version 0.90.0
+        run: python3 scripts/audit_release_claims.py .
 
   linux-cli:
     runs-on: ubuntu-24.04
