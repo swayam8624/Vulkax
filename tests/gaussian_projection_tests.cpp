@@ -145,6 +145,11 @@ int main() {
 
         const auto projection = render::projectGaussianCloudNative(
             backendKind, cloud, settings, 16U);
+        assert(projection.fusedProjectionScheduling);
+        assert(projection.intermediateReadbackBytes == 8U * sizeof(std::uint32_t));
+        assert(projection.schedulerInputBytes == 0U);
+        assert(projection.schedulerOutputBytes > 0U);
+        assert(projection.schedulerWorkspaceBytes > 0U);
         assert(projection.projected.size() == reference.stats.visibleSplats);
         assert(projection.stats.inputSplats == reference.stats.inputSplats);
         assert(projection.stats.visibleSplats == reference.stats.visibleSplats);
@@ -157,6 +162,8 @@ int main() {
         assert(projection.maximumSplatsPerTile == referenceTiles.maximumSplatsPerTile);
         assert(std::isfinite(projection.projectionMilliseconds));
         assert(projection.projectionMilliseconds >= 0.0);
+        assert(std::isfinite(projection.schedulingMilliseconds));
+        assert(projection.schedulingMilliseconds >= 0.0);
         assert(projection.inputBytes == cloud.size() * sizeof(render::GaussianProjectionInput));
         assert(projection.outputBytes == cloud.size() * sizeof(render::GaussianProjectedSplat));
 
