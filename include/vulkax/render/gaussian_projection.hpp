@@ -96,8 +96,8 @@ struct GaussianNativeProjectionResult {
 // backend. On the 1.1A Vulkan/Metal fused path, raw projected records stay on
 // the device through cull classification, deterministic depth ordering and CSR
 // construction; the host reads only a tiny allocation-metadata block between
-// projection and scheduling. The final ordered visible records are returned for
-// the still-host-side raster-vertex builder and CPU oracle comparison.
+// projection and scheduling. The final ordered visible records are still
+// materialized on the host for CPU-oracle inspection.
 [[nodiscard]] GaussianNativeProjectionResult projectGaussianCloudNative(
     backend::BackendKind backend,
     const gaussian::GaussianCloud& cloud,
@@ -105,6 +105,15 @@ struct GaussianNativeProjectionResult {
     std::uint32_t tileSize = 16U);
 
 [[nodiscard]] GaussianRasterBatch buildGaussianRasterBatchFromProjection(
+    const GaussianNativeProjectionResult& projection,
+    const GaussianRenderSettings& settings = {});
+
+// Rasterizes one fixed projected record per visible splat. Six quad vertices are
+// generated from vertex_id in the native vertex shader, eliminating host-side
+// GaussianRasterVertex expansion while retaining the CPU-expanded path as an
+// independent image oracle.
+[[nodiscard]] GaussianRenderResult renderGaussianProjectionHeadless(
+    backend::BackendKind backend,
     const GaussianNativeProjectionResult& projection,
     const GaussianRenderSettings& settings = {});
 
