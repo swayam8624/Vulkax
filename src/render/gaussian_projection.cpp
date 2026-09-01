@@ -1,8 +1,10 @@
 #include "vulkax/render/gaussian_projection.hpp"
+#include "vulkax/render/gaussian_scheduler.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -128,6 +130,23 @@ void validateSettings(const GaussianRenderSettings& settings, std::uint32_t tile
         std::abs(encoded - static_cast<float>(rounded)) > 1.0e-4F)
         throw std::runtime_error(std::string("native Gaussian projection returned invalid ") + label);
     return static_cast<std::uint32_t>(rounded);
+}
+
+[[nodiscard]] std::size_t referenceCapacityForProjectedSplat(
+    const GaussianProjectedSplat& projected,
+    std::uint32_t tileColumns,
+    std::uint32_t tileRows) {
+    const std::uint32_t firstColumn = decodeTile(projected.tileBounds[0], tileColumns, "first tile column");
+    const std::uint32_t lastColumn = decodeTile(projected.tileBounds[1], tileColumns, "last tile column");
+    const std::uint32_t firstRow = decodeTile(projected.tileBounds[2], tileRows, "first tile row");
+    const std::uint32_t lastRow = decodeTile(projected.tileBounds[3], tileRows, "last tile row");
+    if (firstColumn > lastColumn || firstRow > lastRow)
+        throw std::runtime_error("native Gaussian projection returned an inverted tile range");
+    const std::size_t columns = static_cast<std::size_t>(lastColumn - firstColumn) + 1U;
+    const std::size_t rows = static_cast<std::size_t>(lastRow - firstRow) + 1U;
+    if (rows > std::numeric_limits<std::size_t>::max() / columns)
+        throw std::overflow_error("native Gaussian tile-reference capacity overflow");
+    return columns * rows;
 }
 
 } // namespace
@@ -278,32 +297,33 @@ GaussianNativeProjectionResult projectGaussianCloudNative(
                 break;
         }
     }
-
-    std::stable_sort(
-        result.projected.begin(), result.projected.end(),
-        [](const GaussianProjectedSplat& lhs, const GaussianProjectedSplat& rhs) {
-            return lhs.minorDepth[2] > rhs.minorDepth[2];
-        });
     result.stats.visibleSplats = result.projected.size();
 
-    std::vector<std::size_t> tileOccupancy(
-        static_cast<std::size_t>(result.tileColumns) * result.tileRows, 0U);
+    // The host computes only the scalar allocation bound needed to size the
+    // device reference buffer. It no longer constructs per-tile occupancy,
+    // prefix offsets, or ordering.
     for (const auto& projected : result.projected) {
-        const std::uint32_t firstColumn = decodeTile(projected.tileBounds[0], result.tileColumns, "first tile column");
-        const std::uint32_t lastColumn = decodeTile(projected.tileBounds[1], result.tileColumns, "last tile column");
-        const std::uint32_t firstRow = decodeTile(projected.tileBounds[2], result.tileRows, "first tile row");
-        const std::uint32_t lastRow = decodeTile(projected.tileBounds[3], result.tileRows, "last tile row");
-        if (firstColumn > lastColumn || firstRow > lastRow)
-            throw std::runtime_error("native Gaussian projection returned an inverted tile range");
-        for (std::uint32_t row = firstRow; row <= lastRow; ++row) {
-            for (std::uint32_t column = firstColumn; column <= lastColumn; ++column) {
-                auto& occupancy = tileOccupancy[static_cast<std::size_t>(row) * result.tileColumns + column];
-                ++occupancy;
-                ++result.splatReferences;
-                result.maximumSplatsPerTile = std::max(result.maximumSplatsPerTile, occupancy);
-            }
-        }
+        const std::size_t references = referenceCapacityForProjectedSplat(
+            projected, result.tileColumns, result.tileRows);
+        if (references > std::numeric_limits<std::size_t>::max() - result.splatReferences)
+            throw std::overflow_error("native Gaussian total tile-reference capacity overflow");
+        result.splatReferences += references;
     }
+
+    const auto nativeSchedule = scheduleGaussianProjectionNative(backend, result);
+    if (nativeSchedule.schedule.splatReferences != result.splatReferences)
+        throw std::runtime_error("native Gaussian scheduler reference count disagrees with allocation bound");
+    result.maximumSplatsPerTile = nativeSchedule.schedule.maximumSplatsPerTile;
+    result.schedulingMilliseconds = nativeSchedule.schedulingMilliseconds;
+    result.schedulerInputBytes = nativeSchedule.inputBytes;
+    result.schedulerOutputBytes = nativeSchedule.outputBytes;
+    result.schedulerWorkspaceBytes = nativeSchedule.workspaceBytes;
+
+    std::vector<GaussianProjectedSplat> ordered;
+    ordered.reserve(result.projected.size());
+    for (const std::uint32_t index : nativeSchedule.depthOrder)
+        ordered.push_back(result.projected.at(index));
+    result.projected = std::move(ordered);
     return result;
 }
 

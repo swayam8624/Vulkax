@@ -53,8 +53,12 @@ struct GaussianNativeProjectionResult {
     std::size_t splatReferences{};
     std::size_t maximumSplatsPerTile{};
     double projectionMilliseconds{};
+    double schedulingMilliseconds{};
     std::size_t inputBytes{};
     std::size_t outputBytes{};
+    std::size_t schedulerInputBytes{};
+    std::size_t schedulerOutputBytes{};
+    std::size_t schedulerWorkspaceBytes{};
 };
 
 [[nodiscard]] std::vector<GaussianProjectionInput> prepareGaussianProjectionInputs(
@@ -65,9 +69,11 @@ struct GaussianNativeProjectionResult {
     const GaussianRenderSettings& settings,
     std::uint32_t tileSize = 16U);
 
-// Runs the geometric projection/tile-range kernel on the requested native
-// backend, then deterministically compacts/sorts the fixed records on CPU by
-// depth. CPU sorting is deliberately retained as the ordering oracle in 0.50.
+// Runs geometric projection/tile-range generation on the requested native
+// backend. Cull compaction is still host-side in 1.1A, but deterministic depth
+// ordering and CSR tile scheduling are computed by the native GPU scheduler.
+// The projected records are returned in the same back-to-front order as the
+// established CPU oracle so downstream raster behavior remains unchanged.
 [[nodiscard]] GaussianNativeProjectionResult projectGaussianCloudNative(
     backend::BackendKind backend,
     const gaussian::GaussianCloud& cloud,
