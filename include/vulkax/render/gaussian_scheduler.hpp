@@ -15,7 +15,7 @@ namespace vulkax::render {
 // Within every tile, references are ordered back-to-front by projected depth.
 // Equal-depth ties preserve the input projected-splat order. That is the exact
 // deterministic contract native GPU schedulers must reproduce even when their
-// reference emission uses atomics.
+// reference emission later becomes parallel.
 struct GaussianTileSchedule {
     std::uint32_t tileSize{};
     std::uint32_t columns{};
@@ -24,6 +24,13 @@ struct GaussianTileSchedule {
     std::size_t maximumSplatsPerTile{};
     std::vector<std::uint32_t> tileOffsets;
     std::vector<std::uint32_t> projectedSplatIndices;
+};
+
+struct GaussianNativeScheduleResult {
+    GaussianTileSchedule schedule;
+    double schedulingMilliseconds{};
+    std::size_t inputBytes{};
+    std::size_t outputBytes{};
 };
 
 // Correctness oracle for the 1.1 GPU-resident scheduler. This intentionally
@@ -37,6 +44,14 @@ struct GaussianTileSchedule {
 // and agreement with projection-level occupancy statistics.
 void validateGaussianTileSchedule(
     const GaussianTileSchedule& schedule,
+    const GaussianNativeProjectionResult& projection);
+
+// Native 1.1A CSR construction stage. The input projection is already
+// depth-ordered by the established projection oracle; tile counting, prefix
+// offsets, and reference emission are executed on the requested GPU backend.
+// A later 1.1A stage will move the depth ordering itself onto the device.
+[[nodiscard]] GaussianNativeScheduleResult scheduleGaussianProjectionNative(
+    backend::BackendKind backend,
     const GaussianNativeProjectionResult& projection);
 
 } // namespace vulkax::render

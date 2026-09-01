@@ -1,0 +1,109 @@
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+struct GaussianOutput {
+    vec4 centerMajor;
+    vec4 minorDepth;
+    vec4 colorCull;
+    vec4 tileBounds;
+};
+
+layout(std430, binding = 0) readonly buffer ProjectedBuffer {
+    GaussianOutput values[];
+} projected;
+
+layout(std430, binding = 1) buffer OffsetBuffer {
+    uint values[];
+} offsets;
+
+layout(std430, binding = 2) buffer CursorBuffer {
+    uint values[];
+} cursors;
+
+layout(std430, binding = 3) buffer ReferenceBuffer {
+    uint values[];
+} references;
+
+layout(std430, binding = 4) buffer MetadataBuffer {
+    uvec4 value;
+} metadata;
+
+layout(push_constant) uniform ScheduleParameters {
+    uint projectedCount;
+    uint columns;
+    uint rows;
+    uint referenceCapacity;
+} parameters;
+
+void main() {
+    if (gl_GlobalInvocationID.x != 0u) return;
+
+    const uint tileCount = parameters.columns * parameters.rows;
+    metadata.value = uvec4(0u);
+    for (uint tile = 0u; tile <= tileCount; ++tile) offsets.values[tile] = 0u;
+    for (uint tile = 0u; tile < tileCount; ++tile) cursors.values[tile] = 0u;
+
+    uint total = 0u;
+    for (uint splat = 0u; splat < parameters.projectedCount; ++splat) {
+        const vec4 bounds = projected.values[splat].tileBounds;
+        const uint firstColumn = uint(bounds.x + 0.5);
+        const uint lastColumn = uint(bounds.y + 0.5);
+        const uint firstRow = uint(bounds.z + 0.5);
+        const uint lastRow = uint(bounds.w + 0.5);
+        if (firstColumn > lastColumn || firstRow > lastRow ||
+            lastColumn >= parameters.columns || lastRow >= parameters.rows) {
+            metadata.value.z = 1u;
+            return;
+        }
+        for (uint row = firstRow; row <= lastRow; ++row) {
+            for (uint column = firstColumn; column <= lastColumn; ++column) {
+                if (total >= parameters.referenceCapacity) {
+                    metadata.value.z = 2u;
+                    return;
+                }
+                const uint tile = row * parameters.columns + column;
+                offsets.values[tile + 1u] += 1u;
+                total += 1u;
+            }
+        }
+    }
+
+    uint running = 0u;
+    uint maximum = 0u;
+    for (uint tile = 0u; tile < tileCount; ++tile) {
+        const uint count = offsets.values[tile + 1u];
+        maximum = max(maximum, count);
+        offsets.values[tile] = running;
+        cursors.values[tile] = running;
+        running += count;
+    }
+    offsets.values[tileCount] = running;
+    if (running != total) {
+        metadata.value.z = 3u;
+        return;
+    }
+
+    // projected[] is already in the stable back-to-front oracle order. The
+    // sequential device emission therefore preserves depth and tie ordering.
+    for (uint splat = 0u; splat < parameters.projectedCount; ++splat) {
+        const vec4 bounds = projected.values[splat].tileBounds;
+        const uint firstColumn = uint(bounds.x + 0.5);
+        const uint lastColumn = uint(bounds.y + 0.5);
+        const uint firstRow = uint(bounds.z + 0.5);
+        const uint lastRow = uint(bounds.w + 0.5);
+        for (uint row = firstRow; row <= lastRow; ++row) {
+            for (uint column = firstColumn; column <= lastColumn; ++column) {
+                const uint tile = row * parameters.columns + column;
+                const uint slot = cursors.values[tile]++;
+                if (slot >= parameters.referenceCapacity) {
+                    metadata.value.z = 4u;
+                    return;
+                }
+                references.values[slot] = splat;
+            }
+        }
+    }
+
+    metadata.value = uvec4(total, maximum, 0u, 0u);
+}
