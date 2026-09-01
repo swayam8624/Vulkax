@@ -1,8 +1,10 @@
 #include "vulkax/render/gaussian_projection.hpp"
+#include "vulkax/render/gaussian_scheduler.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -16,6 +18,12 @@
 #ifndef VULKAX_HAS_METAL_GAUSSIAN_PROJECTION
 #define VULKAX_HAS_METAL_GAUSSIAN_PROJECTION 0
 #endif
+#ifndef VULKAX_HAS_VULKAN_GAUSSIAN_FUSED
+#define VULKAX_HAS_VULKAN_GAUSSIAN_FUSED 0
+#endif
+#ifndef VULKAX_HAS_METAL_GAUSSIAN_FUSED
+#define VULKAX_HAS_METAL_GAUSSIAN_FUSED 0
+#endif
 
 namespace vulkax::render {
 
@@ -28,6 +36,20 @@ std::pair<std::vector<GaussianProjectedSplat>, double> projectGaussianSplatsVulk
 std::pair<std::vector<GaussianProjectedSplat>, double> projectGaussianSplatsMetal(
     const std::vector<GaussianProjectionInput>& inputs,
     const GaussianProjectionParameters& parameters);
+#endif
+#if VULKAX_HAS_VULKAN_GAUSSIAN_FUSED
+GaussianFusedProjectionScheduleResult projectScheduleGaussianSplatsVulkan(
+    const std::vector<GaussianProjectionInput>& inputs,
+    const GaussianProjectionParameters& parameters,
+    std::uint32_t columns,
+    std::uint32_t rows);
+#endif
+#if VULKAX_HAS_METAL_GAUSSIAN_FUSED
+GaussianFusedProjectionScheduleResult projectScheduleGaussianSplatsMetal(
+    const std::vector<GaussianProjectionInput>& inputs,
+    const GaussianProjectionParameters& parameters,
+    std::uint32_t columns,
+    std::uint32_t rows);
 #endif
 
 namespace {
@@ -130,6 +152,74 @@ void validateSettings(const GaussianRenderSettings& settings, std::uint32_t tile
     return static_cast<std::uint32_t>(rounded);
 }
 
+[[nodiscard]] std::size_t referenceCapacityForProjectedSplat(
+    const GaussianProjectedSplat& projected,
+    std::uint32_t tileColumns,
+    std::uint32_t tileRows) {
+    const std::uint32_t firstColumn = decodeTile(projected.tileBounds[0], tileColumns, "first tile column");
+    const std::uint32_t lastColumn = decodeTile(projected.tileBounds[1], tileColumns, "last tile column");
+    const std::uint32_t firstRow = decodeTile(projected.tileBounds[2], tileRows, "first tile row");
+    const std::uint32_t lastRow = decodeTile(projected.tileBounds[3], tileRows, "last tile row");
+    if (firstColumn > lastColumn || firstRow > lastRow)
+        throw std::runtime_error("native Gaussian projection returned an inverted tile range");
+    const std::size_t columns = static_cast<std::size_t>(lastColumn - firstColumn) + 1U;
+    const std::size_t rows = static_cast<std::size_t>(lastRow - firstRow) + 1U;
+    if (rows > std::numeric_limits<std::size_t>::max() / columns)
+        throw std::overflow_error("native Gaussian tile-reference capacity overflow");
+    return columns * rows;
+}
+
+[[nodiscard]] GaussianNativeProjectionResult finishFusedProjection(
+    GaussianFusedProjectionScheduleResult fused,
+    std::uint32_t tileSize,
+    std::uint32_t tileColumns,
+    std::uint32_t tileRows) {
+    GaussianNativeProjectionResult result;
+    result.projected = std::move(fused.projected);
+    result.stats = fused.stats;
+    result.tileSize = tileSize;
+    result.tileColumns = tileColumns;
+    result.tileRows = tileRows;
+    result.splatReferences = fused.splatReferences;
+    result.maximumSplatsPerTile = fused.maximumSplatsPerTile;
+    result.projectionMilliseconds = fused.projectionMilliseconds;
+    result.schedulingMilliseconds = fused.schedulingMilliseconds;
+    result.inputBytes = fused.inputBytes;
+    result.outputBytes = fused.outputBytes;
+    result.schedulerInputBytes = 0U;
+    result.schedulerOutputBytes = fused.schedulerOutputBytes;
+    result.schedulerWorkspaceBytes = fused.schedulerWorkspaceBytes;
+    result.intermediateReadbackBytes = fused.intermediateReadbackBytes;
+    result.fusedProjectionScheduling = true;
+
+    if (result.projected.size() != result.stats.visibleSplats)
+        throw std::runtime_error("fused Gaussian visible record count is inconsistent");
+    if (result.stats.inputSplats != result.stats.visibleSplats + result.stats.culledOpacity +
+                                      result.stats.culledBehindCamera + result.stats.culledOutsideImage)
+        throw std::runtime_error("fused Gaussian cull accounting is inconsistent");
+
+    for (std::size_t index = 0U; index < result.projected.size(); ++index) {
+        const auto& projected = result.projected[index];
+        if (decodeCullReason(projected.colorCull[3]) != GaussianProjectionCullReason::Visible)
+            throw std::runtime_error("fused Gaussian compacted output contains a culled record");
+        if (!std::isfinite(projected.minorDepth[2]) || !(projected.minorDepth[2] > 0.0F))
+            throw std::runtime_error("fused Gaussian compacted output has invalid depth");
+        if (index > 0U && projected.minorDepth[2] > result.projected[index - 1U].minorDepth[2])
+            throw std::runtime_error("fused Gaussian compacted output is not back-to-front ordered");
+    }
+
+    GaussianTileSchedule schedule;
+    schedule.tileSize = tileSize;
+    schedule.columns = tileColumns;
+    schedule.rows = tileRows;
+    schedule.splatReferences = fused.splatReferences;
+    schedule.maximumSplatsPerTile = fused.maximumSplatsPerTile;
+    schedule.tileOffsets = std::move(fused.tileOffsets);
+    schedule.projectedSplatIndices = std::move(fused.projectedSplatIndices);
+    validateGaussianTileSchedule(schedule, result);
+    return result;
+}
+
 } // namespace
 
 std::vector<GaussianProjectionInput> prepareGaussianProjectionInputs(
@@ -226,7 +316,36 @@ GaussianNativeProjectionResult projectGaussianCloudNative(
     std::uint32_t tileSize) {
     const auto inputs = prepareGaussianProjectionInputs(cloud, settings);
     const auto parameters = makeGaussianProjectionParameters(settings, tileSize);
+    const std::uint32_t tileColumns = (settings.image.width + tileSize - 1U) / tileSize;
+    const std::uint32_t tileRows = (settings.image.height + tileSize - 1U) / tileSize;
 
+    switch (backend) {
+        case backend::BackendKind::Vulkan:
+#if VULKAX_HAS_VULKAN_GAUSSIAN_FUSED
+            return finishFusedProjection(
+                projectScheduleGaussianSplatsVulkan(inputs, parameters, tileColumns, tileRows),
+                tileSize, tileColumns, tileRows);
+#elif VULKAX_HAS_VULKAN_GAUSSIAN_PROJECTION
+            break;
+#else
+            throw std::runtime_error("Vulkan Gaussian projection was not compiled into this build");
+#endif
+        case backend::BackendKind::Metal:
+#if VULKAX_HAS_METAL_GAUSSIAN_FUSED
+            return finishFusedProjection(
+                projectScheduleGaussianSplatsMetal(inputs, parameters, tileColumns, tileRows),
+                tileSize, tileColumns, tileRows);
+#elif VULKAX_HAS_METAL_GAUSSIAN_PROJECTION
+            break;
+#else
+            throw std::runtime_error("Metal Gaussian projection was not compiled into this build");
+#endif
+        case backend::BackendKind::OpenGL:
+            throw std::runtime_error("OpenGL Gaussian projection is not implemented");
+    }
+
+    // Portable fallback retained as a correctness/reference path for builds
+    // where native projection exists but the fused scheduling backend does not.
     std::pair<std::vector<GaussianProjectedSplat>, double> raw;
     switch (backend) {
         case backend::BackendKind::Vulkan:
@@ -253,8 +372,8 @@ GaussianNativeProjectionResult projectGaussianCloudNative(
     GaussianNativeProjectionResult result;
     result.stats.inputSplats = cloud.size();
     result.tileSize = tileSize;
-    result.tileColumns = (settings.image.width + tileSize - 1U) / tileSize;
-    result.tileRows = (settings.image.height + tileSize - 1U) / tileSize;
+    result.tileColumns = tileColumns;
+    result.tileRows = tileRows;
     result.projectionMilliseconds = raw.second;
     result.inputBytes = inputs.size() * sizeof(GaussianProjectionInput);
     result.outputBytes = raw.first.size() * sizeof(GaussianProjectedSplat);
@@ -278,32 +397,30 @@ GaussianNativeProjectionResult projectGaussianCloudNative(
                 break;
         }
     }
-
-    std::stable_sort(
-        result.projected.begin(), result.projected.end(),
-        [](const GaussianProjectedSplat& lhs, const GaussianProjectedSplat& rhs) {
-            return lhs.minorDepth[2] > rhs.minorDepth[2];
-        });
     result.stats.visibleSplats = result.projected.size();
 
-    std::vector<std::size_t> tileOccupancy(
-        static_cast<std::size_t>(result.tileColumns) * result.tileRows, 0U);
     for (const auto& projected : result.projected) {
-        const std::uint32_t firstColumn = decodeTile(projected.tileBounds[0], result.tileColumns, "first tile column");
-        const std::uint32_t lastColumn = decodeTile(projected.tileBounds[1], result.tileColumns, "last tile column");
-        const std::uint32_t firstRow = decodeTile(projected.tileBounds[2], result.tileRows, "first tile row");
-        const std::uint32_t lastRow = decodeTile(projected.tileBounds[3], result.tileRows, "last tile row");
-        if (firstColumn > lastColumn || firstRow > lastRow)
-            throw std::runtime_error("native Gaussian projection returned an inverted tile range");
-        for (std::uint32_t row = firstRow; row <= lastRow; ++row) {
-            for (std::uint32_t column = firstColumn; column <= lastColumn; ++column) {
-                auto& occupancy = tileOccupancy[static_cast<std::size_t>(row) * result.tileColumns + column];
-                ++occupancy;
-                ++result.splatReferences;
-                result.maximumSplatsPerTile = std::max(result.maximumSplatsPerTile, occupancy);
-            }
-        }
+        const std::size_t references = referenceCapacityForProjectedSplat(
+            projected, result.tileColumns, result.tileRows);
+        if (references > std::numeric_limits<std::size_t>::max() - result.splatReferences)
+            throw std::overflow_error("native Gaussian total tile-reference capacity overflow");
+        result.splatReferences += references;
     }
+
+    const auto nativeSchedule = scheduleGaussianProjectionNative(backend, result);
+    if (nativeSchedule.schedule.splatReferences != result.splatReferences)
+        throw std::runtime_error("native Gaussian scheduler reference count disagrees with allocation bound");
+    result.maximumSplatsPerTile = nativeSchedule.schedule.maximumSplatsPerTile;
+    result.schedulingMilliseconds = nativeSchedule.schedulingMilliseconds;
+    result.schedulerInputBytes = nativeSchedule.inputBytes;
+    result.schedulerOutputBytes = nativeSchedule.outputBytes;
+    result.schedulerWorkspaceBytes = nativeSchedule.workspaceBytes;
+
+    std::vector<GaussianProjectedSplat> ordered;
+    ordered.reserve(result.projected.size());
+    for (const std::uint32_t index : nativeSchedule.depthOrder)
+        ordered.push_back(result.projected.at(index));
+    result.projected = std::move(ordered);
     return result;
 }
 
@@ -348,8 +465,7 @@ GaussianRenderResult renderGaussianCloudScalableHeadless(
     const GaussianRenderSettings& settings,
     std::uint32_t tileSize) {
     const auto projection = projectGaussianCloudNative(backend, cloud, settings, tileSize);
-    const auto batch = buildGaussianRasterBatchFromProjection(projection, settings);
-    return renderGaussianRasterBatchHeadless(backend, batch, settings.image);
+    return renderGaussianProjectionHeadless(backend, projection, settings);
 }
 
 static_assert(sizeof(GaussianProjectionInput) == 64U);

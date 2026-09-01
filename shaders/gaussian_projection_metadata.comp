@@ -1,0 +1,111 @@
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+struct GaussianOutput {
+    vec4 centerMajor;
+    vec4 minorDepth;
+    vec4 colorCull;
+    vec4 tileBounds;
+};
+
+layout(std430, binding = 0) readonly buffer ProjectedBuffer {
+    GaussianOutput values[];
+} projected;
+
+layout(std430, binding = 1) buffer MetadataBuffer {
+    uvec4 values[2];
+} metadata;
+
+layout(push_constant) uniform MetadataParameters {
+    uint projectedCount;
+    uint columns;
+    uint rows;
+    uint reserved;
+} parameters;
+
+bool finiteFloat(float value) {
+    return !isnan(value) && !isinf(value);
+}
+
+bool decodeExactUint(float encoded, uint limit, out uint value) {
+    if (!finiteFloat(encoded)) return false;
+    float rounded = round(encoded);
+    if (abs(encoded - rounded) > 1.0e-4 || rounded < 0.0 || rounded >= float(limit)) return false;
+    value = uint(rounded);
+    return true;
+}
+
+void main() {
+    if (gl_GlobalInvocationID.x != 0u) return;
+
+    uint visible = 0u;
+    uint opacity = 0u;
+    uint behind = 0u;
+    uint outside = 0u;
+    uint references = 0u;
+    uint errorCode = 0u;
+
+    for (uint index = 0u; index < parameters.projectedCount; ++index) {
+        float encodedReason = projected.values[index].colorCull.w;
+        if (!finiteFloat(encodedReason)) {
+            errorCode = 1u;
+            break;
+        }
+        float roundedReason = round(encodedReason);
+        if (abs(encodedReason - roundedReason) > 1.0e-4 || roundedReason < 0.0 || roundedReason > 3.0) {
+            errorCode = 2u;
+            break;
+        }
+        uint reason = uint(roundedReason);
+        if (reason == 1u) {
+            opacity += 1u;
+            continue;
+        }
+        if (reason == 2u) {
+            behind += 1u;
+            continue;
+        }
+        if (reason == 3u) {
+            outside += 1u;
+            continue;
+        }
+
+        float depth = projected.values[index].minorDepth.z;
+        if (!finiteFloat(depth) || !(depth > 0.0)) {
+            errorCode = 3u;
+            break;
+        }
+
+        vec4 bounds = projected.values[index].tileBounds;
+        uint firstColumn = 0u;
+        uint lastColumn = 0u;
+        uint firstRow = 0u;
+        uint lastRow = 0u;
+        if (!decodeExactUint(bounds.x, parameters.columns, firstColumn) ||
+            !decodeExactUint(bounds.y, parameters.columns, lastColumn) ||
+            !decodeExactUint(bounds.z, parameters.rows, firstRow) ||
+            !decodeExactUint(bounds.w, parameters.rows, lastRow) ||
+            firstColumn > lastColumn || firstRow > lastRow) {
+            errorCode = 4u;
+            break;
+        }
+
+        uint width = lastColumn - firstColumn + 1u;
+        uint height = lastRow - firstRow + 1u;
+        if (height != 0u && width > 0xffffffffu / height) {
+            errorCode = 5u;
+            break;
+        }
+        uint contribution = width * height;
+        if (contribution > 0xffffffffu - references) {
+            errorCode = 6u;
+            break;
+        }
+        references += contribution;
+        visible += 1u;
+    }
+
+    metadata.values[0] = uvec4(visible, opacity, behind, outside);
+    metadata.values[1] = uvec4(references, errorCode, 0u, 0u);
+}

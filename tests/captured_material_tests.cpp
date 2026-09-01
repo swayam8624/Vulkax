@@ -1,10 +1,12 @@
 #include "vulkax/research/captured_material_calibration.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -106,6 +108,16 @@ capture::CapturedDeformableDataset makeDataset(
     return dataset;
 }
 
+template <typename Fn>
+bool rejectsInvalidArgument(Fn&& fn) {
+    try {
+        fn();
+    } catch (const std::invalid_argument&) {
+        return true;
+    }
+    return false;
+}
+
 } // namespace
 
 int main() {
@@ -147,11 +159,72 @@ int main() {
         splat.position = applyAffine(deformation, translation, splat.position);
     const auto dataset = makeDataset(body, deformation, translation, trajectories);
 
+    const auto preflight = research::summarizeCapturedMaterialCalibrationPreflight(dataset);
+    assert(preflight.markerCount == 5U);
+    assert(preflight.fitSamples == 13U);
+    assert(preflight.validationSamples == 7U);
+    assert(preflight.fitDynamicSamples == 9U);
+    assert(preflight.validationDynamicSamples == 6U);
+    assert(preflight.initializationSamples == 5U);
+    assert(preflight.distinctFitInitializationParticles == 4U);
+    assert(preflight.minimumTime == 0.0);
+    assert(std::abs(preflight.maximumTime - 3.0e-3) < 1.0e-15);
+    research::validateCapturedMaterialCalibrationPreflight(preflight);
+
+    auto tooFewMarkers = dataset;
+    std::erase_if(tooFewMarkers.observations, [](const auto& observation) {
+        return observation.markerId == "m3" || observation.markerId == "m4";
+    });
+    assert(rejectsInvalidArgument([&] {
+        research::validateCapturedMaterialCalibrationPreflight(
+            research::summarizeCapturedMaterialCalibrationPreflight(tooFewMarkers));
+    }));
+
+    auto noDynamicFit = dataset;
+    for (auto& observation : noDynamicFit.observations) {
+        if (observation.time > 1.0e-12 && observation.split == capture::ObservationSplit::Fit)
+            observation.split = capture::ObservationSplit::Validation;
+    }
+    assert(rejectsInvalidArgument([&] {
+        research::validateCapturedMaterialCalibrationPreflight(
+            research::summarizeCapturedMaterialCalibrationPreflight(noDynamicFit));
+    }));
+
+    auto noDynamicValidation = dataset;
+    for (auto& observation : noDynamicValidation.observations) {
+        if (observation.time > 1.0e-12 && observation.split == capture::ObservationSplit::Validation)
+            observation.split = capture::ObservationSplit::Fit;
+    }
+    assert(rejectsInvalidArgument([&] {
+        research::validateCapturedMaterialCalibrationPreflight(
+            research::summarizeCapturedMaterialCalibrationPreflight(noDynamicValidation));
+    }));
+
+    auto insufficientInitialization = dataset;
+    for (auto& observation : insufficientInitialization.observations) {
+        if (observation.time <= 1.0e-12 && observation.markerId == "m3") {
+            observation.split = capture::ObservationSplit::Validation;
+            break;
+        }
+    }
+    assert(rejectsInvalidArgument([&] {
+        research::validateCapturedMaterialCalibrationPreflight(
+            research::summarizeCapturedMaterialCalibrationPreflight(insufficientInitialization));
+    }));
+
     research::NonlinearDeformableWorldSettings settings;
     settings.dt = 1.0e-4;
     settings.material.density = 1000.0;
     settings.couplingNeighborCount = 20;
     settings.transferScheme = solvers::MpmTransferScheme::APIC;
+
+    // The calibration entry point itself must enforce the same readiness gate,
+    // rather than relying on callers to run the public preflight command first.
+    assert(rejectsInvalidArgument([&] {
+        (void)research::calibrateCapturedMaterialGrid(
+            capturedWorld, active, noDynamicValidation, makeGrid(), settings,
+            {1.5e4}, {0.30});
+    }));
 
     const auto calibration = research::calibrateCapturedMaterialGrid(
         capturedWorld, active, dataset, makeGrid(), settings,

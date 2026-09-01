@@ -1,0 +1,150 @@
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+struct GaussianOutput {
+    vec4 centerMajor;
+    vec4 minorDepth;
+    vec4 colorCull;
+    vec4 tileBounds;
+};
+
+layout(std430, binding = 0) readonly buffer ProjectedBuffer {
+    GaussianOutput values[];
+} projected;
+
+layout(std430, binding = 1) readonly buffer OrderBuffer {
+    uint values[];
+} orderIndices;
+
+layout(std430, binding = 2) buffer OffsetBuffer {
+    uint values[];
+} offsets;
+
+layout(std430, binding = 3) buffer CursorBuffer {
+    uint values[];
+} cursors;
+
+layout(std430, binding = 4) buffer ReferenceBuffer {
+    uint values[];
+} references;
+
+layout(std430, binding = 5) buffer MetadataBuffer {
+    uvec4 value;
+} metadata;
+
+layout(push_constant) uniform ScheduleParameters {
+    uvec4 counts;   // raw projected count, visible count, columns, rows
+    uvec4 capacity; // reference capacity, reserved...
+} parameters;
+
+bool finiteFloat(float value) {
+    return !isnan(value) && !isinf(value);
+}
+
+bool decodeTile(float encoded, uint limit, out uint value) {
+    if (!finiteFloat(encoded)) return false;
+    float rounded = round(encoded);
+    if (abs(encoded - rounded) > 1.0e-4 || rounded < 0.0 || rounded >= float(limit)) return false;
+    value = uint(rounded);
+    return true;
+}
+
+void main() {
+    if (gl_GlobalInvocationID.x != 0u) return;
+
+    const uint rawCount = parameters.counts.x;
+    const uint visibleCount = parameters.counts.y;
+    const uint columns = parameters.counts.z;
+    const uint rows = parameters.counts.w;
+    const uint referenceCapacity = parameters.capacity.x;
+    const uint tileCount = columns * rows;
+
+    metadata.value = uvec4(0u);
+    for (uint tile = 0u; tile <= tileCount; ++tile) offsets.values[tile] = 0u;
+    for (uint tile = 0u; tile < tileCount; ++tile) cursors.values[tile] = 0u;
+
+    uint total = 0u;
+    for (uint rank = 0u; rank < visibleCount; ++rank) {
+        const uint rawIndex = orderIndices.values[rank];
+        if (rawIndex >= rawCount) {
+            metadata.value.z = 1u;
+            return;
+        }
+        if (abs(projected.values[rawIndex].colorCull.w) > 1.0e-4) {
+            metadata.value.z = 2u;
+            return;
+        }
+
+        const vec4 bounds = projected.values[rawIndex].tileBounds;
+        uint firstColumn = 0u;
+        uint lastColumn = 0u;
+        uint firstRow = 0u;
+        uint lastRow = 0u;
+        if (!decodeTile(bounds.x, columns, firstColumn) ||
+            !decodeTile(bounds.y, columns, lastColumn) ||
+            !decodeTile(bounds.z, rows, firstRow) ||
+            !decodeTile(bounds.w, rows, lastRow) ||
+            firstColumn > lastColumn || firstRow > lastRow) {
+            metadata.value.z = 3u;
+            return;
+        }
+
+        for (uint row = firstRow; row <= lastRow; ++row) {
+            for (uint column = firstColumn; column <= lastColumn; ++column) {
+                if (total >= referenceCapacity) {
+                    metadata.value.z = 4u;
+                    return;
+                }
+                offsets.values[row * columns + column + 1u] += 1u;
+                total += 1u;
+            }
+        }
+    }
+
+    uint running = 0u;
+    uint maximum = 0u;
+    for (uint tile = 0u; tile < tileCount; ++tile) {
+        const uint count = offsets.values[tile + 1u];
+        maximum = max(maximum, count);
+        offsets.values[tile] = running;
+        cursors.values[tile] = running;
+        running += count;
+    }
+    offsets.values[tileCount] = running;
+    if (running != total) {
+        metadata.value.z = 5u;
+        return;
+    }
+
+    for (uint rank = 0u; rank < visibleCount; ++rank) {
+        const uint rawIndex = orderIndices.values[rank];
+        const vec4 bounds = projected.values[rawIndex].tileBounds;
+        const uint firstColumn = uint(round(bounds.x));
+        const uint lastColumn = uint(round(bounds.y));
+        const uint firstRow = uint(round(bounds.z));
+        const uint lastRow = uint(round(bounds.w));
+        for (uint row = firstRow; row <= lastRow; ++row) {
+            for (uint column = firstColumn; column <= lastColumn; ++column) {
+                const uint tile = row * columns + column;
+                const uint slot = cursors.values[tile]++;
+                if (slot >= referenceCapacity) {
+                    metadata.value.z = 6u;
+                    return;
+                }
+                // References address the final compacted, depth-ordered projected array.
+                references.values[slot] = rank;
+            }
+        }
+    }
+
+    if (visibleCount < rawCount) {
+        const uint firstCulled = orderIndices.values[visibleCount];
+        if (firstCulled < rawCount && abs(projected.values[firstCulled].colorCull.w) <= 1.0e-4) {
+            metadata.value.z = 7u;
+            return;
+        }
+    }
+
+    metadata.value = uvec4(total, maximum, 0u, visibleCount);
+}
