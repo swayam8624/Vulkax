@@ -1,0 +1,76 @@
+name: Vulkax 1.0 release smoke
+
+on:
+  push:
+    branches: ["release/1.0.0"]
+    tags: ["v1.0.0"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-release-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate 1.0 release contract
+        run: |
+          python3 scripts/validate_evidence_registry.py .
+          python3 scripts/audit_release_claims.py . --expected-project-version 1.0.0
+          grep -q 'project(Vulkax VERSION 1.0.0 LANGUAGES CXX)' CMakeLists.txt
+
+  linux-smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release smoke target
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+          cmake --build build --parallel 2
+      - name: Run targeted baseline tests
+        run: |
+          ctest --test-dir build -R 'vulkax_(captured_bundle|verified_rewrite|gaussian_identity|captured_world_run)' --output-on-failure
+      - name: Run controlled no-render certificate smoke
+        run: |
+          ./build/vulkax captured-deformable-generate-example build/captured-example
+          ./build/vulkax captured-world-run \
+            build/captured-example/capture.vkcap \
+            build/release-smoke \
+            m4 0.003 1 1 1 \
+            none 0.08 0.01 0.02 12345
+          python3 scripts/validate_captured_world_run.py \
+            build/release-smoke \
+            --expected-backend none \
+            --expected-rewrite verified \
+            --expected-showcase none
+
+  macos-smoke:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release smoke target
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+          cmake --build build --parallel 2
+      - name: Verify Metal and baseline tests
+        run: |
+          ctest --test-dir build -R 'vulkax_(captured_bundle|verified_rewrite|gaussian_identity|captured_world_run)' --output-on-failure
+          ./build/vulkax --require-backend Metal
+          ./build/vulkax --conformance Metal
+
+  windows-smoke:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release smoke target
+        run: |
+          cmake -S . -B build -DVULKAX_BUILD_TESTS=ON
+          cmake --build build --config Release --parallel 2
+      - name: Run targeted baseline tests
+        run: ctest --test-dir build -C Release -R 'vulkax_(captured_bundle|verified_rewrite|gaussian_identity|captured_world_run)' --output-on-failure
+      - name: Check release CLI help
+        run: .\build\Release\vulkax.exe captured-world-run --help
