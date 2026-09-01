@@ -11,11 +11,13 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
 #ifndef VULKAX_GAUSSIAN_SCHEDULE_SPV_PATH
 #error "VULKAX_GAUSSIAN_SCHEDULE_SPV_PATH missing"
+#endif
+#ifndef VULKAX_GAUSSIAN_DEPTH_ORDER_SPV_PATH
+#error "VULKAX_GAUSSIAN_DEPTH_ORDER_SPV_PATH missing"
 #endif
 
 namespace vulkax::render {
@@ -27,17 +29,17 @@ void check(VkResult result, const char* operation) {
                                  std::to_string(static_cast<int>(result)));
 }
 
-[[nodiscard]] std::vector<std::uint32_t> readSpirv() {
-    std::ifstream stream(VULKAX_GAUSSIAN_SCHEDULE_SPV_PATH, std::ios::binary | std::ios::ate);
-    if (!stream) throw std::runtime_error("cannot open Gaussian scheduler SPIR-V shader");
+[[nodiscard]] std::vector<std::uint32_t> readSpirv(const char* path, const char* label) {
+    std::ifstream stream(path, std::ios::binary | std::ios::ate);
+    if (!stream) throw std::runtime_error(std::string("cannot open ") + label + " SPIR-V shader");
     const std::streamsize byteCount = stream.tellg();
     if (byteCount <= 0 || byteCount % static_cast<std::streamsize>(sizeof(std::uint32_t)) != 0)
-        throw std::runtime_error("invalid Gaussian scheduler SPIR-V size");
+        throw std::runtime_error(std::string("invalid ") + label + " SPIR-V size");
     stream.seekg(0, std::ios::beg);
     std::vector<std::uint32_t> words(
         static_cast<std::size_t>(byteCount) / sizeof(std::uint32_t));
     if (!stream.read(reinterpret_cast<char*>(words.data()), byteCount))
-        throw std::runtime_error("Gaussian scheduler SPIR-V read failed");
+        throw std::runtime_error(std::string(label) + " SPIR-V read failed");
     return words;
 }
 
@@ -73,6 +75,15 @@ struct VulkanContext {
     std::uint32_t queueFamily{};
     VkPhysicalDeviceMemoryProperties memoryProperties{};
 
+    VulkanContext() = default;
+    VulkanContext(const VulkanContext&) = delete;
+    VulkanContext& operator=(const VulkanContext&) = delete;
+    VulkanContext(VulkanContext&& other) noexcept
+        : instance(other.instance), physicalDevice(other.physicalDevice), device(other.device),
+          queue(other.queue), queueFamily(other.queueFamily), memoryProperties(other.memoryProperties) {
+        other.instance = VK_NULL_HANDLE;
+        other.device = VK_NULL_HANDLE;
+    }
     ~VulkanContext() {
         if (device != VK_NULL_HANDLE) vkDestroyDevice(device, nullptr);
         if (instance != VK_NULL_HANDLE) vkDestroyInstance(instance, nullptr);
@@ -152,7 +163,6 @@ struct HostBuffer {
     VkDevice device{VK_NULL_HANDLE};
     VkBuffer buffer{VK_NULL_HANDLE};
     VkDeviceMemory memory{VK_NULL_HANDLE};
-    VkDeviceSize allocationSize{};
     bool coherent{false};
     void* mapped{nullptr};
 
@@ -161,7 +171,7 @@ struct HostBuffer {
     HostBuffer& operator=(const HostBuffer&) = delete;
     HostBuffer(HostBuffer&& other) noexcept
         : device(other.device), buffer(other.buffer), memory(other.memory),
-          allocationSize(other.allocationSize), coherent(other.coherent), mapped(other.mapped) {
+          coherent(other.coherent), mapped(other.mapped) {
         other.buffer = VK_NULL_HANDLE;
         other.memory = VK_NULL_HANDLE;
         other.mapped = nullptr;
@@ -173,9 +183,7 @@ struct HostBuffer {
     }
 };
 
-[[nodiscard]] HostBuffer makeHostBuffer(
-    const VulkanContext& context,
-    VkDeviceSize bytes) {
+[[nodiscard]] HostBuffer makeHostBuffer(const VulkanContext& context, VkDeviceSize bytes) {
     HostBuffer result;
     result.device = context.device;
     VkBufferCreateInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -207,7 +215,6 @@ struct HostBuffer {
     allocationInfo.allocationSize = requirements.size;
     allocationInfo.memoryTypeIndex = selected;
     check(vkAllocateMemory(context.device, &allocationInfo, nullptr, &result.memory), "vkAllocateMemory");
-    result.allocationSize = requirements.size;
     check(vkBindBufferMemory(context.device, result.buffer, result.memory, 0U), "vkBindBufferMemory");
     check(vkMapMemory(context.device, result.memory, 0U, requirements.size, 0U, &result.mapped), "vkMapMemory");
     return result;
@@ -231,6 +238,23 @@ void invalidateIfNeeded(const HostBuffer& buffer) {
     check(vkInvalidateMappedMemoryRanges(buffer.device, 1U, &range), "vkInvalidateMappedMemoryRanges");
 }
 
+[[nodiscard]] std::size_t paddedOrderCount(std::size_t count) {
+    std::size_t padded = 1U;
+    while (padded < count) {
+        if (padded > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()) / 2U)
+            throw std::invalid_argument("Vulkan Gaussian depth order exceeds uint32 power-of-two capacity");
+        padded *= 2U;
+    }
+    return padded;
+}
+
+struct OrderParameters {
+    std::uint32_t projectedCount{};
+    std::uint32_t paddedCount{};
+    std::uint32_t compareDistance{};
+    std::uint32_t sequenceLength{};
+};
+
 struct ScheduleParameters {
     std::uint32_t projectedCount{};
     std::uint32_t columns{};
@@ -238,9 +262,39 @@ struct ScheduleParameters {
     std::uint32_t referenceCapacity{};
 };
 
+[[nodiscard]] VkShaderModule makeShaderModule(
+    VkDevice device,
+    const char* path,
+    const char* label) {
+    const auto words = readSpirv(path, label);
+    VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    shaderInfo.codeSize = words.size() * sizeof(std::uint32_t);
+    shaderInfo.pCode = words.data();
+    VkShaderModule shader{VK_NULL_HANDLE};
+    check(vkCreateShaderModule(device, &shaderInfo, nullptr, &shader), "vkCreateShaderModule");
+    return shader;
+}
+
+[[nodiscard]] VkPipeline makeComputePipeline(
+    VkDevice device,
+    VkPipelineLayout layout,
+    VkShaderModule shader) {
+    VkPipelineShaderStageCreateInfo stage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+    stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stage.module = shader;
+    stage.pName = "main";
+    VkComputePipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    pipelineInfo.stage = stage;
+    pipelineInfo.layout = layout;
+    VkPipeline pipeline{VK_NULL_HANDLE};
+    check(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1U, &pipelineInfo, nullptr, &pipeline),
+          "vkCreateComputePipelines");
+    return pipeline;
+}
+
 } // namespace
 
-std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
+GaussianNativeScheduleResult scheduleGaussianProjectionVulkan(
     const GaussianNativeProjectionResult& projection) {
     const std::size_t tileCount =
         static_cast<std::size_t>(projection.tileColumns) * projection.tileRows;
@@ -248,10 +302,12 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
         projection.splatReferences > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()) ||
         tileCount > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
         throw std::invalid_argument("Vulkan Gaussian scheduler exceeds uint32 capacity");
+    const std::size_t paddedCount = paddedOrderCount(projection.projected.size());
 
     auto context = makeContext();
     const VkDeviceSize projectedBytes = static_cast<VkDeviceSize>(
         std::max<std::size_t>(projection.projected.size() * sizeof(GaussianProjectedSplat), 4U));
+    const VkDeviceSize orderBytes = static_cast<VkDeviceSize>(paddedCount * sizeof(std::uint32_t));
     const VkDeviceSize offsetsBytes = static_cast<VkDeviceSize>((tileCount + 1U) * sizeof(std::uint32_t));
     const VkDeviceSize cursorsBytes = static_cast<VkDeviceSize>(
         std::max<std::size_t>(tileCount, 1U) * sizeof(std::uint32_t));
@@ -260,6 +316,7 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
     constexpr VkDeviceSize metadataBytes = 4U * sizeof(std::uint32_t);
 
     HostBuffer projectedBuffer = makeHostBuffer(context, projectedBytes);
+    HostBuffer orderBuffer = makeHostBuffer(context, orderBytes);
     HostBuffer offsetsBuffer = makeHostBuffer(context, offsetsBytes);
     HostBuffer cursorsBuffer = makeHostBuffer(context, cursorsBytes);
     HostBuffer referencesBuffer = makeHostBuffer(context, referencesBytes);
@@ -268,25 +325,32 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
         std::memcpy(projectedBuffer.mapped, projection.projected.data(),
                     projection.projected.size() * sizeof(GaussianProjectedSplat));
     }
+    auto* hostOrder = static_cast<std::uint32_t*>(orderBuffer.mapped);
+    for (std::size_t index = 0U; index < paddedCount; ++index) {
+        hostOrder[index] = index < projection.projected.size()
+            ? static_cast<std::uint32_t>(index)
+            : std::numeric_limits<std::uint32_t>::max();
+    }
     std::memset(offsetsBuffer.mapped, 0, static_cast<std::size_t>(offsetsBytes));
     std::memset(cursorsBuffer.mapped, 0, static_cast<std::size_t>(cursorsBytes));
     std::memset(referencesBuffer.mapped, 0, static_cast<std::size_t>(referencesBytes));
     std::memset(metadataBuffer.mapped, 0, static_cast<std::size_t>(metadataBytes));
     flushIfNeeded(projectedBuffer);
+    flushIfNeeded(orderBuffer);
     flushIfNeeded(offsetsBuffer);
     flushIfNeeded(cursorsBuffer);
     flushIfNeeded(referencesBuffer);
     flushIfNeeded(metadataBuffer);
 
-    VkDescriptorSetLayoutBinding bindings[5]{};
-    for (std::uint32_t index = 0U; index < 5U; ++index) {
+    VkDescriptorSetLayoutBinding bindings[6]{};
+    for (std::uint32_t index = 0U; index < 6U; ++index) {
         bindings[index].binding = index;
         bindings[index].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         bindings[index].descriptorCount = 1U;
         bindings[index].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     }
     VkDescriptorSetLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    layoutInfo.bindingCount = 5U;
+    layoutInfo.bindingCount = 6U;
     layoutInfo.pBindings = bindings;
     VkDescriptorSetLayout descriptorLayout{VK_NULL_HANDLE};
     check(vkCreateDescriptorSetLayout(context.device, &layoutInfo, nullptr, &descriptorLayout),
@@ -295,7 +359,7 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
     VkPushConstantRange pushRange{};
     pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     pushRange.offset = 0U;
-    pushRange.size = sizeof(ScheduleParameters);
+    pushRange.size = 16U;
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     pipelineLayoutInfo.setLayoutCount = 1U;
     pipelineLayoutInfo.pSetLayouts = &descriptorLayout;
@@ -305,24 +369,14 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
     check(vkCreatePipelineLayout(context.device, &pipelineLayoutInfo, nullptr, &pipelineLayout),
           "vkCreatePipelineLayout");
 
-    const auto words = readSpirv();
-    VkShaderModuleCreateInfo shaderInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    shaderInfo.codeSize = words.size() * sizeof(std::uint32_t);
-    shaderInfo.pCode = words.data();
-    VkShaderModule shader{VK_NULL_HANDLE};
-    check(vkCreateShaderModule(context.device, &shaderInfo, nullptr, &shader), "vkCreateShaderModule");
-    VkPipelineShaderStageCreateInfo stage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
-    stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    stage.module = shader;
-    stage.pName = "main";
-    VkComputePipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
-    pipelineInfo.stage = stage;
-    pipelineInfo.layout = pipelineLayout;
-    VkPipeline pipeline{VK_NULL_HANDLE};
-    check(vkCreateComputePipelines(context.device, VK_NULL_HANDLE, 1U, &pipelineInfo, nullptr, &pipeline),
-          "vkCreateComputePipelines");
+    VkShaderModule orderShader = makeShaderModule(
+        context.device, VULKAX_GAUSSIAN_DEPTH_ORDER_SPV_PATH, "Gaussian depth-order");
+    VkShaderModule scheduleShader = makeShaderModule(
+        context.device, VULKAX_GAUSSIAN_SCHEDULE_SPV_PATH, "Gaussian scheduler");
+    VkPipeline orderPipeline = makeComputePipeline(context.device, pipelineLayout, orderShader);
+    VkPipeline schedulePipeline = makeComputePipeline(context.device, pipelineLayout, scheduleShader);
 
-    VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5U};
+    VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 6U};
     VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     poolInfo.maxSets = 1U;
     poolInfo.poolSizeCount = 1U;
@@ -336,14 +390,15 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
     VkDescriptorSet descriptorSet{VK_NULL_HANDLE};
     check(vkAllocateDescriptorSets(context.device, &allocateInfo, &descriptorSet), "vkAllocateDescriptorSets");
 
-    VkDescriptorBufferInfo bufferInfos[5]{};
+    VkDescriptorBufferInfo bufferInfos[6]{};
     bufferInfos[0] = {projectedBuffer.buffer, 0U, projectedBytes};
-    bufferInfos[1] = {offsetsBuffer.buffer, 0U, offsetsBytes};
-    bufferInfos[2] = {cursorsBuffer.buffer, 0U, cursorsBytes};
-    bufferInfos[3] = {referencesBuffer.buffer, 0U, referencesBytes};
-    bufferInfos[4] = {metadataBuffer.buffer, 0U, metadataBytes};
-    VkWriteDescriptorSet writes[5]{};
-    for (std::uint32_t index = 0U; index < 5U; ++index) {
+    bufferInfos[1] = {orderBuffer.buffer, 0U, orderBytes};
+    bufferInfos[2] = {offsetsBuffer.buffer, 0U, offsetsBytes};
+    bufferInfos[3] = {cursorsBuffer.buffer, 0U, cursorsBytes};
+    bufferInfos[4] = {referencesBuffer.buffer, 0U, referencesBytes};
+    bufferInfos[5] = {metadataBuffer.buffer, 0U, metadataBytes};
+    VkWriteDescriptorSet writes[6]{};
+    for (std::uint32_t index = 0U; index < 6U; ++index) {
         writes[index].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[index].dstSet = descriptorSet;
         writes[index].dstBinding = index;
@@ -351,7 +406,7 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
         writes[index].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         writes[index].pBufferInfo = &bufferInfos[index];
     }
-    vkUpdateDescriptorSets(context.device, 5U, writes, 0U, nullptr);
+    vkUpdateDescriptorSets(context.device, 6U, writes, 0U, nullptr);
 
     VkCommandPoolCreateInfo commandPoolInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     commandPoolInfo.queueFamilyIndex = context.queueFamily;
@@ -367,17 +422,47 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
     VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     check(vkBeginCommandBuffer(commandBuffer, &beginInfo), "vkBeginCommandBuffer");
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout,
                             0U, 1U, &descriptorSet, 0U, nullptr);
-    const ScheduleParameters parameters{
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, orderPipeline);
+    const std::uint32_t groups =
+        (static_cast<std::uint32_t>(paddedCount) + 63U) / 64U;
+    for (std::uint32_t sequenceLength = 2U;
+         sequenceLength <= static_cast<std::uint32_t>(paddedCount);
+         sequenceLength <<= 1U) {
+        for (std::uint32_t compareDistance = sequenceLength >> 1U;
+             compareDistance > 0U;
+             compareDistance >>= 1U) {
+            const OrderParameters parameters{
+                static_cast<std::uint32_t>(projection.projected.size()),
+                static_cast<std::uint32_t>(paddedCount),
+                compareDistance,
+                sequenceLength,
+            };
+            vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT,
+                               0U, sizeof(parameters), &parameters);
+            vkCmdDispatch(commandBuffer, groups, 1U, 1U);
+            VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+            barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+            vkCmdPipelineBarrier(commandBuffer,
+                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                                 0U, 1U, &barrier, 0U, nullptr, 0U, nullptr);
+        }
+        if (sequenceLength > static_cast<std::uint32_t>(paddedCount) / 2U) break;
+    }
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, schedulePipeline);
+    const ScheduleParameters scheduleParameters{
         static_cast<std::uint32_t>(projection.projected.size()),
         projection.tileColumns,
         projection.tileRows,
         static_cast<std::uint32_t>(projection.splatReferences),
     };
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT,
-                       0U, sizeof(parameters), &parameters);
+                       0U, sizeof(scheduleParameters), &scheduleParameters);
     vkCmdDispatch(commandBuffer, 1U, 1U, 1U);
     check(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
 
@@ -391,8 +476,8 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
     check(vkQueueSubmit(context.queue, 1U, &submitInfo, fence), "vkQueueSubmit");
     check(vkWaitForFences(context.device, 1U, &fence, VK_TRUE, 10'000'000'000ULL), "vkWaitForFences");
     const auto stop = std::chrono::steady_clock::now();
-    const double milliseconds = std::chrono::duration<double, std::milli>(stop - start).count();
 
+    invalidateIfNeeded(orderBuffer);
     invalidateIfNeeded(offsetsBuffer);
     invalidateIfNeeded(referencesBuffer);
     invalidateIfNeeded(metadataBuffer);
@@ -402,30 +487,50 @@ std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
     if (metadata[0] > projection.splatReferences)
         throw std::runtime_error("Vulkan Gaussian scheduler returned too many references");
 
-    GaussianTileSchedule schedule;
-    schedule.tileSize = projection.tileSize;
-    schedule.columns = projection.tileColumns;
-    schedule.rows = projection.tileRows;
-    schedule.splatReferences = metadata[0];
-    schedule.maximumSplatsPerTile = metadata[1];
-    schedule.tileOffsets.resize(tileCount + 1U);
-    std::memcpy(schedule.tileOffsets.data(), offsetsBuffer.mapped, static_cast<std::size_t>(offsetsBytes));
-    schedule.projectedSplatIndices.resize(schedule.splatReferences);
-    if (schedule.splatReferences > 0U) {
-        std::memcpy(schedule.projectedSplatIndices.data(), referencesBuffer.mapped,
-                    schedule.splatReferences * sizeof(std::uint32_t));
+    GaussianNativeScheduleResult result;
+    result.paddedOrderCount = paddedCount;
+    result.schedulingMilliseconds =
+        std::chrono::duration<double, std::milli>(stop - start).count();
+    result.inputBytes = projection.projected.size() * sizeof(GaussianProjectedSplat);
+    result.outputBytes = projection.projected.size() * sizeof(std::uint32_t) +
+                         (tileCount + 1U) * sizeof(std::uint32_t) +
+                         metadata[0] * sizeof(std::uint32_t) +
+                         4U * sizeof(std::uint32_t);
+    result.workspaceBytes =
+        (paddedCount - projection.projected.size()) * sizeof(std::uint32_t) +
+        std::max<std::size_t>(tileCount, 1U) * sizeof(std::uint32_t);
+    result.depthOrder.resize(projection.projected.size());
+    if (!result.depthOrder.empty())
+        std::memcpy(result.depthOrder.data(), orderBuffer.mapped,
+                    result.depthOrder.size() * sizeof(std::uint32_t));
+
+    result.schedule.tileSize = projection.tileSize;
+    result.schedule.columns = projection.tileColumns;
+    result.schedule.rows = projection.tileRows;
+    result.schedule.splatReferences = metadata[0];
+    result.schedule.maximumSplatsPerTile = metadata[1];
+    result.schedule.tileOffsets.resize(tileCount + 1U);
+    std::memcpy(result.schedule.tileOffsets.data(), offsetsBuffer.mapped,
+                static_cast<std::size_t>(offsetsBytes));
+    result.schedule.projectedSplatIndices.resize(result.schedule.splatReferences);
+    if (result.schedule.splatReferences > 0U) {
+        std::memcpy(result.schedule.projectedSplatIndices.data(), referencesBuffer.mapped,
+                    result.schedule.splatReferences * sizeof(std::uint32_t));
     }
 
     vkDestroyFence(context.device, fence, nullptr);
     vkDestroyCommandPool(context.device, commandPool, nullptr);
     vkDestroyDescriptorPool(context.device, descriptorPool, nullptr);
-    vkDestroyPipeline(context.device, pipeline, nullptr);
-    vkDestroyShaderModule(context.device, shader, nullptr);
+    vkDestroyPipeline(context.device, orderPipeline, nullptr);
+    vkDestroyPipeline(context.device, schedulePipeline, nullptr);
+    vkDestroyShaderModule(context.device, orderShader, nullptr);
+    vkDestroyShaderModule(context.device, scheduleShader, nullptr);
     vkDestroyPipelineLayout(context.device, pipelineLayout, nullptr);
     vkDestroyDescriptorSetLayout(context.device, descriptorLayout, nullptr);
-    return {std::move(schedule), milliseconds};
+    return result;
 }
 
+static_assert(sizeof(OrderParameters) == 16U);
 static_assert(sizeof(ScheduleParameters) == 16U);
 
 } // namespace vulkax::render

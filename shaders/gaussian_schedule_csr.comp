@@ -13,19 +13,23 @@ layout(std430, binding = 0) readonly buffer ProjectedBuffer {
     GaussianOutput values[];
 } projected;
 
-layout(std430, binding = 1) buffer OffsetBuffer {
+layout(std430, binding = 1) readonly buffer OrderBuffer {
+    uint values[];
+} orderIndices;
+
+layout(std430, binding = 2) buffer OffsetBuffer {
     uint values[];
 } offsets;
 
-layout(std430, binding = 2) buffer CursorBuffer {
+layout(std430, binding = 3) buffer CursorBuffer {
     uint values[];
 } cursors;
 
-layout(std430, binding = 3) buffer ReferenceBuffer {
+layout(std430, binding = 4) buffer ReferenceBuffer {
     uint values[];
 } references;
 
-layout(std430, binding = 4) buffer MetadataBuffer {
+layout(std430, binding = 5) buffer MetadataBuffer {
     uvec4 value;
 } metadata;
 
@@ -45,7 +49,12 @@ void main() {
     for (uint tile = 0u; tile < tileCount; ++tile) cursors.values[tile] = 0u;
 
     uint total = 0u;
-    for (uint splat = 0u; splat < parameters.projectedCount; ++splat) {
+    for (uint rank = 0u; rank < parameters.projectedCount; ++rank) {
+        const uint splat = orderIndices.values[rank];
+        if (splat >= parameters.projectedCount) {
+            metadata.value.z = 5u;
+            return;
+        }
         const vec4 bounds = projected.values[splat].tileBounds;
         const uint firstColumn = uint(bounds.x + 0.5);
         const uint lastColumn = uint(bounds.y + 0.5);
@@ -84,9 +93,8 @@ void main() {
         return;
     }
 
-    // projected[] is already in the stable back-to-front oracle order. The
-    // sequential device emission therefore preserves depth and tie ordering.
-    for (uint splat = 0u; splat < parameters.projectedCount; ++splat) {
+    for (uint rank = 0u; rank < parameters.projectedCount; ++rank) {
+        const uint splat = orderIndices.values[rank];
         const vec4 bounds = projected.values[splat].tileBounds;
         const uint firstColumn = uint(bounds.x + 0.5);
         const uint lastColumn = uint(bounds.y + 0.5);

@@ -1,0 +1,54 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct GaussianOutput {
+    vec4 centerMajor;
+    vec4 minorDepth;
+    vec4 colorCull;
+    vec4 tileBounds;
+};
+
+layout(std430, binding = 0) readonly buffer ProjectedBuffer {
+    GaussianOutput values[];
+} projected;
+
+layout(std430, binding = 1) buffer OrderBuffer {
+    uint values[];
+} orderIndices;
+
+layout(push_constant) uniform OrderParameters {
+    uint projectedCount;
+    uint paddedCount;
+    uint compareDistance;
+    uint sequenceLength;
+} parameters;
+
+bool comesBefore(uint lhs, uint rhs) {
+    const uint sentinel = 0xffffffffu;
+    if (lhs == rhs) return false;
+    if (lhs == sentinel) return false;
+    if (rhs == sentinel) return true;
+
+    const float lhsDepth = projected.values[lhs].minorDepth.z;
+    const float rhsDepth = projected.values[rhs].minorDepth.z;
+    if (lhsDepth > rhsDepth) return true;
+    if (lhsDepth < rhsDepth) return false;
+    return lhs < rhs;
+}
+
+void main() {
+    const uint index = gl_GlobalInvocationID.x;
+    if (index >= parameters.paddedCount) return;
+    const uint partner = index ^ parameters.compareDistance;
+    if (partner <= index || partner >= parameters.paddedCount) return;
+
+    const uint lhs = orderIndices.values[index];
+    const uint rhs = orderIndices.values[partner];
+    const bool ascendingDesiredOrder = (index & parameters.sequenceLength) == 0u;
+    const bool swap = ascendingDesiredOrder ? comesBefore(rhs, lhs) : comesBefore(lhs, rhs);
+    if (swap) {
+        orderIndices.values[index] = rhs;
+        orderIndices.values[partner] = lhs;
+    }
+}

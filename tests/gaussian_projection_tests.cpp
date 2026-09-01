@@ -77,7 +77,7 @@ void compareBatch(
     assert(maximum < 2.0e-4);
 }
 
-vulkax::render::GaussianNativeProjectionResult makeTieProjection() {
+vulkax::render::GaussianNativeProjectionResult makeUnsortedTieProjection() {
     using namespace vulkax;
     render::GaussianNativeProjectionResult projection;
     projection.tileSize = 16U;
@@ -87,7 +87,7 @@ vulkax::render::GaussianNativeProjectionResult makeTieProjection() {
     projection.stats.visibleSplats = 4U;
     projection.splatReferences = 4U;
     projection.maximumSplatsPerTile = 4U;
-    const std::array<float, 4> depths{4.0F, 4.0F, 2.0F, 1.0F};
+    const std::array<float, 4> depths{2.0F, 4.0F, 4.0F, 1.0F};
     for (std::size_t index = 0U; index < depths.size(); ++index) {
         projection.projected[index].minorDepth[2] = depths[index];
         projection.projected[index].tileBounds = {0.0F, 0.0F, 0.0F, 0.0F};
@@ -97,12 +97,12 @@ vulkax::render::GaussianNativeProjectionResult makeTieProjection() {
 
 void verifyDeterministicScheduleOracle() {
     using namespace vulkax;
-    auto projection = makeTieProjection();
+    const auto projection = makeUnsortedTieProjection();
     const auto schedule = render::buildGaussianTileScheduleOracle(projection);
     render::validateGaussianTileSchedule(schedule, projection);
     assert(schedule.tileOffsets == std::vector<std::uint32_t>({0U, 4U}));
     assert(schedule.projectedSplatIndices ==
-           std::vector<std::uint32_t>({0U, 1U, 2U, 3U}));
+           std::vector<std::uint32_t>({1U, 2U, 0U, 3U}));
     assert(schedule.maximumSplatsPerTile == 4U);
 }
 
@@ -185,19 +185,23 @@ int main() {
         assert(nativeSchedule.inputBytes ==
                projection.projected.size() * sizeof(render::GaussianProjectedSplat));
         assert(nativeSchedule.outputBytes ==
+               projection.projected.size() * sizeof(std::uint32_t) +
                oracleSchedule.tileOffsets.size() * sizeof(std::uint32_t) +
                oracleSchedule.projectedSplatIndices.size() * sizeof(std::uint32_t) +
                4U * sizeof(std::uint32_t));
+        assert(nativeSchedule.paddedOrderCount >= std::max<std::size_t>(projection.projected.size(), 1U));
+        assert((nativeSchedule.paddedOrderCount & (nativeSchedule.paddedOrderCount - 1U)) == 0U);
         assert(nativeSchedule.schedule.tileOffsets == oracleSchedule.tileOffsets);
         assert(nativeSchedule.schedule.projectedSplatIndices == oracleSchedule.projectedSplatIndices);
         assert(nativeSchedule.schedule.splatReferences == oracleSchedule.splatReferences);
         assert(nativeSchedule.schedule.maximumSplatsPerTile == oracleSchedule.maximumSplatsPerTile);
 
-        const auto tieProjection = makeTieProjection();
-        const auto nativeTie = render::scheduleGaussianProjectionNative(backendKind, tieProjection);
-        assert(nativeTie.schedule.tileOffsets == std::vector<std::uint32_t>({0U, 4U}));
-        assert(nativeTie.schedule.projectedSplatIndices ==
-               std::vector<std::uint32_t>({0U, 1U, 2U, 3U}));
+        const auto unsorted = makeUnsortedTieProjection();
+        const auto nativeUnsorted = render::scheduleGaussianProjectionNative(backendKind, unsorted);
+        assert(nativeUnsorted.depthOrder == std::vector<std::uint32_t>({1U, 2U, 0U, 3U}));
+        assert(nativeUnsorted.schedule.tileOffsets == std::vector<std::uint32_t>({0U, 4U}));
+        assert(nativeUnsorted.schedule.projectedSplatIndices ==
+               std::vector<std::uint32_t>({1U, 2U, 0U, 3U}));
 
         const auto acceleratedBatch = render::buildGaussianRasterBatchFromProjection(
             projection, settings);

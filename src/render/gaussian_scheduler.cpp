@@ -7,7 +7,6 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
 #ifndef VULKAX_HAS_VULKAN_GAUSSIAN_SCHEDULER
@@ -20,11 +19,11 @@
 namespace vulkax::render {
 
 #if VULKAX_HAS_VULKAN_GAUSSIAN_SCHEDULER
-std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionVulkan(
+GaussianNativeScheduleResult scheduleGaussianProjectionVulkan(
     const GaussianNativeProjectionResult& projection);
 #endif
 #if VULKAX_HAS_METAL_GAUSSIAN_SCHEDULER
-std::pair<GaussianTileSchedule, double> scheduleGaussianProjectionMetal(
+GaussianNativeScheduleResult scheduleGaussianProjectionMetal(
     const GaussianNativeProjectionResult& projection);
 #endif
 
@@ -60,22 +59,45 @@ struct TileReferenceEntry {
     return static_cast<std::size_t>(projection.tileColumns) * projection.tileRows;
 }
 
-void validateDepthOrderedProjection(const GaussianNativeProjectionResult& projection) {
-    float previous = std::numeric_limits<float>::infinity();
-    for (const auto& projected : projection.projected) {
-        const float depth = projected.minorDepth[2];
-        if (!std::isfinite(depth) || !(depth > 0.0F))
-            throw std::invalid_argument("Gaussian native scheduler requires finite positive depths");
-        if (depth > previous)
-            throw std::invalid_argument("Gaussian native scheduler requires a back-to-front projection");
-        previous = depth;
-    }
-}
-
 [[nodiscard]] bool referenceLess(const TileReferenceEntry& lhs, const TileReferenceEntry& rhs) {
     if (lhs.tileId != rhs.tileId) return lhs.tileId < rhs.tileId;
     if (lhs.depth != rhs.depth) return lhs.depth > rhs.depth;
     return lhs.projectedSplatIndex < rhs.projectedSplatIndex;
+}
+
+void validateDepthOrder(
+    const GaussianNativeScheduleResult& result,
+    const GaussianNativeProjectionResult& projection) {
+    if (result.depthOrder.size() != projection.projected.size())
+        throw std::invalid_argument("Gaussian native scheduler depth-order count is inconsistent");
+    if (result.paddedOrderCount == 0U ||
+        (result.paddedOrderCount & (result.paddedOrderCount - 1U)) != 0U ||
+        result.paddedOrderCount < std::max<std::size_t>(projection.projected.size(), 1U))
+        throw std::invalid_argument("Gaussian native scheduler padded order count is invalid");
+
+    std::vector<bool> seen(projection.projected.size(), false);
+    float previousDepth = std::numeric_limits<float>::infinity();
+    std::uint32_t previousIndex = 0U;
+    bool havePrevious = false;
+    for (const std::uint32_t index : result.depthOrder) {
+        if (index >= projection.projected.size())
+            throw std::invalid_argument("Gaussian native scheduler depth order references an invalid splat");
+        if (seen[index])
+            throw std::invalid_argument("Gaussian native scheduler depth order is not a permutation");
+        seen[index] = true;
+        const float depth = projection.projected[index].minorDepth[2];
+        if (!std::isfinite(depth) || !(depth > 0.0F))
+            throw std::invalid_argument("Gaussian native scheduler received a non-finite visible depth");
+        if (havePrevious) {
+            if (depth > previousDepth)
+                throw std::invalid_argument("Gaussian native scheduler depth order is not back-to-front");
+            if (depth == previousDepth && index < previousIndex)
+                throw std::invalid_argument("Gaussian native scheduler violates deterministic equal-depth order");
+        }
+        previousDepth = depth;
+        previousIndex = index;
+        havePrevious = true;
+    }
 }
 
 } // namespace
@@ -221,23 +243,22 @@ void validateGaussianTileSchedule(
 GaussianNativeScheduleResult scheduleGaussianProjectionNative(
     backend::BackendKind backend,
     const GaussianNativeProjectionResult& projection) {
-    const std::size_t tiles = tileCount(projection);
-    validateDepthOrderedProjection(projection);
+    (void)tileCount(projection);
     if (projection.splatReferences > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
         throw std::invalid_argument("Gaussian native scheduler reference capacity exceeds uint32");
 
-    std::pair<GaussianTileSchedule, double> native;
+    GaussianNativeScheduleResult result;
     switch (backend) {
         case backend::BackendKind::Vulkan:
 #if VULKAX_HAS_VULKAN_GAUSSIAN_SCHEDULER
-            native = scheduleGaussianProjectionVulkan(projection);
+            result = scheduleGaussianProjectionVulkan(projection);
             break;
 #else
             throw std::runtime_error("Vulkan Gaussian scheduler was not compiled into this build");
 #endif
         case backend::BackendKind::Metal:
 #if VULKAX_HAS_METAL_GAUSSIAN_SCHEDULER
-            native = scheduleGaussianProjectionMetal(projection);
+            result = scheduleGaussianProjectionMetal(projection);
             break;
 #else
             throw std::runtime_error("Metal Gaussian scheduler was not compiled into this build");
@@ -246,15 +267,8 @@ GaussianNativeScheduleResult scheduleGaussianProjectionNative(
             throw std::runtime_error("OpenGL Gaussian scheduler is not implemented");
     }
 
-    validateGaussianTileSchedule(native.first, projection);
-
-    GaussianNativeScheduleResult result;
-    result.schedule = std::move(native.first);
-    result.schedulingMilliseconds = native.second;
-    result.inputBytes = projection.projected.size() * sizeof(GaussianProjectedSplat);
-    result.outputBytes = (tiles + 1U) * sizeof(std::uint32_t) +
-                         result.schedule.projectedSplatIndices.size() * sizeof(std::uint32_t) +
-                         4U * sizeof(std::uint32_t);
+    validateDepthOrder(result, projection);
+    validateGaussianTileSchedule(result.schedule, projection);
     return result;
 }
 
