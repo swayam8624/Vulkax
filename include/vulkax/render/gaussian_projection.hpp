@@ -44,6 +44,26 @@ struct alignas(16) GaussianProjectionParameters {
     std::array<float, 4> sigmaTile{};      // cutoff, min sigma px, max sigma px, tile size
 };
 
+// Backend-level result for the 1.1A fused projection -> ordering -> CSR path.
+// `projected` contains only visible records in deterministic back-to-front order.
+// CSR references index that compacted ordered array, not the raw projection buffer.
+struct GaussianFusedProjectionScheduleResult {
+    std::vector<GaussianProjectedSplat> projected;
+    GaussianProjectionStats stats{};
+    std::vector<std::uint32_t> tileOffsets;
+    std::vector<std::uint32_t> projectedSplatIndices;
+    std::size_t splatReferences{};
+    std::size_t maximumSplatsPerTile{};
+    std::size_t paddedOrderCount{};
+    double projectionMilliseconds{};
+    double schedulingMilliseconds{};
+    std::size_t inputBytes{};
+    std::size_t outputBytes{};
+    std::size_t schedulerOutputBytes{};
+    std::size_t schedulerWorkspaceBytes{};
+    std::size_t intermediateReadbackBytes{};
+};
+
 struct GaussianNativeProjectionResult {
     std::vector<GaussianProjectedSplat> projected;
     GaussianProjectionStats stats{};
@@ -59,6 +79,8 @@ struct GaussianNativeProjectionResult {
     std::size_t schedulerInputBytes{};
     std::size_t schedulerOutputBytes{};
     std::size_t schedulerWorkspaceBytes{};
+    std::size_t intermediateReadbackBytes{};
+    bool fusedProjectionScheduling{false};
 };
 
 [[nodiscard]] std::vector<GaussianProjectionInput> prepareGaussianProjectionInputs(
@@ -70,10 +92,11 @@ struct GaussianNativeProjectionResult {
     std::uint32_t tileSize = 16U);
 
 // Runs geometric projection/tile-range generation on the requested native
-// backend. Cull compaction is still host-side in 1.1A, but deterministic depth
-// ordering and CSR tile scheduling are computed by the native GPU scheduler.
-// The projected records are returned in the same back-to-front order as the
-// established CPU oracle so downstream raster behavior remains unchanged.
+// backend. On the 1.1A Vulkan/Metal fused path, raw projected records stay on
+// the device through cull classification, deterministic depth ordering and CSR
+// construction; the host reads only a tiny allocation-metadata block between
+// projection and scheduling. The final ordered visible records are returned for
+// the still-host-side raster-vertex builder and CPU oracle comparison.
 [[nodiscard]] GaussianNativeProjectionResult projectGaussianCloudNative(
     backend::BackendKind backend,
     const gaussian::GaussianCloud& cloud,

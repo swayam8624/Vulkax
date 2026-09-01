@@ -24,11 +24,32 @@ layout(push_constant) uniform OrderParameters {
     uint sequenceLength;
 } parameters;
 
+bool finiteFloat(float value) {
+    return !isnan(value) && !isinf(value);
+}
+
+uint cullReason(uint index) {
+    float encoded = projected.values[index].colorCull.w;
+    if (!finiteFloat(encoded)) return 4u;
+    float rounded = round(encoded);
+    if (abs(encoded - rounded) > 1.0e-4 || rounded < 0.0 || rounded > 3.0) return 4u;
+    return uint(rounded);
+}
+
 bool comesBefore(uint lhs, uint rhs) {
     const uint sentinel = 0xffffffffu;
     if (lhs == rhs) return false;
     if (lhs == sentinel) return false;
     if (rhs == sentinel) return true;
+
+    const uint lhsCull = cullReason(lhs);
+    const uint rhsCull = cullReason(rhs);
+    const bool lhsVisible = lhsCull == 0u;
+    const bool rhsVisible = rhsCull == 0u;
+    if (lhsVisible != rhsVisible) return lhsVisible;
+
+    // Culled records are kept deterministic but do not participate in depth order.
+    if (!lhsVisible) return lhs < rhs;
 
     const float lhsDepth = projected.values[lhs].minorDepth.z;
     const float rhsDepth = projected.values[rhs].minorDepth.z;
@@ -40,6 +61,13 @@ bool comesBefore(uint lhs, uint rhs) {
 void main() {
     const uint index = gl_GlobalInvocationID.x;
     if (index >= parameters.paddedCount) return;
+
+    // sequenceLength == 0 is the device-side order initialization pass.
+    if (parameters.sequenceLength == 0u) {
+        orderIndices.values[index] = index < parameters.projectedCount ? index : 0xffffffffu;
+        return;
+    }
+
     const uint partner = index ^ parameters.compareDistance;
     if (partner <= index || partner >= parameters.paddedCount) return;
 
