@@ -32,9 +32,11 @@ if(Vulkan_FOUND)
         set(VULKAX_GAUSSIAN_VERT_SPV "${VULKAX_SHADER_DIR}/gaussian.vert.spv")
         set(VULKAX_GAUSSIAN_FRAG_SPV "${VULKAX_SHADER_DIR}/gaussian.frag.spv")
         set(VULKAX_GAUSSIAN_PROJECT_SPV "${VULKAX_SHADER_DIR}/gaussian_project.spv")
+        set(VULKAX_GAUSSIAN_METADATA_SPV "${VULKAX_SHADER_DIR}/gaussian_projection_metadata.spv")
         set(VULKAX_GAUSSIAN_DEPTH_ORDER_SPV "${VULKAX_SHADER_DIR}/gaussian_depth_order.spv")
         set(VULKAX_GAUSSIAN_SCHEDULE_SPV "${VULKAX_SHADER_DIR}/gaussian_schedule_csr.spv")
-        add_custom_command(OUTPUT "${VULKAX_CONFORMANCE_SPV}" "${VULKAX_PARTICLE_VERT_SPV}" "${VULKAX_PARTICLE_FRAG_SPV}" "${VULKAX_GAUSSIAN_VERT_SPV}" "${VULKAX_GAUSSIAN_FRAG_SPV}" "${VULKAX_GAUSSIAN_PROJECT_SPV}" "${VULKAX_GAUSSIAN_DEPTH_ORDER_SPV}" "${VULKAX_GAUSSIAN_SCHEDULE_SPV}"
+        set(VULKAX_GAUSSIAN_FUSED_SCHEDULE_SPV "${VULKAX_SHADER_DIR}/gaussian_fused_schedule_csr.spv")
+        add_custom_command(OUTPUT "${VULKAX_CONFORMANCE_SPV}" "${VULKAX_PARTICLE_VERT_SPV}" "${VULKAX_PARTICLE_FRAG_SPV}" "${VULKAX_GAUSSIAN_VERT_SPV}" "${VULKAX_GAUSSIAN_FRAG_SPV}" "${VULKAX_GAUSSIAN_PROJECT_SPV}" "${VULKAX_GAUSSIAN_METADATA_SPV}" "${VULKAX_GAUSSIAN_DEPTH_ORDER_SPV}" "${VULKAX_GAUSSIAN_SCHEDULE_SPV}" "${VULKAX_GAUSSIAN_FUSED_SCHEDULE_SPV}"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${VULKAX_SHADER_DIR}"
             COMMAND "${VULKAX_GLSLANG_VALIDATOR}" -V "${CMAKE_CURRENT_SOURCE_DIR}/shaders/conformance.comp" -o "${VULKAX_CONFORMANCE_SPV}"
             COMMAND "${VULKAX_GLSLANG_VALIDATOR}" -V "${CMAKE_CURRENT_SOURCE_DIR}/shaders/particle.vert" -o "${VULKAX_PARTICLE_VERT_SPV}"
@@ -42,29 +44,31 @@ if(Vulkan_FOUND)
             COMMAND "${VULKAX_GLSLANG_VALIDATOR}" -V "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian.vert" -o "${VULKAX_GAUSSIAN_VERT_SPV}"
             COMMAND "${VULKAX_GLSLANG_VALIDATOR}" -V "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian.frag" -o "${VULKAX_GAUSSIAN_FRAG_SPV}"
             COMMAND "${VULKAX_GLSLANG_VALIDATOR}" -V "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_project.comp" -o "${VULKAX_GAUSSIAN_PROJECT_SPV}"
+            COMMAND "${VULKAX_GLSLANG_VALIDATOR}" -V "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_projection_metadata.comp" -o "${VULKAX_GAUSSIAN_METADATA_SPV}"
             COMMAND "${VULKAX_GLSLANG_VALIDATOR}" -V "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_depth_order.comp" -o "${VULKAX_GAUSSIAN_DEPTH_ORDER_SPV}"
             COMMAND "${VULKAX_GLSLANG_VALIDATOR}" -V "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_schedule_csr.comp" -o "${VULKAX_GAUSSIAN_SCHEDULE_SPV}"
-            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/conformance.comp" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/particle.vert" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/particle.frag" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian.vert" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian.frag" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_project.comp" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_depth_order.comp" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_schedule_csr.comp" VERBATIM)
-        add_custom_target(vulkax_gpu_shaders DEPENDS "${VULKAX_CONFORMANCE_SPV}" "${VULKAX_PARTICLE_VERT_SPV}" "${VULKAX_PARTICLE_FRAG_SPV}" "${VULKAX_GAUSSIAN_VERT_SPV}" "${VULKAX_GAUSSIAN_FRAG_SPV}" "${VULKAX_GAUSSIAN_PROJECT_SPV}" "${VULKAX_GAUSSIAN_DEPTH_ORDER_SPV}" "${VULKAX_GAUSSIAN_SCHEDULE_SPV}")
+            COMMAND "${VULKAX_GLSLANG_VALIDATOR}" -V "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_fused_schedule_csr.comp" -o "${VULKAX_GAUSSIAN_FUSED_SCHEDULE_SPV}"
+            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/conformance.comp" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/particle.vert" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/particle.frag" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian.vert" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian.frag" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_project.comp" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_projection_metadata.comp" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_depth_order.comp" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_schedule_csr.comp" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gaussian_fused_schedule_csr.comp" VERBATIM)
+        add_custom_target(vulkax_gpu_shaders DEPENDS "${VULKAX_CONFORMANCE_SPV}" "${VULKAX_PARTICLE_VERT_SPV}" "${VULKAX_PARTICLE_FRAG_SPV}" "${VULKAX_GAUSSIAN_VERT_SPV}" "${VULKAX_GAUSSIAN_FRAG_SPV}" "${VULKAX_GAUSSIAN_PROJECT_SPV}" "${VULKAX_GAUSSIAN_METADATA_SPV}" "${VULKAX_GAUSSIAN_DEPTH_ORDER_SPV}" "${VULKAX_GAUSSIAN_SCHEDULE_SPV}" "${VULKAX_GAUSSIAN_FUSED_SCHEDULE_SPV}")
         add_dependencies(vulkax_core vulkax_gpu_shaders)
-        target_sources(vulkax_core PRIVATE src/compute/vulkan_conformance.cpp src/render/vulkan_headless.cpp src/render/vulkan_gaussian.cpp src/render/vulkan_gaussian_projection.cpp src/render/vulkan_gaussian_scheduler.cpp)
-        target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_COMPUTE=1 VULKAX_HAS_VULKAN_RENDER=1 VULKAX_HAS_VULKAN_GAUSSIAN_PROJECTION=1 VULKAX_HAS_VULKAN_GAUSSIAN_SCHEDULER=1 VULKAX_CONFORMANCE_SPV_PATH="${VULKAX_CONFORMANCE_SPV}" VULKAX_PARTICLE_VERT_SPV_PATH="${VULKAX_PARTICLE_VERT_SPV}" VULKAX_PARTICLE_FRAG_SPV_PATH="${VULKAX_PARTICLE_FRAG_SPV}" VULKAX_GAUSSIAN_VERT_SPV_PATH="${VULKAX_GAUSSIAN_VERT_SPV}" VULKAX_GAUSSIAN_FRAG_SPV_PATH="${VULKAX_GAUSSIAN_FRAG_SPV}" VULKAX_GAUSSIAN_PROJECT_SPV_PATH="${VULKAX_GAUSSIAN_PROJECT_SPV}" VULKAX_GAUSSIAN_DEPTH_ORDER_SPV_PATH="${VULKAX_GAUSSIAN_DEPTH_ORDER_SPV}" VULKAX_GAUSSIAN_SCHEDULE_SPV_PATH="${VULKAX_GAUSSIAN_SCHEDULE_SPV}")
+        target_sources(vulkax_core PRIVATE src/compute/vulkan_conformance.cpp src/render/vulkan_headless.cpp src/render/vulkan_gaussian.cpp src/render/vulkan_gaussian_projection.cpp src/render/vulkan_gaussian_scheduler.cpp src/render/vulkan_gaussian_fused.cpp)
+        target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_COMPUTE=1 VULKAX_HAS_VULKAN_RENDER=1 VULKAX_HAS_VULKAN_GAUSSIAN_PROJECTION=1 VULKAX_HAS_VULKAN_GAUSSIAN_SCHEDULER=1 VULKAX_HAS_VULKAN_GAUSSIAN_FUSED=1 VULKAX_CONFORMANCE_SPV_PATH="${VULKAX_CONFORMANCE_SPV}" VULKAX_PARTICLE_VERT_SPV_PATH="${VULKAX_PARTICLE_VERT_SPV}" VULKAX_PARTICLE_FRAG_SPV_PATH="${VULKAX_PARTICLE_FRAG_SPV}" VULKAX_GAUSSIAN_VERT_SPV_PATH="${VULKAX_GAUSSIAN_VERT_SPV}" VULKAX_GAUSSIAN_FRAG_SPV_PATH="${VULKAX_GAUSSIAN_FRAG_SPV}" VULKAX_GAUSSIAN_PROJECT_SPV_PATH="${VULKAX_GAUSSIAN_PROJECT_SPV}" VULKAX_GAUSSIAN_METADATA_SPV_PATH="${VULKAX_GAUSSIAN_METADATA_SPV}" VULKAX_GAUSSIAN_DEPTH_ORDER_SPV_PATH="${VULKAX_GAUSSIAN_DEPTH_ORDER_SPV}" VULKAX_GAUSSIAN_SCHEDULE_SPV_PATH="${VULKAX_GAUSSIAN_SCHEDULE_SPV}" VULKAX_GAUSSIAN_FUSED_SCHEDULE_SPV_PATH="${VULKAX_GAUSSIAN_FUSED_SCHEDULE_SPV}")
     else()
-        target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_COMPUTE=0 VULKAX_HAS_VULKAN_RENDER=0 VULKAX_HAS_VULKAN_GAUSSIAN_PROJECTION=0 VULKAX_HAS_VULKAN_GAUSSIAN_SCHEDULER=0)
+        target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN_COMPUTE=0 VULKAX_HAS_VULKAN_RENDER=0 VULKAX_HAS_VULKAN_GAUSSIAN_PROJECTION=0 VULKAX_HAS_VULKAN_GAUSSIAN_SCHEDULER=0 VULKAX_HAS_VULKAN_GAUSSIAN_FUSED=0)
     endif()
 else()
-    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN=0 VULKAX_HAS_VULKAN_COMPUTE=0 VULKAX_HAS_VULKAN_RENDER=0 VULKAX_HAS_VULKAN_GAUSSIAN_PROJECTION=0 VULKAX_HAS_VULKAN_GAUSSIAN_SCHEDULER=0)
+    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_VULKAN=0 VULKAX_HAS_VULKAN_COMPUTE=0 VULKAX_HAS_VULKAN_RENDER=0 VULKAX_HAS_VULKAN_GAUSSIAN_PROJECTION=0 VULKAX_HAS_VULKAN_GAUSSIAN_SCHEDULER=0 VULKAX_HAS_VULKAN_GAUSSIAN_FUSED=0)
 endif()
 if(APPLE)
     enable_language(OBJCXX)
     find_library(VULKAX_METAL_FRAMEWORK Metal REQUIRED)
     find_library(VULKAX_FOUNDATION_FRAMEWORK Foundation REQUIRED)
-    target_sources(vulkax_core PRIVATE src/backend/metal_probe.mm src/compute/metal_conformance.mm src/render/metal_headless.mm src/render/metal_gaussian.mm src/render/metal_gaussian_projection.mm src/render/metal_gaussian_scheduler.mm)
-    set_source_files_properties(src/backend/metal_probe.mm src/compute/metal_conformance.mm src/render/metal_headless.mm src/render/metal_gaussian.mm src/render/metal_gaussian_projection.mm src/render/metal_gaussian_scheduler.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+    target_sources(vulkax_core PRIVATE src/backend/metal_probe.mm src/compute/metal_conformance.mm src/render/metal_headless.mm src/render/metal_gaussian.mm src/render/metal_gaussian_projection.mm src/render/metal_gaussian_scheduler.mm src/render/metal_gaussian_fused.mm)
+    set_source_files_properties(src/backend/metal_probe.mm src/compute/metal_conformance.mm src/render/metal_headless.mm src/render/metal_gaussian.mm src/render/metal_gaussian_projection.mm src/render/metal_gaussian_scheduler.mm src/render/metal_gaussian_fused.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
     target_link_libraries(vulkax_core PRIVATE ${VULKAX_METAL_FRAMEWORK} ${VULKAX_FOUNDATION_FRAMEWORK})
-    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_METAL=1 VULKAX_HAS_METAL_COMPUTE=1 VULKAX_HAS_METAL_RENDER=1 VULKAX_HAS_METAL_GAUSSIAN_PROJECTION=1 VULKAX_HAS_METAL_GAUSSIAN_SCHEDULER=1)
+    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_METAL=1 VULKAX_HAS_METAL_COMPUTE=1 VULKAX_HAS_METAL_RENDER=1 VULKAX_HAS_METAL_GAUSSIAN_PROJECTION=1 VULKAX_HAS_METAL_GAUSSIAN_SCHEDULER=1 VULKAX_HAS_METAL_GAUSSIAN_FUSED=1)
 else()
-    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_METAL=0 VULKAX_HAS_METAL_COMPUTE=0 VULKAX_HAS_METAL_RENDER=0 VULKAX_HAS_METAL_GAUSSIAN_PROJECTION=0 VULKAX_HAS_METAL_GAUSSIAN_SCHEDULER=0)
+    target_compile_definitions(vulkax_core PRIVATE VULKAX_HAS_METAL=0 VULKAX_HAS_METAL_COMPUTE=0 VULKAX_HAS_METAL_RENDER=0 VULKAX_HAS_METAL_GAUSSIAN_PROJECTION=0 VULKAX_HAS_METAL_GAUSSIAN_SCHEDULER=0 VULKAX_HAS_METAL_GAUSSIAN_FUSED=0)
 endif()
 if(MSVC)
     target_compile_options(vulkax_core PRIVATE /W4 /permissive-)
