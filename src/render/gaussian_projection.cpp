@@ -465,8 +465,7 @@ GaussianRenderResult renderGaussianCloudScalableHeadless(
     const GaussianRenderSettings& settings,
     std::uint32_t tileSize) {
     const auto projection = projectGaussianCloudNative(backend, cloud, settings, tileSize);
-    const auto batch = buildGaussianRasterBatchFromProjection(projection, settings);
-    return renderGaussianRasterBatchHeadless(backend, batch, settings.image);
+    return renderGaussianProjectionHeadless(backend, projection, settings);
 }
 
 static_assert(sizeof(GaussianProjectionInput) == 64U);
