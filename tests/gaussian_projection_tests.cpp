@@ -1,12 +1,16 @@
 #include "vulkax/render/gaussian_projection.hpp"
+#include "vulkax/render/gaussian_scheduler.hpp"
 #include "vulkax/render/gaussian_tiles.hpp"
 #include "vulkax/render/image_metrics.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
+#include <vector>
 
 namespace {
 
@@ -73,10 +77,37 @@ void compareBatch(
     assert(maximum < 2.0e-4);
 }
 
+void verifyDeterministicScheduleOracle() {
+    using namespace vulkax;
+    render::GaussianNativeProjectionResult projection;
+    projection.tileSize = 16U;
+    projection.tileColumns = 1U;
+    projection.tileRows = 1U;
+    projection.projected.resize(4U);
+    projection.stats.visibleSplats = 4U;
+    projection.splatReferences = 4U;
+    projection.maximumSplatsPerTile = 4U;
+
+    const std::array<float, 4> depths{2.0F, 4.0F, 4.0F, 1.0F};
+    for (std::size_t index = 0U; index < depths.size(); ++index) {
+        projection.projected[index].minorDepth[2] = depths[index];
+        projection.projected[index].tileBounds = {0.0F, 0.0F, 0.0F, 0.0F};
+    }
+
+    const auto schedule = render::buildGaussianTileScheduleOracle(projection);
+    render::validateGaussianTileSchedule(schedule, projection);
+    assert(schedule.tileOffsets == std::vector<std::uint32_t>({0U, 4U}));
+    assert(schedule.projectedSplatIndices ==
+           std::vector<std::uint32_t>({1U, 2U, 0U, 3U}));
+    assert(schedule.maximumSplatsPerTile == 4U);
+}
+
 } // namespace
 
 int main() {
     using namespace vulkax;
+    verifyDeterministicScheduleOracle();
+
     const auto cloud = makeScene();
 
     render::GaussianRenderSettings settings;
@@ -124,6 +155,25 @@ int main() {
         assert(projection.projectionMilliseconds >= 0.0);
         assert(projection.inputBytes == cloud.size() * sizeof(render::GaussianProjectionInput));
         assert(projection.outputBytes == cloud.size() * sizeof(render::GaussianProjectedSplat));
+
+        const auto schedule = render::buildGaussianTileScheduleOracle(projection);
+        render::validateGaussianTileSchedule(schedule, projection);
+        assert(schedule.splatReferences == referenceTiles.splatReferences);
+        assert(schedule.maximumSplatsPerTile == referenceTiles.maximumSplatsPerTile);
+        assert(schedule.tileOffsets.size() == referenceTiles.tiles.size() + 1U);
+        for (std::uint32_t row = 0U; row < schedule.rows; ++row) {
+            for (std::uint32_t column = 0U; column < schedule.columns; ++column) {
+                const std::size_t tileId = static_cast<std::size_t>(row) * schedule.columns + column;
+                const auto& referenceTile = referenceTiles.at(column, row);
+                const std::uint32_t begin = schedule.tileOffsets[tileId];
+                const std::uint32_t end = schedule.tileOffsets[tileId + 1U];
+                assert(static_cast<std::size_t>(end - begin) == referenceTile.splatIndices.size());
+                for (std::uint32_t offset = 0U; offset < end - begin; ++offset) {
+                    assert(schedule.projectedSplatIndices[begin + offset] ==
+                           referenceTile.splatIndices[offset]);
+                }
+            }
+        }
 
         const auto acceleratedBatch = render::buildGaussianRasterBatchFromProjection(
             projection, settings);
