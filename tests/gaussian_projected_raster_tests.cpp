@@ -66,6 +66,8 @@ int main() {
             backendKind, expandedBatch, settings.image);
         const auto direct = render::renderGaussianProjectionHeadless(
             backendKind, projection, settings);
+        const auto scalable = render::renderGaussianCloudScalableHeadless(
+            backendKind, cloud, settings, 16U);
 
         assert(!legacy.directProjectedRaster);
         assert(legacy.cpuExpandedVertexBytes ==
@@ -79,10 +81,19 @@ int main() {
         assert(direct.nativeRasterInputBytes < legacy.nativeRasterInputBytes);
         assert(direct.stats.visibleSplats == legacy.stats.visibleSplats);
 
-        const auto comparison = render::compareImages(legacy.image, direct.image);
-        assert(comparison.maximumChannelDifference <= 2U);
-        assert(comparison.rootMeanSquareError < 0.5);
-        assert(comparison.changedPixelFraction < 0.05);
+        assert(scalable.directProjectedRaster);
+        assert(scalable.cpuExpandedVertexBytes == 0U);
+        assert(scalable.nativeRasterInputBytes == direct.nativeRasterInputBytes);
+
+        const auto directComparison = render::compareImages(legacy.image, direct.image);
+        assert(directComparison.maximumChannelDifference <= 2U);
+        assert(directComparison.rootMeanSquareError < 0.5);
+        assert(directComparison.changedPixelFraction < 0.05);
+
+        const auto scalableComparison = render::compareImages(direct.image, scalable.image);
+        assert(scalableComparison.maximumChannelDifference <= 2U);
+        assert(scalableComparison.rootMeanSquareError < 0.5);
+        assert(scalableComparison.changedPixelFraction < 0.05);
     }
 
     return 0;
