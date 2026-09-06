@@ -104,6 +104,42 @@ jobs:
             --expected-backend Vulkan \
             --expected-showcase cloth_showcase
 
+      - name: Validate presentation-facing showcase artifacts
+        run: |
+          test -s build/dot-c2-world-run/render/showcase/gallery.html
+          test -s build/dot-c2-world-run/render/showcase/contact_sheet.png
+          test -s build/dot-c2-world-run/render/showcase/summary_card.svg
+          test -s build/dot-c2-world-run/render/showcase/hero_baseline.png
+          test -s build/dot-c2-world-run/render/showcase/hero_rollback.png
+          test -s build/dot-c2-world-run/render/showcase/closeup_baseline.png
+          test -s build/dot-c2-world-run/render/showcase/closeup_rollback.png
+          for frame in $(seq -w 0 7); do
+            test -s "build/dot-c2-world-run/render/showcase/turntable/frame_0${frame}.png"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("build/dot-c2-world-run/render/showcase")
+          signature = b"\x89PNG\r\n\x1a\n"
+          pngs = [
+              root / "contact_sheet.png",
+              root / "hero_baseline.png",
+              root / "hero_rollback.png",
+              root / "closeup_baseline.png",
+              root / "closeup_rollback.png",
+              *sorted((root / "turntable").glob("*.png")),
+          ]
+          if len(pngs) != 13:
+              raise SystemExit(f"expected 13 presentation PNGs, found {len(pngs)}")
+          for path in pngs:
+              if path.read_bytes()[:8] != signature:
+                  raise SystemExit(f"invalid PNG signature: {path}")
+          gallery = (root / "gallery.html").read_text(encoding="utf-8")
+          for required in ("Vulkax / 1.0 visual system", "hero_baseline.png", "hero_rollback.png", "turntable/frame_000.png"):
+              if required not in gallery:
+                  raise SystemExit(f"gallery is missing presentation reference: {required}")
+          PY
+
       - name: Upload complete measured one-command evidence
         uses: actions/upload-artifact@v4
         with:
