@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <iterator>
 #include <vector>
 
 int main() {
@@ -24,19 +23,29 @@ int main() {
     };
     const auto pngPath = std::filesystem::temp_directory_path() / "vulkax_render_test.png";
     render::writePng(pngFixture, pngPath.string());
+
+    // Read only the fixed header that this smoke test needs. Explicitly close the
+    // file before removal because Windows does not permit unlinking an open file in
+    // the same way POSIX systems do.
     std::ifstream pngStream(pngPath, std::ios::binary);
-    const std::vector<std::uint8_t> pngBytes{
-        std::istreambuf_iterator<char>(pngStream), std::istreambuf_iterator<char>()};
+    assert(pngStream.is_open());
+    std::array<std::uint8_t, 16> pngHeader{};
+    pngStream.read(
+        reinterpret_cast<char*>(pngHeader.data()),
+        static_cast<std::streamsize>(pngHeader.size()));
+    assert(pngStream.gcount() == static_cast<std::streamsize>(pngHeader.size()));
+    pngStream.close();
+
     const std::array<std::uint8_t, 8> pngSignature{
         0x89U, 0x50U, 0x4EU, 0x47U, 0x0DU, 0x0AU, 0x1AU, 0x0AU};
-    assert(pngBytes.size() > 40U);
+    assert(std::filesystem::file_size(pngPath) > 40U);
     for (std::size_t index = 0U; index < pngSignature.size(); ++index)
-        assert(pngBytes[index] == pngSignature[index]);
-    assert(pngBytes[12U] == static_cast<std::uint8_t>('I'));
-    assert(pngBytes[13U] == static_cast<std::uint8_t>('H'));
-    assert(pngBytes[14U] == static_cast<std::uint8_t>('D'));
-    assert(pngBytes[15U] == static_cast<std::uint8_t>('R'));
-    std::filesystem::remove(pngPath);
+        assert(pngHeader[index] == pngSignature[index]);
+    assert(pngHeader[12U] == static_cast<std::uint8_t>('I'));
+    assert(pngHeader[13U] == static_cast<std::uint8_t>('H'));
+    assert(pngHeader[14U] == static_cast<std::uint8_t>('D'));
+    assert(pngHeader[15U] == static_cast<std::uint8_t>('R'));
+    assert(std::filesystem::remove(pngPath));
 
     const std::vector<visualization::ParticleInstance> particles = {
         {{-0.45, -0.15, 0.1}, 0.22, {0.95F, 0.25F, 0.10F, 1.0F}},
