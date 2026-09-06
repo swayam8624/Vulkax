@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/build_interactive_viewer.py'
+      - 'scripts/build_interactive_viewer_app.py'
       - 'docs/INTERACTIVE_VIEWER_MVP.md'
       - '.github/workflows/interactive-viewer.yml'
   workflow_dispatch:
@@ -14,18 +15,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Python self-test
-        run: python3 scripts/build_interactive_viewer.py --self-test
+      - name: Python self-tests
+        run: |
+          python3 scripts/build_interactive_viewer.py --self-test
+          python3 scripts/build_interactive_viewer_app.py --self-test
 
-      - name: Generate persistent viewer fixture
+      - name: Generate persistent hardened viewer fixture
         run: |
           python3 - <<'PY'
           import importlib.util
+          import sys
           from pathlib import Path
 
-          spec = importlib.util.spec_from_file_location('viewer', 'scripts/build_interactive_viewer.py')
-          viewer = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(viewer)
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          import build_interactive_viewer as viewer
+          import build_interactive_viewer_app as app
 
           root = Path('/tmp/vulkax-viewer-fixture')
           (root / 'appearance').mkdir(parents=True, exist_ok=True)
@@ -58,8 +62,7 @@ jobs:
               for z in range(2) for y in range(2) for x in range(2)
           ) + '\n')
           (root / 'influence' / 'selected_rewrite_region.csv').write_text('region_id,particle_id\nr,1\n')
-          scene = viewer.build_scene(root, particles)
-          viewer.write_viewer(scene, root / 'viewer.html')
+          app.build(root, particles, root / 'viewer.html')
           print(root / 'viewer.html')
           PY
 
@@ -79,6 +82,9 @@ jobs:
               'canvas id="gl"',
               'WebGL2',
               'Capture PNG',
+              "cam.splat*.62:cam.splat*.72",
+              "const beforeBtn=document.getElementById('beforeBtn')",
+              "drop.addEventListener('drop'",
           ]
           for token in required:
               assert token in html, token
