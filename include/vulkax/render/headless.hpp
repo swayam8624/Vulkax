@@ -27,6 +27,13 @@ struct ImageRGBA8 {
 [[nodiscard]] ImageRGBA8 renderParticlesHeadless(
     backend::BackendKind backend, const std::vector<visualization::ParticleInstance>& particles,
     const RenderSettings& settings = {});
+
+// PPM remains the compact regression/evidence format used by the 1.0 contract.
 void writePpm(const ImageRGBA8& image, const std::string& path);
+
+// Dependency-free RGBA PNG writer used by presentation-facing artifacts. The
+// encoder intentionally uses stored DEFLATE blocks: files are deterministic and
+// universally viewable without introducing zlib/libpng into the stable core.
+void writePng(const ImageRGBA8& image, const std::string& path);
 
 } // namespace vulkax::render
