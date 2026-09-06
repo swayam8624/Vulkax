@@ -5,6 +5,8 @@ on:
     paths:
       - 'scripts/build_interactive_viewer.py'
       - 'scripts/build_interactive_viewer_app.py'
+      - 'scripts/viewer_importers.js'
+      - 'scripts/viewer_importers_test.js'
       - 'docs/INTERACTIVE_VIEWER_MVP.md'
       - '.github/workflows/interactive-viewer.yml'
   workflow_dispatch:
@@ -20,15 +22,16 @@ jobs:
           python3 scripts/build_interactive_viewer.py --self-test
           python3 scripts/build_interactive_viewer_app.py --self-test
 
+      - name: Importer regression tests
+        run: node scripts/viewer_importers_test.js
+
       - name: Generate persistent hardened viewer fixture
         run: |
           python3 - <<'PY'
-          import importlib.util
           import sys
           from pathlib import Path
 
           sys.path.insert(0, str(Path('scripts').resolve()))
-          import build_interactive_viewer as viewer
           import build_interactive_viewer_app as app
 
           root = Path('/tmp/vulkax-viewer-fixture')
@@ -84,11 +87,15 @@ jobs:
               'Capture PNG',
               "cam.splat*.62:cam.splat*.72",
               "const beforeBtn=document.getElementById('beforeBtn')",
-              "drop.addEventListener('drop'",
+              "VulkaxImport.parseAsset",
+              "f.arrayBuffer()",
+              "importDrop.addEventListener('drop'",
+              "VULKAX_IMPORT_POINT_BUDGET=250000",
           ]
           for token in required:
               assert token in html, token
           assert '__SCENE_JSON__' not in html
+          assert 'new DataTransfer()' not in html
           scripts = re.findall(r'<script>(.*?)</script>', html, re.S)
           assert len(scripts) == 1
           Path('/tmp/vulkax-viewer-fixture/viewer.js').write_text(scripts[0])
