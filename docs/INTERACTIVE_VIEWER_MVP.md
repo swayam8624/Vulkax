@@ -27,29 +27,43 @@ Interaction:
 
 The viewer is fully self-contained: no CDN, framework, font, JavaScript package, or network request is required at runtime.
 
-## Build a viewer from a run
+## One-command launch
+
+From the Vulkax repository after a captured-world run already exists:
+
+```bash
+bash scripts/open_interactive_viewer.sh
+```
+
+The launcher uses `build/captured-world-run` and, when available, `build/captured-example/particles.csv`. On macOS it opens the generated viewer automatically.
+
+## Build a viewer manually
 
 For the canonical controlled example:
 
 ```bash
-python3 scripts/build_interactive_viewer.py \
+python3 scripts/build_interactive_viewer_app.py \
   build/captured-world-run \
   --particles-csv build/captured-example/particles.csv
 
 open build/captured-world-run/render/interactive/viewer.html
 ```
 
+`build_interactive_viewer.py` is the core scene-data/HTML compiler. `build_interactive_viewer_app.py` is the public hardened launcher: it applies Retina-safe point sizing, explicit DOM bindings for stable Chrome/Safari behavior, and real drag/drop file handling.
+
 The generated HTML embeds the data needed to display that run, so `file://` opening works without running a local web server.
 
 ## Asset import
 
-The right-side inspector can load local ASCII `.ply` and `.obj` files with the browser File API. Imported assets are normalized into viewer space and displayed as live splats. This is deliberately viewer-only: it does not author or overwrite a Vulkax capture bundle.
+The right-side inspector can click or drag/drop local ASCII `.ply` and `.obj` files with the browser File API. Imported assets are normalized into viewer space and displayed as live splats. This is deliberately viewer-only: it does not author or overwrite a Vulkax capture bundle.
 
 The MVP treats OBJ vertices as splat seeds. Face-aware mesh-to-Gaussian sampling, glTF/GLB ingestion, and image/video reconstruction belong to the next authoring/import phase.
 
 ## Rendering model
 
-Gaussian mode uses WebGL2 `POINTS` with a Gaussian radial falloff in the fragment shader. Point size is perspective-scaled from the stored Gaussian scale. This is intentionally a stable MVP rather than a full production 3DGS tile/sort pipeline; the native Vulkan/Metal renderer can later adopt the same interaction and scene model.
+Gaussian mode uses WebGL2 `POINTS` with a Gaussian radial falloff in the fragment shader. Point size is perspective-scaled from the stored Gaussian scale and clamped by the browser/GPU point-size implementation limit. The hardened launcher keeps the scale multiplier in world-space territory so Retina displays do not collapse the scene into giant point sprites.
+
+This is intentionally a stable MVP rather than a full production 3DGS tile/sort pipeline; the native Vulkan/Metal renderer can later adopt the same interaction and scene model.
 
 When physical particles form a complete regular Cartesian lattice, the generator derives only the six outer shell surfaces, triangulates them deterministically, and colors vertices in the selected rewrite region orange. If topology is not known, the surface mode remains unavailable rather than inventing a scientific surface.
 
@@ -62,10 +76,11 @@ The viewer distinguishes authoritative and presentation data:
 
 A verified material rewrite can legitimately leave Gaussian centers unchanged. The viewer therefore never fabricates displacement: it keeps the geometry fixed and highlights the selected physical rewrite region.
 
-## Smoke test
+## Smoke tests
 
 ```bash
 python3 scripts/build_interactive_viewer.py --self-test
+python3 scripts/build_interactive_viewer_app.py --self-test
 ```
 
-The self-test verifies PLY parsing, particle-lattice shell construction, rewrite-region ingestion, and generation of a self-contained HTML file.
+CI additionally generates a persistent viewer fixture, validates the HTML contract, and runs `node --check` on the generated inline JavaScript.
