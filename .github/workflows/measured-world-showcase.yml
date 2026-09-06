@@ -113,11 +113,14 @@ jobs:
           test -s build/dot-c2-world-run/render/showcase/hero_rollback.png
           test -s build/dot-c2-world-run/render/showcase/closeup_baseline.png
           test -s build/dot-c2-world-run/render/showcase/closeup_rollback.png
-          for frame in $(seq -w 0 7); do
-            test -s "build/dot-c2-world-run/render/showcase/turntable/frame_0${frame}.png"
+          for frame in $(seq 0 7); do
+            printf -v frame_name 'frame_%03d.png' "$frame"
+            test -s "build/dot-c2-world-run/render/showcase/turntable/${frame_name}"
           done
           python3 - <<'PY'
           from pathlib import Path
+          import struct
+          import zlib
 
           root = Path("build/dot-c2-world-run/render/showcase")
           signature = b"\x89PNG\r\n\x1a\n"
@@ -131,11 +134,42 @@ jobs:
           ]
           if len(pngs) != 13:
               raise SystemExit(f"expected 13 presentation PNGs, found {len(pngs)}")
+
           for path in pngs:
-              if path.read_bytes()[:8] != signature:
+              data = path.read_bytes()
+              if data[:8] != signature:
                   raise SystemExit(f"invalid PNG signature: {path}")
+              offset = 8
+              width = height = None
+              idat = bytearray()
+              while offset < len(data):
+                  length = struct.unpack(">I", data[offset:offset + 4])[0]
+                  kind = data[offset + 4:offset + 8]
+                  payload = data[offset + 8:offset + 8 + length]
+                  offset += 12 + length
+                  if kind == b"IHDR":
+                      width, height = struct.unpack(">II", payload[:8])
+                  elif kind == b"IDAT":
+                      idat.extend(payload)
+                  elif kind == b"IEND":
+                      break
+              if width is None or height is None:
+                  raise SystemExit(f"PNG is missing IHDR: {path}")
+              raw = zlib.decompress(bytes(idat))
+              expected = height * (1 + width * 4)
+              if len(raw) != expected:
+                  raise SystemExit(f"PNG scanline size mismatch: {path}")
+              row = 1 + width * 4
+              if any(raw[y * row] != 0 for y in range(height)):
+                  raise SystemExit(f"PNG uses unexpected scanline filter: {path}")
+
           gallery = (root / "gallery.html").read_text(encoding="utf-8")
-          for required in ("Vulkax / 1.0 visual system", "hero_baseline.png", "hero_rollback.png", "turntable/frame_000.png"):
+          for required in (
+              "Vulkax / 1.0 visual system",
+              "hero_baseline.png",
+              "hero_rollback.png",
+              "turntable/frame_000.png",
+          ):
               if required not in gallery:
                   raise SystemExit(f"gallery is missing presentation reference: {required}")
           PY
