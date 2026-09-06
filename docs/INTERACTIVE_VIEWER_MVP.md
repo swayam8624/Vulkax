@@ -49,15 +49,30 @@ python3 scripts/build_interactive_viewer_app.py \
 open build/captured-world-run/render/interactive/viewer.html
 ```
 
-`build_interactive_viewer.py` is the core scene-data/HTML compiler. `build_interactive_viewer_app.py` is the public hardened launcher: it applies Retina-safe point sizing, explicit DOM bindings for stable Chrome/Safari behavior, and real drag/drop file handling.
+`build_interactive_viewer.py` is the core scene-data/HTML compiler. `build_interactive_viewer_app.py` is the public hardened launcher: it applies Retina-safe point sizing, explicit DOM bindings for stable Chrome/Safari behavior, and the production local-file importer.
 
 The generated HTML embeds the data needed to display that run, so `file://` opening works without running a local web server.
 
 ## Asset import
 
-The right-side inspector can click or drag/drop local ASCII `.ply` and `.obj` files with the browser File API. Imported assets are normalized into viewer space and displayed as live splats. This is deliberately viewer-only: it does not author or overwrite a Vulkax capture bundle.
+The right-side inspector can click or drag/drop local `.ply` and `.obj` files through the browser File API. Imported assets are normalized into viewer space and displayed as live splats. This is deliberately viewer-only: it does not author or overwrite a Vulkax capture bundle.
 
-The MVP treats OBJ vertices as splat seeds. Face-aware mesh-to-Gaussian sampling, glTF/GLB ingestion, and image/video reconstruction belong to the next authoring/import phase.
+Supported PLY paths include:
+
+- ASCII PLY;
+- binary little-endian PLY;
+- binary big-endian PLY;
+- XYZ-only point clouds;
+- RGB vertex colors;
+- 3D-Gaussian-style `f_dc_0..2`, `scale_0..2`, and `opacity` fields.
+
+PLY scales are normalized with scene extent instead of being left in source units. Large point clouds are deterministically reduced to a 250,000-point browser budget rather than blindly allocating unbounded WebGL buffers.
+
+OBJ import understands polygon faces and positive/negative face indices, triangulates the faces, and deterministically surface-samples the triangles into splats. OBJ files with only vertex records are still accepted as point clouds. Vertex colors are used when the exporter stores them directly on `v` records.
+
+The importer reads files as `ArrayBuffer`, so binary PLY is not corrupted through text decoding. Drag/drop calls the same import routine directly rather than trying to synthesize and assign a `DataTransfer` object to the hidden file input, which is unreliable across browsers.
+
+The current browser importer intentionally stops at PLY/OBJ. glTF/GLB ingestion and image/video reconstruction belong to the next authoring/import phase.
 
 ## Rendering model
 
@@ -81,6 +96,7 @@ A verified material rewrite can legitimately leave Gaussian centers unchanged. T
 ```bash
 python3 scripts/build_interactive_viewer.py --self-test
 python3 scripts/build_interactive_viewer_app.py --self-test
+node scripts/viewer_importers_test.js
 ```
 
-CI additionally generates a persistent viewer fixture, validates the HTML contract, and runs `node --check` on the generated inline JavaScript.
+The importer regression test covers RGB ASCII PLY, binary little-endian Gaussian PLY, OBJ face sampling, negative OBJ indices, malformed inputs, and deterministic downsampling. CI additionally generates a persistent hardened viewer fixture, validates the HTML contract, and runs `node --check` on the generated inline JavaScript.
