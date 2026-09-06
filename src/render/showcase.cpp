@@ -381,7 +381,7 @@ main{width:min(1480px,calc(100% - 40px));margin:0 auto;padding:58px 0 80px}.eyeb
     output << "<div class=\"pill " << (rejected ? "warn" : "good") << "\">"
            << htmlEscape(statusText) << "</div></div>\n";
     output << "<div class=\"meta\"><div><span>Scene</span><strong>" << htmlEscape(preset)
-           << "</strong></div><div><span>Backend</span><strong>" << htmlEscape(backend::toString(backendKind))
+           << "</strong></div><div><span>Backend</span><strong>" << backend::toString(backendKind)
            << "</strong></div><div><span>Turntable</span><strong>" << turntableFrames
            << " views</strong></div></div>\n";
 
