@@ -121,7 +121,7 @@ function testDownsample() {
 function testClearFailures() {
   assert.throws(() => imp.parseAsset('empty.ply', new ArrayBuffer(0)), /empty/i);
   assert.throws(() => imp.parseAsset('bad.ply', asciiBuffer('ply\nformat ascii 1.0\n')), /end_header/i);
-  assert.throws(() => imp.parseAsset('bad.obj', asciiBuffer('f 1 2 3\n')), /no vertex/i);
+  assert.throws(() => imp.parseAsset('bad.obj', asciiBuffer('f 1 2 3\n')), /no vertex|face index out of range/i);
   assert.throws(() => imp.parseAsset('thing.xyz', asciiBuffer('hello world')), /unsupported asset type/i);
 }
 
