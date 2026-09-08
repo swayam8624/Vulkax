@@ -2,6 +2,8 @@
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
 
+#include "vulkax/viewer/gpu_sort_session.hpp"
+#include "vulkax/viewer/metal_gpu_sorter.hpp"
 #include "vulkax/viewer/metal_shader_source.hpp"
 #include "vulkax/viewer/scene.hpp"
 #include "vulkax/viewer/visibility.hpp"
@@ -14,6 +16,7 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <numeric>
 #include <stdexcept>
 #include <string>
@@ -76,6 +79,35 @@ MTLScissorRect scissor(NSUInteger x, NSUInteger y, NSUInteger width, NSUInteger 
 MTLViewport viewport(double x, double y, double width, double height) {
     MTLViewport value; value.originX=x; value.originY=y; value.width=width; value.height=height; value.znear=0.0; value.zfar=1.0; return value;
 }
+
+double elapsedMilliseconds(std::chrono::steady_clock::time_point start) {
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+}
+
+std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
+    const std::vector<vulkax::viewer::ViewerGaussian>& source,
+    const std::vector<std::uint32_t>& order,
+    Vec3 eye,
+    Vec3 forward) {
+    // Match Metal's float input precision closely so parity detects algorithmic
+    // disagreements rather than harmless double->float source conversion noise.
+    const float ex = static_cast<float>(eye.x);
+    const float ey = static_cast<float>(eye.y);
+    const float ez = static_cast<float>(eye.z);
+    const float fx = static_cast<float>(forward.x);
+    const float fy = static_cast<float>(forward.y);
+    const float fz = static_cast<float>(forward.z);
+    std::vector<vulkax::viewer::GpuDepthKey> result;
+    result.reserve(order.size());
+    for (const auto index : order) {
+        const auto& p = source[index].position;
+        const float dx = static_cast<float>(p.x) - ex;
+        const float dy = static_cast<float>(p.y) - ey;
+        const float dz = static_cast<float>(p.z) - ez;
+        result.push_back({dx*fx + dy*fy + dz*fz, index});
+    }
+    return result;
+}
 } // namespace
 
 @class VulkaxRenderer;
@@ -97,6 +129,9 @@ MTLViewport viewport(double x, double y, double width, double height) {
     std::vector<std::uint32_t> _beforeOrder, _afterOrder, _particleOrder;
     std::size_t _beforeVisible, _afterVisible, _splatBudget;
     std::size_t _beforeCulled, _afterCulled;
+    std::unique_ptr<vulkax::viewer::MetalGpuSorter> _gpuSorter;
+    vulkax::viewer::GpuSortSession _gpuSortSession;
+    double _gpuSortMilliseconds, _visibilityMilliseconds;
     Vec3 _target;
     double _yaw, _pitch, _distance;
     float _splatScale, _opacity, _exposure;
@@ -112,6 +147,7 @@ MTLViewport viewport(double x, double y, double width, double height) {
 }
 - (instancetype)initWithView:(MTKView*)view scene:(ViewerScene)scene;
 - (void)setStatsLabel:(NSTextField*)label;
+- (void)resetSortValidation;
 - (void)orbitDX:(double)dx dy:(double)dy;
 - (void)panDX:(double)dx dy:(double)dy;
 - (void)zoomDelta:(double)delta;
@@ -191,6 +227,7 @@ MTLViewport viewport(double x, double y, double width, double height) {
     _highlight = YES; _showGrid = YES; _autoOrbit = NO; _visibilityDirty = YES; _shEnabled = YES;
     _captureRequested = NO; _captureURL = nil;
     _splatBudget = 200000U; _beforeVisible = _scene.before.size(); _afterVisible = _scene.after.size(); _beforeCulled = _afterCulled = 0U;
+    _gpuSortMilliseconds = 0.0; _visibilityMilliseconds = 0.0;
     _fpsFrames = 0; _fps = 0; _lastFrame = _fpsEpoch = std::chrono::steady_clock::now();
 
     NSString* source = [NSString stringWithUTF8String:vulkax::viewer::metal::shaderSource];
@@ -204,6 +241,8 @@ MTLViewport viewport(double x, double y, double width, double height) {
     _opaqueDepth = [_device newDepthStencilStateWithDescriptor:od];
     MTLDepthStencilDescriptor* td = [MTLDepthStencilDescriptor new]; td.depthCompareFunction = MTLCompareFunctionLessEqual; td.depthWriteEnabled = NO;
     _transparentDepth = [_device newDepthStencilStateWithDescriptor:td];
+
+    _gpuSorter = std::make_unique<vulkax::viewer::MetalGpuSorter>(_device);
     [self uploadScene]; [self resetCamera];
     return self;
 }
@@ -233,6 +272,12 @@ MTLViewport viewport(double x, double y, double width, double height) {
         out[i].meta = (simd_uint4){source[i].shCoefficientCount,0U,0U,0U};
     }
     return out;
+}
+
+- (void)resetSortValidation {
+    const bool available = _gpuSorter && _gpuSorter->available();
+    _gpuSortSession.reset(available, available ? std::string{} : (_gpuSorter ? _gpuSorter->error() : "Metal GPU sorter missing"));
+    _gpuSortMilliseconds = 0.0;
 }
 
 - (void)uploadScene {
@@ -277,16 +322,24 @@ MTLViewport viewport(double x, double y, double width, double height) {
         grid.push_back((simd_float4){(float)(_scene.bounds.center.x+r),(float)gy,(float)(_scene.bounds.center.z+t),1});
         grid.push_back((simd_float4){(float)(_scene.bounds.center.x+t),(float)gy,(float)(_scene.bounds.center.z-r),1});
         grid.push_back((simd_float4){(float)(_scene.bounds.center.x+t),(float)gy,(float)(_scene.bounds.center.z+r),1});}
-    _gridBuffer=[self buffer:grid.data() length:grid.size()*sizeof(simd_float4)]; _visibilityDirty=YES; [self updateStats];
+    _gridBuffer=[self buffer:grid.data() length:grid.size()*sizeof(simd_float4)];
+    [self resetSortValidation];
+    _visibilityDirty=YES; [self updateStats];
 }
 
 - (void)setStatsLabel:(NSTextField*)label { _stats=label; [self updateStats]; }
 - (void)updateStats {
     if(!_stats)return;
-    _stats.stringValue=[NSString stringWithFormat:@"Gaussians   %lu → %lu\nVisible     %lu | %lu\nCulled      %lu | %lu\nBudget      %lu\nParticles   %lu\nRewrite     %lu\nSurface     %@\nMax Δ       %.3e\nSH          %@\nFPS         %.1f\n\nDrop .ply or run folder\n1–5 modes · B/A state\nS SH · P capture\nH highlight · G grid\nSpace orbit · R camera",
+    NSString* sortStatus=nil;
+    if(_gpuSortSession.gpuTrusted()) sortStatus=@"Metal GPU";
+    else if(_gpuSortSession.validating()) sortStatus=[NSString stringWithFormat:@"GPU validate %lu/%lu",(unsigned long)_gpuSortSession.parityPasses(),(unsigned long)_gpuSortSession.requiredParityPasses()];
+    else sortStatus=@"CPU fallback";
+    NSString* sortNote=_gpuSortSession.note().empty()?@"":[NSString stringWithFormat:@"\nSort note   %@",ns(_gpuSortSession.note())];
+    _stats.stringValue=[NSString stringWithFormat:@"Gaussians   %lu → %lu\nVisible     %lu | %lu\nCulled      %lu | %lu\nBudget      %lu\nParticles   %lu\nRewrite     %lu\nSurface     %@\nMax Δ       %.3e\nSH          %@\nSort        %@\nCull/LOD    %.3f ms\nGPU sort    %.3f ms%@\nFPS         %.1f\n\nDrop .ply or run folder\n1–5 modes · B/A state\nS SH · P capture\nH highlight · G grid\nSpace orbit · R camera",
         (unsigned long)_scene.before.size(),(unsigned long)_scene.after.size(),(unsigned long)_beforeVisible,(unsigned long)_afterVisible,
         (unsigned long)_beforeCulled,(unsigned long)_afterCulled,(unsigned long)_splatBudget,(unsigned long)_scene.particles.size(),
-        (unsigned long)_scene.rewriteParticleCount,ns(_scene.surfaceKind),_scene.maxGaussianDisplacement,_shEnabled?@"view-dependent":@"DC only",_fps];
+        (unsigned long)_scene.rewriteParticleCount,ns(_scene.surfaceKind),_scene.maxGaussianDisplacement,_shEnabled?@"view-dependent":@"DC only",sortStatus,
+        _visibilityMilliseconds,_gpuSortMilliseconds,sortNote,_fps];
 }
 - (void)resetCamera { _target=_scene.bounds.center; _yaw=0.68; _pitch=0.30; _distance=std::max(0.12,_scene.bounds.radius*3.2); _visibilityDirty=YES; }
 - (void)orbitDX:(double)dx dy:(double)dy { _yaw-=dx*0.006; _pitch=std::clamp(_pitch-dy*0.006,-1.45,1.45); _visibilityDirty=YES; }
@@ -341,15 +394,67 @@ MTLViewport viewport(double x, double y, double width, double height) {
 - (void)updateVisibilityForView:(MTKView*)view {
     if(!_visibilityDirty)return;
     const Vec3 eye=cameraPosition(_target,_yaw,_pitch,_distance);
+    const Vec3 forward=vulkax::math::normalized(_target-eye);
     const double effectiveWidth = _mode==ViewMode::Compare ? std::max(view.drawableSize.width*0.5,1.0) : std::max(view.drawableSize.width,1.0);
     vulkax::viewer::ViewerCamera camera; camera.position=eye; camera.target=_target; camera.aspect=effectiveWidth/std::max(view.drawableSize.height,1.0);
     camera.verticalFovRadians=M_PI/4.0; camera.nearPlane=std::max(0.0005,_scene.bounds.radius*0.008); camera.farPlane=std::max(10.0,_scene.bounds.radius*60.0+_distance);
-    vulkax::viewer::VisibilitySettings settings; settings.maxSplats=_splatBudget; settings.minimumOpacity=0.002;
-    auto before=vulkax::viewer::selectVisibleGaussians(_scene.before,camera,settings); auto after=vulkax::viewer::selectVisibleGaussians(_scene.after,camera,settings);
-    _beforeOrder=std::move(before.order); _afterOrder=std::move(after.order); _beforeVisible=_beforeOrder.size(); _afterVisible=_afterOrder.size();
-    _beforeCulled=before.opacityRejected+before.frustumRejected+before.budgetRejected; _afterCulled=after.opacityRejected+after.frustumRejected+after.budgetRejected;
-    if(_beforeOrderBuffer&&!_beforeOrder.empty())std::memcpy(_beforeOrderBuffer.contents,_beforeOrder.data(),_beforeOrder.size()*sizeof(std::uint32_t));
-    if(_afterOrderBuffer&&!_afterOrder.empty())std::memcpy(_afterOrderBuffer.contents,_afterOrder.data(),_afterOrder.size()*sizeof(std::uint32_t));
+
+    vulkax::viewer::VisibilitySettings retainedSettings; retainedSettings.maxSplats=_splatBudget; retainedSettings.minimumOpacity=0.002; retainedSettings.sortBackToFront=false;
+    const auto visibilityStart=std::chrono::steady_clock::now();
+    auto beforeRetained=vulkax::viewer::selectVisibleGaussians(_scene.before,camera,retainedSettings);
+    auto afterRetained=vulkax::viewer::selectVisibleGaussians(_scene.after,camera,retainedSettings);
+    _visibilityMilliseconds=elapsedMilliseconds(visibilityStart);
+    _beforeCulled=beforeRetained.opacityRejected+beforeRetained.frustumRejected+beforeRetained.budgetRejected;
+    _afterCulled=afterRetained.opacityRejected+afterRetained.frustumRejected+afterRetained.budgetRejected;
+
+    const auto installOrders=[&](std::vector<std::uint32_t> beforeOrder,std::vector<std::uint32_t> afterOrder){
+        _beforeOrder=std::move(beforeOrder);_afterOrder=std::move(afterOrder);_beforeVisible=_beforeOrder.size();_afterVisible=_afterOrder.size();
+        if(_beforeOrderBuffer&&!_beforeOrder.empty())std::memcpy(_beforeOrderBuffer.contents,_beforeOrder.data(),_beforeOrder.size()*sizeof(std::uint32_t));
+        if(_afterOrderBuffer&&!_afterOrder.empty())std::memcpy(_afterOrderBuffer.contents,_afterOrder.data(),_afterOrder.size()*sizeof(std::uint32_t));
+    };
+
+    const auto cpuFallback=[&](){
+        vulkax::viewer::VisibilitySettings sortedSettings=retainedSettings;sortedSettings.sortBackToFront=true;
+        const auto cpuStart=std::chrono::steady_clock::now();
+        auto beforeCpu=vulkax::viewer::selectVisibleGaussians(_scene.before,camera,sortedSettings);
+        auto afterCpu=vulkax::viewer::selectVisibleGaussians(_scene.after,camera,sortedSettings);
+        _visibilityMilliseconds+=elapsedMilliseconds(cpuStart);
+        _gpuSortMilliseconds=0.0;
+        _beforeCulled=beforeCpu.opacityRejected+beforeCpu.frustumRejected+beforeCpu.budgetRejected;
+        _afterCulled=afterCpu.opacityRejected+afterCpu.frustumRejected+afterCpu.budgetRejected;
+        installOrders(std::move(beforeCpu.order),std::move(afterCpu.order));
+    };
+
+    if(_gpuSortSession.cpuFallback()||!_gpuSorter||!_gpuSorter->available()){
+        cpuFallback();
+    }else{
+        const auto beforeGpu=_gpuSorter->sort(_beforeBuffer,beforeRetained.order,eye,forward);
+        const auto afterGpu=_gpuSorter->sort(_afterBuffer,afterRetained.order,eye,forward);
+        _gpuSortMilliseconds=(beforeGpu.gpuSeconds+afterGpu.gpuSeconds)*1000.0;
+        if(!beforeGpu.success||!afterGpu.success){
+            const std::string reason=!beforeGpu.success?beforeGpu.error:afterGpu.error;
+            _gpuSortSession.recordRuntimeFailure("Metal GPU sort failed: "+reason);
+            cpuFallback();
+        }else if(_gpuSortSession.validating()){
+            vulkax::viewer::VisibilitySettings sortedSettings=retainedSettings;sortedSettings.sortBackToFront=true;
+            const auto referenceStart=std::chrono::steady_clock::now();
+            auto beforeCpu=vulkax::viewer::selectVisibleGaussians(_scene.before,camera,sortedSettings);
+            auto afterCpu=vulkax::viewer::selectVisibleGaussians(_scene.after,camera,sortedSettings);
+            _visibilityMilliseconds+=elapsedMilliseconds(referenceStart);
+            const auto beforeReference=referenceDepthKeys(_scene.before,beforeCpu.order,eye,forward);
+            const auto afterReference=referenceDepthKeys(_scene.after,afterCpu.order,eye,forward);
+            const auto beforeValidation=vulkax::viewer::validateGpuDepthKeys(beforeGpu.depthKeys,beforeReference,2.0e-4);
+            const auto afterValidation=vulkax::viewer::validateGpuDepthKeys(afterGpu.depthKeys,afterReference,2.0e-4);
+            const bool exactOrder=beforeGpu.order==beforeCpu.order&&afterGpu.order==afterCpu.order;
+            const bool parity=beforeValidation.valid()&&afterValidation.valid()&&exactOrder;
+            _gpuSortSession.recordParity(parity,parity?std::string{}:"Metal GPU sort parity mismatch; using deterministic CPU ordering");
+            if(_gpuSortSession.gpuTrusted())installOrders(beforeGpu.order,afterGpu.order);
+            else installOrders(std::move(beforeCpu.order),std::move(afterCpu.order));
+        }else{
+            installOrders(beforeGpu.order,afterGpu.order);
+        }
+    }
+
     _visibilityDirty=NO; [self updateStats];
 }
 
@@ -451,5 +556,5 @@ static NSVisualEffectView* inspector(VulkaxRenderer* r,NSTextField** statsOut){N
 
 static void menu(){NSMenu* bar=[NSMenu new];NSMenuItem* root=[NSMenuItem new];[bar addItem:root];NSApp.mainMenu=bar;NSMenu* m=[NSMenu new];[m addItemWithTitle:@"About Vulkax Viewer" action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""];[m addItem:[NSMenuItem separatorItem]];[m addItemWithTitle:@"Quit Vulkax Viewer" action:@selector(terminate:) keyEquivalent:@"q"];root.submenu=m;}
 struct Args{std::filesystem::path run{"build/captured-world-run"},particles{},ply{};};
-static Args args(int argc,const char* argv[]){Args a;for(int i=1;i<argc;++i){std::string v=argv[i];auto next=[&](const char* f){if(i+1>=argc)throw std::runtime_error(std::string(f)+" requires a path");return std::string(argv[++i]);};if(v=="--run")a.run=next("--run");else if(v=="--particles")a.particles=next("--particles");else if(v=="--ply")a.ply=next("--ply");else if(v=="--help"||v=="-h"){std::cout<<"Usage: vulkax_viewer [--run captured-world-run] [--particles particles.csv] [--ply gaussians.ply]\nControls: 1-5 modes, B/A state, S SH, P capture, H highlight, G grid, Space orbit, R reset.\n";std::exit(0);}else if(!v.starts_with('-'))a.run=v;else throw std::runtime_error("unknown argument: "+v);}return a;}
+static Args args(int argc,const char* argv[]){Args a;for(int i=1;i<argc;++i){std::string v=argv[i];auto next=[&](const char* f){if(i+1>=argc)throw std::runtime_error(std::string(f)+" requires a path");return std::string(argv[++i]);};if(v=="--run")a.run=next("--run");else if(v=="--particles")a.particles=next("--particles");else if(v=="--ply")a.ply=next("--ply");else if(v=="--help"||v=="-h"){std::cout<<"Usage: vulkax_viewer [--run captured-world-run] [--particles particles.csv] [--ply gaussians.ply]\nControls: 1-5 modes, B/A state, S SH, P capture, H highlight, G grid, Space orbit, R reset.\nGPU ordering is promoted automatically after three CPU-parity passes and falls back safely on any mismatch.\n";std::exit(0);}else if(!v.starts_with('-'))a.run=v;else throw std::runtime_error("unknown argument: "+v);}return a;}
 int main(int argc,const char* argv[]){@autoreleasepool{try{const auto a=args(argc,argv);ViewerScene scene=a.ply.empty()?vulkax::viewer::loadCapturedWorldScene(a.run,a.particles):vulkax::viewer::loadStandaloneGaussianScene(a.ply);[NSApplication sharedApplication];[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];menu();VulkaxAppDelegate* d=[[VulkaxAppDelegate alloc] initWithScene:std::move(scene)];NSApp.delegate=d;[NSApp run];return 0;}catch(const std::exception& e){std::cerr<<"vulkax_viewer: "<<e.what()<<'\n';return 1;}}}

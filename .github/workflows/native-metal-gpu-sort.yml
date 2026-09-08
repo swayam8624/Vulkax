@@ -1,0 +1,90 @@
+name: Native Metal GPU sort validation
+
+on:
+  pull_request:
+    paths:
+      - 'include/vulkax/viewer/gpu_sort_contract.hpp'
+      - 'include/vulkax/viewer/gpu_sort_session.hpp'
+      - 'include/vulkax/viewer/visibility.hpp'
+      - 'include/vulkax/viewer/metal_shader_source.hpp'
+      - 'include/vulkax/viewer/metal_sort_shader_source.hpp'
+      - 'include/vulkax/viewer/metal_gpu_sorter.hpp'
+      - 'tests/gpu_sort_contract_tests.cpp'
+      - 'tests/gpu_sort_session_tests.cpp'
+      - 'tests/visibility_gpu_handoff_tests.cpp'
+      - 'tests/viewer_metal_depth_key_tests.mm'
+      - 'tests/viewer_metal_bitonic_sort_tests.mm'
+      - 'tests/viewer_metal_gpu_sorter_tests.mm'
+      - '.github/workflows/native-metal-gpu-sort.yml'
+  workflow_dispatch:
+
+jobs:
+  contract-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build GPU sort validation contract test
+        run: c++ -std=c++20 -Wall -Wextra -Wpedantic -Iinclude tests/gpu_sort_contract_tests.cpp -o /tmp/vulkax_gpu_sort_contract_tests
+      - name: Run GPU sort validation contract test
+        run: /tmp/vulkax_gpu_sort_contract_tests
+      - name: Build GPU sort session policy test
+        run: c++ -std=c++20 -Wall -Wextra -Wpedantic -Iinclude tests/gpu_sort_session_tests.cpp -o /tmp/vulkax_gpu_sort_session_tests
+      - name: Run GPU sort session policy test
+        run: /tmp/vulkax_gpu_sort_session_tests
+      - name: Build visibility handoff test
+        run: c++ -std=c++20 -Wall -Wextra -Wpedantic -Iinclude tests/visibility_gpu_handoff_tests.cpp -o /tmp/vulkax_visibility_gpu_handoff_tests
+      - name: Run visibility handoff test
+        run: /tmp/vulkax_visibility_gpu_handoff_tests
+
+  metal-runtime:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile exact embedded Metal render/depth source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('include/vulkax/viewer/metal_shader_source.hpp').read_text()
+          begin_marker = 'R"METAL(\n'
+          end_marker = ')METAL";'
+          begin = source.index(begin_marker) + len(begin_marker)
+          end = source.index(end_marker, begin)
+          Path('/tmp/vulkax_gpu_depth.metal').write_text(source[begin:end])
+          PY
+          xcrun -sdk macosx metal -c /tmp/vulkax_gpu_depth.metal -o /tmp/vulkax_gpu_depth.air
+      - name: Compile exact embedded Metal sort source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('include/vulkax/viewer/metal_sort_shader_source.hpp').read_text()
+          begin_marker = 'R"METAL(\n'
+          end_marker = ')METAL";'
+          begin = source.index(begin_marker) + len(begin_marker)
+          end = source.index(end_marker, begin)
+          Path('/tmp/vulkax_gpu_sort.metal').write_text(source[begin:end])
+          PY
+          xcrun -sdk macosx metal -c /tmp/vulkax_gpu_sort.metal -o /tmp/vulkax_gpu_sort.air
+      - name: Build runtime Metal depth-key parity test
+        run: |
+          clang++ -std=c++20 -fobjc-arc -x objective-c++ -Iinclude \
+            tests/viewer_metal_depth_key_tests.mm \
+            -framework Foundation -framework Metal \
+            -o /tmp/vulkax_viewer_metal_depth_key_tests
+      - name: Run depth-key compute parity test on Metal
+        run: /tmp/vulkax_viewer_metal_depth_key_tests
+      - name: Build runtime Metal bitonic-sort parity test
+        run: |
+          clang++ -std=c++20 -fobjc-arc -x objective-c++ -Iinclude \
+            tests/viewer_metal_bitonic_sort_tests.mm \
+            -framework Foundation -framework Metal \
+            -o /tmp/vulkax_viewer_metal_bitonic_sort_tests
+      - name: Run retained-set bitonic sort parity test on Metal
+        run: /tmp/vulkax_viewer_metal_bitonic_sort_tests
+      - name: Build reusable MetalGpuSorter parity test
+        run: |
+          clang++ -std=c++20 -fobjc-arc -x objective-c++ -Iinclude \
+            tests/viewer_metal_gpu_sorter_tests.mm \
+            -framework Foundation -framework Metal \
+            -o /tmp/vulkax_viewer_metal_gpu_sorter_tests
+      - name: Run reusable MetalGpuSorter parity test
+        run: /tmp/vulkax_viewer_metal_gpu_sorter_tests
