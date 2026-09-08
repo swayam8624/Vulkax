@@ -29,7 +29,20 @@ For each Gaussian it uploads:
 
 The vertex shader rotates the three scaled Gaussian basis vectors, projects them through the camera, constructs the 2D screen covariance `C = A A^T`, eigen-decomposes that covariance, and draws a camera-facing ellipse along the two screen-space eigenvectors. The fragment shader evaluates a three-sigma Gaussian falloff.
 
-Transparent splats use a CPU back-to-front index sort. Sorting is marked dirty by camera/state changes rather than performed blindly on every stationary frame.
+Transparent splats currently use a CPU back-to-front index sort. Sorting is marked dirty by camera/state changes rather than performed blindly on every stationary frame.
+
+## Visibility and large-scene groundwork
+
+`include/vulkax/viewer/visibility.hpp` adds a reusable visibility/LOD stage for both Metal and the future Vulkan frontend. It performs:
+
+1. minimum-opacity rejection;
+2. conservative three-sigma sphere/frustum culling;
+3. projected-footprint importance ranking when the visible set exceeds a splat budget;
+4. back-to-front depth ordering of the retained set.
+
+The budget stage deliberately selects first and depth-sorts second so LOD does not destroy conventional alpha-compositing order. Regression tests cover behind-camera rejection, side-frustum rejection, opacity rejection, importance budgeting, and final depth order.
+
+The utility is part of the reusable viewer layer now; replacing the Metal frontend's current all-splat dirty sort with this visibility result is the next performance integration step.
 
 ## Viewer modes
 
@@ -45,6 +58,7 @@ Before/verified-after switching changes the authoritative Gaussian state. A mate
 - left drag: orbit;
 - right or middle drag: pan;
 - wheel/trackpad scroll: zoom;
+- drag a `.ply` file directly onto the Metal viewport: load that Gaussian asset;
 - `R`: reset camera;
 - `1`–`4`: Hybrid / Splats / Surface / Particles;
 - `B` / `A`: Before / Verified After;
@@ -52,9 +66,25 @@ Before/verified-after switching changes the authoritative Gaussian state. A mate
 - `G`: ground grid;
 - Space: auto orbit.
 
-The native inspector exposes the same mode/state controls plus splat scale, opacity, exposure, and a standalone Gaussian PLY open dialog.
+The native inspector exposes the same mode/state controls plus splat scale, opacity, exposure, a live FPS readout, scene/rewrite statistics, and a standalone Gaussian PLY open dialog.
 
 ## Build and run on macOS
+
+The simplest path after a captured-world run already exists is:
+
+```bash
+bash scripts/open_native_viewer.sh
+```
+
+It configures/builds only the required native viewer target and then launches the existing run. Optional explicit run/particle paths are accepted:
+
+```bash
+bash scripts/open_native_viewer.sh \
+  build/captured-world-run \
+  build/captured-example/particles.csv
+```
+
+Manual build/run:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
@@ -73,4 +103,13 @@ Open an authored/exported Gaussian asset directly:
 
 ## Current boundary
 
-This PR establishes the native scene model, desktop interaction and Metal anisotropic splat renderer. It is not yet the final production 3DGS backend. Future renderer work can add GPU radix/tile sorting, exact perspective covariance/Jacobian handling, SH view-dependent color, visibility culling, LOD, and the Vulkan window frontend while reusing `vulkax_viewer_common`.
+This PR establishes the reusable native scene model, desktop interaction, anisotropic Metal Gaussian renderer, native asset loading, FPS diagnostics, and shared visibility/LOD selection logic. It is not yet the final production 3DGS backend.
+
+The next renderer stages are:
+
+- wire the common visibility/LOD result into Metal draw counts;
+- replace CPU `O(N log N)` transparency sorting with GPU depth/tile/radix work for genuinely large clouds;
+- move from the current projected-axis covariance approximation to the exact perspective Jacobian form;
+- add view-dependent higher-order SH color;
+- add native before/after comparison and capture tooling;
+- add a Vulkan desktop frontend reusing `vulkax_viewer_common`.
