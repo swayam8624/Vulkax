@@ -222,7 +222,14 @@ std::vector<ViewerGaussian> makeViewerGaussians(const gaussian::GaussianCloud& c
         for (std::size_t i = 0; i < 3U; ++i)
             g.scale[i] = static_cast<float>(std::clamp(std::isfinite(scales[i]) ? scales[i] : 0.02, 1.0e-6, 1.0e4));
         for (std::size_t i = 0; i < 4U; ++i) g.rotation[i] = static_cast<float>(source.rotation[i]);
-        for (std::size_t i = 0; i < 3U; ++i) g.color[i] = clamp01(0.5 + sh0 * source.shDC[i]);
+        for (std::size_t i = 0; i < 3U; ++i) {
+            g.shDC[i] = static_cast<float>(source.shDC[i]);
+            g.color[i] = clamp01(0.5 + sh0 * source.shDC[i]);
+        }
+        const std::size_t restCount = std::min(source.shRest.size(), kViewerShRestValues);
+        for (std::size_t i = 0; i < restCount; ++i) g.shRest[i] = static_cast<float>(source.shRest[i]);
+        g.shCoefficientCount = static_cast<std::uint8_t>(
+            std::min(kViewerMaxShCoefficients, 1U + source.shRest.size() / 3U));
         g.opacity = clamp01(source.opacity());
         g.id = source.id;
         out.push_back(g);
