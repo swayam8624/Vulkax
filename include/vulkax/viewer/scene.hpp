@@ -11,12 +11,21 @@
 
 namespace vulkax::viewer {
 
+inline constexpr std::size_t kViewerMaxShCoefficients = 16U;
+inline constexpr std::size_t kViewerShRestValues = (kViewerMaxShCoefficients - 1U) * 3U;
+
 struct ViewerGaussian {
     math::Vec3 position{};
     std::array<float, 3> scale{0.02F, 0.02F, 0.02F};
     // Quaternion in Vulkax/3DGS storage order: w, x, y, z.
     std::array<float, 4> rotation{1.0F, 0.0F, 0.0F, 0.0F};
+    // DC-only fallback color used when view-dependent SH is disabled.
     std::array<float, 3> color{0.62F, 0.72F, 0.92F};
+    // Raw 3DGS spherical-harmonic coefficients. shRest is coefficient-major RGB:
+    // (coefficient - 1) * 3 + channel, matching GaussianSplat::shRest.
+    std::array<float, 3> shDC{};
+    std::array<float, kViewerShRestValues> shRest{};
+    std::uint8_t shCoefficientCount{1U};
     float opacity{1.0F};
     gaussian::GaussianId id{};
 };
