@@ -34,8 +34,7 @@ kernel void bitonicSortStep(device GPUDepthKey* keys [[buffer(0)]],
     GPUDepthKey a = keys[gid];
     GPUDepthKey b = keys[partner];
     bool descending = (gid & parameters.k) == 0u;
-    bool aBeforeB = comesBefore(a, b);
-    bool shouldSwap = descending ? !aBeforeB : aBeforeB;
+    bool shouldSwap = descending ? comesBefore(b, a) : comesBefore(a, b);
     if (shouldSwap) {
         keys[gid] = b;
         keys[partner] = a;
