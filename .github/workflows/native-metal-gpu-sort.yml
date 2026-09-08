@@ -1,0 +1,46 @@
+name: Native Metal GPU sort validation
+
+on:
+  pull_request:
+    paths:
+      - 'include/vulkax/viewer/gpu_sort_contract.hpp'
+      - 'include/vulkax/viewer/metal_shader_source.hpp'
+      - 'tests/gpu_sort_contract_tests.cpp'
+      - 'tests/viewer_metal_depth_key_tests.mm'
+      - '.github/workflows/native-metal-gpu-sort.yml'
+  workflow_dispatch:
+
+jobs:
+  contract-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build GPU sort validation contract test
+        run: c++ -std=c++20 -Wall -Wextra -Wpedantic -Iinclude tests/gpu_sort_contract_tests.cpp -o /tmp/vulkax_gpu_sort_contract_tests
+      - name: Run GPU sort validation contract test
+        run: /tmp/vulkax_gpu_sort_contract_tests
+
+  depth-keys-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile exact embedded Metal source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('include/vulkax/viewer/metal_shader_source.hpp').read_text()
+          begin_marker = 'R"METAL(\n'
+          end_marker = ')METAL";'
+          begin = source.index(begin_marker) + len(begin_marker)
+          end = source.index(end_marker, begin)
+          Path('/tmp/vulkax_gpu_sort.metal').write_text(source[begin:end])
+          PY
+          xcrun -sdk macosx metal -c /tmp/vulkax_gpu_sort.metal -o /tmp/vulkax_gpu_sort.air
+      - name: Build runtime Metal depth-key parity test
+        run: |
+          clang++ -std=c++20 -fobjc-arc -x objective-c++ -Iinclude \
+            tests/viewer_metal_depth_key_tests.mm \
+            -framework Foundation -framework Metal \
+            -o /tmp/vulkax_viewer_metal_depth_key_tests
+      - name: Run depth-key compute parity test on Metal
+        run: /tmp/vulkax_viewer_metal_depth_key_tests
