@@ -5,8 +5,10 @@ on:
     paths:
       - 'include/vulkax/viewer/gpu_sort_contract.hpp'
       - 'include/vulkax/viewer/metal_shader_source.hpp'
+      - 'include/vulkax/viewer/metal_sort_shader_source.hpp'
       - 'tests/gpu_sort_contract_tests.cpp'
       - 'tests/viewer_metal_depth_key_tests.mm'
+      - 'tests/viewer_metal_bitonic_sort_tests.mm'
       - '.github/workflows/native-metal-gpu-sort.yml'
   workflow_dispatch:
 
@@ -20,15 +22,27 @@ jobs:
       - name: Run GPU sort validation contract test
         run: /tmp/vulkax_gpu_sort_contract_tests
 
-  depth-keys-macos:
+  metal-runtime:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Compile exact embedded Metal source
+      - name: Compile exact embedded Metal render/depth source
         run: |
           python3 - <<'PY'
           from pathlib import Path
           source = Path('include/vulkax/viewer/metal_shader_source.hpp').read_text()
+          begin_marker = 'R"METAL(\n'
+          end_marker = ')METAL";'
+          begin = source.index(begin_marker) + len(begin_marker)
+          end = source.index(end_marker, begin)
+          Path('/tmp/vulkax_gpu_depth.metal').write_text(source[begin:end])
+          PY
+          xcrun -sdk macosx metal -c /tmp/vulkax_gpu_depth.metal -o /tmp/vulkax_gpu_depth.air
+      - name: Compile exact embedded Metal sort source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('include/vulkax/viewer/metal_sort_shader_source.hpp').read_text()
           begin_marker = 'R"METAL(\n'
           end_marker = ')METAL";'
           begin = source.index(begin_marker) + len(begin_marker)
@@ -44,3 +58,11 @@ jobs:
             -o /tmp/vulkax_viewer_metal_depth_key_tests
       - name: Run depth-key compute parity test on Metal
         run: /tmp/vulkax_viewer_metal_depth_key_tests
+      - name: Build runtime Metal bitonic-sort parity test
+        run: |
+          clang++ -std=c++20 -fobjc-arc -x objective-c++ -Iinclude \
+            tests/viewer_metal_bitonic_sort_tests.mm \
+            -framework Foundation -framework Metal \
+            -o /tmp/vulkax_viewer_metal_bitonic_sort_tests
+      - name: Run retained-set bitonic sort parity test on Metal
+        run: /tmp/vulkax_viewer_metal_bitonic_sort_tests
