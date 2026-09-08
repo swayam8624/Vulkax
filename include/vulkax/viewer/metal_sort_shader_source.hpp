@@ -6,9 +6,22 @@ inline constexpr char sortShaderSource[] = R"METAL(
 #include <metal_stdlib>
 using namespace metal;
 
+struct GPUSplat {
+    float4 positionScaleX;
+    float4 scaleYZOpacity;
+    float4 rotation;
+    float4 colorMark;
+};
+
 struct GPUDepthKey {
     float depth;
     uint sourceIndex;
+};
+
+struct GPUDepthUniforms {
+    float4 cameraPosition;
+    float4 cameraForward;
+    uint4 countAndFlags;
 };
 
 struct BitonicParameters {
@@ -22,6 +35,19 @@ bool comesBefore(GPUDepthKey lhs, GPUDepthKey rhs) {
     if (lhs.depth > rhs.depth) return true;
     if (lhs.depth < rhs.depth) return false;
     return lhs.sourceIndex < rhs.sourceIndex;
+}
+
+kernel void generateDepthKeys(device const GPUSplat* splats [[buffer(0)]],
+                              device const uint* order [[buffer(1)]],
+                              device GPUDepthKey* output [[buffer(2)]],
+                              constant GPUDepthUniforms& uniforms [[buffer(3)]],
+                              uint gid [[thread_position_in_grid]]) {
+    uint count = uniforms.countAndFlags.x;
+    if (gid >= count) return;
+    uint sourceIndex = order[gid];
+    float3 delta = splats[sourceIndex].positionScaleX.xyz - uniforms.cameraPosition.xyz;
+    output[gid].depth = dot(delta, uniforms.cameraForward.xyz);
+    output[gid].sourceIndex = sourceIndex;
 }
 
 kernel void bitonicSortStep(device GPUDepthKey* keys [[buffer(0)]],
