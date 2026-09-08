@@ -4,9 +4,11 @@ on:
   pull_request:
     paths:
       - 'include/vulkax/viewer/gpu_sort_contract.hpp'
+      - 'include/vulkax/viewer/visibility.hpp'
       - 'include/vulkax/viewer/metal_shader_source.hpp'
       - 'include/vulkax/viewer/metal_sort_shader_source.hpp'
       - 'tests/gpu_sort_contract_tests.cpp'
+      - 'tests/visibility_gpu_handoff_tests.cpp'
       - 'tests/viewer_metal_depth_key_tests.mm'
       - 'tests/viewer_metal_bitonic_sort_tests.mm'
       - '.github/workflows/native-metal-gpu-sort.yml'
@@ -21,6 +23,10 @@ jobs:
         run: c++ -std=c++20 -Wall -Wextra -Wpedantic -Iinclude tests/gpu_sort_contract_tests.cpp -o /tmp/vulkax_gpu_sort_contract_tests
       - name: Run GPU sort validation contract test
         run: /tmp/vulkax_gpu_sort_contract_tests
+      - name: Build visibility handoff test
+        run: c++ -std=c++20 -Wall -Wextra -Wpedantic -Iinclude tests/visibility_gpu_handoff_tests.cpp -o /tmp/vulkax_visibility_gpu_handoff_tests
+      - name: Run visibility handoff test
+        run: /tmp/vulkax_visibility_gpu_handoff_tests
 
   metal-runtime:
     runs-on: macos-latest
