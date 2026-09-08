@@ -55,7 +55,7 @@ int main() {
         assert(std::abs(splat.position.z) < 1.0e-9);
         assert(splat.scale[0] > splat.scale[2]);
         assert(splat.scale[1] > splat.scale[2]);
-        assert(splat.id.local == i + 1U);
+        assert(splat.id.localId == i + 1U);
         assert(splat.shCoefficientCount == 1U);
         assert(splat.opacity > 0.9F);
         for (const auto channel : splat.color) assert(channel >= 0.0F && channel <= 1.0F);
