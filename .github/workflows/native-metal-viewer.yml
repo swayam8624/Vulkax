@@ -31,6 +31,18 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
       - name: Build native Metal viewer
         run: cmake --build build --target vulkax_viewer vulkax_viewer_scene_tests --parallel 3
+      - name: Compile exact embedded Metal shader
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('include/vulkax/viewer/metal_shader_source.hpp').read_text()
+          begin_marker = 'R"METAL(\n'
+          end_marker = ')METAL";'
+          begin = source.index(begin_marker) + len(begin_marker)
+          end = source.index(end_marker, begin)
+          Path('build/vulkax_native_viewer_embedded.metal').write_text(source[begin:end])
+          PY
+          xcrun -sdk macosx metal -c build/vulkax_native_viewer_embedded.metal -o build/vulkax_native_viewer_embedded.air
       - name: Test reusable scene layer on macOS
         run: ctest --test-dir build -R '^vulkax_viewer_scene$' --output-on-failure
       - name: Verify viewer CLI links and starts far enough to print help
