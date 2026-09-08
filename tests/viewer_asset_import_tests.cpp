@@ -1,3 +1,4 @@
+#include "vulkax/viewer/asset_export.hpp"
 #include "vulkax/viewer/asset_import.hpp"
 #include "vulkax/viewer/image_splat_card.hpp"
 
@@ -27,6 +28,7 @@ int main() {
     using vulkax::viewer::ObjImportSettings;
     using vulkax::viewer::loadObjAsGaussianScene;
     using vulkax::viewer::makeImageSplatCard;
+    using vulkax::viewer::writeViewerGaussianPly;
 
     const auto root = fs::temp_directory_path() / "vulkax-viewer-asset-import-tests";
     fs::remove_all(root);
@@ -59,6 +61,23 @@ int main() {
         assert(splat.shCoefficientCount == 1U);
         assert(splat.opacity > 0.9F);
         for (const auto channel : splat.color) assert(channel >= 0.0F && channel <= 1.0F);
+    }
+
+    // Native authoring export must round-trip through the authoritative Vulkax
+    // 3DGS PLY loader with stable IDs, anisotropic scale and opacity intact.
+    const auto exportedObj = root / "obj_export.ply";
+    writeViewerGaussianPly(scene.before, exportedObj);
+    const auto exportedCloud = vulkax::gaussian::load3dgsPly(exportedObj);
+    assert(exportedCloud.size() == scene.before.size());
+    assert(exportedCloud.shRestCoefficientsPerSplat == 0U);
+    for (std::size_t i = 0U; i < exportedCloud.size(); ++i) {
+        const auto& roundTrip = exportedCloud.splats[i];
+        const auto linear = roundTrip.linearScale();
+        assert(roundTrip.id == scene.before[i].id);
+        assert(std::abs(linear[0] - scene.before[i].scale[0]) < 1.0e-6);
+        assert(std::abs(linear[1] - scene.before[i].scale[1]) < 1.0e-6);
+        assert(std::abs(linear[2] - scene.before[i].scale[2]) < 1.0e-6);
+        assert(std::abs(roundTrip.opacity() - scene.before[i].opacity) < 1.0e-6);
     }
 
     // Negative OBJ indices must resolve relative to the currently defined vertices.
@@ -124,6 +143,12 @@ int main() {
         assert(splat.opacity > 0.99F);
         assert(splat.shCoefficientCount == 1U);
     }
+
+    const auto exportedImage = root / "image_export.ply";
+    writeViewerGaussianPly(imageScene.before, exportedImage);
+    const auto exportedImageCloud = vulkax::gaussian::load3dgsPly(exportedImage);
+    assert(exportedImageCloud.size() == imageScene.before.size());
+    assert(exportedImageCloud.splats.front().id == imageScene.before.front().id);
 
     // A strict budget selects a deterministic pixel stride instead of allocating every pixel.
     std::fill(rgba.begin(), rgba.end(), 255U);
