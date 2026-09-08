@@ -7,10 +7,12 @@ on:
       - 'include/vulkax/viewer/visibility.hpp'
       - 'include/vulkax/viewer/metal_shader_source.hpp'
       - 'include/vulkax/viewer/metal_sort_shader_source.hpp'
+      - 'include/vulkax/viewer/metal_gpu_sorter.hpp'
       - 'tests/gpu_sort_contract_tests.cpp'
       - 'tests/visibility_gpu_handoff_tests.cpp'
       - 'tests/viewer_metal_depth_key_tests.mm'
       - 'tests/viewer_metal_bitonic_sort_tests.mm'
+      - 'tests/viewer_metal_gpu_sorter_tests.mm'
       - '.github/workflows/native-metal-gpu-sort.yml'
   workflow_dispatch:
 
@@ -72,3 +74,11 @@ jobs:
             -o /tmp/vulkax_viewer_metal_bitonic_sort_tests
       - name: Run retained-set bitonic sort parity test on Metal
         run: /tmp/vulkax_viewer_metal_bitonic_sort_tests
+      - name: Build reusable MetalGpuSorter parity test
+        run: |
+          clang++ -std=c++20 -fobjc-arc -x objective-c++ -Iinclude \
+            tests/viewer_metal_gpu_sorter_tests.mm \
+            -framework Foundation -framework Metal \
+            -o /tmp/vulkax_viewer_metal_gpu_sorter_tests
+      - name: Run reusable MetalGpuSorter parity test
+        run: /tmp/vulkax_viewer_metal_gpu_sorter_tests
