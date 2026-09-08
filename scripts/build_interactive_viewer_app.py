@@ -3,7 +3,8 @@
 
 This wraps the core generator with presentation/runtime hardening that is easier to
 iterate independently from the scene-data compiler: Retina-safe point sizing,
-explicit DOM bindings, and production browser-side PLY/OBJ/glTF/GLB/image importers.
+explicit DOM bindings, production browser-side PLY/OBJ/glTF/GLB/image importers,
+and Vulkax-compatible splat export.
 """
 from __future__ import annotations
 
@@ -47,9 +48,11 @@ def harden_html(path: Path) -> None:
     importer = _source("viewer_importers.js")
     gltf_importer = _source("viewer_gltf_importer.js")
     image_importer = _source("viewer_image_importer.js")
+    exporter = _source("viewer_splat_export.js")
     import_runtime = r"""
 const VULKAX_IMPORT_POINT_BUDGET=250000;
 const VULKAX_IMAGE_POINT_BUDGET=80000;
+let currentAssetName='vulkax_scene';
 function importedSceneFrom(result){
     const pts=result.points;
     return {before:pts,after:structuredClone(pts),particles:[],rewriteIds:[],surface:{positions:[],normals:[],colors:[],indices:[],kind:'none'},meta:{gaussians:pts.length,particles:0,rewriteParticles:0,maxGaussianDisplacement:0,surfaceKind:'imported_'+result.kind}};
@@ -67,6 +70,7 @@ function importDescription(name,result){
     return detail+'.';
 }
 function extension(name){const m=String(name||'').toLowerCase().match(/(\.[^.]+)$/);return m?m[1]:''}
+function stem(name){return String(name||'vulkax_scene').replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9._-]+/g,'_')||'vulkax_scene'}
 function importPrimary(files){
     // Prefer actual 3D containers over texture/image sidecars when several files are
     // dropped together. This prevents a PNG texture from becoming the primary asset
@@ -111,6 +115,7 @@ async function handleImportFiles(fileList){
                 : VulkaxImport.parseAsset(primary.name,primaryBuffer,{maxPoints:VULKAX_IMPORT_POINT_BUDGET});
         }
         scene=importedSceneFrom(result);
+        currentAssetName=stem(primary.name);
         rebuild();
         cam.mode='gaussian';
         document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('active',x.dataset.mode==='gaussian'));
@@ -130,14 +135,33 @@ const importDrop=document.querySelector('.drop');
 importDrop.addEventListener('drop',e=>handleImportFiles(e.dataTransfer&&e.dataTransfer.files));
 window.addEventListener('dragover',e=>e.preventDefault());
 window.addEventListener('drop',e=>e.preventDefault());
-importStatus.textContent='Import PLY/OBJ/GLB/GLTF or PNG/JPEG/WebP. For GLTF + external BIN, select/drop both. A single image is shown as a 2.5D splat card, not reconstructed 3D.';
+
+const exportPlyBtn=document.createElement('button');
+exportPlyBtn.className='btn';
+exportPlyBtn.id='exportSplatPly';
+exportPlyBtn.textContent='Export splat PLY';
+shot.parentElement.appendChild(exportPlyBtn);
+exportPlyBtn.onclick=()=>{
+    try{
+        const pts=cam.state==='before'?scene.before:scene.after;
+        VulkaxSplatExport.download(pts,currentAssetName+'_vulkax_splats.ply');
+        importStatus.classList.remove('warn');
+        importStatus.textContent=`Exported ${pts.length.toLocaleString()} splats as Vulkax-compatible PLY. Coordinates are the current viewer/import coordinates.`;
+    }catch(err){
+        importStatus.textContent='Export failed — '+(err&&err.message?err.message:String(err));
+        importStatus.classList.add('warn');
+    }
+};
+const originalResetScene=resetScene.onclick;
+resetScene.onclick=()=>{if(originalResetScene)originalResetScene();currentAssetName='vulkax_scene'};
+importStatus.textContent='Import PLY/OBJ/GLB/GLTF or PNG/JPEG/WebP. For GLTF + external BIN, select/drop both. A single image is shown as a 2.5D splat card, not reconstructed 3D. Imported/current splats can be exported to Vulkax-compatible PLY.';
 """
 
     anchor = "rebuild();requestAnimationFrame(frame);"
-    injected = importer + "\n" + gltf_importer + "\n" + image_importer + "\n" + import_runtime
-    if "VulkaxImageImport.parseFile" not in text:
+    injected = importer + "\n" + gltf_importer + "\n" + image_importer + "\n" + exporter + "\n" + import_runtime
+    if "VulkaxSplatExport.download" not in text:
         if anchor not in text:
-            raise RuntimeError("interactive viewer frame anchor changed; importer injection refused")
+            raise RuntimeError("interactive viewer frame anchor changed; importer/export injection refused")
         text = text.replace(anchor, injected + "\n" + anchor, 1)
 
     path.write_text(text, encoding="utf-8")
@@ -176,6 +200,8 @@ def self_test() -> None:
         assert "VulkaxImport.parseAsset" in text
         assert "VulkaxGltfImport.parseAsset" in text
         assert "VulkaxImageImport.parseFile" in text
+        assert "VulkaxSplatExport.download" in text
+        assert "Export splat PLY" in text
         assert "handleImportFiles" in text
         assert "e.dataTransfer&&e.dataTransfer.files" in text
         assert 'multiple accept=".ply,.obj,.glb,.gltf,.bin,.png,.jpg,.jpeg,.webp"' in text
