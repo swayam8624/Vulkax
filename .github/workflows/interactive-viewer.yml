@@ -7,6 +7,8 @@ on:
       - 'scripts/build_interactive_viewer_app.py'
       - 'scripts/viewer_importers.js'
       - 'scripts/viewer_importers_test.js'
+      - 'scripts/viewer_gltf_importer.js'
+      - 'scripts/viewer_gltf_importer_test.js'
       - 'docs/INTERACTIVE_VIEWER_MVP.md'
       - '.github/workflows/interactive-viewer.yml'
   workflow_dispatch:
@@ -22,8 +24,11 @@ jobs:
           python3 scripts/build_interactive_viewer.py --self-test
           python3 scripts/build_interactive_viewer_app.py --self-test
 
-      - name: Importer regression tests
+      - name: PLY and OBJ importer regression tests
         run: node scripts/viewer_importers_test.js
+
+      - name: glTF and GLB importer regression tests
+        run: node scripts/viewer_gltf_importer_test.js
 
       - name: Generate persistent hardened viewer fixture
         run: |
@@ -88,8 +93,10 @@ jobs:
               "cam.splat*.62:cam.splat*.72",
               "const beforeBtn=document.getElementById('beforeBtn')",
               "VulkaxImport.parseAsset",
-              "f.arrayBuffer()",
-              "importDrop.addEventListener('drop'",
+              "VulkaxGltfImport.parseAsset",
+              "handleImportFiles",
+              "e.dataTransfer&&e.dataTransfer.files",
+              'multiple accept=".ply,.obj,.glb,.gltf,.bin"',
               "VULKAX_IMPORT_POINT_BUDGET=250000",
           ]
           for token in required:
