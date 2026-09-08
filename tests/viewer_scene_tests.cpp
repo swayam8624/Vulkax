@@ -52,15 +52,11 @@ void testVisibility() {
         cloud[i].scale = {0.05F, 0.05F, 0.05F};
         cloud[i].opacity = 0.8F;
     }
-    // Three visible points at different depths.
     cloud[0].position = {0.0, 0.0, -2.0};
     cloud[1].position = {0.0, 0.0, -5.0};
     cloud[2].position = {0.0, 0.0, -8.0};
-    // Behind the camera.
     cloud[3].position = {0.0, 0.0, 2.0};
-    // Far outside horizontal FOV.
     cloud[4].position = {100.0, 0.0, -3.0};
-    // Visible but below opacity threshold.
     cloud[5].position = {0.0, 0.0, -4.0};
     cloud[5].opacity = 0.0001F;
 
@@ -73,15 +69,12 @@ void testVisibility() {
 
     auto visible = vulkax::viewer::selectVisibleGaussians(cloud, camera);
     assert(visible.order.size() == 3U);
-    // Back-to-front alpha order: z=-8, -5, -2.
     assert(visible.order[0] == 2U);
     assert(visible.order[1] == 1U);
     assert(visible.order[2] == 0U);
     assert(visible.opacityRejected == 1U);
     assert(visible.frustumRejected == 2U);
 
-    // Budget selection should retain the larger projected footprint, then preserve
-    // depth ordering among the retained candidates.
     cloud[0].scale = {0.30F, 0.30F, 0.30F};
     cloud[1].scale = {0.05F, 0.05F, 0.05F};
     cloud[2].scale = {0.25F, 0.25F, 0.25F};
@@ -90,8 +83,29 @@ void testVisibility() {
     const auto lod = vulkax::viewer::selectVisibleGaussians(cloud, camera, limited);
     assert(lod.order.size() == 2U);
     assert(lod.budgetRejected == 1U);
-    // Near large splat 0 and far-but-large splat 2 outrank tiny splat 1.
     assert((lod.order[0] == 2U && lod.order[1] == 0U));
+}
+
+void testShPreservation() {
+    vulkax::gaussian::GaussianCloud cloud;
+    vulkax::gaussian::GaussianSplat splat;
+    splat.position = {0.0, 0.0, 0.0};
+    splat.logScale = {-3.0, -3.0, -3.0};
+    splat.opacityLogit = 4.0;
+    splat.shDC = {0.1, 0.2, 0.3};
+    splat.shRest.resize(vulkax::viewer::kViewerShRestValues);
+    for (std::size_t i = 0; i < splat.shRest.size(); ++i)
+        splat.shRest[i] = static_cast<double>(i + 1U) * 0.001;
+    splat.id = {9U, 4U};
+    cloud.splats.push_back(splat);
+    cloud.shRestCoefficientsPerSplat = vulkax::viewer::kViewerShRestValues;
+
+    const auto viewer = vulkax::viewer::makeViewerGaussians(cloud);
+    assert(viewer.size() == 1U);
+    assert(viewer.front().shCoefficientCount == 16U);
+    assert(viewer.front().shDC[0] > 0.099F && viewer.front().shDC[0] < 0.101F);
+    assert(viewer.front().shRest[0] > 0.0009F && viewer.front().shRest[0] < 0.0011F);
+    assert(viewer.front().shRest[44] > 0.044F && viewer.front().shRest[44] < 0.046F);
 }
 
 } // namespace
@@ -135,8 +149,10 @@ int main() {
     assert(standalone.after.size() == 2U);
     assert(standalone.particles.empty());
     assert(!standalone.hasSurface());
+    assert(standalone.before.front().shCoefficientCount == 1U);
 
     testVisibility();
+    testShPreservation();
 
     std::filesystem::remove_all(root);
     return 0;
