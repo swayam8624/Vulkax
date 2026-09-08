@@ -7,8 +7,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <limits>
 #include <span>
+#include <stdexcept>
+#include <utility>
 
 namespace vulkax::viewer {
 
