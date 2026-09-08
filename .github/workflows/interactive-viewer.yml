@@ -9,6 +9,8 @@ on:
       - 'scripts/viewer_importers_test.js'
       - 'scripts/viewer_gltf_importer.js'
       - 'scripts/viewer_gltf_importer_test.js'
+      - 'scripts/viewer_image_importer.js'
+      - 'scripts/viewer_image_importer_test.js'
       - 'docs/INTERACTIVE_VIEWER_MVP.md'
       - '.github/workflows/interactive-viewer.yml'
   workflow_dispatch:
@@ -29,6 +31,9 @@ jobs:
 
       - name: glTF and GLB importer regression tests
         run: node scripts/viewer_gltf_importer_test.js
+
+      - name: Image splat-card regression tests
+        run: node scripts/viewer_image_importer_test.js
 
       - name: Generate persistent hardened viewer fixture
         run: |
@@ -94,10 +99,12 @@ jobs:
               "const beforeBtn=document.getElementById('beforeBtn')",
               "VulkaxImport.parseAsset",
               "VulkaxGltfImport.parseAsset",
+              "VulkaxImageImport.parseFile",
               "handleImportFiles",
               "e.dataTransfer&&e.dataTransfer.files",
-              'multiple accept=".ply,.obj,.glb,.gltf,.bin"',
+              'multiple accept=".ply,.obj,.glb,.gltf,.bin,.png,.jpg,.jpeg,.webp"',
               "VULKAX_IMPORT_POINT_BUDGET=250000",
+              "VULKAX_IMAGE_POINT_BUDGET=80000",
           ]
           for token in required:
               assert token in html, token
