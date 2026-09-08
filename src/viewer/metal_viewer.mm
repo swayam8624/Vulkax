@@ -4,6 +4,7 @@
 
 #include "vulkax/viewer/asset_import.hpp"
 #include "vulkax/viewer/gpu_sort_session.hpp"
+#include "vulkax/viewer/macos_image_import.hpp"
 #include "vulkax/viewer/metal_gpu_sorter.hpp"
 #include "vulkax/viewer/metal_shader_source.hpp"
 #include "vulkax/viewer/scene.hpp"
@@ -73,6 +74,12 @@ simd_float4x4 lookAt(Vec3 eyeValue, Vec3 centerValue) {
 
 NSString* ns(const std::string& s) { return [NSString stringWithUTF8String:s.c_str()]; }
 std::string errorText(NSError* e) { return (e && e.localizedDescription) ? std::string(e.localizedDescription.UTF8String) : "unknown Metal error"; }
+
+bool isImageExtension(NSString* extension) {
+    if (!extension) return false;
+    static NSSet<NSString*>* extensions = [NSSet setWithArray:@[@"png",@"jpg",@"jpeg",@"webp",@"bmp",@"tif",@"tiff",@"heic"]];
+    return [extensions containsObject:extension.lowercaseString];
+}
 
 MTLScissorRect scissor(NSUInteger x, NSUInteger y, NSUInteger width, NSUInteger height) {
     MTLScissorRect rect; rect.x=x; rect.y=y; rect.width=width; rect.height=height; return rect;
@@ -153,6 +160,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
 - (void)handleKey:(NSString*)key;
 - (void)loadPlyURL:(NSURL*)url;
 - (void)loadObjURL:(NSURL*)url;
+- (void)loadImageURL:(NSURL*)url;
 - (void)loadRunURL:(NSURL*)url;
 - (IBAction)modeChanged:(NSSegmentedControl*)sender;
 - (IBAction)stateChanged:(NSSegmentedControl*)sender;
@@ -166,6 +174,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
 - (IBAction)budgetChanged:(NSSlider*)sender;
 - (IBAction)openPly:(id)sender;
 - (IBAction)openObj:(id)sender;
+- (IBAction)openImage:(id)sender;
 - (IBAction)openRun:(id)sender;
 - (IBAction)capturePng:(id)sender;
 @end
@@ -191,7 +200,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
     NSNumber* directory = nil;
     [url getResourceValue:&directory forKey:NSURLIsDirectoryKey error:nil];
     NSString* extension=url.pathExtension.lowercaseString;
-    if (directory.boolValue || [extension isEqualToString:@"ply"] || [extension isEqualToString:@"obj"]) return NSDragOperationCopy;
+    if (directory.boolValue || [extension isEqualToString:@"ply"] || [extension isEqualToString:@"obj"] || isImageExtension(extension)) return NSDragOperationCopy;
     return NSDragOperationNone;
 }
 - (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
@@ -203,6 +212,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
     NSString* extension=url.pathExtension.lowercaseString;
     if ([extension isEqualToString:@"ply"]) { [self.renderer loadPlyURL:url]; return YES; }
     if ([extension isEqualToString:@"obj"]) { [self.renderer loadObjURL:url]; return YES; }
+    if (isImageExtension(extension)) { [self.renderer loadImageURL:url]; return YES; }
     return NO;
 }
 @end
@@ -339,7 +349,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
     else if(_gpuSortSession.validating()) sortStatus=[NSString stringWithFormat:@"GPU validate %lu/%lu",(unsigned long)_gpuSortSession.parityPasses(),(unsigned long)_gpuSortSession.requiredParityPasses()];
     else sortStatus=@"CPU fallback";
     NSString* sortNote=_gpuSortSession.note().empty()?@"":[NSString stringWithFormat:@"\nSort note   %@",ns(_gpuSortSession.note())];
-    _stats.stringValue=[NSString stringWithFormat:@"Gaussians   %lu → %lu\nVisible     %lu | %lu\nCulled      %lu | %lu\nBudget      %lu\nParticles   %lu\nRewrite     %lu\nSurface     %@\nMax Δ       %.3e\nSH          %@\nSort        %@\nCull/LOD    %.3f ms\nGPU sort    %.3f ms%@\nFPS         %.1f\n\nDrop .ply/.obj or run folder\n1–5 modes · B/A state\nS SH · P capture\nH highlight · G grid\nSpace orbit · R camera",
+    _stats.stringValue=[NSString stringWithFormat:@"Gaussians   %lu → %lu\nVisible     %lu | %lu\nCulled      %lu | %lu\nBudget      %lu\nParticles   %lu\nRewrite     %lu\nSurface     %@\nMax Δ       %.3e\nSH          %@\nSort        %@\nCull/LOD    %.3f ms\nGPU sort    %.3f ms%@\nFPS         %.1f\n\nDrop .ply/.obj/image or run folder\n1–5 modes · B/A state\nS SH · P capture\nH highlight · G grid\nSpace orbit · R camera",
         (unsigned long)_scene.before.size(),(unsigned long)_scene.after.size(),(unsigned long)_beforeVisible,(unsigned long)_afterVisible,
         (unsigned long)_beforeCulled,(unsigned long)_afterCulled,(unsigned long)_splatBudget,(unsigned long)_scene.particles.size(),
         (unsigned long)_scene.rewriteParticleCount,ns(_scene.surfaceKind),_scene.maxGaussianDisplacement,_shEnabled?@"view-dependent":@"DC only",sortStatus,
@@ -387,6 +397,14 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
         [self uploadScene];[self resetCamera];
     } catch(const std::exception& e){NSAlert* a=[NSAlert new];a.messageText=@"Could not import OBJ";a.informativeText=ns(e.what());[a runModal];}
 }
+- (void)loadImageURL:(NSURL*)url {
+    try {
+        vulkax::viewer::ImageSplatCardSettings settings;
+        settings.maxSplats=std::min<std::size_t>(250000U,std::max<std::size_t>(20000U,_splatBudget));
+        _scene=vulkax::viewer::loadMacImageAsSplatCard(std::filesystem::path(url.path.UTF8String),settings);
+        [self uploadScene];[self resetCamera];
+    } catch(const std::exception& e){NSAlert* a=[NSAlert new];a.messageText=@"Could not import image";a.informativeText=ns(e.what());[a runModal];}
+}
 - (void)loadRunURL:(NSURL*)url {
     try { _scene=vulkax::viewer::loadCapturedWorldScene(std::filesystem::path(url.path.UTF8String)); [self uploadScene]; [self resetCamera]; }
     catch(const std::exception& e){NSAlert* a=[NSAlert new];a.messageText=@"Could not open Vulkax run";a.informativeText=ns(e.what());[a runModal];}
@@ -398,6 +416,10 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
 - (IBAction)openObj:(id)sender {
     (void)sender; NSOpenPanel* p=[NSOpenPanel openPanel]; p.canChooseDirectories=NO; p.allowsMultipleSelection=NO; p.allowedFileTypes=@[@"obj"];
     if([p runModal]==NSModalResponseOK&&p.URL)[self loadObjURL:p.URL];
+}
+- (IBAction)openImage:(id)sender {
+    (void)sender; NSOpenPanel* p=[NSOpenPanel openPanel]; p.canChooseDirectories=NO; p.allowsMultipleSelection=NO; p.allowedFileTypes=@[@"png",@"jpg",@"jpeg",@"webp",@"bmp",@"tif",@"tiff",@"heic"];
+    if([p runModal]==NSModalResponseOK&&p.URL)[self loadImageURL:p.URL];
 }
 - (IBAction)openRun:(id)sender {
     (void)sender; NSOpenPanel* p=[NSOpenPanel openPanel]; p.canChooseDirectories=YES; p.canChooseFiles=NO; p.allowsMultipleSelection=NO;
@@ -558,7 +580,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
 
 static NSTextField* label(NSString* text,CGFloat size,NSFontWeight weight){NSTextField* f=[NSTextField labelWithString:text];f.font=[NSFont systemFontOfSize:size weight:weight];f.textColor=[NSColor colorWithCalibratedWhite:0.92 alpha:1];return f;}
 static NSView* sliderRow(NSString* title,double lo,double hi,double value,id target,SEL action){NSStackView* s=[NSStackView stackViewWithViews:@[]];s.orientation=NSUserInterfaceLayoutOrientationVertical;s.spacing=4;NSTextField* c=label(title,11,NSFontWeightMedium);c.textColor=[NSColor colorWithCalibratedRed:.64 green:.73 blue:.86 alpha:1];NSSlider* slider=[NSSlider sliderWithValue:value minValue:lo maxValue:hi target:target action:action];slider.continuous=YES;[s addArrangedSubview:c];[s addArrangedSubview:slider];return s;}
-static NSVisualEffectView* inspector(VulkaxRenderer* r,NSTextField** statsOut){NSVisualEffectView* p=[NSVisualEffectView new];p.material=NSVisualEffectMaterialSidebar;p.blendingMode=NSVisualEffectBlendingModeBehindWindow;p.state=NSVisualEffectStateActive;NSStackView* s=[NSStackView stackViewWithViews:@[]];s.translatesAutoresizingMaskIntoConstraints=NO;s.orientation=NSUserInterfaceLayoutOrientationVertical;s.alignment=NSLayoutAttributeLeading;s.spacing=10;s.edgeInsets=NSEdgeInsetsMake(20,18,18,18);[p addSubview:s];[NSLayoutConstraint activateConstraints:@[[s.leadingAnchor constraintEqualToAnchor:p.leadingAnchor],[s.trailingAnchor constraintEqualToAnchor:p.trailingAnchor],[s.topAnchor constraintEqualToAnchor:p.topAnchor]]];NSTextField* brand=label(@"VULKAX NATIVE VIEWER",11,NSFontWeightSemibold);brand.textColor=[NSColor colorWithCalibratedRed:.52 green:.70 blue:1 alpha:1];[s addArrangedSubview:brand];[s addArrangedSubview:label(@"Interactive Gaussian World",20,NSFontWeightBold)];NSSegmentedControl* m=[NSSegmentedControl segmentedControlWithLabels:@[@"Hybrid",@"Splats",@"Surface",@"Particles",@"Compare"] trackingMode:NSSegmentSwitchTrackingSelectOne target:r action:@selector(modeChanged:)];m.selectedSegment=0;[s addArrangedSubview:m];NSSegmentedControl* st=[NSSegmentedControl segmentedControlWithLabels:@[@"Before",@"Verified After"] trackingMode:NSSegmentSwitchTrackingSelectOne target:r action:@selector(stateChanged:)];st.selectedSegment=1;[s addArrangedSubview:st];NSButton* h=[NSButton checkboxWithTitle:@"Rewrite highlight" target:r action:@selector(highlightChanged:)];h.state=NSControlStateValueOn;NSButton* g=[NSButton checkboxWithTitle:@"Ground grid" target:r action:@selector(gridChanged:)];g.state=NSControlStateValueOn;NSButton* o=[NSButton checkboxWithTitle:@"Auto orbit" target:r action:@selector(orbitChanged:)];NSButton* sh=[NSButton checkboxWithTitle:@"View-dependent SH" target:r action:@selector(shChanged:)];sh.state=NSControlStateValueOn;[s addArrangedSubview:h];[s addArrangedSubview:g];[s addArrangedSubview:o];[s addArrangedSubview:sh];[s addArrangedSubview:sliderRow(@"Splat scale",.2,4,1,r,@selector(splatScaleChanged:))];[s addArrangedSubview:sliderRow(@"Opacity",.05,1,.88,r,@selector(opacityChanged:))];[s addArrangedSubview:sliderRow(@"Exposure",.35,2.4,1,r,@selector(exposureChanged:))];[s addArrangedSubview:sliderRow(@"Splat budget",10000,500000,200000,r,@selector(budgetChanged:))];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Vulkax Run…" target:r action:@selector(openRun:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Gaussian PLY…" target:r action:@selector(openPly:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open OBJ Mesh…" target:r action:@selector(openObj:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Capture PNG…" target:r action:@selector(capturePng:)]];NSTextField* stats=label(@"",11,NSFontWeightRegular);stats.textColor=[NSColor colorWithCalibratedRed:.68 green:.77 blue:.90 alpha:1];stats.maximumNumberOfLines=0;[s addArrangedSubview:stats];*statsOut=stats;return p;}
+static NSVisualEffectView* inspector(VulkaxRenderer* r,NSTextField** statsOut){NSVisualEffectView* p=[NSVisualEffectView new];p.material=NSVisualEffectMaterialSidebar;p.blendingMode=NSVisualEffectBlendingModeBehindWindow;p.state=NSVisualEffectStateActive;NSStackView* s=[NSStackView stackViewWithViews:@[]];s.translatesAutoresizingMaskIntoConstraints=NO;s.orientation=NSUserInterfaceLayoutOrientationVertical;s.alignment=NSLayoutAttributeLeading;s.spacing=10;s.edgeInsets=NSEdgeInsetsMake(20,18,18,18);[p addSubview:s];[NSLayoutConstraint activateConstraints:@[[s.leadingAnchor constraintEqualToAnchor:p.leadingAnchor],[s.trailingAnchor constraintEqualToAnchor:p.trailingAnchor],[s.topAnchor constraintEqualToAnchor:p.topAnchor]]];NSTextField* brand=label(@"VULKAX NATIVE VIEWER",11,NSFontWeightSemibold);brand.textColor=[NSColor colorWithCalibratedRed:.52 green:.70 blue:1 alpha:1];[s addArrangedSubview:brand];[s addArrangedSubview:label(@"Interactive Gaussian World",20,NSFontWeightBold)];NSSegmentedControl* m=[NSSegmentedControl segmentedControlWithLabels:@[@"Hybrid",@"Splats",@"Surface",@"Particles",@"Compare"] trackingMode:NSSegmentSwitchTrackingSelectOne target:r action:@selector(modeChanged:)];m.selectedSegment=0;[s addArrangedSubview:m];NSSegmentedControl* st=[NSSegmentedControl segmentedControlWithLabels:@[@"Before",@"Verified After"] trackingMode:NSSegmentSwitchTrackingSelectOne target:r action:@selector(stateChanged:)];st.selectedSegment=1;[s addArrangedSubview:st];NSButton* h=[NSButton checkboxWithTitle:@"Rewrite highlight" target:r action:@selector(highlightChanged:)];h.state=NSControlStateValueOn;NSButton* g=[NSButton checkboxWithTitle:@"Ground grid" target:r action:@selector(gridChanged:)];g.state=NSControlStateValueOn;NSButton* o=[NSButton checkboxWithTitle:@"Auto orbit" target:r action:@selector(orbitChanged:)];NSButton* sh=[NSButton checkboxWithTitle:@"View-dependent SH" target:r action:@selector(shChanged:)];sh.state=NSControlStateValueOn;[s addArrangedSubview:h];[s addArrangedSubview:g];[s addArrangedSubview:o];[s addArrangedSubview:sh];[s addArrangedSubview:sliderRow(@"Splat scale",.2,4,1,r,@selector(splatScaleChanged:))];[s addArrangedSubview:sliderRow(@"Opacity",.05,1,.88,r,@selector(opacityChanged:))];[s addArrangedSubview:sliderRow(@"Exposure",.35,2.4,1,r,@selector(exposureChanged:))];[s addArrangedSubview:sliderRow(@"Splat budget",10000,500000,200000,r,@selector(budgetChanged:))];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Vulkax Run…" target:r action:@selector(openRun:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Gaussian PLY…" target:r action:@selector(openPly:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open OBJ Mesh…" target:r action:@selector(openObj:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Image as 2.5D Splats…" target:r action:@selector(openImage:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Capture PNG…" target:r action:@selector(capturePng:)]];NSTextField* stats=label(@"",11,NSFontWeightRegular);stats.textColor=[NSColor colorWithCalibratedRed:.68 green:.77 blue:.90 alpha:1];stats.maximumNumberOfLines=0;[s addArrangedSubview:stats];*statsOut=stats;return p;}
 
 @interface VulkaxAppDelegate : NSObject <NSApplicationDelegate> { @private ViewerScene _initialScene; }
 @property(nonatomic,strong) NSWindow* window;
@@ -572,6 +594,6 @@ static NSVisualEffectView* inspector(VulkaxRenderer* r,NSTextField** statsOut){N
 @end
 
 static void menu(){NSMenu* bar=[NSMenu new];NSMenuItem* root=[NSMenuItem new];[bar addItem:root];NSApp.mainMenu=bar;NSMenu* m=[NSMenu new];[m addItemWithTitle:@"About Vulkax Viewer" action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""];[m addItem:[NSMenuItem separatorItem]];[m addItemWithTitle:@"Quit Vulkax Viewer" action:@selector(terminate:) keyEquivalent:@"q"];root.submenu=m;}
-struct Args{std::filesystem::path run{"build/captured-world-run"},particles{},ply{},obj{};};
-static Args args(int argc,const char* argv[]){Args a;for(int i=1;i<argc;++i){std::string v=argv[i];auto next=[&](const char* f){if(i+1>=argc)throw std::runtime_error(std::string(f)+" requires a path");return std::string(argv[++i]);};if(v=="--run")a.run=next("--run");else if(v=="--particles")a.particles=next("--particles");else if(v=="--ply")a.ply=next("--ply");else if(v=="--obj")a.obj=next("--obj");else if(v=="--help"||v=="-h"){std::cout<<"Usage: vulkax_viewer [--run captured-world-run] [--particles particles.csv] [--ply gaussians.ply] [--obj model.obj]\nControls: 1-5 modes, B/A state, S SH, P capture, H highlight, G grid, Space orbit, R reset.\nGPU ordering is promoted automatically after three CPU-parity passes and falls back safely on any mismatch.\n";std::exit(0);}else if(!v.starts_with('-'))a.run=v;else throw std::runtime_error("unknown argument: "+v);}return a;}
-int main(int argc,const char* argv[]){@autoreleasepool{try{const auto a=args(argc,argv);ViewerScene scene;if(!a.obj.empty())scene=vulkax::viewer::loadObjAsGaussianScene(a.obj);else if(!a.ply.empty())scene=vulkax::viewer::loadStandaloneGaussianScene(a.ply);else scene=vulkax::viewer::loadCapturedWorldScene(a.run,a.particles);[NSApplication sharedApplication];[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];menu();VulkaxAppDelegate* d=[[VulkaxAppDelegate alloc] initWithScene:std::move(scene)];NSApp.delegate=d;[NSApp run];return 0;}catch(const std::exception& e){std::cerr<<"vulkax_viewer: "<<e.what()<<'\n';return 1;}}}
+struct Args{std::filesystem::path run{"build/captured-world-run"},particles{},ply{},obj{},image{};};
+static Args args(int argc,const char* argv[]){Args a;for(int i=1;i<argc;++i){std::string v=argv[i];auto next=[&](const char* f){if(i+1>=argc)throw std::runtime_error(std::string(f)+" requires a path");return std::string(argv[++i]);};if(v=="--run")a.run=next("--run");else if(v=="--particles")a.particles=next("--particles");else if(v=="--ply")a.ply=next("--ply");else if(v=="--obj")a.obj=next("--obj");else if(v=="--image")a.image=next("--image");else if(v=="--help"||v=="-h"){std::cout<<"Usage: vulkax_viewer [--run captured-world-run] [--particles particles.csv] [--ply gaussians.ply] [--obj model.obj] [--image image.png]\nControls: 1-5 modes, B/A state, S SH, P capture, H highlight, G grid, Space orbit, R reset.\nSingle-image import is an explicit flat 2.5D splat card; it does not claim reconstructed 3D.\nGPU ordering is promoted automatically after three CPU-parity passes and falls back safely on any mismatch.\n";std::exit(0);}else if(!v.starts_with('-'))a.run=v;else throw std::runtime_error("unknown argument: "+v);}return a;}
+int main(int argc,const char* argv[]){@autoreleasepool{try{const auto a=args(argc,argv);ViewerScene scene;if(!a.image.empty())scene=vulkax::viewer::loadMacImageAsSplatCard(a.image);else if(!a.obj.empty())scene=vulkax::viewer::loadObjAsGaussianScene(a.obj);else if(!a.ply.empty())scene=vulkax::viewer::loadStandaloneGaussianScene(a.ply);else scene=vulkax::viewer::loadCapturedWorldScene(a.run,a.particles);[NSApplication sharedApplication];[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];menu();VulkaxAppDelegate* d=[[VulkaxAppDelegate alloc] initWithScene:std::move(scene)];NSApp.delegate=d;[NSApp run];return 0;}catch(const std::exception& e){std::cerr<<"vulkax_viewer: "<<e.what()<<'\n';return 1;}}}
