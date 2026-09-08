@@ -2,6 +2,7 @@
 
 #include "vulkax/viewer/macos_image_import.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
