@@ -1,11 +1,14 @@
 #include "vulkax/viewer/asset_import.hpp"
+#include "vulkax/viewer/image_splat_card.hpp"
 
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -20,8 +23,10 @@ void writeText(const std::filesystem::path& path, const std::string& text) {
 
 int main() {
     namespace fs = std::filesystem;
+    using vulkax::viewer::ImageSplatCardSettings;
     using vulkax::viewer::ObjImportSettings;
     using vulkax::viewer::loadObjAsGaussianScene;
+    using vulkax::viewer::makeImageSplatCard;
 
     const auto root = fs::temp_directory_path() / "vulkax-viewer-asset-import-tests";
     fs::remove_all(root);
@@ -91,6 +96,41 @@ int main() {
         threw = true;
     }
     assert(threw);
+
+    // RGBA images become explicitly flat 2.5D cards; transparent pixels are skipped.
+    std::vector<std::uint8_t> rgba(4U * 2U * 4U, 255U);
+    for (std::size_t pixel = 0U; pixel < 8U; ++pixel) {
+        rgba[pixel * 4U + 0U] = static_cast<std::uint8_t>(pixel * 20U);
+        rgba[pixel * 4U + 1U] = static_cast<std::uint8_t>(255U - pixel * 20U);
+        rgba[pixel * 4U + 2U] = 64U;
+        rgba[pixel * 4U + 3U] = 255U;
+    }
+    rgba[3U] = 0U; // top-left pixel transparent.
+    ImageSplatCardSettings imageSettings;
+    imageSettings.maxSplats = 8U;
+    imageSettings.worldHeight = 2.0;
+    const auto imageScene = makeImageSplatCard(4U, 2U, rgba, imageSettings);
+    assert(imageScene.before.size() == 7U);
+    assert(imageScene.after.size() == 7U);
+    assert(imageScene.surfaceKind == "image_splat_card_2_5d");
+    assert(!imageScene.hasSurface());
+    assert(std::abs(imageScene.bounds.maximum.x - 2.0) < 1.0e-9);
+    assert(std::abs(imageScene.bounds.minimum.x + 2.0) < 1.0e-9);
+    assert(std::abs(imageScene.bounds.maximum.y - 1.0) < 1.0e-9);
+    assert(imageScene.before.front().position.y > 0.0); // input row zero maps upward.
+    for (const auto& splat : imageScene.before) {
+        assert(std::abs(splat.position.z) < 1.0e-12);
+        assert(splat.scale[0] > splat.scale[2]);
+        assert(splat.opacity > 0.99F);
+        assert(splat.shCoefficientCount == 1U);
+    }
+
+    // A strict budget selects a deterministic pixel stride instead of allocating every pixel.
+    std::fill(rgba.begin(), rgba.end(), 255U);
+    imageSettings.maxSplats = 2U;
+    const auto budgetedImage = makeImageSplatCard(4U, 2U, rgba, imageSettings);
+    assert(budgetedImage.before.size() <= 2U);
+    assert(!budgetedImage.before.empty());
 
     fs::remove_all(root);
     return 0;
