@@ -23,7 +23,8 @@ Interaction:
 - rewrite-region highlight toggle;
 - ground grid toggle;
 - splat-size, opacity, and exposure controls;
-- PNG capture.
+- PNG capture;
+- export the currently displayed splat scene as a Vulkax-compatible PLY.
 
 The viewer is fully self-contained: no CDN, framework, font, JavaScript package, or network request is required at runtime.
 
@@ -49,7 +50,7 @@ python3 scripts/build_interactive_viewer_app.py \
 open build/captured-world-run/render/interactive/viewer.html
 ```
 
-`build_interactive_viewer.py` is the core scene-data/HTML compiler. `build_interactive_viewer_app.py` is the public hardened launcher: it applies Retina-safe point sizing, explicit DOM bindings for stable Chrome/Safari behavior, and the production local-file importers.
+`build_interactive_viewer.py` is the core scene-data/HTML compiler. `build_interactive_viewer_app.py` is the public hardened launcher: it applies Retina-safe point sizing, explicit DOM bindings for stable Chrome/Safari behavior, the production local-file importers, and splat PLY export.
 
 The generated HTML embeds the data needed to display that run, so `file://` opening works without running a local web server.
 
@@ -127,6 +128,31 @@ Orbiting the camera therefore reveals that the result is a plane. True image/vid
 
 The importer reads all binary formats as `ArrayBuffer`, so binary PLY and GLB are not corrupted through text decoding. Drag/drop calls the same package import routine directly rather than trying to synthesize and assign a `DataTransfer` object to the hidden file input, which is unreliable across browsers.
 
+## Export generated splats
+
+The viewer adds an **Export splat PLY** action next to the capture controls. It exports the currently selected before/after splat set in a PLY that the existing Vulkax Gaussian loader understands:
+
+- `x`, `y`, `z`;
+- `f_dc_0..2` spherical-harmonic DC color coefficients;
+- opacity as a logit;
+- isotropic `scale_0..2` in log-space;
+- identity `rot_0..3` quaternion;
+- `vulkax_id_namespace` and `vulkax_id_local` stable IDs.
+
+This makes the viewer a lightweight authoring bridge:
+
+```text
+OBJ / GLB / glTF / image / point cloud
+                    ↓
+              viewer splats
+                    ↓
+           Export splat PLY
+                    ↓
+       Vulkax 3DGS-compatible asset
+```
+
+For imported OBJ/glTF/image data, coordinates are the normalized viewer/import coordinates. The exported PLY is therefore an authoring/presentation asset, **not** captured scientific evidence and not a replacement for a calibrated capture bundle.
+
 ## Rendering model
 
 Gaussian mode uses WebGL2 `POINTS` with a Gaussian radial falloff in the fragment shader. Point size is perspective-scaled from the stored Gaussian scale and clamped by the browser/GPU point-size implementation limit. The hardened launcher keeps the scale multiplier in world-space territory so Retina displays do not collapse the scene into giant point sprites.
@@ -142,7 +168,8 @@ The viewer distinguishes authoritative and presentation data:
 - authoritative: before/rewritten Gaussian centers and appearance properties, physical particles, selected rewrite-region IDs;
 - presentation: derived shell triangles, studio lighting, grid, exposure, camera, point-sprite falloff;
 - imported external assets: presentation-only viewer data, never written into a Vulkax capture bundle by this MVP;
-- single-image imports: explicitly 2.5D cards, not reconstructed 3D evidence.
+- single-image imports: explicitly 2.5D cards, not reconstructed 3D evidence;
+- exported imported splats: authoring/presentation PLYs in viewer-normalized coordinates.
 
 A verified material rewrite can legitimately leave Gaussian centers unchanged. The viewer therefore never fabricates displacement: it keeps the geometry fixed and highlights the selected physical rewrite region.
 
@@ -154,6 +181,7 @@ python3 scripts/build_interactive_viewer_app.py --self-test
 node scripts/viewer_importers_test.js
 node scripts/viewer_gltf_importer_test.js
 node scripts/viewer_image_importer_test.js
+node scripts/viewer_splat_export_test.js
 ```
 
-The importer regression suites cover RGB ASCII PLY, binary little-endian Gaussian PLY, OBJ face sampling, negative OBJ indices, malformed inputs, deterministic downsampling, embedded-buffer glTF, external `.gltf + .bin`, GLB 2.0, indexed triangles, triangle strips, image aspect preservation, alpha filtering, and image point-budget downsampling. CI additionally generates a persistent hardened viewer fixture, validates the HTML contract, and runs `node --check` on the generated inline JavaScript.
+The importer/export regression suites cover RGB ASCII PLY, binary little-endian Gaussian PLY, OBJ face sampling, negative OBJ indices, malformed inputs, deterministic downsampling, embedded-buffer glTF, external `.gltf + .bin`, GLB 2.0, indexed triangles, triangle strips, image aspect preservation, alpha filtering, image point-budget downsampling, and Vulkax-compatible Gaussian PLY export semantics. CI additionally generates a persistent hardened viewer fixture, validates the HTML contract, and runs `node --check` on the generated inline JavaScript.
