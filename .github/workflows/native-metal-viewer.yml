@@ -8,6 +8,7 @@ on:
       - 'src/viewer/**'
       - 'tests/viewer_scene_tests.cpp'
       - 'tests/viewer_asset_import_tests.cpp'
+      - 'tests/viewer_macos_image_import_tests.mm'
       - 'docs/NATIVE_METAL_VIEWER_MVP.md'
       - '.github/workflows/native-metal-viewer.yml'
   workflow_dispatch:
@@ -46,7 +47,16 @@ jobs:
           xcrun -sdk macosx metal -c build/vulkax_native_viewer_embedded.metal -o build/vulkax_native_viewer_embedded.air
       - name: Test reusable viewer layers on macOS
         run: ctest --test-dir build -R '^vulkax_viewer_(scene|asset_import)$' --output-on-failure
-      - name: Verify viewer CLI links and advertises OBJ import
+      - name: Build macOS PNG decode round-trip test
+        run: |
+          clang++ -std=c++20 -fobjc-arc -x objective-c++ -Iinclude \
+            tests/viewer_macos_image_import_tests.mm src/viewer/macos_image_import.mm \
+            -framework AppKit -framework CoreGraphics \
+            -o /tmp/vulkax_viewer_macos_image_import_tests
+      - name: Run macOS PNG decode round-trip test
+        run: /tmp/vulkax_viewer_macos_image_import_tests
+      - name: Verify viewer CLI links and advertises native asset import
         run: |
           ./build/vulkax_viewer --help | tee /tmp/vulkax-viewer-help.txt
           grep -q -- '--obj' /tmp/vulkax-viewer-help.txt
+          grep -q -- '--image' /tmp/vulkax-viewer-help.txt
