@@ -11,6 +11,8 @@ on:
       - 'scripts/viewer_gltf_importer_test.js'
       - 'scripts/viewer_image_importer.js'
       - 'scripts/viewer_image_importer_test.js'
+      - 'scripts/viewer_splat_export.js'
+      - 'scripts/viewer_splat_export_test.js'
       - 'docs/INTERACTIVE_VIEWER_MVP.md'
       - '.github/workflows/interactive-viewer.yml'
   workflow_dispatch:
@@ -34,6 +36,9 @@ jobs:
 
       - name: Image splat-card regression tests
         run: node scripts/viewer_image_importer_test.js
+
+      - name: Splat PLY exporter regression tests
+        run: node scripts/viewer_splat_export_test.js
 
       - name: Generate persistent hardened viewer fixture
         run: |
@@ -95,11 +100,13 @@ jobs:
               'canvas id="gl"',
               'WebGL2',
               'Capture PNG',
+              'Export splat PLY',
               "cam.splat*.62:cam.splat*.72",
               "const beforeBtn=document.getElementById('beforeBtn')",
               "VulkaxImport.parseAsset",
               "VulkaxGltfImport.parseAsset",
               "VulkaxImageImport.parseFile",
+              "VulkaxSplatExport.download",
               "handleImportFiles",
               "e.dataTransfer&&e.dataTransfer.files",
               'multiple accept=".ply,.obj,.glb,.gltf,.bin,.png,.jpg,.jpeg,.webp"',
