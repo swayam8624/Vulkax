@@ -29,11 +29,16 @@ struct VisibilitySettings {
     // Prevent a single pathological source scale close to the camera from taking
     // effectively infinite importance and evicting the rest of the scene.
     double maximumProjectedRadiusNdc{4.0};
+    // CPU/reference rendering needs a conventional back-to-front order. A
+    // validated GPU sorter can disable this final O(N log N) stage while still
+    // reusing the same conservative culling and importance-budget selection.
+    bool sortBackToFront{true};
 };
 
 struct VisibilityResult {
-    // Indices into the original ViewerGaussian array, ordered back-to-front for
-    // conventional alpha blending.
+    // Indices into the original ViewerGaussian array. With sortBackToFront=true
+    // they are ordered for conventional alpha blending. With it disabled they
+    // are the retained set only and must be ordered by the downstream renderer.
     std::vector<std::uint32_t> order;
     std::size_t sourceCount{};
     std::size_t opacityRejected{};
@@ -62,8 +67,9 @@ struct VisibilityCandidate {
 // crossing a frustum edge are retained rather than clipped away too aggressively.
 //
 // When the visible set exceeds maxSplats, importance is roughly opacity times
-// projected footprint. The retained set is then sorted by depth, so LOD selection
-// does not break alpha-compositing order.
+// projected footprint. By default the retained set is then sorted by depth. A
+// renderer with a validated GPU sort can set sortBackToFront=false to receive the
+// same retained set without paying for the final CPU depth sort.
 [[nodiscard]] inline VisibilityResult selectVisibleGaussians(
     std::span<const ViewerGaussian> gaussians,
     const ViewerCamera& camera,
@@ -105,8 +111,6 @@ struct VisibilityCandidate {
             continue;
         }
 
-        // For points intersecting the near plane, use nearPlane as the projection
-        // denominator. This keeps the cull conservative and importance finite.
         const double projectionDepth = std::max(depth, nearPlane);
         const double horizontal = math::dot(delta, right);
         const double vertical = math::dot(delta, up);
@@ -136,10 +140,12 @@ struct VisibilityCandidate {
         candidates.resize(budget);
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.depth != rhs.depth) return lhs.depth > rhs.depth;
-        return lhs.index < rhs.index;
-    });
+    if (settings.sortBackToFront) {
+        std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
+            if (lhs.depth != rhs.depth) return lhs.depth > rhs.depth;
+            return lhs.index < rhs.index;
+        });
+    }
     result.order.reserve(candidates.size());
     for (const auto& candidate : candidates) result.order.push_back(candidate.index);
     return result;
