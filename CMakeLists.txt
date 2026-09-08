@@ -73,7 +73,7 @@ endif()
 
 # Viewer scene data is intentionally outside vulkax_core: it consumes authoritative
 # state but remains presentation/debugging infrastructure reusable by Metal/Vulkan UIs.
-add_library(vulkax_viewer_common STATIC src/viewer/scene.cpp)
+add_library(vulkax_viewer_common STATIC src/viewer/scene.cpp src/viewer/asset_import.cpp)
 target_include_directories(vulkax_viewer_common PUBLIC include)
 target_compile_features(vulkax_viewer_common PUBLIC cxx_std_20)
 target_link_libraries(vulkax_viewer_common PUBLIC vulkax_core)
@@ -93,8 +93,8 @@ add_executable(vulkax_captured_rewrite src/tools/captured_verified_rewrite.cpp)
 target_link_libraries(vulkax_captured_rewrite PRIVATE vulkax_core)
 
 if(APPLE)
-    add_executable(vulkax_viewer src/viewer/metal_viewer.mm)
-    set_source_files_properties(src/viewer/metal_viewer.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+    add_executable(vulkax_viewer src/viewer/metal_viewer.mm src/viewer/macos_image_import.mm)
+    set_source_files_properties(src/viewer/metal_viewer.mm src/viewer/macos_image_import.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
     target_link_libraries(vulkax_viewer PRIVATE vulkax_viewer_common
         ${VULKAX_METAL_FRAMEWORK} ${VULKAX_METALKIT_FRAMEWORK} ${VULKAX_APPKIT_FRAMEWORK}
         ${VULKAX_QUARTZCORE_FRAMEWORK} ${VULKAX_FOUNDATION_FRAMEWORK})
@@ -116,10 +116,15 @@ if(VULKAX_BUILD_TESTS)
 
     add_executable(vulkax_viewer_scene_tests tests/viewer_scene_tests.cpp)
     target_link_libraries(vulkax_viewer_scene_tests PRIVATE vulkax_viewer_common)
+    add_executable(vulkax_viewer_asset_import_tests tests/viewer_asset_import_tests.cpp)
+    target_link_libraries(vulkax_viewer_asset_import_tests PRIVATE vulkax_viewer_common)
     if(MSVC)
         target_compile_options(vulkax_viewer_scene_tests PRIVATE /W4 /permissive- /UNDEBUG)
+        target_compile_options(vulkax_viewer_asset_import_tests PRIVATE /W4 /permissive- /UNDEBUG)
     else()
         target_compile_options(vulkax_viewer_scene_tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+        target_compile_options(vulkax_viewer_asset_import_tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
     endif()
     add_test(NAME vulkax_viewer_scene COMMAND vulkax_viewer_scene_tests)
+    add_test(NAME vulkax_viewer_asset_import COMMAND vulkax_viewer_asset_import_tests)
 endif()

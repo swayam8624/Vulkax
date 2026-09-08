@@ -7,6 +7,8 @@ on:
       - 'include/vulkax/viewer/**'
       - 'src/viewer/**'
       - 'tests/viewer_scene_tests.cpp'
+      - 'tests/viewer_asset_import_tests.cpp'
+      - 'tests/viewer_macos_image_import_tests.mm'
       - 'docs/NATIVE_METAL_VIEWER_MVP.md'
       - '.github/workflows/native-metal-viewer.yml'
   workflow_dispatch:
@@ -16,12 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Configure viewer scene test
+      - name: Configure reusable viewer tests
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
-      - name: Build reusable scene layer
-        run: cmake --build build --target vulkax_viewer_scene_tests --parallel 2
-      - name: Test reusable scene layer
-        run: ctest --test-dir build -R '^vulkax_viewer_scene$' --output-on-failure
+      - name: Build reusable viewer scene and asset import tests
+        run: cmake --build build --target vulkax_viewer_scene_tests vulkax_viewer_asset_import_tests --parallel 2
+      - name: Test reusable viewer layers
+        run: ctest --test-dir build -R '^vulkax_viewer_(scene|asset_import)$' --output-on-failure
 
   metal-macos:
     runs-on: macos-latest
@@ -29,8 +31,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Configure native viewer
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
-      - name: Build native Metal viewer
-        run: cmake --build build --target vulkax_viewer vulkax_viewer_scene_tests --parallel 3
+      - name: Build native Metal viewer and reusable tests
+        run: cmake --build build --target vulkax_viewer vulkax_viewer_scene_tests vulkax_viewer_asset_import_tests --parallel 3
       - name: Compile exact embedded Metal shader
         run: |
           python3 - <<'PY'
@@ -43,7 +45,18 @@ jobs:
           Path('build/vulkax_native_viewer_embedded.metal').write_text(source[begin:end])
           PY
           xcrun -sdk macosx metal -c build/vulkax_native_viewer_embedded.metal -o build/vulkax_native_viewer_embedded.air
-      - name: Test reusable scene layer on macOS
-        run: ctest --test-dir build -R '^vulkax_viewer_scene$' --output-on-failure
-      - name: Verify viewer CLI links and starts far enough to print help
-        run: ./build/vulkax_viewer --help
+      - name: Test reusable viewer layers on macOS
+        run: ctest --test-dir build -R '^vulkax_viewer_(scene|asset_import)$' --output-on-failure
+      - name: Build macOS PNG decode round-trip test
+        run: |
+          clang++ -std=c++20 -fobjc-arc -x objective-c++ -Iinclude \
+            tests/viewer_macos_image_import_tests.mm src/viewer/macos_image_import.mm \
+            -framework AppKit -framework CoreGraphics \
+            -o /tmp/vulkax_viewer_macos_image_import_tests
+      - name: Run macOS PNG decode round-trip test
+        run: /tmp/vulkax_viewer_macos_image_import_tests
+      - name: Verify viewer CLI links and advertises native asset import
+        run: |
+          ./build/vulkax_viewer --help | tee /tmp/vulkax-viewer-help.txt
+          grep -q -- '--obj' /tmp/vulkax-viewer-help.txt
+          grep -q -- '--image' /tmp/vulkax-viewer-help.txt
