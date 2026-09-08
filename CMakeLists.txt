@@ -93,8 +93,8 @@ add_executable(vulkax_captured_rewrite src/tools/captured_verified_rewrite.cpp)
 target_link_libraries(vulkax_captured_rewrite PRIVATE vulkax_core)
 
 if(APPLE)
-    add_executable(vulkax_viewer src/viewer/metal_viewer.mm)
-    set_source_files_properties(src/viewer/metal_viewer.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+    add_executable(vulkax_viewer src/viewer/metal_viewer.mm src/viewer/macos_image_import.mm)
+    set_source_files_properties(src/viewer/metal_viewer.mm src/viewer/macos_image_import.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
     target_link_libraries(vulkax_viewer PRIVATE vulkax_viewer_common
         ${VULKAX_METAL_FRAMEWORK} ${VULKAX_METALKIT_FRAMEWORK} ${VULKAX_APPKIT_FRAMEWORK}
         ${VULKAX_QUARTZCORE_FRAMEWORK} ${VULKAX_FOUNDATION_FRAMEWORK})
