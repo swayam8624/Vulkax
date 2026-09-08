@@ -1,0 +1,37 @@
+name: Native Metal viewer
+
+on:
+  pull_request:
+    paths:
+      - 'CMakeLists.txt'
+      - 'include/vulkax/viewer/**'
+      - 'src/viewer/**'
+      - 'tests/viewer_scene_tests.cpp'
+      - 'docs/NATIVE_METAL_VIEWER_MVP.md'
+      - '.github/workflows/native-metal-viewer.yml'
+  workflow_dispatch:
+
+jobs:
+  scene-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure viewer scene test
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build reusable scene layer
+        run: cmake --build build --target vulkax_viewer_scene_tests --parallel 2
+      - name: Test reusable scene layer
+        run: ctest --test-dir build -R '^vulkax_viewer_scene$' --output-on-failure
+
+  metal-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure native viewer
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build native Metal viewer
+        run: cmake --build build --target vulkax_viewer vulkax_viewer_scene_tests --parallel 3
+      - name: Test reusable scene layer on macOS
+        run: ctest --test-dir build -R '^vulkax_viewer_scene$' --output-on-failure
+      - name: Verify viewer CLI links and starts far enough to print help
+        run: ./build/vulkax_viewer --help
