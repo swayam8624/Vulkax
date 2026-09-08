@@ -49,13 +49,15 @@ python3 scripts/build_interactive_viewer_app.py \
 open build/captured-world-run/render/interactive/viewer.html
 ```
 
-`build_interactive_viewer.py` is the core scene-data/HTML compiler. `build_interactive_viewer_app.py` is the public hardened launcher: it applies Retina-safe point sizing, explicit DOM bindings for stable Chrome/Safari behavior, and the production local-file importer.
+`build_interactive_viewer.py` is the core scene-data/HTML compiler. `build_interactive_viewer_app.py` is the public hardened launcher: it applies Retina-safe point sizing, explicit DOM bindings for stable Chrome/Safari behavior, and the production local-file importers.
 
 The generated HTML embeds the data needed to display that run, so `file://` opening works without running a local web server.
 
 ## Asset import
 
-The right-side inspector can click or drag/drop local `.ply` and `.obj` files through the browser File API. Imported assets are normalized into viewer space and displayed as live splats. This is deliberately viewer-only: it does not author or overwrite a Vulkax capture bundle.
+The right-side inspector can click or drag/drop local `.ply`, `.obj`, `.glb`, and `.gltf` assets through the browser File API. Imported assets are normalized into viewer space and displayed as live splats. This is deliberately viewer-only: it does not author or overwrite a Vulkax capture bundle.
+
+### PLY
 
 Supported PLY paths include:
 
@@ -68,11 +70,34 @@ Supported PLY paths include:
 
 PLY scales are normalized with scene extent instead of being left in source units. Large point clouds are deterministically reduced to a 250,000-point browser budget rather than blindly allocating unbounded WebGL buffers.
 
+### OBJ
+
 OBJ import understands polygon faces and positive/negative face indices, triangulates the faces, and deterministically surface-samples the triangles into splats. OBJ files with only vertex records are still accepted as point clouds. Vertex colors are used when the exporter stores them directly on `v` records.
 
-The importer reads files as `ArrayBuffer`, so binary PLY is not corrupted through text decoding. Drag/drop calls the same import routine directly rather than trying to synthesize and assign a `DataTransfer` object to the hidden file input, which is unreliable across browsers.
+### GLB / glTF 2.0
 
-The current browser importer intentionally stops at PLY/OBJ. glTF/GLB ingestion and image/video reconstruction belong to the next authoring/import phase.
+The dependency-free glTF path supports:
+
+- GLB 2.0 with embedded JSON/BIN chunks;
+- `.gltf` JSON with base64/data-URI buffers;
+- `.gltf` plus external `.bin` sidecars when the `.gltf` and `.bin` are selected or dropped together;
+- active-scene traversal and node matrix/TRS transforms;
+- indexed and non-indexed mesh primitives;
+- `TRIANGLES`, `TRIANGLE_STRIP`, `TRIANGLE_FAN`, and `POINTS` primitive modes;
+- `POSITION` and `COLOR_0` accessors;
+- material `baseColorFactor` tint/alpha;
+- deterministic triangle surface sampling into display splats.
+
+Texture images are not sampled in this MVP, so textured glTF meshes use their vertex colors and/or material base color. Skins and animation playback are not applied yet. Sparse accessors and Draco/meshopt-compressed primitives are rejected with explicit diagnostics rather than silently rendering corrupted geometry.
+
+For a `.gltf` with an external buffer, select both files together in the picker or drag them together onto the importer:
+
+```text
+model.gltf
+model.bin
+```
+
+The importer reads all binary formats as `ArrayBuffer`, so binary PLY and GLB are not corrupted through text decoding. Drag/drop calls the same package import routine directly rather than trying to synthesize and assign a `DataTransfer` object to the hidden file input, which is unreliable across browsers.
 
 ## Rendering model
 
@@ -87,7 +112,8 @@ When physical particles form a complete regular Cartesian lattice, the generator
 The viewer distinguishes authoritative and presentation data:
 
 - authoritative: before/rewritten Gaussian centers and appearance properties, physical particles, selected rewrite-region IDs;
-- presentation: derived shell triangles, studio lighting, grid, exposure, camera, point-sprite falloff.
+- presentation: derived shell triangles, studio lighting, grid, exposure, camera, point-sprite falloff;
+- imported external assets: presentation-only viewer data, never written into a Vulkax capture bundle by this MVP.
 
 A verified material rewrite can legitimately leave Gaussian centers unchanged. The viewer therefore never fabricates displacement: it keeps the geometry fixed and highlights the selected physical rewrite region.
 
@@ -97,6 +123,7 @@ A verified material rewrite can legitimately leave Gaussian centers unchanged. T
 python3 scripts/build_interactive_viewer.py --self-test
 python3 scripts/build_interactive_viewer_app.py --self-test
 node scripts/viewer_importers_test.js
+node scripts/viewer_gltf_importer_test.js
 ```
 
-The importer regression test covers RGB ASCII PLY, binary little-endian Gaussian PLY, OBJ face sampling, negative OBJ indices, malformed inputs, and deterministic downsampling. CI additionally generates a persistent hardened viewer fixture, validates the HTML contract, and runs `node --check` on the generated inline JavaScript.
+The importer regression suites cover RGB ASCII PLY, binary little-endian Gaussian PLY, OBJ face sampling, negative OBJ indices, malformed inputs, deterministic downsampling, embedded-buffer glTF, external `.gltf + .bin`, GLB 2.0, node transforms, indexed triangles, and triangle strips. CI additionally generates a persistent hardened viewer fixture, validates the HTML contract, and runs `node --check` on the generated inline JavaScript.
