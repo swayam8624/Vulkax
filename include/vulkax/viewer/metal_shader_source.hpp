@@ -26,6 +26,8 @@ struct GPUUniforms {
     float4 cameraUpAndFocalY;
     float4 cameraBackAndMinSigma;
 };
+struct GPUDepthKey { float depth; uint sourceIndex; };
+struct GPUDepthUniforms { float4 cameraPosition; float4 cameraForward; uint4 countAndFlags; };
 struct SplatOut {
     float4 position [[position]];
     float2 local;
@@ -221,6 +223,19 @@ vertex float4 lineVertex(uint vertexId [[vertex_id]],
     return u.viewProjection * positions[vertexId];
 }
 fragment float4 lineFragment() { return float4(0.22,0.36,0.58,0.38); }
+
+kernel void generateDepthKeys(device const GPUSplat* splats [[buffer(0)]],
+                              device const uint* order [[buffer(1)]],
+                              device GPUDepthKey* output [[buffer(2)]],
+                              constant GPUDepthUniforms& uniforms [[buffer(3)]],
+                              uint gid [[thread_position_in_grid]]) {
+    uint count = uniforms.countAndFlags.x;
+    if (gid >= count) return;
+    uint sourceIndex = order[gid];
+    float3 delta = splats[sourceIndex].positionScaleX.xyz - uniforms.cameraPosition.xyz;
+    output[gid].depth = dot(delta, uniforms.cameraForward.xyz);
+    output[gid].sourceIndex = sourceIndex;
+}
 )METAL";
 
 } // namespace vulkax::viewer::metal
