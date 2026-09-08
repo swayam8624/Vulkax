@@ -55,7 +55,7 @@ The generated HTML embeds the data needed to display that run, so `file://` open
 
 ## Asset import
 
-The right-side inspector can click or drag/drop local `.ply`, `.obj`, `.glb`, and `.gltf` assets through the browser File API. Imported assets are normalized into viewer space and displayed as live splats. This is deliberately viewer-only: it does not author or overwrite a Vulkax capture bundle.
+The right-side inspector can click or drag/drop local `.ply`, `.obj`, `.glb`, `.gltf`, `.png`, `.jpg/.jpeg`, and `.webp` assets through the browser File API. Imported assets are normalized into viewer space and displayed as live splats. This is deliberately viewer-only: it does not author or overwrite a Vulkax capture bundle.
 
 ### PLY
 
@@ -97,6 +97,34 @@ model.gltf
 model.bin
 ```
 
+### Images: presentation 2.5D splat card
+
+A single image does not contain enough information for honest 3D reconstruction, so the current image path does **not** pretend to recover a 3D scene. Instead it converts the visible pixels into a color/alpha-preserving Gaussian-style splat card:
+
+```text
+PNG / JPEG / WebP
+        ↓
+browser image decode
+        ↓
+RGBA pixels
+        ↓
+budget-aware spatial sampling
+        ↓
+aspect-preserving XY splats at z = 0
+        ↓
+interactive WebGL Gaussian view
+```
+
+The image card:
+
+- preserves source aspect ratio;
+- preserves RGB and alpha;
+- ignores fully/mostly transparent pixels;
+- deterministically reduces large images to an 80,000-splat browser budget;
+- is explicitly marked `presentation-only` / `image_2.5d` in importer metadata.
+
+Orbiting the camera therefore reveals that the result is a plane. True image/video → 3D Gaussian reconstruction is a separate future pipeline requiring depth/multi-view inference, camera poses, or an actual 3DGS optimization stage.
+
 The importer reads all binary formats as `ArrayBuffer`, so binary PLY and GLB are not corrupted through text decoding. Drag/drop calls the same package import routine directly rather than trying to synthesize and assign a `DataTransfer` object to the hidden file input, which is unreliable across browsers.
 
 ## Rendering model
@@ -113,7 +141,8 @@ The viewer distinguishes authoritative and presentation data:
 
 - authoritative: before/rewritten Gaussian centers and appearance properties, physical particles, selected rewrite-region IDs;
 - presentation: derived shell triangles, studio lighting, grid, exposure, camera, point-sprite falloff;
-- imported external assets: presentation-only viewer data, never written into a Vulkax capture bundle by this MVP.
+- imported external assets: presentation-only viewer data, never written into a Vulkax capture bundle by this MVP;
+- single-image imports: explicitly 2.5D cards, not reconstructed 3D evidence.
 
 A verified material rewrite can legitimately leave Gaussian centers unchanged. The viewer therefore never fabricates displacement: it keeps the geometry fixed and highlights the selected physical rewrite region.
 
@@ -124,6 +153,7 @@ python3 scripts/build_interactive_viewer.py --self-test
 python3 scripts/build_interactive_viewer_app.py --self-test
 node scripts/viewer_importers_test.js
 node scripts/viewer_gltf_importer_test.js
+node scripts/viewer_image_importer_test.js
 ```
 
-The importer regression suites cover RGB ASCII PLY, binary little-endian Gaussian PLY, OBJ face sampling, negative OBJ indices, malformed inputs, deterministic downsampling, embedded-buffer glTF, external `.gltf + .bin`, GLB 2.0, node transforms, indexed triangles, and triangle strips. CI additionally generates a persistent hardened viewer fixture, validates the HTML contract, and runs `node --check` on the generated inline JavaScript.
+The importer regression suites cover RGB ASCII PLY, binary little-endian Gaussian PLY, OBJ face sampling, negative OBJ indices, malformed inputs, deterministic downsampling, embedded-buffer glTF, external `.gltf + .bin`, GLB 2.0, indexed triangles, triangle strips, image aspect preservation, alpha filtering, and image point-budget downsampling. CI additionally generates a persistent hardened viewer fixture, validates the HTML contract, and runs `node --check` on the generated inline JavaScript.
