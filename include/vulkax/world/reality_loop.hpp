@@ -62,6 +62,36 @@ struct ParameterSensitivity {
     double weightedPredictionL2Derivative{};
 };
 
+struct IdentifiabilitySettings {
+    double relativeFiniteDifferenceStep{1.0e-4};
+    double absoluteFiniteDifferenceStep{1.0e-8};
+    double relativeRankTolerance{1.0e-8};
+    double absoluteRankTolerance{1.0e-12};
+    std::vector<ObservationRole> roles{ObservationRole::Fit};
+};
+
+// Coefficients live in normalized parameter coordinates. If a parameter has two
+// finite belief bounds, one normalized unit is the bound span; otherwise Vulkax
+// uses max(abs(current value), 1). This prevents metres, pascals and focal pixels
+// from making the rank test meaningless purely because of unit scale.
+struct WeakParameterCombination {
+    double singularValue{};
+    std::vector<double> normalizedCoefficients;
+};
+
+struct LocalIdentifiabilityReport {
+    std::vector<ParameterAddress> parameterOrder;
+    std::vector<double> parameterScales;
+    std::size_t scalarObservationCount{};
+    std::size_t numericalRank{};
+    bool locallyIdentifiable{};
+    double largestSingularValue{};
+    double smallestResolvedSingularValue{};
+    double conditionNumber{};
+    std::vector<double> singularValuesDescending;
+    std::vector<WeakParameterCombination> weakCombinations;
+};
+
 // Fits an executable WorldIR against its observation records. The supplied forward
 // model may dispatch to MPM/FEM/rendering/reconstruction code, but the inverse loop
 // itself stays solver-agnostic. Derivatives are finite-difference numerical oracles,
@@ -81,5 +111,17 @@ struct ParameterSensitivity {
     const ForwardModel& forwardModel,
     double relativeStep = 1.0e-4,
     double absoluteStep = 1.0e-8);
+
+// Diagnoses local parameter identifiability from the uncertainty-weighted residual
+// Jacobian. This is deliberately separate from optimizer convergence: a low loss can
+// coexist with infinitely many parameter explanations. The singular spectrum and
+// weak combinations expose local gauge freedoms such as monocular image scale versus
+// metric acceleration. This is a local differential diagnostic, not a proof of
+// global uniqueness.
+[[nodiscard]] LocalIdentifiabilityReport analyzeLocalIdentifiability(
+    const WorldIR& world,
+    const std::vector<ParameterAddress>& parameters,
+    const ForwardModel& forwardModel,
+    const IdentifiabilitySettings& settings = {});
 
 } // namespace vulkax::world

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
@@ -38,6 +39,16 @@ void validateSettings(const RealityLoopSettings& settings) {
         settings.objectiveTolerance < 0.0 || settings.relativeImprovementTolerance < 0.0 ||
         settings.parameterStepTolerance < 0.0) {
         throw std::invalid_argument("invalid reality-loop numerical settings");
+    }
+}
+
+void validateIdentifiabilitySettings(const IdentifiabilitySettings& settings) {
+    if (settings.roles.empty() || !(settings.relativeFiniteDifferenceStep > 0.0) ||
+        !(settings.absoluteFiniteDifferenceStep > 0.0) ||
+        !(settings.relativeRankTolerance > 0.0) || !(settings.relativeRankTolerance < 1.0) ||
+        !(settings.absoluteRankTolerance >= 0.0) || !std::isfinite(settings.relativeRankTolerance) ||
+        !std::isfinite(settings.absoluteRankTolerance)) {
+        throw std::invalid_argument("invalid local-identifiability settings");
     }
 }
 
@@ -160,6 +171,95 @@ DifferenceColumn finiteDifferenceColumn(const WorldIR& world,
     column.objectiveDerivative =
         (plusEvaluation.objective - minusEvaluation.objective) / denominator;
     return column;
+}
+
+double identifiabilityParameterScale(const WorldIR& world, const ParameterAddress& parameter) {
+    const auto* belief = world.findParameterBelief(parameter);
+    if (belief != nullptr && belief->lowerBound.has_value() && belief->upperBound.has_value()) {
+        const double span = *belief->upperBound - *belief->lowerBound;
+        if (std::isfinite(span) && span > 0.0) return span;
+    }
+    const auto value = world.parameterValue(parameter);
+    if (!value.has_value() || !std::isfinite(*value)) {
+        throw std::invalid_argument("identifiability parameter does not exist or is non-finite");
+    }
+    return std::max(std::abs(*value), 1.0);
+}
+
+struct SymmetricEigenResult {
+    std::vector<double> values;
+    numerics::DenseMatrix vectors;
+};
+
+// Jacobi diagonalization is intentionally small/deterministic here. Reality-loop
+// parameter sets are expected to be modest, and keeping this reference diagnostic
+// independent of an external BLAS/LAPACK stack makes it available in every CI path.
+SymmetricEigenResult symmetricEigenJacobi(numerics::DenseMatrix matrix) {
+    if (matrix.rows() != matrix.cols()) {
+        throw std::invalid_argument("Jacobi eigensolver requires a square matrix");
+    }
+    const std::size_t n = matrix.rows();
+    numerics::DenseMatrix vectors = numerics::DenseMatrix::identity(n);
+    if (n <= 1U) {
+        return {{n == 1U ? matrix(0, 0) : 0.0}, std::move(vectors)};
+    }
+
+    const std::size_t maximumIterations = std::max<std::size_t>(64U, 32U * n * n);
+    for (std::size_t iteration = 0; iteration < maximumIterations; ++iteration) {
+        std::size_t p = 0U;
+        std::size_t q = 1U;
+        double largestOffDiagonal = 0.0;
+        double diagonalScale = 1.0;
+        for (std::size_t row = 0; row < n; ++row) {
+            diagonalScale = std::max(diagonalScale, std::abs(matrix(row, row)));
+            for (std::size_t column = row + 1U; column < n; ++column) {
+                const double magnitude = std::abs(matrix(row, column));
+                if (magnitude > largestOffDiagonal) {
+                    largestOffDiagonal = magnitude;
+                    p = row;
+                    q = column;
+                }
+            }
+        }
+        if (largestOffDiagonal <= 1.0e-14 * diagonalScale) break;
+
+        const double app = matrix(p, p);
+        const double aqq = matrix(q, q);
+        const double apq = matrix(p, q);
+        if (apq == 0.0) continue;
+        const double tau = (aqq - app) / (2.0 * apq);
+        const double t = (tau >= 0.0 ? 1.0 : -1.0) /
+                         (std::abs(tau) + std::sqrt(1.0 + tau * tau));
+        const double c = 1.0 / std::sqrt(1.0 + t * t);
+        const double s = t * c;
+
+        for (std::size_t k = 0; k < n; ++k) {
+            if (k == p || k == q) continue;
+            const double mkp = matrix(k, p);
+            const double mkq = matrix(k, q);
+            const double newKp = c * mkp - s * mkq;
+            const double newKq = s * mkp + c * mkq;
+            matrix(k, p) = newKp;
+            matrix(p, k) = newKp;
+            matrix(k, q) = newKq;
+            matrix(q, k) = newKq;
+        }
+        matrix(p, p) = c * c * app - 2.0 * s * c * apq + s * s * aqq;
+        matrix(q, q) = s * s * app + 2.0 * s * c * apq + c * c * aqq;
+        matrix(p, q) = 0.0;
+        matrix(q, p) = 0.0;
+
+        for (std::size_t k = 0; k < n; ++k) {
+            const double vkp = vectors(k, p);
+            const double vkq = vectors(k, q);
+            vectors(k, p) = c * vkp - s * vkq;
+            vectors(k, q) = s * vkp + c * vkq;
+        }
+    }
+
+    std::vector<double> values(n, 0.0);
+    for (std::size_t index = 0; index < n; ++index) values[index] = matrix(index, index);
+    return {std::move(values), std::move(vectors)};
 }
 
 } // namespace
@@ -316,6 +416,111 @@ std::vector<ParameterSensitivity> rankParameterSensitivity(
         return std::abs(lhs.objectiveDerivative) > std::abs(rhs.objectiveDerivative);
     });
     return sensitivities;
+}
+
+LocalIdentifiabilityReport analyzeLocalIdentifiability(
+    const WorldIR& world,
+    const std::vector<ParameterAddress>& parameters,
+    const ForwardModel& forwardModel,
+    const IdentifiabilitySettings& settings) {
+    requireUniqueParameters(parameters);
+    validateIdentifiabilitySettings(settings);
+    const HypothesisValidation validation = world.validateHypothesis();
+    if (!validation.valid) {
+        throw std::invalid_argument("WorldIR hypothesis validation failed: " + validation.errors.front());
+    }
+
+    const Evaluation base = evaluate(world, forwardModel, settings.roles);
+    const std::size_t residualCount = base.residuals.size();
+    const std::size_t parameterCount = parameters.size();
+    numerics::DenseMatrix jacobian(residualCount, parameterCount, 0.0);
+    std::vector<double> parameterScales(parameterCount, 1.0);
+    for (std::size_t columnIndex = 0; columnIndex < parameterCount; ++columnIndex) {
+        parameterScales[columnIndex] = identifiabilityParameterScale(world, parameters[columnIndex]);
+        const auto column = finiteDifferenceColumn(
+            world, parameters[columnIndex], forwardModel,
+            settings.relativeFiniteDifferenceStep, settings.absoluteFiniteDifferenceStep,
+            settings.roles);
+        for (std::size_t row = 0; row < residualCount; ++row) {
+            jacobian(row, columnIndex) =
+                column.residualDerivative[row] * parameterScales[columnIndex];
+        }
+    }
+
+    numerics::DenseMatrix gram(parameterCount, parameterCount, 0.0);
+    for (std::size_t row = 0; row < residualCount; ++row) {
+        for (std::size_t first = 0; first < parameterCount; ++first) {
+            for (std::size_t second = first; second < parameterCount; ++second) {
+                gram(first, second) += jacobian(row, first) * jacobian(row, second);
+            }
+        }
+    }
+    for (std::size_t first = 0; first < parameterCount; ++first) {
+        for (std::size_t second = first + 1U; second < parameterCount; ++second) {
+            gram(second, first) = gram(first, second);
+        }
+    }
+
+    auto eigen = symmetricEigenJacobi(std::move(gram));
+    std::vector<std::size_t> order(parameterCount);
+    std::iota(order.begin(), order.end(), 0U);
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t lhs, std::size_t rhs) {
+        return eigen.values[lhs] > eigen.values[rhs];
+    });
+
+    LocalIdentifiabilityReport report;
+    report.parameterOrder = parameters;
+    report.parameterScales = std::move(parameterScales);
+    report.scalarObservationCount = residualCount;
+    report.singularValuesDescending.reserve(parameterCount);
+    for (const std::size_t index : order) {
+        const double eigenvalue = std::max(eigen.values[index], 0.0);
+        report.singularValuesDescending.push_back(std::sqrt(eigenvalue));
+    }
+    report.largestSingularValue = report.singularValuesDescending.empty()
+                                      ? 0.0
+                                      : report.singularValuesDescending.front();
+    const double threshold = std::max(
+        settings.absoluteRankTolerance,
+        settings.relativeRankTolerance * report.largestSingularValue);
+    for (const double singularValue : report.singularValuesDescending) {
+        if (singularValue > threshold) ++report.numericalRank;
+    }
+    report.locallyIdentifiable = report.numericalRank == parameterCount;
+    if (report.numericalRank > 0U) {
+        report.smallestResolvedSingularValue =
+            report.singularValuesDescending[report.numericalRank - 1U];
+    }
+    if (report.locallyIdentifiable && report.smallestResolvedSingularValue > 0.0) {
+        report.conditionNumber =
+            report.largestSingularValue / report.smallestResolvedSingularValue;
+    } else {
+        report.conditionNumber = std::numeric_limits<double>::infinity();
+    }
+
+    for (std::size_t sortedIndex = report.numericalRank;
+         sortedIndex < parameterCount; ++sortedIndex) {
+        const std::size_t eigenIndex = order[sortedIndex];
+        WeakParameterCombination weak;
+        weak.singularValue = report.singularValuesDescending[sortedIndex];
+        weak.normalizedCoefficients.resize(parameterCount, 0.0);
+        std::size_t largestComponent = 0U;
+        double largestMagnitude = 0.0;
+        for (std::size_t parameterIndex = 0; parameterIndex < parameterCount; ++parameterIndex) {
+            const double coefficient = eigen.vectors(parameterIndex, eigenIndex);
+            weak.normalizedCoefficients[parameterIndex] = coefficient;
+            if (std::abs(coefficient) > largestMagnitude) {
+                largestMagnitude = std::abs(coefficient);
+                largestComponent = parameterIndex;
+            }
+        }
+        if (!weak.normalizedCoefficients.empty() &&
+            weak.normalizedCoefficients[largestComponent] < 0.0) {
+            for (double& coefficient : weak.normalizedCoefficients) coefficient = -coefficient;
+        }
+        report.weakCombinations.push_back(std::move(weak));
+    }
+    return report;
 }
 
 } // namespace vulkax::world
