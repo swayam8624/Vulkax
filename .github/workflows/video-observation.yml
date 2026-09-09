@@ -7,6 +7,7 @@ on:
       - "include/vulkax/capture/video_track.hpp"
       - "src/world/**"
       - "src/research/captured_reality_loop.cpp"
+      - "src/tools/reality_video_seed.cpp"
       - "tests/reality_loop_tests.cpp"
       - "tests/pinhole_camera_tests.cpp"
       - "tests/bouncing_video_reality_loop_tests.cpp"
@@ -23,6 +24,7 @@ on:
       - "include/vulkax/capture/video_track.hpp"
       - "src/world/**"
       - "src/research/captured_reality_loop.cpp"
+      - "src/tools/reality_video_seed.cpp"
       - "tests/reality_loop_tests.cpp"
       - "tests/pinhole_camera_tests.cpp"
       - "tests/bouncing_video_reality_loop_tests.cpp"
@@ -47,8 +49,65 @@ jobs:
       - name: Validate pinned real-video source manifest
         run: python3 scripts/fetch_reality_video_assets.py --validate-only
 
-      - name: Exercise raw-video to point-track extraction
+      - name: Exercise synthetic raw-video to point-track extraction
         run: python3 scripts/test_video_track_extractor.py
+
+      - name: Fetch checksum-pinned real bouncing-ball footage
+        run: python3 scripts/fetch_reality_video_assets.py
+
+      - name: Derive measured-source image-plane track
+        run: |
+          mkdir -p build/reality-real
+          python3 scripts/extract_video_track.py \
+            build/reality-assets/video/sciencecola_bouncing_ball_2013.webm \
+            build/reality-real/sciencecola_bouncing_ball.track.csv \
+            --source "https://commons.wikimedia.org/wiki/File:Bouncing_Ball.webm" \
+            --fps 12 --scale-width 320 --threshold 20 \
+            --min-component-pixels 12 --validation-stride 5 --max-frames 300
+
+      - name: Build measured-source image-plane seed tool
+        run: |
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Wconversion -Wshadow \
+            -Iinclude src/tools/reality_video_seed.cpp src/numerics/dense.cpp \
+            -o build/vulkax_reality_video_seed
+
+      - name: Initialize measured-source bounce hypothesis
+        run: |
+          build/vulkax_reality_video_seed \
+            build/reality-real/sciencecola_bouncing_ball.track.csv \
+            | tee build/reality-real/sciencecola_bouncing_ball.seed.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("build/reality-real/sciencecola_bouncing_ball.seed.json")
+          seed = json.loads(path.read_text(encoding="utf-8"))
+          if seed.get("schema") != "vulkax_image_plane_bounce_seed" or seed.get("version") != 1:
+              raise SystemExit("unexpected measured-source seed schema")
+          if seed["sample_count"] < 12 or seed["fit_samples"] == 0 or seed["validation_samples"] == 0:
+              raise SystemExit("real-video tracker did not produce a usable fit/validation evidence set")
+          if not (0.0 < seed["ground_y_pixels"] < seed["height_pixels"]):
+              raise SystemExit("image-plane ground estimate lies outside the extracted frame")
+          if not (0.0 < seed["acceleration_y_pixels_per_second2"] < 1.0e6):
+              raise SystemExit("image-plane acceleration proxy is invalid")
+          if not (0.0 < seed["restitution_proxy"] <= 1.0):
+              raise SystemExit("image-plane restitution proxy is invalid")
+          if seed["first_bounce_sample"] is None:
+              raise SystemExit("real-video initializer failed to identify a bounce event")
+          if "pixels/s^2" not in seed["metric_status"]:
+              raise SystemExit("measured-source seed lost its non-metric evidence caveat")
+          print("VALID measured-source image-plane hypothesis bootstrap")
+          PY
+
+      - name: Upload measured-source derived evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-real-video-bootstrap
+          path: |
+            build/reality-real/sciencecola_bouncing_ball.track.csv
+            build/reality-real/sciencecola_bouncing_ball.seed.json
+          if-no-files-found: warn
 
       - name: Configure Vulkax
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
