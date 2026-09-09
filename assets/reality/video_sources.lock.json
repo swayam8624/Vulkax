@@ -1,9 +1,9 @@
 {
   "schema": "vulkax_reality_video_assets",
-  "version": 1,
+  "version": 2,
   "assets": [
     {
-      "id": "sciencecola_bouncing_ball_2013",
+      "id": "sciencecola_electrostatic_ball_2013",
       "kind": "video",
       "source": "Wikimedia Commons",
       "source_page": "https://commons.wikimedia.org/wiki/File:Bouncing_Ball.webm",
@@ -16,7 +16,27 @@
       "width_pixels": 640,
       "height_pixels": 480,
       "destination": "video/sciencecola_bouncing_ball_2013.webm",
-      "role": "development-only real-video observation source; derived tracks are not physical ground truth or Vulkax 1.0 verification evidence"
+      "mechanism": "electrostatic_pendulum_contact",
+      "evidence_scope": "development_observation_source",
+      "role": "real electrostatic-contact motion source for a future charged-pendulum benchmark; explicitly not ballistic ground-contact evidence and not Vulkax 1.0 verification evidence"
+    },
+    {
+      "id": "golhamedia_bouncy_ball_240fps_2016",
+      "kind": "video",
+      "source": "Wikimedia Commons",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Bouncy_ball_240fps.webm",
+      "download_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bouncy_ball_240fps.webm",
+      "license": "CC-BY-SA-4.0",
+      "attribution": "GolhaMedia",
+      "sha1": "10a795ac3403164b3cd830478d164ad53fb1b59f",
+      "bytes": 75465750,
+      "duration_seconds": 41.443,
+      "width_pixels": 1280,
+      "height_pixels": 720,
+      "destination": "video/golhamedia_bouncy_ball_240fps_2016.webm",
+      "mechanism": "ballistic_ground_contact",
+      "evidence_scope": "development_observation_source",
+      "role": "high-speed real bouncing-ball footage matched to the gravity-plus-ground-contact model family; derived image tracks remain non-metric observations until camera and scene scale are calibrated"
     }
   ]
 }

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Fetch checksum-pinned development videos for the post-1.0 reality loop."""
+"""Fetch checksum-pinned, license-reviewed video inputs for post-1.0 reality-loop development.
+
+These assets are observation sources only. They are never Vulkax 1.0 verification
+evidence, and the lock records the physical mechanism expected by a benchmark so a
+visually similar clip cannot silently be paired with the wrong governing model.
+"""
 
 from __future__ import annotations
 
@@ -11,9 +16,8 @@ import shutil
 import tempfile
 import urllib.request
 
-SCHEMA = "vulkax_reality_video_assets"
-VERSION = 1
-ALLOWED_LICENSES = {"CC0-1.0", "CC-BY-3.0", "CC-BY-4.0"}
+
+ALLOWED_LICENSES = {"CC0-1.0", "CC-BY-3.0", "CC-BY-4.0", "CC-BY-SA-4.0"}
 
 
 def fail(message: str) -> "None":
@@ -28,100 +32,99 @@ def sha1_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def load_lock(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"cannot read lock file {path}: {error}")
+    if data.get("schema") != "vulkax_reality_video_assets" or data.get("version") != 2:
+        fail("unexpected reality video asset lock schema/version")
+    assets = data.get("assets")
+    if not isinstance(assets, list) or not assets:
+        fail("reality video asset lock contains no assets")
+    return data
+
+
 def safe_destination(root: Path, relative_text: str) -> Path:
     relative = Path(relative_text)
     if relative.is_absolute() or ".." in relative.parts:
-        fail(f"unsafe destination: {relative_text}")
+        fail(f"unsafe video destination: {relative_text}")
     root_resolved = root.resolve()
     destination = (root / relative).resolve()
     try:
         destination.relative_to(root_resolved)
     except ValueError:
-        fail(f"destination escapes output root: {relative_text}")
+        fail(f"video destination escapes root: {relative_text}")
     return destination
 
 
-def validate_entry(asset: dict) -> None:
+def validate_asset_entry(asset: dict) -> None:
     required = {
-        "id", "kind", "source", "source_page", "download_url", "license",
-        "attribution", "sha1", "bytes", "duration_seconds", "width_pixels",
-        "height_pixels", "destination", "role",
+        "id", "kind", "source", "source_page", "download_url", "license", "attribution",
+        "sha1", "bytes", "duration_seconds", "width_pixels", "height_pixels", "destination",
+        "mechanism", "evidence_scope", "role",
     }
     missing = sorted(required - set(asset))
     if missing:
-        fail("asset entry missing fields: " + ", ".join(missing))
+        fail("video asset entry missing fields: " + ", ".join(missing))
     if asset["kind"] != "video":
-        fail(f"asset {asset['id']} must have kind=video")
+        fail(f"asset {asset['id']} is not a video")
+    for field in ("id", "source", "source_page", "download_url", "license", "attribution",
+                  "destination", "mechanism", "evidence_scope", "role"):
+        if not isinstance(asset[field], str) or not asset[field]:
+            fail(f"asset field {field} must be a non-empty string")
     if asset["license"] not in ALLOWED_LICENSES:
-        fail(f"asset {asset['id']} uses unsupported development license {asset['license']}")
-    if not asset["attribution"]:
-        fail(f"asset {asset['id']} requires attribution text")
-    if not str(asset["source_page"]).startswith("https://") or not str(asset["download_url"]).startswith("https://"):
-        fail(f"asset {asset['id']} must use HTTPS source/download URLs")
-    digest = str(asset["sha1"]).lower()
-    if len(digest) != 40 or any(character not in "0123456789abcdef" for character in digest):
+        fail(f"asset {asset['id']} uses a license outside the reviewed allow-list")
+    if not asset["source_page"].startswith("https://") or not asset["download_url"].startswith("https://"):
+        fail(f"asset {asset['id']} must use https source/download URLs")
+    checksum = asset["sha1"].lower()
+    if len(checksum) != 40 or any(character not in "0123456789abcdef" for character in checksum):
         fail(f"asset {asset['id']} has invalid SHA-1")
     if not isinstance(asset["bytes"], int) or asset["bytes"] <= 0:
         fail(f"asset {asset['id']} has invalid byte count")
-    if not isinstance(asset["width_pixels"], int) or asset["width_pixels"] <= 0:
-        fail(f"asset {asset['id']} has invalid width")
-    if not isinstance(asset["height_pixels"], int) or asset["height_pixels"] <= 0:
-        fail(f"asset {asset['id']} has invalid height")
     if not isinstance(asset["duration_seconds"], (int, float)) or asset["duration_seconds"] <= 0:
         fail(f"asset {asset['id']} has invalid duration")
+    if not isinstance(asset["width_pixels"], int) or not isinstance(asset["height_pixels"], int) or \
+            asset["width_pixels"] <= 0 or asset["height_pixels"] <= 0:
+        fail(f"asset {asset['id']} has invalid dimensions")
 
 
-def load_lock(path: Path) -> dict:
-    try:
-        lock = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        fail(f"cannot read lock file {path}: {error}")
-    if lock.get("schema") != SCHEMA or lock.get("version") != VERSION:
-        fail("unexpected reality-video lock schema/version")
-    assets = lock.get("assets")
-    if not isinstance(assets, list) or not assets:
-        fail("reality-video lock contains no assets")
-    identifiers: set[str] = set()
-    destinations: set[str] = set()
-    for asset in assets:
-        if not isinstance(asset, dict):
-            fail("reality-video asset entry must be an object")
-        validate_entry(asset)
-        if asset["id"] in identifiers:
-            fail(f"duplicate asset id: {asset['id']}")
-        if asset["destination"] in destinations:
-            fail(f"duplicate asset destination: {asset['destination']}")
-        identifiers.add(asset["id"])
-        destinations.add(asset["destination"])
-    return lock
+def select_assets(assets: list[dict], requested_ids: list[str]) -> list[dict]:
+    if not requested_ids:
+        return assets
+    by_id = {asset.get("id"): asset for asset in assets}
+    missing = [asset_id for asset_id in requested_ids if asset_id not in by_id]
+    if missing:
+        fail("unknown --asset-id value(s): " + ", ".join(missing))
+    return [by_id[asset_id] for asset_id in requested_ids]
 
 
-def fetch(asset: dict, output_root: Path, force: bool) -> None:
-    destination = safe_destination(output_root, asset["destination"])
+def fetch_asset(asset: dict, root: Path, force: bool) -> None:
+    validate_asset_entry(asset)
+    destination = safe_destination(root, asset["destination"])
     destination.parent.mkdir(parents=True, exist_ok=True)
-    expected_sha1 = asset["sha1"].lower()
-    expected_bytes = asset["bytes"]
     if destination.is_file() and not force:
-        if destination.stat().st_size == expected_bytes and sha1_file(destination) == expected_sha1:
+        if destination.stat().st_size == asset["bytes"] and sha1_file(destination) == asset["sha1"]:
             print(f"OK cached {asset['id']}: {destination}")
             return
-        fail(f"existing file does not match lock: {destination}")
+        fail(f"existing video does not match lock: {destination}")
 
     request = urllib.request.Request(
         asset["download_url"],
-        headers={"User-Agent": "Vulkax-RealityLoop/0.1 (+https://github.com/swayam8624/Vulkax)"},
+        headers={"User-Agent": "Vulkax-reality-loop/2.0 (+https://github.com/swayam8624/Vulkax)"},
     )
     temporary_path: Path | None = None
     try:
-        with urllib.request.urlopen(request, timeout=120) as response:
+        with urllib.request.urlopen(request, timeout=180) as response:
             with tempfile.NamedTemporaryFile(delete=False, dir=destination.parent) as temporary:
                 temporary_path = Path(temporary.name)
                 shutil.copyfileobj(response, temporary)
-        if temporary_path.stat().st_size != expected_bytes:
-            fail(f"{asset['id']} byte mismatch: expected {expected_bytes}, got {temporary_path.stat().st_size}")
+        actual_size = temporary_path.stat().st_size
         actual_sha1 = sha1_file(temporary_path)
-        if actual_sha1 != expected_sha1:
-            fail(f"{asset['id']} SHA-1 mismatch: expected {expected_sha1}, got {actual_sha1}")
+        if actual_size != asset["bytes"]:
+            fail(f"{asset['id']} byte count mismatch: expected {asset['bytes']}, got {actual_size}")
+        if actual_sha1 != asset["sha1"]:
+            fail(f"{asset['id']} SHA-1 mismatch: expected {asset['sha1']}, got {actual_sha1}")
         temporary_path.replace(destination)
         temporary_path = None
     finally:
@@ -131,20 +134,24 @@ def fetch(asset: dict, output_root: Path, force: bool) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fetch pinned post-1.0 Vulkax video inputs")
+    parser = argparse.ArgumentParser(description="Fetch checksum-pinned Vulkax reality-loop video assets")
     parser.add_argument("lock_file", type=Path, nargs="?", default=Path("assets/reality/video_sources.lock.json"))
     parser.add_argument("output_root", type=Path, nargs="?", default=Path("build/reality-assets"))
+    parser.add_argument("--asset-id", action="append", default=[], help="fetch only the named locked asset (repeatable)")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
 
     lock = load_lock(args.lock_file)
-    if args.validate_only:
-        print(f"VALID reality video asset lock: {len(lock['assets'])} asset(s)")
-        return
     for asset in lock["assets"]:
-        fetch(asset, args.output_root, args.force)
-    print(f"VALID reality video asset pack: {len(lock['assets'])} asset(s)")
+        validate_asset_entry(asset)
+    selected = select_assets(lock["assets"], args.asset_id)
+    if args.validate_only:
+        print(f"VALID reality video asset lock: {len(lock['assets'])} asset(s); selected {len(selected)}")
+        return
+    for asset in selected:
+        fetch_asset(asset, args.output_root, args.force)
+    print(f"VALID reality video asset pack: {len(selected)} selected asset(s)")
 
 
 if __name__ == "__main__":
