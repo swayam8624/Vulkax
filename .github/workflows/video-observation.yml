@@ -10,6 +10,7 @@ on:
       - "tests/reality_loop_tests.cpp"
       - "tests/pinhole_camera_tests.cpp"
       - "tests/bouncing_video_reality_loop_tests.cpp"
+      - "tests/image_plane_bounce_tests.cpp"
       - "scripts/extract_video_track.py"
       - "scripts/fetch_reality_video_assets.py"
       - "scripts/test_video_track_extractor.py"
@@ -25,6 +26,7 @@ on:
       - "tests/reality_loop_tests.cpp"
       - "tests/pinhole_camera_tests.cpp"
       - "tests/bouncing_video_reality_loop_tests.cpp"
+      - "tests/image_plane_bounce_tests.cpp"
       - "scripts/extract_video_track.py"
       - "scripts/fetch_reality_video_assets.py"
       - "scripts/test_video_track_extractor.py"
@@ -76,3 +78,13 @@ jobs:
 
       - name: Run video-to-physics bounce regression
         run: build/vulkax_bouncing_video_reality_loop_tests
+
+      - name: Build monocular image-plane initializer regression
+        run: |
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -UNDEBUG \
+            -Iinclude tests/image_plane_bounce_tests.cpp \
+            src/world/world_ir.cpp src/world/reality_loop.cpp src/numerics/dense.cpp \
+            -o build/vulkax_image_plane_bounce_tests
+
+      - name: Run monocular image-plane initializer regression
+        run: build/vulkax_image_plane_bounce_tests
