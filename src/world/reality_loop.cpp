@@ -18,9 +18,18 @@ struct Evaluation {
     ResidualSummary summary;
 };
 
+bool hasRole(const std::vector<ObservationRole>& roles, ObservationRole role) {
+    return std::find(roles.begin(), roles.end(), role) != roles.end();
+}
+
+bool worldHasRole(const WorldIR& world, ObservationRole role) {
+    return std::any_of(world.observations.begin(), world.observations.end(),
+                       [role](const auto& observation) { return observation.role == role; });
+}
+
 void validateSettings(const RealityLoopSettings& settings) {
-    if (settings.maxIterations == 0 || settings.maxBacktrackingSteps == 0) {
-        throw std::invalid_argument("reality-loop iteration counts must be positive");
+    if (settings.maxIterations == 0 || settings.maxBacktrackingSteps == 0 || settings.fittingRoles.empty()) {
+        throw std::invalid_argument("reality-loop iteration counts and fitting-role set must be non-empty");
     }
     if (!(settings.relativeFiniteDifferenceStep > 0.0) ||
         !(settings.absoluteFiniteDifferenceStep > 0.0) ||
@@ -32,7 +41,9 @@ void validateSettings(const RealityLoopSettings& settings) {
     }
 }
 
-Evaluation evaluate(const WorldIR& world, const ForwardModel& forwardModel) {
+Evaluation evaluate(const WorldIR& world,
+                    const ForwardModel& forwardModel,
+                    const std::vector<ObservationRole>& roles) {
     if (!forwardModel) throw std::invalid_argument("reality loop requires a forward model");
     if (world.observations.empty()) throw std::invalid_argument("reality loop requires observations");
 
@@ -47,6 +58,7 @@ Evaluation evaluate(const WorldIR& world, const ForwardModel& forwardModel) {
 
     Evaluation result;
     for (const auto& observation : world.observations) {
+        if (!hasRole(roles, observation.role)) continue;
         const auto it = byId.find(observation.id);
         if (it == byId.end()) {
             throw std::runtime_error("forward model did not predict observation: " + observation.id);
@@ -69,10 +81,11 @@ Evaluation evaluate(const WorldIR& world, const ForwardModel& forwardModel) {
         }
     }
     result.summary.scalarCount = result.residuals.size();
-    if (!result.residuals.empty()) {
-        result.summary.weightedRms =
-            std::sqrt(2.0 * result.objective / static_cast<double>(result.residuals.size()));
+    if (result.residuals.empty()) {
+        throw std::invalid_argument("reality loop selected no observations for the requested role set");
     }
+    result.summary.weightedRms =
+        std::sqrt(2.0 * result.objective / static_cast<double>(result.residuals.size()));
     return result;
 }
 
@@ -113,7 +126,8 @@ DifferenceColumn finiteDifferenceColumn(const WorldIR& world,
                                         const ParameterAddress& parameter,
                                         const ForwardModel& forwardModel,
                                         double relativeStep,
-                                        double absoluteStep) {
+                                        double absoluteStep,
+                                        const std::vector<ObservationRole>& roles) {
     const auto baseValue = world.parameterValue(parameter);
     if (!baseValue.has_value()) throw std::invalid_argument("finite-difference parameter does not exist");
     const double requestedStep = finiteDifferenceStep(*baseValue, relativeStep, absoluteStep);
@@ -121,7 +135,7 @@ DifferenceColumn finiteDifferenceColumn(const WorldIR& world,
     const double minusValue = world.clampToBelief(parameter, *baseValue - requestedStep);
 
     DifferenceColumn column;
-    const Evaluation base = evaluate(world, forwardModel);
+    const Evaluation base = evaluate(world, forwardModel, roles);
     column.residualDerivative.assign(base.residuals.size(), 0.0);
     if (plusValue == minusValue) return column;
 
@@ -130,8 +144,8 @@ DifferenceColumn finiteDifferenceColumn(const WorldIR& world,
     if (!plus.setParameterValue(parameter, plusValue) || !minus.setParameterValue(parameter, minusValue)) {
         throw std::invalid_argument("failed to perturb reality-loop parameter");
     }
-    const Evaluation plusEvaluation = evaluate(plus, forwardModel);
-    const Evaluation minusEvaluation = evaluate(minus, forwardModel);
+    const Evaluation plusEvaluation = evaluate(plus, forwardModel, roles);
+    const Evaluation minusEvaluation = evaluate(minus, forwardModel, roles);
     if (plusEvaluation.residuals.size() != base.residuals.size() ||
         minusEvaluation.residuals.size() != base.residuals.size()) {
         throw std::runtime_error("forward model changed residual dimension during finite difference");
@@ -161,7 +175,7 @@ RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
     (void)parameterValues(initialWorld, parameters);
 
     WorldIR current = std::move(initialWorld);
-    Evaluation currentEvaluation = evaluate(current, forwardModel);
+    Evaluation currentEvaluation = evaluate(current, forwardModel, settings.fittingRoles);
     RealityLoopResult result;
     result.initialObjective = currentEvaluation.objective;
     double damping = settings.initialDamping;
@@ -181,7 +195,8 @@ RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
                                                        parameters[columnIndex],
                                                        forwardModel,
                                                        settings.relativeFiniteDifferenceStep,
-                                                       settings.absoluteFiniteDifferenceStep);
+                                                       settings.absoluteFiniteDifferenceStep,
+                                                       settings.fittingRoles);
             for (std::size_t row = 0; row < residualCount; ++row) {
                 jacobian(row, columnIndex) = column.residualDerivative[row];
             }
@@ -233,7 +248,7 @@ RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
                 const double actualStep = candidate - oldValues[parameterIndex];
                 stepSquared += actualStep * actualStep;
             }
-            const Evaluation trialEvaluation = evaluate(trial, forwardModel);
+            const Evaluation trialEvaluation = evaluate(trial, forwardModel, settings.fittingRoles);
             if (trialEvaluation.objective < currentEvaluation.objective) {
                 acceptedStepNorm = std::sqrt(stepSquared);
                 acceptedImprovement = currentEvaluation.objective - trialEvaluation.objective;
@@ -271,6 +286,12 @@ RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
     result.world = std::move(current);
     result.finalObjective = currentEvaluation.objective;
     result.residual = currentEvaluation.summary;
+    if (worldHasRole(result.world, ObservationRole::Validation)) {
+        const Evaluation validationEvaluation =
+            evaluate(result.world, forwardModel, {ObservationRole::Validation});
+        result.validationObjective = validationEvaluation.objective;
+        result.validationResidual = validationEvaluation.summary;
+    }
     return result;
 }
 
@@ -292,7 +313,8 @@ std::vector<ParameterSensitivity> rankParameterSensitivity(
     std::vector<ParameterSensitivity> sensitivities;
     sensitivities.reserve(parameters.size());
     for (const auto& parameter : parameters) {
-        const auto column = finiteDifferenceColumn(world, parameter, forwardModel, relativeStep, absoluteStep);
+        const auto column = finiteDifferenceColumn(world, parameter, forwardModel, relativeStep, absoluteStep,
+                                                   {ObservationRole::Fit});
         sensitivities.push_back(
             {parameter, column.objectiveDerivative, numerics::l2Norm(column.residualDerivative)});
     }

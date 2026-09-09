@@ -24,6 +24,7 @@ enum class EvidenceClass : std::uint8_t {
 };
 
 enum class ParameterSpace : std::uint8_t { Material, Constraint, Global };
+enum class ObservationRole : std::uint8_t { Fit, Validation, Initialization, Diagnostic };
 
 struct ParameterAddress {
     ParameterSpace space{ParameterSpace::Material};
@@ -51,6 +52,7 @@ struct ObservationRecord {
     std::vector<double> standardDeviationSI;
     EvidenceClass evidence{EvidenceClass::Unknown};
     std::string source;
+    ObservationRole role{ObservationRole::Fit};
 };
 
 struct Entity {
