@@ -2,8 +2,9 @@
 """Extract a reproducible single-point motion track from a static-camera video.
 
 This bootstrap observation producer uses ffmpeg for grayscale frame extraction,
-a temporal-median background, connected foreground components, and area/proximity
-tracking. Output rows are derived image evidence, not 3D or material ground truth.
+a temporal-median background, motion-supported foreground components, geometric
+component filtering, and continuity-aware tracking. Output rows are derived image
+evidence, not 3D or material ground truth.
 """
 
 from __future__ import annotations
@@ -57,7 +58,7 @@ def read_pgm(path: Path) -> tuple[int, int, bytes]:
     return width, height, pixels
 
 
-def temporal_background(frames: list[bytes], max_samples: int = 17) -> bytes:
+def temporal_background(frames: list[bytes], max_samples: int = 21) -> bytes:
     if not frames:
         fail("no frames available for background estimation")
     stride = max(1, len(frames) // max_samples)
@@ -72,27 +73,47 @@ def temporal_background(frames: list[bytes], max_samples: int = 17) -> bytes:
     return bytes(background)
 
 
-def components(frame: bytes, background: bytes, width: int, height: int,
-               threshold: int, min_pixels: int) -> list[tuple[int, float, float, float]]:
-    mask = bytearray(len(frame))
+def components(
+    frame: bytes,
+    background: bytes,
+    motion_reference: bytes,
+    width: int,
+    height: int,
+    threshold: int,
+    motion_threshold: int,
+    min_pixels: int,
+    max_component_fraction: float,
+    max_aspect_ratio: float,
+    min_motion_fraction: float,
+) -> list[tuple[int, float, float, float, float, float]]:
+    foreground = bytearray(len(frame))
+    motion = bytearray(len(frame))
     delta = bytearray(len(frame))
-    for index, (value, reference) in enumerate(zip(frame, background)):
+    for index, (value, reference, prior) in enumerate(zip(frame, background, motion_reference)):
         difference = abs(value - reference)
         delta[index] = min(difference, 255)
         if difference >= threshold:
-            mask[index] = 1
+            foreground[index] = 1
+        if abs(value - prior) >= motion_threshold:
+            motion[index] = 1
 
-    result: list[tuple[int, float, float, float]] = []
+    result: list[tuple[int, float, float, float, float, float]] = []
     stack: list[int] = []
-    for seed in range(len(mask)):
-        if mask[seed] == 0:
+    maximum_area = max(min_pixels, int(width * height * max_component_fraction))
+    for seed in range(len(foreground)):
+        if foreground[seed] == 0:
             continue
-        mask[seed] = 0
+        foreground[seed] = 0
         stack.append(seed)
         area = 0
         sum_x = 0.0
         sum_y = 0.0
         sum_delta = 0.0
+        motion_hits = 0
+        min_x = width
+        min_y = height
+        max_x = 0
+        max_y = 0
         while stack:
             current = stack.pop()
             y, x = divmod(current, width)
@@ -100,51 +121,99 @@ def components(frame: bytes, background: bytes, width: int, height: int,
             sum_x += x + 0.5
             sum_y += y + 0.5
             sum_delta += delta[current]
+            motion_hits += int(motion[current] != 0)
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x)
+            max_y = max(max_y, y)
             if x > 0:
                 neighbor = current - 1
-                if mask[neighbor]:
-                    mask[neighbor] = 0
+                if foreground[neighbor]:
+                    foreground[neighbor] = 0
                     stack.append(neighbor)
             if x + 1 < width:
                 neighbor = current + 1
-                if mask[neighbor]:
-                    mask[neighbor] = 0
+                if foreground[neighbor]:
+                    foreground[neighbor] = 0
                     stack.append(neighbor)
             if y > 0:
                 neighbor = current - width
-                if mask[neighbor]:
-                    mask[neighbor] = 0
+                if foreground[neighbor]:
+                    foreground[neighbor] = 0
                     stack.append(neighbor)
             if y + 1 < height:
                 neighbor = current + width
-                if mask[neighbor]:
-                    mask[neighbor] = 0
+                if foreground[neighbor]:
+                    foreground[neighbor] = 0
                     stack.append(neighbor)
-        if area >= min_pixels:
-            result.append((area, sum_x / area, sum_y / area, sum_delta / area))
+
+        if area < min_pixels or area > maximum_area:
+            continue
+        box_width = max_x - min_x + 1
+        box_height = max_y - min_y + 1
+        short_side = max(1, min(box_width, box_height))
+        long_side = max(box_width, box_height)
+        aspect_ratio = long_side / short_side
+        if aspect_ratio > max_aspect_ratio:
+            continue
+        box_area = box_width * box_height
+        compactness = area / max(float(box_area), 1.0)
+        motion_fraction = motion_hits / float(area)
+        required_motion_hits = max(2, min_pixels // 8)
+        if motion_hits < required_motion_hits or motion_fraction < min_motion_fraction:
+            continue
+        result.append((
+            area,
+            sum_x / area,
+            sum_y / area,
+            sum_delta / area,
+            compactness,
+            motion_fraction,
+        ))
     return result
 
 
-def select_component(candidates: list[tuple[int, float, float, float]],
-                     previous: tuple[float, float] | None,
-                     threshold: int,
-                     min_pixels: int) -> tuple[float, float, float] | None:
+def select_component(
+    candidates: list[tuple[int, float, float, float, float, float]],
+    previous: tuple[float, float] | None,
+    threshold: int,
+    min_pixels: int,
+    maximum_displacement: float,
+) -> tuple[float, float, float] | None:
     if not candidates:
         return None
-    if previous is None:
-        area, x, y, mean_delta = max(candidates, key=lambda item: item[0])
-    else:
+
+    def quality(item: tuple[int, float, float, float, float, float]) -> float:
+        area, _, _, mean_delta, compactness, motion_fraction = item
+        area_term = min(1.0, area / max(float(min_pixels * 8), 1.0))
+        contrast_term = min(1.0, mean_delta / max(float(threshold * 2), 1.0))
+        return area_term * contrast_term * math.sqrt(max(compactness, 0.0)) * math.sqrt(max(motion_fraction, 0.0))
+
+    usable = candidates
+    if previous is not None:
         px, py = previous
+        usable = [
+            item for item in candidates
+            if math.hypot(item[1] - px, item[2] - py) <= maximum_displacement
+        ]
+        if not usable:
+            return None
 
-        def score(item: tuple[int, float, float, float]) -> float:
-            area, x, y, _ = item
-            distance2 = (x - px) ** 2 + (y - py) ** 2
-            return area / (1.0 + 0.015 * distance2)
+        def score(item: tuple[int, float, float, float, float, float]) -> float:
+            _, x, y, _, _, _ = item
+            distance = math.hypot(x - px, y - py)
+            proximity = 1.0 / (1.0 + (distance / max(maximum_displacement * 0.35, 1.0)) ** 2)
+            return quality(item) * proximity
 
-        area, x, y, mean_delta = max(candidates, key=score)
+        selected = max(usable, key=score)
+    else:
+        selected = max(usable, key=quality)
+
+    area, x, y, mean_delta, compactness, motion_fraction = selected
     area_term = min(1.0, area / max(float(min_pixels * 8), 1.0))
     contrast_term = min(1.0, mean_delta / max(float(threshold * 2), 1.0))
-    confidence = max(0.05, area_term * contrast_term)
+    confidence = area_term * contrast_term * math.sqrt(max(compactness, 0.0)) * math.sqrt(max(motion_fraction, 0.0))
+    confidence = min(1.0, max(0.05, confidence))
     return x, y, confidence
 
 
@@ -156,7 +225,13 @@ def main() -> None:
     parser.add_argument("--fps", type=float, default=12.0)
     parser.add_argument("--scale-width", type=int, default=320)
     parser.add_argument("--threshold", type=int, default=24)
+    parser.add_argument("--motion-threshold", type=int, default=10)
     parser.add_argument("--min-component-pixels", type=int, default=18)
+    parser.add_argument("--max-component-fraction", type=float, default=0.02)
+    parser.add_argument("--max-aspect-ratio", type=float, default=4.0)
+    parser.add_argument("--min-motion-fraction", type=float, default=0.04)
+    parser.add_argument("--max-displacement-fraction", type=float, default=0.12)
+    parser.add_argument("--reset-after-misses", type=int, default=4)
     parser.add_argument("--validation-stride", type=int, default=5)
     parser.add_argument("--max-frames", type=int, default=0, help="0 means no explicit limit")
     args = parser.parse_args()
@@ -169,8 +244,16 @@ def main() -> None:
         fail("--fps must be positive")
     if args.scale_width < 32 or args.threshold < 1 or args.threshold > 255:
         fail("invalid scale width or threshold")
+    if args.motion_threshold < 1 or args.motion_threshold > 255:
+        fail("invalid motion threshold")
     if args.min_component_pixels < 1 or args.validation_stride < 2 or args.max_frames < 0:
         fail("invalid tracking/split settings")
+    if not (0.0 < args.max_component_fraction <= 0.25):
+        fail("--max-component-fraction must lie in (0, 0.25]")
+    if args.max_aspect_ratio < 1.0 or not (0.0 <= args.min_motion_fraction <= 1.0):
+        fail("invalid component geometry/motion settings")
+    if not (0.0 < args.max_displacement_fraction <= 1.0) or args.reset_after_misses < 1:
+        fail("invalid continuity settings")
 
     with tempfile.TemporaryDirectory(prefix="vulkax-video-track-") as temporary:
         root = Path(temporary)
@@ -199,13 +282,24 @@ def main() -> None:
         background = temporal_background(frames)
         samples: list[tuple[int, float, float, float, float, str]] = []
         previous: tuple[float, float] | None = None
+        misses = 0
+        maximum_displacement = math.hypot(width, height) * args.max_displacement_fraction
         for frame_index, frame in enumerate(frames):
+            reference = frames[frame_index - 1] if frame_index > 0 else frames[1]
             found = select_component(
-                components(frame, background, width, height, args.threshold, args.min_component_pixels),
-                previous, args.threshold, args.min_component_pixels,
+                components(
+                    frame, background, reference, width, height,
+                    args.threshold, args.motion_threshold, args.min_component_pixels,
+                    args.max_component_fraction, args.max_aspect_ratio, args.min_motion_fraction,
+                ),
+                previous, args.threshold, args.min_component_pixels, maximum_displacement,
             )
             if found is None:
+                misses += 1
+                if misses >= args.reset_after_misses:
+                    previous = None
                 continue
+            misses = 0
             x, y, confidence = found
             previous = (x, y)
             split = "validation" if len(samples) % args.validation_stride == args.validation_stride - 1 else "fit"

@@ -32,7 +32,9 @@ int main() {
     constexpr double restitution = 0.70;
     constexpr double ground = 300.0;
     constexpr double fps = 30.0;
-    constexpr std::size_t frameCount = 90;
+    constexpr std::size_t frameCount = 120;
+    constexpr std::size_t releaseFrame = 15;
+    constexpr double releaseTime = static_cast<double>(releaseFrame) / fps;
 
     BouncingPointDynamics truth;
     truth.initialPosition = {x0, ground - y0, 0.0};
@@ -42,13 +44,13 @@ int main() {
     truth.groundY = 0.0;
 
     capture::VideoPointTrack track;
-    track.source = "synthetic:image-plane-bounce";
+    track.source = "synthetic:image-plane-bounce-with-preroll";
     track.widthPixels = 640;
     track.heightPixels = 480;
     track.nominalFps = fps;
     for (std::size_t frame = 0; frame < frameCount; ++frame) {
         const double time = static_cast<double>(frame) / fps;
-        const auto state = simulateBouncingPoint(truth, time);
+        const auto state = simulateBouncingPointObservationTime(truth, time, releaseTime);
         capture::VideoPointTrackSample sample;
         sample.frameIndex = frame;
         sample.timeSeconds = time;
@@ -62,16 +64,20 @@ int main() {
     }
 
     const auto seed = estimateImagePlaneBounceSeed(track);
+    assert(seed.releaseSample.has_value());
     assert(seed.firstBounceSample.has_value());
-    assert(*seed.firstBounceSample >= 34U && *seed.firstBounceSample <= 36U);
-    assert(near(seed.velocityXPixelsPerSecond, vx, 1.0e-8));
-    assert(near(seed.accelerationYPixelsPerSecond2, acceleration, 2.0));
-    assert(near(seed.restitution, restitution, 0.05));
-    assert(near(seed.groundYPixels, ground, 1.0));
+    assert(*seed.releaseSample >= releaseFrame - 2U && *seed.releaseSample <= releaseFrame + 2U);
+    assert(near(seed.releaseTimeSeconds, releaseTime, 0.08));
+    assert(*seed.firstBounceSample > releaseFrame + 20U);
+    assert(near(seed.velocityXPixelsPerSecond, vx, 1.0e-6));
+    assert(near(seed.accelerationYPixelsPerSecond2, acceleration, 3.0));
+    assert(near(seed.restitution, restitution, 0.06));
+    assert(near(seed.groundYPixels, ground, 2.0));
 
     const ImagePlaneBounceParameterBinding binding{
         global("image.x0"), global("image.y0"), global("image.vx"), global("image.vy"),
         global("image.acceleration_y"), global("image.restitution"), global("image.ground_y"),
+        global("image.release_time"),
     };
 
     WorldIR world;
@@ -79,6 +85,7 @@ int main() {
     world.globalParameters = {
         {"image.x0", x0}, {"image.y0", y0}, {"image.vx", vx}, {"image.vy", vy},
         {"image.acceleration_y", 430.0}, {"image.restitution", 0.55}, {"image.ground_y", ground},
+        {"image.release_time", releaseTime},
     };
     world.parameterBeliefs.push_back({
         binding.accelerationY, 100.0, 900.0, std::nullopt,
@@ -93,7 +100,7 @@ int main() {
     appendVideoPointTrackObservations(world, track, import);
     for (auto& observation : world.observations) {
         if (observation.role == ObservationRole::Validation &&
-            observation.timeSeconds > 1.5) {
+            observation.timeSeconds > 2.0) {
             observation.values[0] += 5.0;
             break;
         }
@@ -108,12 +115,12 @@ int main() {
         world, {binding.accelerationY, binding.restitution}, forward, settings);
 
     assert(result.finalObjective < result.initialObjective * 1.0e-10);
-    assert(result.residual.scalarCount == 144U);
+    assert(result.residual.scalarCount == 192U);
     assert(result.residual.weightedRms < 1.0e-5);
     assert(near(*result.world.parameterValue(binding.accelerationY), acceleration, 1.0e-4));
     assert(near(*result.world.parameterValue(binding.restitution), restitution, 1.0e-4));
-    assert(result.validationResidual.scalarCount == 36U);
-    assert(result.validationResidual.weightedRms > 0.5);
+    assert(result.validationResidual.scalarCount == 48U);
+    assert(result.validationResidual.weightedRms > 0.4);
 
     return 0;
 }

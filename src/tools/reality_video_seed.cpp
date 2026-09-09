@@ -1,6 +1,7 @@
 #include "vulkax/capture/video_track.hpp"
 #include "vulkax/world/image_plane_bounce.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
@@ -39,18 +40,26 @@ int main(int argc, char** argv) {
         const auto seed = vulkax::world::estimateImagePlaneBounceSeed(track);
         std::size_t fitSamples = 0;
         std::size_t validationSamples = 0;
+        double minimumX = track.samples.front().xPixels;
+        double maximumX = minimumX;
+        double minimumY = track.samples.front().yPixels;
+        double maximumY = minimumY;
         for (const auto& sample : track.samples) {
             if (sample.split == vulkax::capture::VideoTrackSplit::Fit) {
                 ++fitSamples;
             } else {
                 ++validationSamples;
             }
+            minimumX = std::min(minimumX, sample.xPixels);
+            maximumX = std::max(maximumX, sample.xPixels);
+            minimumY = std::min(minimumY, sample.yPixels);
+            maximumY = std::max(maximumY, sample.yPixels);
         }
 
         std::cout << std::setprecision(17);
         std::cout << "{\n";
         std::cout << "  \"schema\": \"vulkax_image_plane_bounce_seed\",\n";
-        std::cout << "  \"version\": 1,\n";
+        std::cout << "  \"version\": 2,\n";
         std::cout << "  \"source\": \"" << jsonEscape(track.source) << "\",\n";
         std::cout << "  \"width_pixels\": " << track.widthPixels << ",\n";
         std::cout << "  \"height_pixels\": " << track.heightPixels << ",\n";
@@ -58,6 +67,8 @@ int main(int argc, char** argv) {
         std::cout << "  \"sample_count\": " << track.samples.size() << ",\n";
         std::cout << "  \"fit_samples\": " << fitSamples << ",\n";
         std::cout << "  \"validation_samples\": " << validationSamples << ",\n";
+        std::cout << "  \"x_span_pixels\": " << maximumX - minimumX << ",\n";
+        std::cout << "  \"y_span_pixels\": " << maximumY - minimumY << ",\n";
         std::cout << "  \"initial_x_pixels\": " << seed.initialXPixels << ",\n";
         std::cout << "  \"initial_y_pixels\": " << seed.initialYPixels << ",\n";
         std::cout << "  \"velocity_x_pixels_per_second\": "
@@ -68,6 +79,12 @@ int main(int argc, char** argv) {
                   << seed.accelerationYPixelsPerSecond2 << ",\n";
         std::cout << "  \"restitution_proxy\": " << seed.restitution << ",\n";
         std::cout << "  \"ground_y_pixels\": " << seed.groundYPixels << ",\n";
+        std::cout << "  \"release_time_seconds\": " << seed.releaseTimeSeconds << ",\n";
+        if (seed.releaseSample.has_value()) {
+            std::cout << "  \"release_sample\": " << *seed.releaseSample << ",\n";
+        } else {
+            std::cout << "  \"release_sample\": null,\n";
+        }
         if (seed.firstBounceSample.has_value()) {
             const auto index = *seed.firstBounceSample;
             std::cout << "  \"first_bounce_sample\": " << index << ",\n";

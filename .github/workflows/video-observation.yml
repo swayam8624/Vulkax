@@ -62,8 +62,14 @@ jobs:
             build/reality-assets/video/sciencecola_bouncing_ball_2013.webm \
             build/reality-real/sciencecola_bouncing_ball.track.csv \
             --source "https://commons.wikimedia.org/wiki/File:Bouncing_Ball.webm" \
-            --fps 12 --scale-width 320 --threshold 20 \
-            --min-component-pixels 12 --validation-stride 5 --max-frames 300
+            --fps 12 --scale-width 320 --threshold 20 --motion-threshold 10 \
+            --min-component-pixels 12 --max-component-fraction 0.015 \
+            --max-aspect-ratio 3.5 --min-motion-fraction 0.05 \
+            --max-displacement-fraction 0.10 --validation-stride 5 --max-frames 300
+          ffmpeg -hide_banner -loglevel error -nostdin -y \
+            -i build/reality-assets/video/sciencecola_bouncing_ball_2013.webm \
+            -vf "fps=1,scale=320:-2,tile=5x5:padding=2:margin=2" -frames:v 1 \
+            build/reality-real/sciencecola_bouncing_ball.contact_sheet.png
 
       - name: Build measured-source image-plane seed tool
         run: |
@@ -82,18 +88,24 @@ jobs:
 
           path = Path("build/reality-real/sciencecola_bouncing_ball.seed.json")
           seed = json.loads(path.read_text(encoding="utf-8"))
-          if seed.get("schema") != "vulkax_image_plane_bounce_seed" or seed.get("version") != 1:
+          if seed.get("schema") != "vulkax_image_plane_bounce_seed" or seed.get("version") != 2:
               raise SystemExit("unexpected measured-source seed schema")
           if seed["sample_count"] < 12 or seed["fit_samples"] == 0 or seed["validation_samples"] == 0:
               raise SystemExit("real-video tracker did not produce a usable fit/validation evidence set")
+          if seed["y_span_pixels"] < 0.05 * seed["height_pixels"]:
+              raise SystemExit("tracked evidence does not contain enough vertical motion for a bounce hypothesis")
           if not (0.0 < seed["ground_y_pixels"] < seed["height_pixels"]):
               raise SystemExit("image-plane ground estimate lies outside the extracted frame")
-          if not (0.0 < seed["acceleration_y_pixels_per_second2"] < 1.0e6):
-              raise SystemExit("image-plane acceleration proxy is invalid")
-          if not (0.0 < seed["restitution_proxy"] <= 1.0):
-              raise SystemExit("image-plane restitution proxy is invalid")
-          if seed["first_bounce_sample"] is None:
-              raise SystemExit("real-video initializer failed to identify a bounce event")
+          if not (0.5 < seed["acceleration_y_pixels_per_second2"] < 1.0e6):
+              raise SystemExit("image-plane acceleration proxy is too small/large to support the bounce model")
+          if not (0.05 < seed["restitution_proxy"] < 0.985):
+              raise SystemExit("restitution proxy hit/approached a clamp boundary; reject weak bounce evidence")
+          if seed["first_bounce_sample"] is None or seed["release_sample"] is None:
+              raise SystemExit("real-video initializer failed to identify release/bounce events")
+          if not (0.0 <= seed["release_time_seconds"] < seed["first_bounce_time_seconds"]):
+              raise SystemExit("release/bounce event ordering is invalid")
+          if seed["first_bounce_time_seconds"] - seed["release_time_seconds"] < 0.1:
+              raise SystemExit("release-to-impact interval is too short for a defensible ballistic seed")
           if "pixels/s^2" not in seed["metric_status"]:
               raise SystemExit("measured-source seed lost its non-metric evidence caveat")
           print("VALID measured-source image-plane hypothesis bootstrap")
@@ -105,8 +117,10 @@ jobs:
         with:
           name: vulkax-real-video-bootstrap
           path: |
+            build/reality-assets/video/sciencecola_bouncing_ball_2013.webm
             build/reality-real/sciencecola_bouncing_ball.track.csv
             build/reality-real/sciencecola_bouncing_ball.seed.json
+            build/reality-real/sciencecola_bouncing_ball.contact_sheet.png
           if-no-files-found: warn
 
       - name: Configure Vulkax

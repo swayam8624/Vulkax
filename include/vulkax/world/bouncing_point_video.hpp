@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -144,6 +145,10 @@ struct BouncingPointParameterBinding {
     ParameterAddress gravityY;
     ParameterAddress restitution;
     ParameterAddress groundY;
+    // Optional observation-time origin. Before this timestamp the point remains
+    // at its initial pose; after it, physical time is t - releaseTime. This is
+    // needed for real footage that contains a stationary pre-roll before release.
+    std::optional<ParameterAddress> releaseTime;
 };
 
 [[nodiscard]] inline BouncingPointDynamics bouncingPointFromWorld(
@@ -178,6 +183,31 @@ struct BouncingPointParameterBinding {
     return dynamics;
 }
 
+[[nodiscard]] inline double bouncingPointReleaseTime(
+    const WorldIR& world,
+    const BouncingPointParameterBinding& binding) {
+    if (!binding.releaseTime.has_value()) return 0.0;
+    const auto value = world.parameterValue(*binding.releaseTime);
+    if (!value.has_value() || !std::isfinite(*value) || *value < 0.0) {
+        throw std::invalid_argument("WorldIR is missing or has invalid bouncing-point release_time");
+    }
+    return *value;
+}
+
+[[nodiscard]] inline BouncingPointState simulateBouncingPointObservationTime(
+    const BouncingPointDynamics& dynamics,
+    double observationTimeSeconds,
+    double releaseTimeSeconds) {
+    if (!std::isfinite(observationTimeSeconds) || observationTimeSeconds < 0.0 ||
+        !std::isfinite(releaseTimeSeconds) || releaseTimeSeconds < 0.0) {
+        throw std::invalid_argument("invalid bouncing-point observation/release time");
+    }
+    if (observationTimeSeconds <= releaseTimeSeconds) {
+        return {dynamics.initialPosition, math::Vec3{}, 0U, false};
+    }
+    return simulateBouncingPoint(dynamics, observationTimeSeconds - releaseTimeSeconds);
+}
+
 // First physical video forward model: a candidate WorldIR supplies both the
 // pinhole camera and point-mass dynamics. The model evolves the 3D state at each
 // imported video observation time, then projects it into exactly ImagePixels.
@@ -205,6 +235,7 @@ class BouncingPointVideoForwardModel {
         const auto camera = pinholeCameraFromWorld(
             world, widthPixels_, heightPixels_, cameraBinding_, cameraUp_);
         const auto dynamics = bouncingPointFromWorld(world, dynamicsBinding_);
+        const double releaseTime = bouncingPointReleaseTime(world, dynamicsBinding_);
         std::vector<ObservationPrediction> predictions;
         for (const auto& observation : world.observations) {
             if (observation.observableId != observableId_) continue;
@@ -212,7 +243,8 @@ class BouncingPointVideoForwardModel {
                 throw std::invalid_argument(
                     "bouncing-point video model requires ImagePixels observations");
             }
-            const auto state = simulateBouncingPoint(dynamics, observation.timeSeconds);
+            const auto state = simulateBouncingPointObservationTime(
+                dynamics, observation.timeSeconds, releaseTime);
             const auto pixel = projectWorldPoint(camera, state.position);
             if (!pixel.has_value()) {
                 throw std::runtime_error(
