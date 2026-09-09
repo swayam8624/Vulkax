@@ -78,6 +78,13 @@ int main(int argc, char** argv) {
         std::cout << "  \"acceleration_y_pixels_per_second2\": "
                   << seed.accelerationYPixelsPerSecond2 << ",\n";
         std::cout << "  \"restitution_proxy\": " << seed.restitution << ",\n";
+        std::cout << "  \"restitution_method\": \""
+                  << vulkax::world::toString(seed.restitutionMethod) << "\",\n";
+        if (seed.reboundHeightRatio.has_value()) {
+            std::cout << "  \"rebound_height_ratio\": " << *seed.reboundHeightRatio << ",\n";
+        } else {
+            std::cout << "  \"rebound_height_ratio\": null,\n";
+        }
         std::cout << "  \"ground_y_pixels\": " << seed.groundYPixels << ",\n";
         std::cout << "  \"release_time_seconds\": " << seed.releaseTimeSeconds << ",\n";
         if (seed.releaseSample.has_value()) {
@@ -93,6 +100,15 @@ int main(int argc, char** argv) {
         } else {
             std::cout << "  \"first_bounce_sample\": null,\n";
             std::cout << "  \"first_bounce_time_seconds\": null,\n";
+        }
+        if (seed.firstReboundApexSample.has_value()) {
+            const auto index = *seed.firstReboundApexSample;
+            std::cout << "  \"first_rebound_apex_sample\": " << index << ",\n";
+            std::cout << "  \"first_rebound_apex_time_seconds\": "
+                      << track.samples.at(index).timeSeconds << ",\n";
+        } else {
+            std::cout << "  \"first_rebound_apex_sample\": null,\n";
+            std::cout << "  \"first_rebound_apex_time_seconds\": null,\n";
         }
         std::cout << "  \"metric_status\": \"image-plane-only; acceleration is pixels/s^2 until camera and scene scale are calibrated\"\n";
         std::cout << "}\n";

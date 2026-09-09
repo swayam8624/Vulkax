@@ -66,11 +66,16 @@ int main() {
     const auto seed = estimateImagePlaneBounceSeed(track);
     assert(seed.releaseSample.has_value());
     assert(seed.firstBounceSample.has_value());
+    assert(seed.firstReboundApexSample.has_value());
+    assert(seed.reboundHeightRatio.has_value());
+    assert(seed.restitutionMethod == ImagePlaneRestitutionMethod::HeightRatio);
     assert(*seed.releaseSample >= releaseFrame - 2U && *seed.releaseSample <= releaseFrame + 2U);
     assert(near(seed.releaseTimeSeconds, releaseTime, 0.08));
     assert(*seed.firstBounceSample > releaseFrame + 20U);
+    assert(*seed.firstReboundApexSample > *seed.firstBounceSample);
     assert(near(seed.velocityXPixelsPerSecond, vx, 1.0e-6));
     assert(near(seed.accelerationYPixelsPerSecond2, acceleration, 3.0));
+    assert(near(*seed.reboundHeightRatio, restitution * restitution, 0.04));
     assert(near(seed.restitution, restitution, 0.06));
     assert(near(seed.groundYPixels, ground, 2.0));
 

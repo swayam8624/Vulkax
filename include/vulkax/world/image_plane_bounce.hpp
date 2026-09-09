@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -14,6 +15,21 @@
 #include <vector>
 
 namespace vulkax::world {
+
+enum class ImagePlaneRestitutionMethod : std::uint8_t {
+    DefaultPrior,
+    HeightRatio,
+    ImpactVelocityRatio,
+};
+
+[[nodiscard]] constexpr const char* toString(ImagePlaneRestitutionMethod method) noexcept {
+    switch (method) {
+        case ImagePlaneRestitutionMethod::DefaultPrior: return "default_prior";
+        case ImagePlaneRestitutionMethod::HeightRatio: return "height_ratio";
+        case ImagePlaneRestitutionMethod::ImpactVelocityRatio: return "impact_velocity_ratio";
+    }
+    return "unknown";
+}
 
 struct ImagePlaneBounceSeed {
     double initialXPixels{};
@@ -26,6 +42,9 @@ struct ImagePlaneBounceSeed {
     double releaseTimeSeconds{};
     std::optional<std::size_t> releaseSample;
     std::optional<std::size_t> firstBounceSample;
+    std::optional<std::size_t> firstReboundApexSample;
+    std::optional<double> reboundHeightRatio;
+    ImagePlaneRestitutionMethod restitutionMethod{ImagePlaneRestitutionMethod::DefaultPrior};
 };
 
 namespace detail {
@@ -132,6 +151,57 @@ namespace detail {
     return std::nullopt;
 }
 
+// After an impact the image-space y coordinate should decrease as the ball rises,
+// reach a local minimum at the rebound apex, then increase again. This event gives
+// a much more stable restitution proxy than differentiating a deforming contact
+// over only a handful of frames. The search is deliberately local to the first
+// three seconds after impact so later scene motion cannot become the rebound apex.
+[[nodiscard]] inline std::optional<std::size_t> firstImageReboundApex(
+    const std::vector<capture::VideoPointTrackSample>& samples,
+    std::size_t bounceIndex) {
+    constexpr std::size_t window = 2U;
+    if (bounceIndex + 2U * window + 1U >= samples.size()) return std::nullopt;
+    const auto [minimumY, maximumY] = verticalExtent(samples);
+    const double verticalRange = std::max(maximumY - minimumY, 1.0);
+    const double medianDt = std::max(medianSampleInterval(samples), 1.0e-9);
+    const double minimumRise = std::max(2.0, 0.08 * verticalRange);
+    const double minimumProminence = std::max(0.25, 0.005 * verticalRange);
+    const double minimumSpeed = std::max(1.0, 0.015 * verticalRange / medianDt);
+    const double bounceY = samples[bounceIndex].yPixels;
+    const double bounceTime = samples[bounceIndex].timeSeconds;
+
+    for (std::size_t index = bounceIndex + window; index + window < samples.size(); ++index) {
+        const auto& candidate = samples[index];
+        if (candidate.timeSeconds - bounceTime > 3.0) break;
+        double beforeY = 0.0;
+        double beforeTime = 0.0;
+        double afterY = 0.0;
+        double afterTime = 0.0;
+        for (std::size_t offset = 1; offset <= window; ++offset) {
+            beforeY += samples[index - offset].yPixels;
+            beforeTime += samples[index - offset].timeSeconds;
+            afterY += samples[index + offset].yPixels;
+            afterTime += samples[index + offset].timeSeconds;
+        }
+        beforeY /= static_cast<double>(window);
+        beforeTime /= static_cast<double>(window);
+        afterY /= static_cast<double>(window);
+        afterTime /= static_cast<double>(window);
+        const double incomingDt = candidate.timeSeconds - beforeTime;
+        const double outgoingDt = afterTime - candidate.timeSeconds;
+        if (!(incomingDt > 0.0) || !(outgoingDt > 0.0)) continue;
+        const double incoming = (candidate.yPixels - beforeY) / incomingDt;
+        const double outgoing = (afterY - candidate.yPixels) / outgoingDt;
+        const double prominence = std::min(beforeY, afterY) - candidate.yPixels;
+        const double rise = bounceY - candidate.yPixels;
+        if (rise >= minimumRise && prominence >= minimumProminence &&
+            incoming <= -minimumSpeed && outgoing >= minimumSpeed) {
+            return index;
+        }
+    }
+    return std::nullopt;
+}
+
 [[nodiscard]] inline std::size_t imageMotionReleaseSample(
     const std::vector<capture::VideoPointTrackSample>& samples,
     std::size_t endExclusive) {
@@ -205,7 +275,34 @@ namespace detail {
     (void)minimumY;
     seed.groundYPixels = bounce.has_value() ? track.samples[*bounce].yPixels : maximumY;
 
-    if (bounce.has_value() && *bounce >= 3U && *bounce + 3U < track.samples.size()) {
+    bool restitutionEstimated = false;
+    if (bounce.has_value()) {
+        seed.firstReboundApexSample = detail::firstImageReboundApex(track.samples, *bounce);
+        if (seed.firstReboundApexSample.has_value()) {
+            const double dropHeight = seed.groundYPixels - track.samples[release].yPixels;
+            const double reboundHeight =
+                seed.groundYPixels - track.samples[*seed.firstReboundApexSample].yPixels;
+            if (dropHeight > 2.0 && reboundHeight > 1.0) {
+                const double ratio = reboundHeight / dropHeight;
+                // In an unforced passive bounce the first rebound must not exceed
+                // the release height. A small tolerance admits pixel/event noise
+                // without silently accepting an obviously wrong tracked object.
+                if (std::isfinite(ratio) && ratio > 0.0025 && ratio <= 1.05) {
+                    seed.reboundHeightRatio = ratio;
+                    seed.restitution = std::clamp(std::sqrt(ratio), 0.05, 0.99);
+                    seed.restitutionMethod = ImagePlaneRestitutionMethod::HeightRatio;
+                    restitutionEstimated = true;
+                }
+            }
+        }
+    }
+
+    // Velocity-ratio restitution is retained as a fallback when the post-impact
+    // track does not contain a defensible first rebound apex. It is intentionally
+    // secondary because contact deformation and finite frame rate make local
+    // derivatives noisier than a height ratio for ordinary drop tests.
+    if (!restitutionEstimated && bounce.has_value() && *bounce >= 3U &&
+        *bounce + 3U < track.samples.size()) {
         const std::size_t beforeBegin = std::max(release, *bounce - 6U);
         const std::size_t beforeEnd = *bounce;
         const std::size_t afterBegin = *bounce;
@@ -220,6 +317,7 @@ namespace detail {
             const double outgoingImpact = afterFit[1];
             if (incomingImpact > 1.0e-6 && outgoingImpact < -1.0e-6) {
                 seed.restitution = std::clamp(-outgoingImpact / incomingImpact, 0.05, 0.99);
+                seed.restitutionMethod = ImagePlaneRestitutionMethod::ImpactVelocityRatio;
             }
         }
     }
