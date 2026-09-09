@@ -126,6 +126,10 @@ jobs:
               raise SystemExit("release/bounce event ordering is invalid")
           if seed["first_bounce_time_seconds"] - seed["release_time_seconds"] < 0.1:
               raise SystemExit("release-to-impact interval is too short for a defensible ballistic seed")
+          if seed.get("restitution_method") == "height_ratio":
+              ratio = seed.get("rebound_height_ratio")
+              if ratio is None or not (0.35 < ratio < 0.95):
+                  raise SystemExit("height-ratio restitution path produced an implausible first rebound ratio")
           if "pixels/s^2" not in seed["metric_status"]:
               raise SystemExit("measured-source seed lost its non-metric evidence caveat")
           print("VALID measured-source ballistic image-plane hypothesis bootstrap")
