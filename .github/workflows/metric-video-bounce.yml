@@ -1,0 +1,33 @@
+name: Metric video bounce calibration
+
+on:
+  pull_request:
+    paths:
+      - "include/vulkax/world/metric_video_bounce.hpp"
+      - "include/vulkax/world/reality_loop.hpp"
+      - "src/world/reality_loop.cpp"
+      - "tests/metric_video_bounce_tests.cpp"
+      - ".github/workflows/metric-video-bounce.yml"
+  push:
+    branches: [main]
+    paths:
+      - "include/vulkax/world/metric_video_bounce.hpp"
+      - "include/vulkax/world/reality_loop.hpp"
+      - "src/world/reality_loop.cpp"
+      - "tests/metric_video_bounce_tests.cpp"
+      - ".github/workflows/metric-video-bounce.yml"
+
+jobs:
+  metric-video-bounce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build metric-scale reality-loop regression
+        run: |
+          mkdir -p build
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -UNDEBUG \
+            -Iinclude tests/metric_video_bounce_tests.cpp \
+            src/world/world_ir.cpp src/world/reality_loop.cpp src/numerics/dense.cpp \
+            -o build/vulkax_metric_video_bounce_tests
+      - name: Run metric-scale reality-loop regression
+        run: build/vulkax_metric_video_bounce_tests

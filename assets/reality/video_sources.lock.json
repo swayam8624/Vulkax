@@ -1,0 +1,60 @@
+{
+  "schema": "vulkax_reality_video_assets",
+  "version": 2,
+  "assets": [
+    {
+      "id": "sciencecola_electrostatic_ball_2013",
+      "kind": "video",
+      "source": "Wikimedia Commons",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Bouncing_Ball.webm",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/3/32/Bouncing_Ball.webm",
+      "license": "CC-BY-3.0",
+      "attribution": "ScienceCOLA",
+      "sha1": "63a7d2d42be52bfc13fcf3643605b39841ae52d5",
+      "bytes": 1081689,
+      "duration_seconds": 26.427,
+      "width_pixels": 640,
+      "height_pixels": 480,
+      "destination": "video/sciencecola_bouncing_ball_2013.webm",
+      "mechanism": "electrostatic_pendulum_contact",
+      "evidence_scope": "development_observation_source",
+      "role": "real electrostatic-contact motion source for a future charged-pendulum benchmark; explicitly not ballistic ground-contact evidence and not Vulkax 1.0 verification evidence"
+    },
+    {
+      "id": "golhamedia_bouncy_ball_240fps_2016",
+      "kind": "video",
+      "source": "Wikimedia Commons",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Bouncy_ball_240fps.webm",
+      "download_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bouncy_ball_240fps.webm",
+      "license": "CC-BY-SA-4.0",
+      "attribution": "GolhaMedia",
+      "sha1": "10a795ac3403164b3cd830478d164ad53fb1b59f",
+      "bytes": 75465750,
+      "duration_seconds": 41.443,
+      "width_pixels": 1280,
+      "height_pixels": 720,
+      "destination": "video/golhamedia_bouncy_ball_240fps_2016.webm",
+      "mechanism": "ballistic_ground_contact",
+      "evidence_scope": "development_observation_source",
+      "role": "high-speed cluttered bouncing-ball footage retained as a future multi-object tracking stress source; not used as the controlled single-ball ballistic benchmark because generic point tracking does not preserve ball identity reliably"
+    },
+    {
+      "id": "rhetos_exercise_ball_rebound_2025",
+      "kind": "video",
+      "source": "Wikimedia Commons",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Flummiversuch_(Gymnastikball-R%C3%BCcksteigh%C3%B6he).webm",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/5/58/Flummiversuch_%28Gymnastikball-R%C3%BCcksteigh%C3%B6he%29.webm",
+      "license": "CC-BY-SA-4.0",
+      "attribution": "Rhetos",
+      "sha1": "522926a3165d1fbb95e085751cc0fca75718bfeb",
+      "bytes": 4432478,
+      "duration_seconds": 22.948,
+      "width_pixels": 1920,
+      "height_pixels": 1080,
+      "destination": "video/rhetos_exercise_ball_rebound_2025.webm",
+      "mechanism": "ballistic_ground_contact",
+      "evidence_scope": "development_observation_source",
+      "role": "controlled exercise-ball free-fall and first-rebound observation source whose published purpose is pixel-height measurement for restitution estimation; derived tracks remain image-plane evidence until an independent metric scale anchor is supplied"
+    }
+  ]
+}

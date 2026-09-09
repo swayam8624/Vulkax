@@ -1,0 +1,31 @@
+name: Reality-loop identifiability
+
+on:
+  pull_request:
+    paths:
+      - "include/vulkax/world/reality_loop.hpp"
+      - "src/world/reality_loop.cpp"
+      - "tests/identifiability_tests.cpp"
+      - ".github/workflows/identifiability.yml"
+  push:
+    branches: [main]
+    paths:
+      - "include/vulkax/world/reality_loop.hpp"
+      - "src/world/reality_loop.cpp"
+      - "tests/identifiability_tests.cpp"
+      - ".github/workflows/identifiability.yml"
+
+jobs:
+  identifiability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build local identifiability regression
+        run: |
+          mkdir -p build
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -UNDEBUG \
+            -Iinclude tests/identifiability_tests.cpp \
+            src/world/world_ir.cpp src/world/reality_loop.cpp src/numerics/dense.cpp \
+            -o build/vulkax_identifiability_tests
+      - name: Run local identifiability regression
+        run: build/vulkax_identifiability_tests
