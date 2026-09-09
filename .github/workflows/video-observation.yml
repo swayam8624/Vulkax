@@ -49,16 +49,19 @@ jobs:
       - name: Validate mechanism-tagged video source manifest
         run: |
           python3 scripts/fetch_reality_video_assets.py --validate-only \
-            --asset-id golhamedia_bouncy_ball_240fps_2016
+            --asset-id rhetos_exercise_ball_rebound_2025
           python3 - <<'PY'
           import json
           from pathlib import Path
           data = json.loads(Path("assets/reality/video_sources.lock.json").read_text())
           by_id = {asset["id"]: asset for asset in data["assets"]}
-          ballistic = by_id["golhamedia_bouncy_ball_240fps_2016"]
+          ballistic = by_id["rhetos_exercise_ball_rebound_2025"]
+          stress = by_id["golhamedia_bouncy_ball_240fps_2016"]
           electrostatic = by_id["sciencecola_electrostatic_ball_2013"]
           if ballistic["mechanism"] != "ballistic_ground_contact":
-              raise SystemExit("ballistic benchmark source has the wrong mechanism tag")
+              raise SystemExit("controlled ballistic benchmark source has the wrong mechanism tag")
+          if stress["mechanism"] != ballistic["mechanism"]:
+              raise SystemExit("ballistic tracking stress source lost its mechanism family")
           if electrostatic["mechanism"] == ballistic["mechanism"]:
               raise SystemExit("visually similar but physically different sources collapsed to one model family")
           print("VALID explicit observation-source mechanism boundary")
@@ -67,26 +70,26 @@ jobs:
       - name: Exercise synthetic raw-video to point-track extraction
         run: python3 scripts/test_video_track_extractor.py
 
-      - name: Fetch checksum-pinned ballistic ground-contact footage
+      - name: Fetch checksum-pinned controlled ballistic footage
         run: |
           python3 scripts/fetch_reality_video_assets.py \
-            --asset-id golhamedia_bouncy_ball_240fps_2016
+            --asset-id rhetos_exercise_ball_rebound_2025
 
       - name: Derive measured-source ballistic image-plane track
         run: |
           mkdir -p build/reality-real
           python3 scripts/extract_video_track.py \
-            build/reality-assets/video/golhamedia_bouncy_ball_240fps_2016.webm \
-            build/reality-real/golhamedia_bouncy_ball.track.csv \
-            --source "https://commons.wikimedia.org/wiki/File:Bouncy_ball_240fps.webm" \
+            build/reality-assets/video/rhetos_exercise_ball_rebound_2025.webm \
+            build/reality-real/rhetos_exercise_ball.track.csv \
+            --source "https://commons.wikimedia.org/wiki/File:Flummiversuch_(Gymnastikball-R%C3%BCcksteigh%C3%B6he).webm" \
             --fps 24 --scale-width 480 --threshold 18 --motion-threshold 8 \
-            --min-component-pixels 10 --max-component-fraction 0.02 \
-            --max-aspect-ratio 3.5 --min-motion-fraction 0.04 \
-            --max-displacement-fraction 0.10 --validation-stride 5 --max-frames 600
+            --min-component-pixels 24 --max-component-fraction 0.10 \
+            --max-aspect-ratio 2.5 --min-motion-fraction 0.03 \
+            --max-displacement-fraction 0.12 --validation-stride 5 --max-frames 560
           ffmpeg -hide_banner -loglevel error -nostdin -y \
-            -i build/reality-assets/video/golhamedia_bouncy_ball_240fps_2016.webm \
+            -i build/reality-assets/video/rhetos_exercise_ball_rebound_2025.webm \
             -vf "fps=1,scale=480:-2,tile=5x5:padding=2:margin=2" -frames:v 1 \
-            build/reality-real/golhamedia_bouncy_ball.contact_sheet.png
+            build/reality-real/rhetos_exercise_ball.contact_sheet.png
 
       - name: Build measured-source image-plane seed tool
         run: |
@@ -97,13 +100,13 @@ jobs:
       - name: Initialize measured-source ballistic hypothesis
         run: |
           build/vulkax_reality_video_seed \
-            build/reality-real/golhamedia_bouncy_ball.track.csv \
-            | tee build/reality-real/golhamedia_bouncy_ball.seed.json
+            build/reality-real/rhetos_exercise_ball.track.csv \
+            | tee build/reality-real/rhetos_exercise_ball.seed.json
           python3 - <<'PY'
           import json
           from pathlib import Path
 
-          path = Path("build/reality-real/golhamedia_bouncy_ball.seed.json")
+          path = Path("build/reality-real/rhetos_exercise_ball.seed.json")
           seed = json.loads(path.read_text(encoding="utf-8"))
           if seed.get("schema") != "vulkax_image_plane_bounce_seed" or seed.get("version") != 2:
               raise SystemExit("unexpected measured-source seed schema")
@@ -134,9 +137,9 @@ jobs:
         with:
           name: vulkax-real-ballistic-video-bootstrap
           path: |
-            build/reality-real/golhamedia_bouncy_ball.track.csv
-            build/reality-real/golhamedia_bouncy_ball.seed.json
-            build/reality-real/golhamedia_bouncy_ball.contact_sheet.png
+            build/reality-real/rhetos_exercise_ball.track.csv
+            build/reality-real/rhetos_exercise_ball.seed.json
+            build/reality-real/rhetos_exercise_ball.contact_sheet.png
           if-no-files-found: warn
 
       - name: Upload source clip for failed observation-producer debugging
@@ -144,7 +147,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vulkax-real-ballistic-source-debug
-          path: build/reality-assets/video/golhamedia_bouncy_ball_240fps_2016.webm
+          path: build/reality-assets/video/rhetos_exercise_ball_rebound_2025.webm
           if-no-files-found: warn
 
       - name: Configure Vulkax
