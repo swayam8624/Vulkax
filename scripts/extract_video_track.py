@@ -50,8 +50,18 @@ def read_pgm(path: Path) -> tuple[int, int, bytes]:
         maximum = int(token())
     except ValueError as error:
         fail(f"invalid PGM header in {path}: {error}")
-    while index < len(data) and chr(data[index]).isspace():
+
+    # Raw PGM has a whitespace separator between maxval and the binary raster.
+    # Consume that separator exactly once (or CRLF as one line ending). Never run
+    # an arbitrary whitespace-skip loop here: pixel bytes are unrestricted and a
+    # perfectly valid first pixel may itself be 0x09, 0x0A, 0x0D or 0x20.
+    if index >= len(data) or not chr(data[index]).isspace():
+        fail(f"missing PGM raster separator: {path}")
+    if data[index:index + 2] == b"\r\n":
+        index += 2
+    else:
         index += 1
+
     pixels = data[index:]
     if width <= 0 or height <= 0 or maximum != 255 or len(pixels) != width * height:
         fail(f"unsupported or truncated PGM frame: {path}")
