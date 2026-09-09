@@ -29,7 +29,7 @@ bool worldHasRole(const WorldIR& world, ObservationRole role) {
 
 void validateSettings(const RealityLoopSettings& settings) {
     if (settings.maxIterations == 0 || settings.maxBacktrackingSteps == 0 || settings.fittingRoles.empty()) {
-        throw std::invalid_argument("reality-loop iteration counts and fitting-role set must be non-empty");
+        throw std::invalid_argument("reality-loop iteration counts must be positive");
     }
     if (!(settings.relativeFiniteDifferenceStep > 0.0) ||
         !(settings.absoluteFiniteDifferenceStep > 0.0) ||
@@ -41,8 +41,7 @@ void validateSettings(const RealityLoopSettings& settings) {
     }
 }
 
-Evaluation evaluate(const WorldIR& world,
-                    const ForwardModel& forwardModel,
+Evaluation evaluate(const WorldIR& world, const ForwardModel& forwardModel,
                     const std::vector<ObservationRole>& roles) {
     if (!forwardModel) throw std::invalid_argument("reality loop requires a forward model");
     if (world.observations.empty()) throw std::invalid_argument("reality loop requires observations");
@@ -63,18 +62,21 @@ Evaluation evaluate(const WorldIR& world,
         if (it == byId.end()) {
             throw std::runtime_error("forward model did not predict observation: " + observation.id);
         }
-        const auto& predicted = it->second->valuesSI;
-        if (predicted.size() != observation.valuesSI.size()) {
+        if (it->second->space != observation.space) {
+            throw std::runtime_error("forward-model observation space mismatch: " + observation.id);
+        }
+        const auto& predicted = it->second->values;
+        if (predicted.size() != observation.values.size()) {
             throw std::runtime_error("forward-model prediction dimension mismatch: " + observation.id);
         }
         for (std::size_t component = 0; component < predicted.size(); ++component) {
             if (!std::isfinite(predicted[component])) {
                 throw std::runtime_error("forward model returned non-finite prediction: " + observation.id);
             }
-            const double sigma = observation.standardDeviationSI.empty()
+            const double sigma = observation.standardDeviation.empty()
                                      ? 1.0
-                                     : observation.standardDeviationSI[component];
-            const double residual = (predicted[component] - observation.valuesSI[component]) / sigma;
+                                     : observation.standardDeviation[component];
+            const double residual = (predicted[component] - observation.values[component]) / sigma;
             result.residuals.push_back(residual);
             result.objective += 0.5 * residual * residual;
             result.summary.weightedMaximum = std::max(result.summary.weightedMaximum, std::abs(residual));
@@ -182,9 +184,7 @@ RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
     result.trace.push_back(
         {0, currentEvaluation.objective, damping, true, parameterValues(current, parameters)});
 
-    if (currentEvaluation.objective <= settings.objectiveTolerance) {
-        result.converged = true;
-    }
+    if (currentEvaluation.objective <= settings.objectiveTolerance) result.converged = true;
 
     for (std::size_t iteration = 1; iteration <= settings.maxIterations && !result.converged; ++iteration) {
         const std::size_t residualCount = currentEvaluation.residuals.size();
@@ -223,10 +223,7 @@ RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
             delta = numerics::solveGaussian(std::move(normal), std::move(rhs));
         } catch (const std::runtime_error&) {
             damping *= settings.dampingGrowth;
-            result.trace.push_back({iteration,
-                                    currentEvaluation.objective,
-                                    damping,
-                                    false,
+            result.trace.push_back({iteration, currentEvaluation.objective, damping, false,
                                     parameterValues(current, parameters)});
             continue;
         }
@@ -262,10 +259,7 @@ RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
         if (accepted) {
             damping = std::max(damping * settings.dampingShrink,
                                std::numeric_limits<double>::epsilon());
-            result.trace.push_back({iteration,
-                                    currentEvaluation.objective,
-                                    damping,
-                                    true,
+            result.trace.push_back({iteration, currentEvaluation.objective, damping, true,
                                     parameterValues(current, parameters)});
             const double improvementScale = std::max(result.trace[result.trace.size() - 2].objective, 1.0);
             if (currentEvaluation.objective <= settings.objectiveTolerance ||
@@ -275,10 +269,7 @@ RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
             }
         } else {
             damping *= settings.dampingGrowth;
-            result.trace.push_back({iteration,
-                                    currentEvaluation.objective,
-                                    damping,
-                                    false,
+            result.trace.push_back({iteration, currentEvaluation.objective, damping, false,
                                     parameterValues(current, parameters)});
         }
     }

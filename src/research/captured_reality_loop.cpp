@@ -53,20 +53,20 @@ void appendCapturedObservations(world::WorldIR& world,
     for (const auto& observation : dataset.observations) {
         const std::string id = capturedObservationId(observation);
         if (world.findObservation(id) != nullptr) {
-            throw std::invalid_argument(
-                "captured observation import would create a duplicate stable observation id: " + id);
+            throw std::invalid_argument("captured observation import would create a duplicate stable observation id: " + id);
         }
         world::ObservationRecord record;
         record.id = id;
         record.observableId = "particle_position";
         record.entityId = options.entityId;
         record.timeSeconds = observation.time;
-        record.valuesSI = {observation.position.x, observation.position.y, observation.position.z};
+        record.values = {observation.position.x, observation.position.y, observation.position.z};
         if (options.isotropicPositionStandardDeviation.has_value()) {
-            record.standardDeviationSI.assign(3U, *options.isotropicPositionStandardDeviation);
+            record.standardDeviation.assign(3U, *options.isotropicPositionStandardDeviation);
         }
         record.evidence = options.evidence;
         record.source = options.source;
+        record.space = world::ObservationSpace::PhysicalSI;
         if (observation.split == capture::ObservationSplit::Validation) {
             record.role = world::ObservationRole::Validation;
         } else if (std::abs(observation.time) <= 1.0e-12) {
@@ -118,6 +118,7 @@ std::vector<world::ObservationPrediction> CapturedMpmForwardModel::operator()(
         predictions.push_back({
             observationId(sample.markerId, sample.particleId, sample.time, sample.split),
             {sample.predicted.x, sample.predicted.y, sample.predicted.z},
+            world::ObservationSpace::PhysicalSI,
         });
     }
     return predictions;

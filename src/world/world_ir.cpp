@@ -147,15 +147,15 @@ HypothesisValidation WorldIR::validateHypothesis() const {
         }
         if (observation.observableId.empty()) fail("observation has empty observable id: " + observation.id);
         if (!std::isfinite(observation.timeSeconds)) fail("observation has non-finite time: " + observation.id);
-        if (observation.valuesSI.empty()) fail("observation has no scalar values: " + observation.id);
-        for (const double value : observation.valuesSI) {
+        if (observation.values.empty()) fail("observation has no scalar values: " + observation.id);
+        for (const double value : observation.values) {
             if (!std::isfinite(value)) fail("observation contains non-finite value: " + observation.id);
         }
-        if (!observation.standardDeviationSI.empty() &&
-            observation.standardDeviationSI.size() != observation.valuesSI.size()) {
+        if (!observation.standardDeviation.empty() &&
+            observation.standardDeviation.size() != observation.values.size()) {
             fail("observation uncertainty dimension mismatch: " + observation.id);
         }
-        for (const double sigma : observation.standardDeviationSI) {
+        for (const double sigma : observation.standardDeviation) {
             if (!std::isfinite(sigma) || sigma <= 0.0) {
                 fail("observation uncertainty must be finite and positive: " + observation.id);
             }

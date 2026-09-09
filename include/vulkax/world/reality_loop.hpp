@@ -11,7 +11,8 @@ namespace vulkax::world {
 
 struct ObservationPrediction {
     std::string observationId;
-    std::vector<double> valuesSI;
+    std::vector<double> values;
+    ObservationSpace space{ObservationSpace::Dimensionless};
 };
 
 using ForwardModel = std::function<std::vector<ObservationPrediction>(const WorldIR&)>;
@@ -61,12 +62,10 @@ struct ParameterSensitivity {
     double weightedPredictionL2Derivative{};
 };
 
-// Fits an executable WorldIR against observations whose roles are listed in
-// RealityLoopSettings::fittingRoles. Validation observations remain held out and
-// are reported separately after fitting, preventing accidental validation leakage.
-// The supplied forward model may dispatch to MPM/FEM/rendering/reconstruction code,
-// while the inverse loop itself remains solver-agnostic. Derivatives are numerical
-// finite-difference oracles, deliberately independent of future adjoint paths.
+// Fits an executable WorldIR against its observation records. The supplied forward
+// model may dispatch to MPM/FEM/rendering/reconstruction code, but the inverse loop
+// itself stays solver-agnostic. Derivatives are finite-difference numerical oracles,
+// intentionally preserving an independent reference path beside future adjoints.
 [[nodiscard]] RealityLoopResult fitWorldHypothesis(
     WorldIR initialWorld,
     const std::vector<ParameterAddress>& parameters,
@@ -74,8 +73,8 @@ struct ParameterSensitivity {
     const RealityLoopSettings& settings = {});
 
 // Local numerical sensitivity, not a claim of formal causal identification. Values
-// describe how Fit-role weighted predictions and the current objective change around
-// the supplied WorldIR state.
+// describe how the current forward model's weighted predictions and objective change
+// around the supplied WorldIR state.
 [[nodiscard]] std::vector<ParameterSensitivity> rankParameterSensitivity(
     const WorldIR& world,
     const std::vector<ParameterAddress>& parameters,

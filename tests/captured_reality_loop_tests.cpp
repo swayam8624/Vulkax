@@ -147,9 +147,6 @@ int main() {
         splat.position = applyAffine(deformation, translation, splat.position);
     auto dataset = makeDataset(body, deformation, translation, trajectories);
 
-    // Deliberately corrupt one held-out dynamic observation. A correct closed-loop
-    // implementation must not use this row to fit material parameters, but it must
-    // still report the mismatch after fitting.
     bool corruptedValidation = false;
     for (auto& observation : dataset.observations) {
         if (observation.split == capture::ObservationSplit::Validation && observation.time > 0.0) {
@@ -165,10 +162,8 @@ int main() {
     world.appearance = capturedWorld;
     world.entities.push_back({1, "deformable", std::nullopt,
                               {{"young_modulus", 1.5e4}, {"poisson_ratio", 0.30}}, {}});
-    const world::ParameterAddress young{
-        world::ParameterSpace::Material, 1, "young_modulus"};
-    const world::ParameterAddress poisson{
-        world::ParameterSpace::Material, 1, "poisson_ratio"};
+    const world::ParameterAddress young{world::ParameterSpace::Material, 1, "young_modulus"};
+    const world::ParameterAddress poisson{world::ParameterSpace::Material, 1, "poisson_ratio"};
     world.parameterBeliefs.push_back(
         {young, 1.0e4, 2.2e4, std::nullopt, world::EvidenceClass::ModelProxy, "synthetic-test"});
     world.parameterBeliefs.push_back(
@@ -188,6 +183,7 @@ int main() {
         if (observation.role == world::ObservationRole::Fit) ++fitRows;
         if (observation.role == world::ObservationRole::Validation) ++validationRows;
         if (observation.role == world::ObservationRole::Initialization) ++initializationRows;
+        assert(observation.space == world::ObservationSpace::PhysicalSI);
     }
     assert(fitRows == 9U);
     assert(validationRows == 7U);

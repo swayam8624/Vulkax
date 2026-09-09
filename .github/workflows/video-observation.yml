@@ -1,0 +1,54 @@
+name: Video observation reality loop
+
+on:
+  pull_request:
+    paths:
+      - "include/vulkax/world/**"
+      - "include/vulkax/capture/video_track.hpp"
+      - "src/world/**"
+      - "src/research/captured_reality_loop.cpp"
+      - "tests/reality_loop_tests.cpp"
+      - "scripts/extract_video_track.py"
+      - "scripts/fetch_reality_video_assets.py"
+      - "scripts/test_video_track_extractor.py"
+      - "assets/reality/**"
+      - ".github/workflows/video-observation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "include/vulkax/world/**"
+      - "include/vulkax/capture/video_track.hpp"
+      - "src/world/**"
+      - "src/research/captured_reality_loop.cpp"
+      - "tests/reality_loop_tests.cpp"
+      - "scripts/extract_video_track.py"
+      - "scripts/fetch_reality_video_assets.py"
+      - "scripts/test_video_track_extractor.py"
+      - "assets/reality/**"
+      - ".github/workflows/video-observation.yml"
+
+jobs:
+  video-observation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install video toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Validate pinned real-video source manifest
+        run: python3 scripts/fetch_reality_video_assets.py --validate-only
+
+      - name: Exercise raw-video to point-track extraction
+        run: python3 scripts/test_video_track_extractor.py
+
+      - name: Configure Vulkax
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+
+      - name: Build typed reality-loop regression
+        run: cmake --build build --target vulkax_reality_loop_tests --parallel 2
+
+      - name: Run typed reality-loop regression
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_reality_loop$'

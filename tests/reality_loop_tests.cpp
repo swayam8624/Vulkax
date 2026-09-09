@@ -1,9 +1,13 @@
 #include "vulkax/operators/operator_graph.hpp"
 #include "vulkax/world/reality_loop.hpp"
+#include "vulkax/world/video_observation.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 namespace {
@@ -37,7 +41,7 @@ void testExecutableHypothesisValidation() {
     check(world.setParameterValue(stiffness, 3.0), "existing addressed parameter must be mutable");
     check(near(world.clampToBelief(stiffness, 100.0), 10.0), "parameter belief must clamp trials to upper bound");
 
-    world.observations[0].standardDeviationSI = {0.0};
+    world.observations[0].standardDeviation = {0.0};
     check(!world.validateHypothesis().valid, "non-positive measurement uncertainty must be rejected");
 }
 
@@ -129,6 +133,65 @@ void testStructuralOperatorBacktraceTerminatesCycles() {
           "direct writer of observable must be the depth-zero structural influence");
 }
 
+void testObservationSpacesCannotBeMixedSilently() {
+    using namespace vulkax::world;
+    WorldIR world;
+    world.entities.push_back({1, "point", std::nullopt, {{"gain", 1.0}}, {}});
+    const ParameterAddress gain{ParameterSpace::Material, 1, "gain"};
+    world.parameterBeliefs.push_back({gain, 0.0, 2.0, std::nullopt, EvidenceClass::ModelProxy, "test"});
+    ObservationRecord observation{"pixel", "image_point", 1, 0.0, {20.0, 30.0}, {1.0, 1.0},
+                                  EvidenceClass::Derived, "test"};
+    observation.space = ObservationSpace::ImagePixels;
+    world.observations.push_back(std::move(observation));
+
+    const ForwardModel wrongSpace = [](const WorldIR&) {
+        return std::vector<ObservationPrediction>{{"pixel", {20.0, 30.0}, ObservationSpace::PhysicalSI}};
+    };
+    bool rejected = false;
+    try {
+        (void)fitWorldHypothesis(world, {gain}, wrongSpace);
+    } catch (const std::runtime_error&) {
+        rejected = true;
+    }
+    check(rejected, "reality loop must reject predictions expressed in a different observation space");
+}
+
+void testVideoTrackBecomesHeldOutPixelEvidence() {
+    using namespace vulkax;
+    const auto path = std::filesystem::temp_directory_path() / "vulkax_video_track_reality_loop.csv";
+    {
+        std::ofstream output(path);
+        output << "# vulkax_video_point_track_v1\n"
+                  "# source=https://example.invalid/clip.webm\n"
+                  "# width_pixels=640\n"
+                  "# height_pixels=480\n"
+                  "# nominal_fps=30\n"
+                  "frame_index,time_seconds,x_pixels,y_pixels,confidence,split\n"
+                  "1,0.0333333333333,100.5,200.5,1.0,fit\n"
+                  "2,0.0666666666667,105.0,204.0,0.25,validation\n";
+    }
+
+    const auto track = capture::loadVideoPointTrackCsv(path);
+    world::WorldIR world;
+    world.entities.push_back({7, "tracked-object", std::nullopt, {}, {}});
+    world::VideoObservationImportOptions options;
+    options.entityId = 7;
+    options.baseStandardDeviationPixels = 2.0;
+    world::appendVideoPointTrackObservations(world, track, options);
+    std::filesystem::remove(path);
+
+    check(world.observations.size() == 2, "every accepted video-track row must become a WorldIR observation");
+    check(world.observations[0].space == world::ObservationSpace::ImagePixels,
+          "video tracks must remain explicitly pixel-space evidence");
+    check(world.observations[0].role == world::ObservationRole::Fit &&
+              world.observations[1].role == world::ObservationRole::Validation,
+          "video import must preserve fit/held-out validation split");
+    check(near(world.observations[0].standardDeviation[0], 2.0) &&
+              near(world.observations[1].standardDeviation[0], 4.0),
+          "video confidence must scale observation uncertainty rather than alter measured coordinates");
+    check(world.validateHypothesis().valid, "typed imported video evidence must produce a valid WorldIR hypothesis");
+}
+
 } // namespace
 
 int main() {
@@ -137,6 +200,8 @@ int main() {
     testBoundsRemainHardConstraints();
     testSensitivityRanking();
     testStructuralOperatorBacktraceTerminatesCycles();
+    testObservationSpacesCannotBeMixedSilently();
+    testVideoTrackBecomesHeldOutPixelEvidence();
     if (failures != 0) {
         std::cerr << failures << " reality-loop test(s) failed\n";
         return 1;

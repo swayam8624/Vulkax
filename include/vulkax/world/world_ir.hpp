@@ -25,6 +25,24 @@ enum class EvidenceClass : std::uint8_t {
 
 enum class ParameterSpace : std::uint8_t { Material, Constraint, Global };
 enum class ObservationRole : std::uint8_t { Fit, Validation, Initialization, Diagnostic };
+enum class ObservationSpace : std::uint8_t {
+    Dimensionless,
+    PhysicalSI,
+    ImagePixels,
+    NormalizedImage,
+    LinearRadiance,
+};
+
+[[nodiscard]] constexpr const char* toString(ObservationSpace space) noexcept {
+    switch (space) {
+        case ObservationSpace::Dimensionless: return "dimensionless";
+        case ObservationSpace::PhysicalSI: return "physical_si";
+        case ObservationSpace::ImagePixels: return "image_pixels";
+        case ObservationSpace::NormalizedImage: return "normalized_image";
+        case ObservationSpace::LinearRadiance: return "linear_radiance";
+    }
+    return "unknown";
+}
 
 struct ParameterAddress {
     ParameterSpace space{ParameterSpace::Material};
@@ -48,11 +66,12 @@ struct ObservationRecord {
     std::string observableId;
     std::optional<EntityId> entityId;
     double timeSeconds{};
-    std::vector<double> valuesSI;
-    std::vector<double> standardDeviationSI;
+    std::vector<double> values;
+    std::vector<double> standardDeviation;
     EvidenceClass evidence{EvidenceClass::Unknown};
     std::string source;
     ObservationRole role{ObservationRole::Fit};
+    ObservationSpace space{ObservationSpace::Dimensionless};
 };
 
 struct Entity {
@@ -82,10 +101,10 @@ struct WorldIR {
     std::uint64_t revision{};
     std::vector<ProvenanceRecord> provenance;
 
-    // Post-1.0 executable-hypothesis state. These fields deliberately live beside,
-    // rather than inside, the stable appearance/transaction state so the 1.0
-    // rewrite contract remains intact while WorldIR grows into a closed-loop model.
-    std::uint32_t schemaVersion{2};
+    // Schema 3 makes the observation coordinate/value space explicit. That is
+    // required before image-space evidence can coexist with physical SI evidence
+    // inside one executable hypothesis without silently mixing incompatible units.
+    std::uint32_t schemaVersion{3};
     std::optional<problem::ProblemIR> physics;
     std::vector<ObservationRecord> observations;
     std::vector<ParameterBelief> parameterBeliefs;

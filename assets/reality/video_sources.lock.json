@@ -1,0 +1,22 @@
+{
+  "schema": "vulkax_reality_video_assets",
+  "version": 1,
+  "assets": [
+    {
+      "id": "sciencecola_bouncing_ball_2013",
+      "kind": "video",
+      "source": "Wikimedia Commons",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Bouncing_Ball.webm",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/3/32/Bouncing_Ball.webm",
+      "license": "CC-BY-3.0",
+      "attribution": "ScienceCOLA",
+      "sha1": "63a7d2d42be52bfc13fcf3643605b39841ae52d5",
+      "bytes": 1081689,
+      "duration_seconds": 26.427,
+      "width_pixels": 640,
+      "height_pixels": 480,
+      "destination": "video/sciencecola_bouncing_ball_2013.webm",
+      "role": "development-only real-video observation source; derived tracks are not physical ground truth or Vulkax 1.0 verification evidence"
+    }
+  ]
+}
