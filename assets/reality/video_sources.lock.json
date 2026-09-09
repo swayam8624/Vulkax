@@ -36,7 +36,25 @@
       "destination": "video/golhamedia_bouncy_ball_240fps_2016.webm",
       "mechanism": "ballistic_ground_contact",
       "evidence_scope": "development_observation_source",
-      "role": "high-speed real bouncing-ball footage matched to the gravity-plus-ground-contact model family; derived image tracks remain non-metric observations until camera and scene scale are calibrated"
+      "role": "high-speed cluttered bouncing-ball footage retained as a future multi-object tracking stress source; not used as the controlled single-ball ballistic benchmark because generic point tracking does not preserve ball identity reliably"
+    },
+    {
+      "id": "rhetos_exercise_ball_rebound_2025",
+      "kind": "video",
+      "source": "Wikimedia Commons",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Flummiversuch_(Gymnastikball-R%C3%BCcksteigh%C3%B6he).webm",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/5/58/Flummiversuch_%28Gymnastikball-R%C3%BCcksteigh%C3%B6he%29.webm",
+      "license": "CC-BY-SA-4.0",
+      "attribution": "Rhetos",
+      "sha1": "522926a3165d1fbb95e085751cc0fca75718bfeb",
+      "bytes": 4432478,
+      "duration_seconds": 22.948,
+      "width_pixels": 1920,
+      "height_pixels": 1080,
+      "destination": "video/rhetos_exercise_ball_rebound_2025.webm",
+      "mechanism": "ballistic_ground_contact",
+      "evidence_scope": "development_observation_source",
+      "role": "controlled exercise-ball free-fall and first-rebound observation source whose published purpose is pixel-height measurement for restitution estimation; derived tracks remain image-plane evidence until an independent metric scale anchor is supplied"
     }
   ]
 }
