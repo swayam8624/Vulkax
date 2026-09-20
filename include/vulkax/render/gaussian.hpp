@@ -48,6 +48,13 @@ struct GaussianRasterBatch {
 struct GaussianRenderResult {
     ImageRGBA8 image;
     GaussianProjectionStats stats;
+    // Native raster input evidence. The legacy/oracle path uploads expanded
+    // GaussianRasterVertex records; the 1.1 projected-splat path uploads one
+    // fixed projected record per visible splat and expands six corners in the
+    // vertex shader.
+    bool directProjectedRaster{false};
+    std::size_t nativeRasterInputBytes{};
+    std::size_t cpuExpandedVertexBytes{};
 };
 
 [[nodiscard]] GaussianRasterBatch buildGaussianRasterBatch(
@@ -55,9 +62,7 @@ struct GaussianRenderResult {
     const GaussianRenderSettings& settings = {});
 
 // Rasterizes an already projected, depth-ordered Gaussian batch through the
-// selected native backend. This keeps the established fragment/compositing
-// implementation reusable by both the CPU projection oracle and accelerated
-// projection paths.
+// selected native backend. This remains the CPU projection/raster oracle path.
 [[nodiscard]] GaussianRenderResult renderGaussianRasterBatchHeadless(
     backend::BackendKind backend,
     const GaussianRasterBatch& batch,
