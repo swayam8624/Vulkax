@@ -1,0 +1,56 @@
+{
+  "schema": "vulkax.hypothesis_priority_queue",
+  "version": 1,
+  "as_of": "2026-09-20",
+  "warning": "Priority is an execution order, not a novelty claim or paper acceptance prediction.",
+  "families": [
+    {
+      "family": "closed-loop refusal → evidence request → refit → disjoint counterfactual",
+      "priority": 1,
+      "reason": "Directly operationalizes the strongest surviving Vulkax identity and is being tested now.",
+      "kill_condition": "No reduction in unsafe target counterfactuals on disjoint evidence/target interventions."
+    },
+    {
+      "family": "application-specific counterfactual validity domain",
+      "priority": 2,
+      "reason": "Could turn requested rewrite magnitude/intervention type into an empirically calibrated trust region.",
+      "kill_condition": "Validity score fails independent calibration or reduces to standard held-out residual."
+    },
+    {
+      "family": "parameter vs model-form vs numerical error attribution",
+      "priority": 3,
+      "reason": "Needed for reason-coded refusal rather than generic abstention.",
+      "kill_condition": "Failure causes cannot be separated above chance under controlled synthetic truth."
+    },
+    {
+      "family": "active evidence acquisition for physical rewrites",
+      "priority": 4,
+      "reason": "Enabling mechanism for repairing insufficiency after refusal.",
+      "kill_condition": "Selected experiment does not beat random/max-motion baselines on parameter/counterfactual recovery."
+    },
+    {
+      "family": "real deformable benchmark transfer on GAUGE",
+      "priority": 5,
+      "reason": "Most important route out of synthetic-only evidence.",
+      "kill_condition": "Required task assets/metadata cannot be mapped to Vulkax without changing the research question."
+    },
+    {
+      "family": "DOT C2 failure forensics",
+      "priority": 6,
+      "reason": "Turns an existing measured-source failure into a model-adequacy/refusal case study.",
+      "kill_condition": "Cannot isolate any falsifiable failure explanation beyond missing ground truth."
+    },
+    {
+      "family": "event-boundary derivative validity",
+      "priority": 7,
+      "reason": "Potentially strong numerical/graphics contribution around contact and topology regime changes.",
+      "kill_condition": "Derivative breakdown is fully explained by standard nonsmooth optimization literature with no Vulkax-specific mechanism."
+    },
+    {
+      "family": "many-world GPU verification batching",
+      "priority": 8,
+      "reason": "Potential systems contribution if counterfactual verification becomes throughput-bound.",
+      "kill_condition": "No meaningful speedup or no scientific workload large enough to matter."
+    }
+  ]
+}

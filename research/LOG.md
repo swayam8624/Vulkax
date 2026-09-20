@@ -92,3 +92,9 @@ The simple one-shot certificate is **not sufficient** and is retained as a negat
 
 ### Next falsification
 Close the loop. Refuse weak-evidence cases, choose the deformation with highest material sensitivity, acquire new evidence, re-fit, then test a *different* target deformation. Determine which failure classes repair (parameter ambiguity) and which persist (numerical/model-class inadequacy).
+
+## 2026-09-20 — Hypothesis search expanded to 360
+
+Expanded the machine-readable hypothesis bank from 180 to 360 while keeping every entry explicitly unvetted. The new matrix crosses representation, uncertainty source, intervention, diagnostic and rewrite-decision dimensions.
+
+Priority remains on the closed-loop refusal/evidence-repair family. The expanded bank exists to prevent premature convergence on the first promising result, not to manufacture novelty by enumeration.
