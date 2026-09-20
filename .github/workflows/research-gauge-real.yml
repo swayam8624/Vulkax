@@ -21,6 +21,7 @@ on:
       - "research/analysis/validate_gauge_effective_span.py"
       - "research/analysis/gauge_shearing_support_aware_affine.py"
       - "research/analysis/gauge_shearing_affine_nonaffine.py"
+      - "research/analysis/gauge_shearing_affine_nonaffine_compare.py"
       - "research/analysis/gauge_fixture_envelope_synthetic_control.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/analysis/gauge_foam_asset_geometry.py"
@@ -195,6 +196,7 @@ jobs:
             build/gauge-mode-compare
             build/gauge-affine-nonaffine-baseline
             build/gauge-affine-nonaffine-released-asset
+            build/gauge-affine-nonaffine-compare
             build/gauge-fixture-envelope-synthetic
             build/gauge-constitutive-matrix
           if-no-files-found: error
