@@ -66,3 +66,14 @@ The truth run's ~9.73% maximum mechanical-energy drift is recorded as a correctn
 
 ### Next falsification
 Run an actual-solver intervention-design positive test for E/nu observability, then build a many-case certificate dataset to test whether held-out error, identifiability, nonlinear trust error, numerical uncertainty and model disagreement predict unseen-intervention failure.
+
+
+## 2026-09-20 — Active physical experiment-design positive control passed
+
+**Branch/SHA:** research/discovery @ `eb90005917593f47d25974621bf3ae518c794160`
+**Workflow:** `35509650146`, success.
+
+Weak synthetic deformation + 20 μm deterministic measurement noise fit E=16.5 kPa and nu=0.425 instead of 15 kPa / 0.35. A finite-difference sensitivity search selected a mixed deformation with condition number 4.46 versus 28.15 for repeating the weak experiment. Adding that observation recovered the exact grid truth. This is enabling machinery, not novelty evidence.
+
+### Next falsification
+Generate a multi-case solver-integrated counterfactual dataset and test whether any pre-truth evidence signal predicts unsafe unseen-intervention error. If held-out, identifiability, numerical refinement and model/scheme disagreement fail to concentrate errors, kill or redesign the certificate direction.

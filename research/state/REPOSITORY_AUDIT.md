@@ -48,3 +48,8 @@ A low loss is not evidence of physical truth. A held-out frame from the same exp
 6. Verification calibration: false accept versus false reject.
 
 All first probes are synthetic scaffolds unless explicitly marked otherwise. They may validate tooling or kill hypotheses; they are not publication evidence.
+
+
+## Historical release-gate evidence
+
+The release-candidate head `1c8f0692a2146ba71e6a7340f4814b3b09f4a219`, merged by PR #51 into tagged control `2e7c306d...`, has successful 2026-08-31 GitHub Actions runs for full CI, captured-world orchestration, measured DOT C2, showcase, release hardening and release smoke. These historical runs are part of the scientific control audit; discovery work never silently redefines them.

@@ -63,6 +63,15 @@ jobs:
           python3 research/probes/validate_solver_active_design.py build/solver-design
           cat build/solver-design/solver_design.csv
 
+      - name: Build solver certificate dataset
+        run: cmake --build build --target vulkax_solver_certificate_probe --parallel 2
+
+      - name: Generate and analyze solver certificate dataset
+        run: |
+          build/vulkax_solver_certificate_probe build/solver-certificate
+          python3 research/probes/analyze_solver_certificate.py build/solver-certificate
+          cat build/solver-certificate/feature_summary.csv
+
       - name: Upload raw synthetic evidence
         uses: actions/upload-artifact@v4
         with:
@@ -71,5 +80,6 @@ jobs:
             build/research-cheap-probes
             build/solver-counterfactual
             build/solver-design
+            build/solver-certificate
           if-no-files-found: error
           retention-days: 30
