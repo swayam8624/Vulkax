@@ -299,7 +299,20 @@ if [[ "$SKIP_GAUGE" == "1" ]]; then ARGS+=(--allow-missing-gauge); fi
 python3 research/analysis/assemble_paper_evidence.py "${ARGS[@]}"
 
 stage "Final evidence integrity checks"
-python3 research/analysis/export_dcs_evidence_pack.py   "$PAPER_DIR/generated/dcs-evidence-index.csv"   "$BUILD_DIR/dcs-positive-control/analysis.json"   "$BUILD_DIR/dcs-solver-native/analysis.json"   "$BUILD_DIR/dcs-active-selection/analysis.json"   "$BUILD_DIR/dcs-d2-validation/analysis.json"   "$BUILD_DIR/dcs-d3-discovery/analysis.json"   "$BUILD_DIR/dcs-d4v-discovery/analysis.json"   $([[ "$SKIP_GAUGE" == "0" ]] && printf '%q' "$BUILD_DIR/gauge-dcs-retrospective/summary.json")
+EVIDENCE_INPUTS=(
+  "$BUILD_DIR/dcs-positive-control/analysis.json"
+  "$BUILD_DIR/dcs-solver-native/analysis.json"
+  "$BUILD_DIR/dcs-active-selection/analysis.json"
+  "$BUILD_DIR/dcs-d2-validation/analysis.json"
+  "$BUILD_DIR/dcs-d3-discovery/analysis.json"
+  "$BUILD_DIR/dcs-d4v-discovery/analysis.json"
+)
+if [[ "$SKIP_GAUGE" == "0" ]]; then
+  EVIDENCE_INPUTS+=("$BUILD_DIR/gauge-dcs-retrospective/summary.json")
+fi
+python3 research/analysis/export_dcs_evidence_pack.py \
+  "$PAPER_DIR/generated/dcs-evidence-index.csv" \
+  "${EVIDENCE_INPUTS[@]}"
 
 python3 - <<PY
 import json, pathlib
