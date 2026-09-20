@@ -344,6 +344,24 @@ print("VALID final paper-evidence bundle:", p)
 print("artifacts:", len(d["artifacts"]))
 PY
 
+stage "Archive paper evidence bundle"
+PAPER_ARCHIVE="$BUILD_DIR/vulkax-paper-evidence-$(git rev-parse --short=12 HEAD).tar.gz"
+python3 - <<PY
+import hashlib, pathlib, tarfile
+root=pathlib.Path("$PAPER_DIR")
+archive=pathlib.Path("$PAPER_ARCHIVE")
+with tarfile.open(archive,"w:gz") as tf:
+    tf.add(root,arcname="paper-evidence")
+h=hashlib.sha256()
+with archive.open("rb") as f:
+    for chunk in iter(lambda:f.read(1024*1024),b""):
+        h.update(chunk)
+digest=h.hexdigest()
+archive.with_suffix(archive.suffix+".sha256").write_text(f"{digest}  {archive.name}\n")
+print("WROTE",archive)
+print("SHA256",digest)
+PY
+
 stage "COMPLETE"
 cat <<EOF
 Vulkax full research reproduction completed.
@@ -357,6 +375,10 @@ Evidence package:
 
 Canonical paper-data entrypoint:
   $PAPER_DIR/README.md
+
+Portable archive:
+  $PAPER_ARCHIVE
+  $PAPER_ARCHIVE.sha256
 
 Important scientific status:
   D2/D3/D4V remain negative/frozen.
