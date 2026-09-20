@@ -111,3 +111,12 @@ This is the first result that supports the *closed-loop* research family rather 
 
 ### Next falsification
 Lock a policy on these cases and test it on off-grid E/nu truths, new evidence deformations, new noise phases and a distinct target deformation. In parallel, add an adapter for the released GAUGE foam marker/metadata schema so real-data transfer can start without relabeling measured evidence as synthetic.
+
+
+## 2026-09-20 — Validation-1 reduces risk but misses target
+
+Run `35510654019` succeeded. Calibration-locked policy moved off-grid validation unsafe rate from 43.75% under accept-all to 16.28% at 67.19% coverage, but missed the <=10% target.
+
+**Decision:** Validation-1 becomes development evidence. Do not tune on it and call it external validation.
+
+**Real-data escalation:** created a dedicated GAUGE job that fetches only 60 public measured foam trajectory JSONs (stretch/compress/shear × soft/hard × ten repeats), keeps raw data ephemeral, exercises the measured-evidence adapter, and uploads only derived statistics/provenance.

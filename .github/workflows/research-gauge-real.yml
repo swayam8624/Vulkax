@@ -1,0 +1,41 @@
+name: Vulkax GAUGE measured-data probe
+
+on:
+  push:
+    branches: ["research/**"]
+    paths:
+      - "research/adapters/**"
+      - "research/analysis/gauge_foam_descriptive.py"
+      - "research/scripts/fetch_gauge_foam_subset.py"
+      - ".github/workflows/research-gauge-real.yml"
+  workflow_dispatch:
+
+jobs:
+  gauge-measured-foam:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch public GAUGE foam subset
+        run: python3 research/scripts/fetch_gauge_foam_subset.py build/gauge-download
+      - name: Exercise Vulkax adapter on each task/material
+        run: |
+          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam stretching.json" --trial "build/gauge-download/data/foam stretching/soft/1.json" --material soft --out "build/gauge-adapted/stretch-soft"
+          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam stretching.json" --trial "build/gauge-download/data/foam stretching/hard/1.json" --material hard --out "build/gauge-adapted/stretch-hard"
+          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam compressing.json" --trial "build/gauge-download/data/foam compressing/soft/1.json" --material soft --out "build/gauge-adapted/compress-soft"
+          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam compressing.json" --trial "build/gauge-download/data/foam compressing/hard/1.json" --material hard --out "build/gauge-adapted/compress-hard"
+          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam shearing.json" --trial "build/gauge-download/data/foam shearing/soft/1.json" --material soft --out "build/gauge-adapted/shear-soft"
+          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam shearing.json" --trial "build/gauge-download/data/foam shearing/hard/1.json" --material hard --out "build/gauge-adapted/shear-hard"
+      - name: Analyze measured repeatability and material signal
+        run: |
+          python3 research/analysis/gauge_foam_descriptive.py --root build/gauge-download --out build/gauge-real
+          cat build/gauge-real/group_summary.csv
+          cat build/gauge-real/findings.json
+      - name: Upload derived measured-data evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-gauge-measured-${{ github.sha }}
+          path: |
+            build/gauge-real
+            build/gauge-adapted
+          if-no-files-found: error
+          retention-days: 30
