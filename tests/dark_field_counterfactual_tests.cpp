@@ -81,5 +81,26 @@ int main() {
         assert(scoreFar > scoreNear);
     }
 
+    {
+        std::vector<InterventionPoint> points{
+            {{1.0,1.0}},{{1.0,-1.0}},{{-1.0,1.0}},{{-1.0,-1.0}}
+        };
+        std::vector<std::vector<Response>> models(2);
+        for (std::size_t m=0;m<models.size();++m) {
+            const double coupling=m==0?1.0:-1.0;
+            for (const auto& point:points) {
+                const double x=point.coordinates[0],y=point.coordinates[1];
+                models[m].push_back({4.0+2.0*x-3.0*y+coupling*x*y});
+            }
+        }
+        const auto synthesized=synthesizeAnnihilatingStencil(points,2,models);
+        assert(synthesized.momentValidation.valid);
+        assert(synthesized.modelDisagreementEnergy > 0.0);
+        assert(synthesized.independentNoiseGain > 0.0);
+        const auto d0=applyAnnihilatingStencil(models[0],synthesized.stencil);
+        const auto d1=applyAnnihilatingStencil(models[1],synthesized.stencil);
+        assert(responseDistance(d0,d1)>1.0);
+    }
+
     return 0;
 }
