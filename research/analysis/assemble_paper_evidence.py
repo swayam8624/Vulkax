@@ -56,6 +56,7 @@ GENERATED = [
     ("dcs-d4v-discovery/analysis.json", "generated/d4v-analysis", True),
     ("dcs-d4v-discovery/proposals.csv", "generated/d4v-proposals", True),
     ("paper-captured-world-run/certificate.json", "generated/captured-world-certificate", True),
+    ("paper-reproduction-validation.json", "generated/reproduction-validation", True),
     ("paper-performance/captured_world_performance.csv", "generated/performance-csv", False),
     ("paper-performance/captured_world_performance_summary.json", "generated/performance-summary", False),
     ("gauge-effective-span/validation.json", "generated/gauge-effective-span-validation", True),
