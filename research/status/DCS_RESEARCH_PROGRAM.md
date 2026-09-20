@@ -63,27 +63,60 @@ For a set S of discrete primitive interventions:
 
 kappa(S) = sum_{T subseteq S} (-1)^(|S|-|T|) F(T).
 
-This is Möbius inversion over the intervention lattice. DCS interprets kappa(S) as
-the observable interaction that cannot be explained by proper subsets of S.
+This is exact Möbius inversion over the intervention lattice. It is deliberately
+kept distinct from Taylor-order annihilation.
+
+At finite intervention amplitude, kappa(A,B) contains every response contribution
+that requires both A and B. It is therefore an **irreducible finite-amplitude
+interaction**, not generally a pure mixed second derivative. Only in the
+small-intervention limit can a suitable normalized contrast be interpreted through
+the corresponding response jet.
 
 Implemented API:
 - counterfactualCumulant
 
 ### 2.4 Mechanism order of contact
 
-Given ordered response spectra for real/candidate worlds, define the first response
-order whose normalized discrepancy exceeds a frozen tolerance.
+For smooth local response maps, the rigorous mathematical reference is the response
+jet j^k F_M(0). Two worlds have order-q contact when their response jets agree
+through q within a preregistered measurement + numerical tolerance.
+
+In implementation we estimate this from a basis of validated order-selective
+contrasts and record the first response order whose normalized discrepancy exceeds
+the frozen tolerance:
 
 nu(M_real,M) = min{k : D^(k)_real != D^(k)_M}.
 
-This is an operational **deception depth**:
-a repair can imitate the world through first order, second order, etc., before its
-mechanism becomes distinguishable.
+This is an operational estimate of **mechanism order of contact** rather than a
+claim that one arbitrary stencil fully reconstructs the mathematical jet.
+
+A repair may therefore imitate a world through first order, second order, etc.,
+before becoming experimentally distinguishable. “Deception depth” remains
+secondary terminology until multi-order experiments support it.
 
 Implemented API:
 - mechanismOrderOfContact
 
-### 2.5 Numerical witness flow
+### 2.5 Mechanism resolution
+
+Higher-order annihilation can destroy signal faster than it destroys noise. DCS
+therefore defines an observable mechanism order, not an instruction to increase k
+until candidate worlds eventually differ.
+
+For order k, form a standardized signal
+
+S_k = RMS(D^(k)) / sqrt(sigma_meas^2 + sigma_num^2 + sigma_repeat^2).
+
+The maximum observable mechanism order is the largest k with S_k above a frozen
+threshold. If two worlds differ only above this order, DCS reports them as
+experimentally indistinguishable at the available mechanism resolution.
+
+Implemented API:
+- mechanismResolution
+- standardizedDarkFieldDiscrepancy
+- worstCaseStandardizedSeparation
+
+### 2.6 Numerical witness convergence
 
 A mechanism claim is not allowed unless the dark-field witness survives a numerical
 fidelity ladder.
@@ -99,7 +132,7 @@ theory as novelty and does not assume a universal power law.
 Implemented API:
 - analyzeWitnessScaleFlow
 
-### 2.6 Deceptive repair
+### 2.7 Deceptive repair
 
 A repair R is deceptive when:
 
@@ -109,17 +142,34 @@ A repair R is deceptive when:
 Implemented API:
 - classifyDeceptiveRepair
 
-### 2.7 Dark-field experiment score
+### 2.8 Dark-field experiment selection
 
-For candidate model dark-field responses D_1,...,D_K, an experiment can be ranked by
-between-model dark-field dispersion divided by measurement variance, numerical
-variance, and acquisition cost.
+The variance/dispersion objective remains as a baseline.
 
-This is a DCS acquisition objective. Fisher/Jacobian OED and generic active model
+The flagship active-selection statistic is standardized maximin separation. For
+candidate dark-field witnesses D_i under total uncertainty sigma:
+
+Gamma_mu(M_i,M_j) =
+    RMS(D_mu[M_i]-D_mu[M_j]) / sigma_mu.
+
+DCS seeks a physically feasible annihilating stencil that approximately maximizes
+
+min_{i != j} Gamma_mu(M_i,M_j),
+
+with explicit safety and acquisition-cost constraints added at the experiment layer.
+
+The current implementation uses a deterministic projected-pair heuristic: generate
+candidate pairwise disagreement directions inside the exact lower-order moment
+nullspace, then retain the stencil with the largest worst-case standardized
+separation. It is not claimed to solve the non-convex maximin problem globally.
+
+Fisher/Jacobian OED, raw maximum model-output separation, and generic active model
 discrimination remain mandatory baselines.
 
 Implemented API:
 - darkFieldDiscriminationScore
+- synthesizeAnnihilatingStencil
+- synthesizeMaximinAnnihilatingStencil
 
 ## 3. Implementation phases
 
