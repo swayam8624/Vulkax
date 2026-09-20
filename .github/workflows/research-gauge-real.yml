@@ -17,6 +17,7 @@ on:
       - "research/analysis/gauge_shearing_constitutive_matrix.py"
       - "research/analysis/gauge_shearing_mode_diagnostic.py"
       - "research/analysis/gauge_shearing_mode_compare.py"
+      - "research/analysis/gauge_shearing_effective_span.py"
       - "research/analysis/gauge_fixture_envelope_synthetic_control.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/analysis/gauge_foam_asset_geometry.py"
@@ -54,6 +55,11 @@ jobs:
         run: |
           python3 research/analysis/gauge_shearing_boundary_attachment.py --root build/gauge-download --out build/gauge-boundary-attachment
           cat build/gauge-boundary-attachment/summary.json
+
+      - name: Infer measured effective deforming span across all shearing repeats
+        run: |
+          python3 research/analysis/gauge_shearing_effective_span.py --root build/gauge-download --out build/gauge-effective-span
+          cat build/gauge-effective-span/summary.json
 
       - name: Compare released foam geometry against marker-span proxy
         run: |
@@ -151,6 +157,7 @@ jobs:
             build/gauge-adapted
             build/gauge-shearing-contract
             build/gauge-boundary-attachment
+            build/gauge-effective-span
             build/gauge-asset-geometry
             build/gauge-affine-null
             build/gauge-nonaffine
