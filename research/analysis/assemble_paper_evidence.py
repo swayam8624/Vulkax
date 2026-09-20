@@ -117,17 +117,53 @@ def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: 
             continue
         add_file(src,generated_root/rel,"build/"+rel,category,effective_required,artifacts)
 
+    paper_figures=build_root/"paper-figures"
+    if not (paper_figures/"figure_manifest.json").is_file():
+        missing.append("build/paper-figures/figure_manifest.json")
+    elif paper_figures.is_dir():
+        for src in sorted(p for p in paper_figures.rglob("*") if p.is_file()):
+            rel=src.relative_to(paper_figures)
+            add_file(
+                src,
+                generated_root/"paper-figures"/rel,
+                "build/paper-figures/"+str(rel),
+                "generated/paper-asset",
+                src.name=="figure_manifest.json",
+                artifacts,
+            )
+
     # Copy system provenance/logs when the runner produced them outside this out dir.
     candidate_sys=build_root/"paper-evidence/system/system-info.txt"
     target_sys=out/"system/system-info.txt"
-    if candidate_sys.is_file() and candidate_sys.resolve()!=target_sys.resolve():
-        add_file(candidate_sys,target_sys,str(candidate_sys),"runtime/system-info",False,artifacts)
+    if candidate_sys.is_file():
+        if candidate_sys.resolve()!=target_sys.resolve():
+            add_file(candidate_sys,target_sys,str(candidate_sys),"runtime/system-info",False,artifacts)
+        else:
+            artifacts.append({
+                "source": str(candidate_sys),
+                "bundle_path": str(target_sys),
+                "category": "runtime/system-info",
+                "required": False,
+                "bytes": target_sys.stat().st_size,
+                "sha256": sha256(target_sys),
+            })
 
     candidate_logs=build_root/"paper-evidence/logs"
     target_logs=out/"logs"
-    if candidate_logs.is_dir() and candidate_logs.resolve()!=target_logs.resolve():
+    if candidate_logs.is_dir():
         for src in sorted(candidate_logs.glob("*.log")):
-            add_file(src,target_logs/src.name,str(src),"runtime/log",False,artifacts)
+            dest=target_logs/src.name
+            if src.resolve()!=dest.resolve():
+                add_file(src,dest,str(src),"runtime/log",False,artifacts)
+            else:
+                artifacts.append({
+                    "source": str(src),
+                    "bundle_path": str(dest),
+                    "category": "runtime/log",
+                    "required": False,
+                    "bytes": dest.stat().st_size,
+                    "sha256": sha256(dest),
+                })
 
     complete=not missing
     manifest={
