@@ -46,6 +46,15 @@ struct DeceptiveRepairAssessment {
     double witnessErrorChange{};
 };
 
+struct SynthesizedStencil {
+    AnnihilatingStencil stencil;
+    MomentValidation momentValidation;
+    double modelDisagreementEnergy{};
+    double independentNoiseGain{};
+    std::size_t powerIterations{};
+    bool converged{};
+};
+
 [[nodiscard]] double responseNorm(const Response& response);
 [[nodiscard]] double responseDistance(const Response& lhs, const Response& rhs);
 
@@ -102,5 +111,17 @@ struct DeceptiveRepairAssessment {
     double numericalVariance,
     double acquisitionCost,
     double costWeight = 1.0);
+
+// Automatically synthesize a signed intervention ensemble. The moment
+// constraints define the lower-order response subspace to suppress. Competing
+// model responses define a disagreement operator; the returned weights maximize
+// its projected energy under unit L2 norm before a final L1 normalization.
+// modelResponses[model][point][observable].
+[[nodiscard]] SynthesizedStencil synthesizeAnnihilatingStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& modelResponses,
+    double momentTolerance = 1.0e-9,
+    std::size_t maximumIterations = 256);
 
 } // namespace vulkax::research::dcs
