@@ -739,6 +739,15 @@ SynthesizedStencil synthesizeMaximinAnnihilatingStencil(
         candidate.powerIterations = iterations;
         candidate.converged = converged;
 
+        UncertaintyBudget witnessUncertainty = uncertainty;
+        const double independentVarianceGain =
+            candidate.independentNoiseGain * candidate.independentNoiseGain;
+        witnessUncertainty.measurementVariance *= independentVarianceGain;
+        witnessUncertainty.repeatVariance *= independentVarianceGain;
+        // numericalVariance is intentionally left unchanged here: callers provide
+        // a conservative per-probe max numerical discrepancy and L1-normalized
+        // stencil weights bound the combined numerical error by that maximum.
+
         std::vector<Response> witnesses;
         witnesses.reserve(modelResponses.size());
         for (const auto& model : modelResponses)
