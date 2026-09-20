@@ -20,7 +20,8 @@ def get(url,path):
             time.sleep(1+attempt)
     raise RuntimeError(f"download failed {url}: {last}")
 get(f"{asset_base}/assets/obj/foam.obj",root/"assets"/"foam.obj")
-if (root/"assets"/"foam.obj").read_bytes()[:40].startswith(b"version https://git-lfs"):\n    raise RuntimeError("GAUGE foam.obj download resolved to an LFS pointer")
+if (root/"assets"/"foam.obj").read_bytes()[:40].startswith(b"version https://git-lfs"):
+    raise RuntimeError("GAUGE foam.obj download resolved to an LFS pointer")
 for data_task,metadata_task in tasks:
     data_enc=urllib.parse.quote(data_task,safe="")
     meta_enc=urllib.parse.quote(metadata_task,safe="")
