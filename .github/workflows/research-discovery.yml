@@ -1,0 +1,54 @@
+name: Vulkax discovery cheap probes
+
+on:
+  push:
+    branches: ["research/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-discovery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  correctness-and-cheap-science:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure core
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+
+      - name: Build executable WorldIR regression
+        run: cmake --build build --target vulkax_reality_loop_tests --parallel 2
+
+      - name: Run executable WorldIR regression
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_reality_loop$'
+
+      - name: Compile identifiability regression at frozen research head
+        run: |
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -UNDEBUG \
+            -Iinclude tests/identifiability_tests.cpp \
+            src/world/world_ir.cpp src/world/reality_loop.cpp src/numerics/dense.cpp \
+            -o build/vulkax_identifiability_tests
+          build/vulkax_identifiability_tests
+
+      - name: Compile cheap falsification suite
+        run: |
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -UNDEBUG \
+            -Iinclude research/probes/cheap_science_probe.cpp \
+            src/world/world_ir.cpp src/world/reality_loop.cpp src/numerics/dense.cpp \
+            -o build/vulkax_cheap_science_probe
+
+      - name: Run cheap falsification suite
+        run: |
+          build/vulkax_cheap_science_probe build/research-cheap-probes
+          python3 research/probes/validate_cheap_science.py build/research-cheap-probes
+          cat build/research-cheap-probes/cheap_probes.csv
+
+      - name: Upload raw synthetic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-discovery-cheap-probes-${{ github.sha }}
+          path: build/research-cheap-probes
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,25 @@
+# Initial novelty matrix — 2026-09-20
+
+This is a threat map, not a novelty claim. Full-text review and citation expansion are still required.
+
+| Candidate Vulkax claim | Collision level | Closest seed prior art | Current interpretation |
+|---|---|---|---|
+| Gaussian + MPM physical dynamics | **Very high** | PhysGaussian, PhysFlow, i-PhysGaussian | Kill as flagship novelty. |
+| Infer physical parameters from multi-view visual observations | **Very high** | PAC-NeRF, EMPM | Kill as standalone claim. |
+| Infer geometry + appearance + physics from monocular video | **Very high** | MonoPhysics | Kill as standalone claim. |
+| Gaussian-based physical-property prediction | **High** | PUGS | Not sufficient. |
+| Gaussian↔generic physics-engine bridging | **High** | GASP | Representation bridge alone is weak. |
+| Online sensory update of deformable physical model | **High** | EMPM | Need a stronger trust/refusal mechanism. |
+| Local identifiability diagnostics inside a persistent visual world | **Medium** | mechanics identifiability literature; MonoPhysics is a direct context threat | Potential only if coupled to refusal, extra-measurement recommendation, or counterfactual reliability. |
+| Active physical intervention chosen to disambiguate competing captured-world models | **Medium** | optimal experiment design literature | Potential gap in graphics/captured-world setting; generic Fisher/Jacobian OED is not novel. |
+| Held-out replay explicitly separated from unseen-intervention transfer | **Medium/unknown** | system ID literature; deformable inverse methods | Promising evaluation contribution; must survey direct precedents. |
+| Counterfactual trust radius for physically editable captured worlds | **Medium/unknown** | trust-region / local-linearization literature | Potential if tied to spatial edits, event boundaries and calibrated failure prediction. |
+| Verification certificate predicting counterfactual correctness | **Low-to-medium direct collision found so far** | model-error/UQ literature broadly | High-priority search target; do not claim novelty yet. |
+| Trustworthy refusal: classify why a physical edit cannot be certified | **Low-to-medium direct collision found so far** | identifiability/UQ/model-error literature | Very promising Vulkax identity if quantitatively evaluated. |
+| Numerical-error-aware rewrite certification | **Low-to-medium direct collision found so far** | numerical verification/UQ literature | Promising if effect-vs-discretization error becomes an operational certificate gate. |
+| Event horizon for derivative validity across contact/topology regime changes | **Unknown** | differentiable contact/discontinuity literature | High-risk/high-upside; needs dedicated survey. |
+| Many-world GPU batching for counterfactual verification | **Systems novelty unknown** | differentiable/GPU simulation literature | Keep as enabling systems track, not flagship until measured. |
+
+## Current search conclusion
+
+The easy story is gone: Vulkax cannot win by saying “we simulate Gaussian splats with physics” or “we infer a material parameter from video.” The research must move one level up: **when is the inferred physical world actually knowable, when does it generalize to interventions, what additional experiment resolves ambiguity, and when should the system refuse to commit a rewrite?**

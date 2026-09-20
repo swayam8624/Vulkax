@@ -1,0 +1,233 @@
+{
+  "schema": "vulkax.repository_audit",
+  "version": 1,
+  "audited_at_utc": "2026-09-20",
+  "repository": "swayam8624/Vulkax",
+  "immutable_scientific_control": {
+    "tag": "v1.0.0",
+    "annotated_tag_object": "e34a4cc60ec40a7b3b40559e83535730b65dce55",
+    "commit": "2e7c306d5275718438e6c658d208f60edec52e53",
+    "interpretation": "Frozen Vulkax 1.0 verified-rewritable-reality scientific control."
+  },
+  "current_main": {
+    "commit": "9860f20f01673f176f457983388a419266b63449",
+    "delta_from_control": "presentation-only showcase polish merged as PR #53"
+  },
+  "discovery_substrate": {
+    "branch": "feat/reality-loop-worldir",
+    "commit": "d48dbded55136e729d6ca8b03538cc93d57e62cc",
+    "reason": "Contains executable WorldIR, uncertainty-weighted inverse loop, local identifiability, explicit observation spaces, metric anchor path, video observation import and current bounce bootstrap."
+  },
+  "active_lines": [
+    {
+      "branch": "develop/1.1",
+      "pr": 52,
+      "status": "experimental",
+      "focus": "evidence gates + native Gaussian scheduling"
+    },
+    {
+      "branch": "feat/reality-loop-worldir",
+      "pr": 59,
+      "status": "experimental",
+      "focus": "closed-loop executable WorldIR / inverse physics / identifiability"
+    },
+    {
+      "branch": "feat/native-research-checkpoint",
+      "pr": 60,
+      "status": "experimental",
+      "focus": "native viewer correctness/performance checkpoint"
+    }
+  ],
+  "subsystems": [
+    {
+      "name": "C++20 core",
+      "status": "validated",
+      "evidence": [
+        "CMakeLists.txt",
+        "multi-platform CI"
+      ]
+    },
+    {
+      "name": "stable composite Gaussian identity",
+      "status": "validated",
+      "evidence": [
+        "docs/GAUSSIAN_IDENTITY_0_70.md",
+        "tests/gaussian_identity_tests.cpp"
+      ]
+    },
+    {
+      "name": "renderer-independent Gaussian appearance + 3DGS PLY",
+      "status": "validated",
+      "evidence": [
+        "README.md",
+        "Gaussian render/identity tests"
+      ]
+    },
+    {
+      "name": "captured evidence bundles + SHA-256 payload identity",
+      "status": "validated",
+      "evidence": [
+        "docs/CAPTURE_BUNDLE_0_40.md",
+        "captured bundle CI"
+      ]
+    },
+    {
+      "name": "measured DOT C2 path",
+      "status": "measured-data-supported",
+      "evidence": [
+        "docs/MEASURED_BENCHMARK_0_45.md",
+        ".github/workflows/measured-dot-c2.yml"
+      ]
+    },
+    {
+      "name": "fit-only APIC/MPM material calibration",
+      "status": "measured-data-supported",
+      "evidence": [
+        "DOT C2 workflow",
+        "captured-material calibration"
+      ]
+    },
+    {
+      "name": "held-out replay + observation robustness",
+      "status": "measured-data-supported",
+      "evidence": [
+        "DOT C2 workflow",
+        "docs/OBSERVATION_ROBUSTNESS_0_39.md"
+      ]
+    },
+    {
+      "name": "finite-difference material influence oracle",
+      "status": "validated",
+      "evidence": [
+        "captured operator influence tests"
+      ]
+    },
+    {
+      "name": "controlled APIC reverse material derivative",
+      "status": "validated",
+      "evidence": [
+        "tests/mpm_adjoint_tests.cpp",
+        "derivative comparison gates"
+      ]
+    },
+    {
+      "name": "adaptive influence-driven rewrite proposal",
+      "status": "validated",
+      "evidence": [
+        "adaptive material influence tests"
+      ]
+    },
+    {
+      "name": "atomic verified rewrite + rollback",
+      "status": "validated",
+      "evidence": [
+        "docs/VERIFIED_REWRITE_0_60.md",
+        "tests/verified_rewrite_tests.cpp"
+      ]
+    },
+    {
+      "name": "captured local Young's-modulus verifier",
+      "status": "validated",
+      "evidence": [
+        "docs/VERIFIED_REWRITE_0_60.md"
+      ]
+    },
+    {
+      "name": "native Vulkan/Metal Gaussian scientific rendering",
+      "status": "validated",
+      "evidence": [
+        "docs/GAUSSIAN_SCALING_0_50.md",
+        "render tests"
+      ]
+    },
+    {
+      "name": "run certificates + evidence registry",
+      "status": "validated",
+      "evidence": [
+        "docs/CAPTURED_WORLD_RUN_0_80.md",
+        "release audit"
+      ]
+    },
+    {
+      "name": "executable WorldIR inverse loop",
+      "status": "experimental",
+      "evidence": [
+        "PR #59",
+        "tests/reality_loop_tests.cpp"
+      ]
+    },
+    {
+      "name": "local identifiability SVD diagnostic",
+      "status": "synthetic-only",
+      "evidence": [
+        "PR #59",
+        "tests/identifiability_tests.cpp",
+        "tests/metric_video_bounce_tests.cpp"
+      ]
+    },
+    {
+      "name": "measured-source video bootstrap",
+      "status": "experimental",
+      "evidence": [
+        "PR #59 video-observation workflow"
+      ]
+    },
+    {
+      "name": "solver-backed captured geometry verification",
+      "status": "missing",
+      "evidence": [
+        "explicit 1.0 limitation"
+      ]
+    },
+    {
+      "name": "solver-backed captured constraint verification",
+      "status": "missing",
+      "evidence": [
+        "explicit 1.0 limitation"
+      ]
+    },
+    {
+      "name": "validated shell/cloth constitutive model for DOT",
+      "status": "missing",
+      "evidence": [
+        "explicit DOT limitation"
+      ]
+    },
+    {
+      "name": "true DOT material/load/density/thickness ground truth",
+      "status": "missing",
+      "evidence": [
+        "docs/MEASURED_BENCHMARK_0_45.md"
+      ]
+    },
+    {
+      "name": "topology surgery / fracture / tearing",
+      "status": "missing",
+      "evidence": [
+        "explicit 1.0 limitation"
+      ]
+    },
+    {
+      "name": "formal causal identification",
+      "status": "missing",
+      "evidence": [
+        "PR #59 scope"
+      ]
+    },
+    {
+      "name": "general reality compiler",
+      "status": "incomplete",
+      "evidence": [
+        "PR #59 scope"
+      ]
+    }
+  ],
+  "immediate_scientific_risks": [
+    "Inverse-fit convergence may be mistaken for identifiable physical recovery.",
+    "Held-out replay under the same intervention may be mistaken for counterfactual transfer.",
+    "DOT C2 volumetric APIC proxy may be a model-class mismatch rather than merely a bad parameter fit.",
+    "Numerical discretization error may be absorbed into fitted material parameters.",
+    "Local derivative agreement may fail beyond contact/event boundaries.",
+    "Current Gaussian/MPM novelty is heavily threatened by established and 2026 prior work."
+  ]
+}
