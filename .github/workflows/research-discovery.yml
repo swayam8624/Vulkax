@@ -89,6 +89,15 @@ jobs:
           build/vulkax_refusal_validation_probe build/refusal-validation
           python3 research/probes/validate_refusal_policy.py build/refusal-repair/cases.csv build/refusal-validation/cases.csv build/refusal-validation
 
+      - name: Build independent refusal-policy Validation-2
+        run: cmake --build build --target vulkax_refusal_validation2_probe --parallel 2
+
+      - name: Validate locked refusal policy on fresh domain shift
+        run: |
+          build/vulkax_refusal_validation2_probe build/refusal-validation2
+          python3 research/probes/validate_refusal_policy_v2.py build/refusal-repair/cases.csv build/refusal-validation2/cases.csv build/refusal-validation2
+          cat build/refusal-validation2/policy_validation2.json
+
       - name: Test GAUGE deformable adapter contract
         run: python3 research/adapters/test_gauge_adapter.py
 
@@ -108,5 +117,6 @@ jobs:
             build/solver-certificate
             build/refusal-repair
             build/refusal-validation
+            build/refusal-validation2
           if-no-files-found: error
           retention-days: 30

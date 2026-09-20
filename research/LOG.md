@@ -158,3 +158,8 @@ The repaired prescribed-boundary CI is green. Added a synthetic driven slab that
 ## 2026-09-20 — GAUGE shearing evaluation contract frozen
 
 Added a measured-only contract stage before simulation. Representative soft/hard repeats are chosen by driver amplitude relative to the within-material median, with no access to Vulkax prediction error. The contract records source hashes, marker geometry, unique face topology, driver path and boundary-role metadata. This prevents tuning trial selection after seeing sim-to-real error.
+
+
+## 2026-09-20 — Validation-2 frozen and launched
+
+Validation-1 is treated as development evidence only. Added a second independent synthetic validation domain with new off-grid E/nu values, marker locations, 25 μm noise, train/evidence/target deformations and noise phases. The gate is still locked from original calibration data only. No Validation-1 label is allowed to tune Validation-2.
