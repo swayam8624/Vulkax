@@ -51,9 +51,20 @@
     "build/gauge-dcs-retrospective/summary.json",
     "build/gauge-dcs-retrospective/per_trial.csv",
     "build/paper-captured-world-run/certificate.json",
-    "build/paper-performance/captured_world_performance_summary.json"
+    "build/paper-performance/captured_world_performance_summary.json",
+    "build/paper-reproduction-validation.json"
   ],
   "scientific_disposition": "implementation_complete_no_positive_flagship_claim",
   "d5_fresh_measured_confirmation": "not_executed",
-  "warning": "Paper data are complete for the executed DCS research sequence, but no fresh positive D5 confirmation may be inferred."
+  "warning": "Paper data are complete for the executed DCS research sequence, but no fresh positive D5 confirmation may be inferred.",
+  "source_maps": {
+    "readme": "research/paper_data/README.md",
+    "figure_table_map": "research/paper_data/FIGURE_TABLE_SOURCE_MAP.md",
+    "experiment_matrix": "research/paper_data/EXPERIMENT_MATRIX.csv",
+    "ablation_matrix": "research/paper_data/ABLATION_MATRIX.md",
+    "reproducibility_checklist": "research/paper_data/REPRODUCIBILITY_CHECKLIST.md",
+    "reproduction_guide": "docs/PAPER_EVIDENCE_REPRODUCTION.md"
+  },
+  "generated_assets_root": "build/paper-figures",
+  "portable_archive_pattern": "build/vulkax-paper-evidence-<commit>.tar.gz"
 }
