@@ -64,6 +64,144 @@ double monomial(
     return result;
 }
 
+using Matrix = std::vector<std::vector<double>>;
+
+Matrix invertSquareMatrix(Matrix matrix) {
+    const std::size_t n = matrix.size();
+    if (n == 0) throw std::invalid_argument("DCS cannot invert an empty matrix");
+    for (const auto& row : matrix)
+        if (row.size() != n) throw std::invalid_argument("DCS inversion requires a square matrix");
+    Matrix inverse(n, std::vector<double>(n, 0.0));
+    for (std::size_t i = 0; i < n; ++i) inverse[i][i] = 1.0;
+
+    constexpr double pivotTolerance = 1.0e-12;
+    for (std::size_t column = 0; column < n; ++column) {
+        std::size_t pivot = column;
+        double magnitude = std::abs(matrix[pivot][column]);
+        for (std::size_t row = column + 1; row < n; ++row) {
+            const double candidate = std::abs(matrix[row][column]);
+            if (candidate > magnitude) {
+                magnitude = candidate;
+                pivot = row;
+            }
+        }
+        if (magnitude < pivotTolerance)
+            throw std::invalid_argument("DCS intervention moments are rank deficient");
+        if (pivot != column) {
+            std::swap(matrix[pivot], matrix[column]);
+            std::swap(inverse[pivot], inverse[column]);
+        }
+        const double invPivot = 1.0 / matrix[column][column];
+        for (std::size_t j = 0; j < n; ++j) {
+            matrix[column][j] *= invPivot;
+            inverse[column][j] *= invPivot;
+        }
+        for (std::size_t row = 0; row < n; ++row) {
+            if (row == column) continue;
+            const double factor = matrix[row][column];
+            for (std::size_t j = 0; j < n; ++j) {
+                matrix[row][j] -= factor * matrix[column][j];
+                inverse[row][j] -= factor * inverse[column][j];
+            }
+        }
+    }
+    return inverse;
+}
+
+std::vector<double> projectMomentNullspace(
+    const std::vector<double>& vector,
+    const Matrix& moments,
+    const Matrix& gramInverse) {
+    const std::size_t rows = moments.size();
+    const std::size_t columns = vector.size();
+    std::vector<double> av(rows, 0.0);
+    for (std::size_t row = 0; row < rows; ++row)
+        for (std::size_t column = 0; column < columns; ++column)
+            av[row] += moments[row][column] * vector[column];
+
+    std::vector<double> solved(rows, 0.0);
+    for (std::size_t row = 0; row < rows; ++row)
+        for (std::size_t column = 0; column < rows; ++column)
+            solved[row] += gramInverse[row][column] * av[column];
+
+    std::vector<double> projected = vector;
+    for (std::size_t column = 0; column < columns; ++column)
+        for (std::size_t row = 0; row < rows; ++row)
+            projected[column] -= moments[row][column] * solved[row];
+    return projected;
+}
+
+double vectorNorm(const std::vector<double>& values) {
+    long double sum = 0.0L;
+    for (const double value : values) sum += static_cast<long double>(value) * value;
+    return std::sqrt(static_cast<double>(sum));
+}
+
+void normalize(std::vector<double>& values) {
+    const double norm = vectorNorm(values);
+    if (!(norm > 1.0e-15))
+        throw std::runtime_error("DCS projected disagreement has no usable nullspace direction");
+    for (double& value : values) value /= norm;
+}
+
+std::vector<double> applyModelDisagreement(
+    const std::vector<double>& weights,
+    const std::vector<std::vector<Response>>& modelResponses) {
+    const std::size_t modelCount = modelResponses.size();
+    const std::size_t pointCount = weights.size();
+    const std::size_t observableCount = modelResponses.front().front().size();
+
+    std::vector<Response> means(pointCount, Response(observableCount, 0.0));
+    for (const auto& model : modelResponses)
+        for (std::size_t point = 0; point < pointCount; ++point)
+            for (std::size_t component = 0; component < observableCount; ++component)
+                means[point][component] += model[point][component];
+    for (auto& mean : means)
+        for (double& value : mean) value /= static_cast<double>(modelCount);
+
+    std::vector<double> result(pointCount, 0.0);
+    const double scale = 1.0 / static_cast<double>(modelCount * observableCount);
+    for (const auto& model : modelResponses) {
+        for (std::size_t component = 0; component < observableCount; ++component) {
+            double coefficient = 0.0;
+            for (std::size_t point = 0; point < pointCount; ++point)
+                coefficient += weights[point] *
+                    (model[point][component] - means[point][component]);
+            for (std::size_t point = 0; point < pointCount; ++point)
+                result[point] += scale * coefficient *
+                    (model[point][component] - means[point][component]);
+        }
+    }
+    return result;
+}
+
+void validateModelResponseGrid(
+    const std::vector<InterventionPoint>& points,
+    const std::vector<std::vector<Response>>& modelResponses) {
+    if (points.empty()) throw std::invalid_argument("DCS synthesis needs intervention points");
+    if (modelResponses.size() < 2)
+        throw std::invalid_argument("DCS synthesis needs at least two candidate models");
+    const std::size_t pointCount = points.size();
+    const std::size_t dimension = points.front().coordinates.size();
+    if (dimension == 0) throw std::invalid_argument("DCS synthesis intervention dimension is zero");
+    for (const auto& point : points) {
+        if (point.coordinates.size() != dimension)
+            throw std::invalid_argument("DCS synthesis intervention dimensions must match");
+        for (const double value : point.coordinates)
+            if (!std::isfinite(value))
+                throw std::invalid_argument("DCS synthesis intervention coordinates must be finite");
+    }
+    std::size_t observableCount = 0;
+    for (const auto& model : modelResponses) {
+        if (model.size() != pointCount)
+            throw std::invalid_argument("DCS synthesis model/point cardinality mismatch");
+        requireSameResponseSize(model);
+        if (observableCount == 0) observableCount = model.front().size();
+        if (model.front().size() != observableCount)
+            throw std::invalid_argument("DCS synthesis observable dimensions must match across models");
+    }
+}
+
 } // namespace
 
 double responseNorm(const Response& response) {
@@ -282,6 +420,99 @@ double darkFieldDiscriminationScore(
         measurementVariance + numericalVariance + costWeight * acquisitionCost;
     return static_cast<double>(dispersion) /
         std::max(denominator, std::numeric_limits<double>::epsilon());
+}
+
+SynthesizedStencil synthesizeAnnihilatingStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& modelResponses,
+    double momentTolerance,
+    std::size_t maximumIterations) {
+    if (order == 0 || maximumIterations == 0)
+        throw std::invalid_argument("DCS synthesis order/iteration count must be positive");
+    if (!std::isfinite(momentTolerance) || momentTolerance <= 0.0)
+        throw std::invalid_argument("DCS synthesis moment tolerance must be positive and finite");
+    validateModelResponseGrid(points, modelResponses);
+
+    const std::size_t pointCount = points.size();
+    const std::size_t dimension = points.front().coordinates.size();
+
+    Matrix moments;
+    for (std::size_t degree = 0; degree < order; ++degree) {
+        for (const auto& exponents : exponentVectors(dimension, degree)) {
+            std::vector<double> row(pointCount, 0.0);
+            for (std::size_t point = 0; point < pointCount; ++point)
+                row[point] = monomial(points[point].coordinates, exponents);
+            moments.push_back(std::move(row));
+        }
+    }
+    if (moments.size() >= pointCount)
+        throw std::invalid_argument("DCS synthesis needs more intervention points than lower-order moment constraints");
+
+    Matrix gram(moments.size(), std::vector<double>(moments.size(), 0.0));
+    for (std::size_t i = 0; i < moments.size(); ++i)
+        for (std::size_t j = 0; j < moments.size(); ++j)
+            for (std::size_t point = 0; point < pointCount; ++point)
+                gram[i][j] += moments[i][point] * moments[j][point];
+    const Matrix gramInverse = invertSquareMatrix(std::move(gram));
+
+    std::vector<double> weights(pointCount, 0.0);
+    double bestSeedNorm = -1.0;
+    for (std::size_t seed = 0; seed < pointCount; ++seed) {
+        std::vector<double> basis(pointCount, 0.0);
+        basis[seed] = 1.0;
+        auto projected = projectMomentNullspace(basis, moments, gramInverse);
+        const double norm = vectorNorm(projected);
+        if (norm > bestSeedNorm) {
+            bestSeedNorm = norm;
+            weights = std::move(projected);
+        }
+    }
+    normalize(weights);
+
+    SynthesizedStencil result;
+    for (std::size_t iteration = 0; iteration < maximumIterations; ++iteration) {
+        const auto projectedWeights = projectMomentNullspace(weights, moments, gramInverse);
+        auto next = applyModelDisagreement(projectedWeights, modelResponses);
+        next = projectMomentNullspace(next, moments, gramInverse);
+        const double norm = vectorNorm(next);
+        if (!(norm > 1.0e-15))
+            throw std::runtime_error("DCS synthesis found no model disagreement after lower-order annihilation");
+        for (double& value : next) value /= norm;
+
+        long double same = 0.0L;
+        long double opposite = 0.0L;
+        for (std::size_t i = 0; i < pointCount; ++i) {
+            const long double ds = static_cast<long double>(next[i]) - weights[i];
+            const long double do_ = static_cast<long double>(next[i]) + weights[i];
+            same += ds * ds;
+            opposite += do_ * do_;
+        }
+        weights = std::move(next);
+        result.powerIterations = iteration + 1U;
+        if (std::sqrt(static_cast<double>(std::min(same, opposite))) < 1.0e-10) {
+            result.converged = true;
+            break;
+        }
+    }
+
+    double l1 = 0.0;
+    for (const double value : weights) l1 += std::abs(value);
+    if (!(l1 > 1.0e-15)) throw std::runtime_error("DCS synthesis produced a zero stencil");
+    for (double& value : weights) value /= l1;
+
+    result.stencil.order = order;
+    result.stencil.points = points;
+    result.stencil.weights = weights;
+    result.momentValidation = validateAnnihilatingStencil(result.stencil, momentTolerance);
+    if (!result.momentValidation.valid)
+        throw std::runtime_error("DCS synthesized stencil violates its annihilation contract");
+
+    const auto disagreementApplied = applyModelDisagreement(weights, modelResponses);
+    for (std::size_t i = 0; i < weights.size(); ++i)
+        result.modelDisagreementEnergy += weights[i] * disagreementApplied[i];
+    result.independentNoiseGain = vectorNorm(weights);
+    return result;
 }
 
 } // namespace vulkax::research::dcs
