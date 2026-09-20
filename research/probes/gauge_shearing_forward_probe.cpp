@@ -22,6 +22,7 @@ using vulkax::gaussian::GaussianCloud;
 using vulkax::gaussian::GaussianSplat;
 using vulkax::math::Vec3;
 using vulkax::research::PrescribedParticleTarget;
+using vulkax::solvers::MpmConstitutiveModel;
 using vulkax::solvers::MpmGridSettings;
 using vulkax::solvers::MpmMaterial;
 using vulkax::solvers::MpmParticle;
@@ -254,6 +255,13 @@ MpmTransferScheme parseTransfer(const std::string& name) {
     throw std::runtime_error("unsupported GAUGE transfer scheme");
 }
 
+MpmConstitutiveModel parseConstitutive(const std::string& name) {
+    if(name=="neo_hookean_log_j") return MpmConstitutiveModel::NeoHookeanLogJ;
+    if(name=="neo_hookean_quadratic_j") return MpmConstitutiveModel::NeoHookeanQuadraticJ;
+    if(name=="st_venant_kirchhoff") return MpmConstitutiveModel::StVenantKirchhoff;
+    throw std::runtime_error("unsupported GAUGE constitutive model");
+}
+
 Vec3 parseGravity(const std::string& name) {
     if(name=="zero") return {0,0,0};
     if(name=="+x") return {9.81,0,0};
@@ -278,28 +286,30 @@ void writeFrame(std::ofstream& out,std::size_t frame,double time,
 } // namespace
 
 int main(int argc,char**argv) {
-    if(argc!=10 && argc!=16) {
+    if(argc!=10 && argc!=16 && argc!=17) {
         std::cerr<<"usage: vulkax_gauge_shearing_forward_probe markers.csv driver.csv output.csv "
                     "young_pa poisson density_kg_m3 mass_kg requested_dt label "
-                    "[n_cross n_long boundary_layers transfer geometry_mode gravity]\n";
+                    "[n_cross n_long boundary_layers transfer geometry_mode gravity [constitutive]]\n";
         return 2;
     }
     const std::filesystem::path markerPath=argv[1],driverPath=argv[2],outPath=argv[3];
     const double young=number(argv[4]),poisson=number(argv[5]),density=number(argv[6]),mass=number(argv[7]);
     const double requestedDt=number(argv[8]);
     const std::string label=argv[9];
-    const int nCross=argc==16?std::stoi(argv[10]):5;
-    const int nLong=argc==16?std::stoi(argv[11]):13;
-    const int boundaryLayers=argc==16?std::stoi(argv[12]):1;
-    const std::string transferName=argc==16?argv[13]:"APIC";
-    const std::string geometryMode=argc==16?argv[14]:"measured_aspect";
-    const std::string gravityName=argc==16?argv[15]:"zero";
+    const int nCross=argc>=16?std::stoi(argv[10]):5;
+    const int nLong=argc>=16?std::stoi(argv[11]):13;
+    const int boundaryLayers=argc>=16?std::stoi(argv[12]):1;
+    const std::string transferName=argc>=16?argv[13]:"APIC";
+    const std::string geometryMode=argc>=16?argv[14]:"measured_aspect";
+    const std::string gravityName=argc>=16?argv[15]:"zero";
+    const std::string constitutiveName=argc==17?argv[16]:"neo_hookean_log_j";
     if(!(poisson>-1.0 && poisson<0.5) || !(requestedDt>0.0))
         throw std::runtime_error("invalid material/timestep argument");
     if(geometryMode!="measured_aspect" && geometryMode!="square_cross")
         throw std::runtime_error("unsupported geometry mode");
     const auto transfer=parseTransfer(transferName);
     const auto gravity=parseGravity(gravityName);
+    const auto constitutive=parseConstitutive(constitutiveName);
 
     const auto markers=loadMarkers(markerPath);
     const auto driver=loadDriver(driverPath);
@@ -319,7 +329,7 @@ int main(int argc,char**argv) {
         side[1]/static_cast<double>(particleDims[1]-1),
         side[2]/static_cast<double>(particleDims[2]-1)});
     const auto grid=makeGrid(geom,driver,cell);
-    const MpmMaterial material{density,young,poisson};
+    const MpmMaterial material{density,young,poisson,constitutive};
 
     std::filesystem::create_directories(outPath.parent_path());
     std::ofstream out(outPath);
@@ -373,6 +383,7 @@ int main(int argc,char**argv) {
            <<"  \"gravity_mode\": \""<<gravityName<<"\",\n"
            <<"  \"gravity\": ["<<gravity.x<<','<<gravity.y<<','<<gravity.z<<"],\n"
            <<"  \"transfer\": \""<<transferName<<"\",\n"
+           <<"  \"constitutive_model\": \""<<constitutiveName<<"\",\n"
            <<"  \"n_cross\": "<<nCross<<",\n"
            <<"  \"n_long\": "<<nLong<<",\n"
            <<"  \"boundary_layers\": "<<boundaryLayers<<",\n"
