@@ -192,3 +192,20 @@ The metadata-only Vulkax shearing prediction did not beat the affine null for ei
 **Decision:** inverse fitting remains forbidden.
 
 **Next:** run all-repeat replication and timestep forensics before touching material parameters. If the miss is repeatable and timestep-stable, direct effort toward geometry/boundary/constitutive structure rather than optimizer tuning.
+
+
+## 2026-09-20 — GAUGE no-fit failure replicates across all 20 shearing repeats
+
+**Workflow:** `35513728635` (scientific replication step succeeded; timestep harness then exposed coarse-step inversion).
+**Head:** `123c35dda98e907206dcc8eca4f53eb7053646dd`.
+
+No-fit metadata-only Vulkax lost to the zero-parameter affine null on **20/20** measured GAUGE shearing trials.
+
+- soft: Vulkax NRMSE **0.9417 ± 0.0288**, affine **0.2104 ± 0.0157**, 0/10 wins;
+- hard: Vulkax **1.1197 ± 0.0297**, affine **0.2312 ± 0.0099**, 0/10 wins;
+- mean temporal correlations remain high (~0.991 soft, ~0.995 hard), reinforcing that the main miss is response magnitude/structure rather than gross timing.
+
+### Decision
+The current APIC + Neo-Hookean + proxy-geometry + prescribed-boundary family is **inadequate for this real benchmark as instantiated**. This is no longer explainable as representative-trial cherry picking. Material inversion remains forbidden.
+
+The first coarse timestep level (dt=1/6000 s) inverted the soft body. This is retained as a numerical-stability negative result. The timestep harness is being repaired to continue baseline->fine evidence even when the coarse level is invalid.
