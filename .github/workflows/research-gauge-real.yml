@@ -133,6 +133,7 @@ jobs:
           python3 research/analysis/gauge_fixture_envelope_synthetic_control.py \
             --exe build-forward/vulkax_gauge_shearing_forward_probe \
             --contract-dir build/gauge-shearing-contract \
+            --real-mode-summary build/gauge-mode-baseline/summary.json \
             --out build/gauge-fixture-envelope-synthetic
           cat build/gauge-fixture-envelope-synthetic/summary.json
 
