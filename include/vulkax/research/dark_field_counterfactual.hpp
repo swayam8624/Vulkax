@@ -152,6 +152,11 @@ struct SynthesizedStencil {
     const Response& predicted,
     const UncertaintyBudget& uncertainty);
 
+// Propagate per-intervention uncertainty through a signed stencil.
+[[nodiscard]] UncertaintyBudget propagateStencilUncertainty(
+    const AnnihilatingStencil& stencil,
+    const UncertaintyBudget& perInterventionUncertainty);
+
 // Smallest pairwise standardized separation among surviving candidate worlds.
 [[nodiscard]] double worstCaseStandardizedSeparation(
     const std::vector<Response>& modelWitnesses,
