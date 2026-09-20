@@ -38,6 +38,16 @@ The historical `measured_aspect` proxy set `prismLo/prismHi` on the long axis di
 
 The new `released_asset_aspect` mode instead centers a 200 mm volume-consistent body around the marker envelope and places prescribed particle layers at the actual proxy body ends. This change is physically justified from released asset aspect + measured mass/density and does not inspect trajectory error.
 
+### Historical prism distortion
+
+Because the historical proxy forced measured mass/density volume into the much shorter marker-envelope length, it also inflated the inferred cross-section:
+
+- soft historical proxy: approximately **58.83 x 56.74 x 149.79 mm**;
+- hard historical proxy: approximately **59.74 x 55.05 x 152.03 mm**;
+- released-asset-aspect proxy: **50 x 50 x 200 mm** for both, from the common 0.0005 m^3 metadata volume and 1:1:4 asset aspect.
+
+Therefore the repair changes both fixture distance and global body aspect in a provenance-backed way. The mechanism comparison must determine which observed mode errors actually move in the predicted direction; no improvement is assumed in advance.
+
 ## Falsifiable hypothesis
 
 **H-GAUGE-FIXTURE-ENVELOPE**
