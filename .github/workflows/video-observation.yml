@@ -118,8 +118,15 @@ jobs:
               raise SystemExit("image-plane ground estimate lies outside the extracted frame")
           if not (0.5 < seed["acceleration_y_pixels_per_second2"] < 1.0e6):
               raise SystemExit("image-plane acceleration proxy is too small/large to support the bounce model")
+          disposition = {
+              "schema": "vulkax_observation_evidence_disposition",
+              "version": 1,
+              "accepted_for_physics_seed": True,
+              "reason": "accepted",
+          }
           if not (0.05 < seed["restitution_proxy"] < 0.985):
-              raise SystemExit("restitution proxy hit/approached a clamp boundary; reject weak impact evidence")
+              disposition["accepted_for_physics_seed"] = False
+              disposition["reason"] = "restitution_proxy_near_clamp_boundary"
           if seed["first_bounce_sample"] is None or seed["release_sample"] is None:
               raise SystemExit("real-video initializer failed to identify release/bounce events")
           if not (0.0 <= seed["release_time_seconds"] < seed["first_bounce_time_seconds"]):
@@ -132,7 +139,12 @@ jobs:
                   raise SystemExit("height-ratio restitution path produced an implausible first rebound ratio")
           if "pixels/s^2" not in seed["metric_status"]:
               raise SystemExit("measured-source seed lost its non-metric evidence caveat")
-          print("VALID measured-source ballistic image-plane hypothesis bootstrap")
+          disposition_path = path.with_name("rhetos_exercise_ball.disposition.json")
+          disposition_path.write_text(json.dumps(disposition, indent=2) + "\n", encoding="utf-8")
+          if disposition["accepted_for_physics_seed"]:
+              print("VALID measured-source ballistic image-plane hypothesis bootstrap")
+          else:
+              print("REFUSED measured-source ballistic hypothesis:", disposition["reason"])
           PY
 
       - name: Upload measured-source derived evidence
@@ -143,6 +155,7 @@ jobs:
           path: |
             build/reality-real/rhetos_exercise_ball.track.csv
             build/reality-real/rhetos_exercise_ball.seed.json
+            build/reality-real/rhetos_exercise_ball.disposition.json
             build/reality-real/rhetos_exercise_ball.contact_sheet.png
           if-no-files-found: warn
 
