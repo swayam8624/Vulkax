@@ -279,15 +279,68 @@ dark-field witness error while remaining poor on the stronger target. This is a
 specific counterexample to treating low order-2 witness error as sufficient.
 
 ### D2b maximin active-selection discovery
-Status: implementation committed; CI pending.
+Status: **COMPLETE — NEGATIVE FOR FIXED ORDER-2 MAXIMIN DCS**.
 
-This stage compares:
-- maximin synthesized DCS stencil;
-- raw maximin single intervention;
-- maximum-motion intervention;
-- random intervention.
+Discovery-set target-ranking agreement:
+- fixed order-2 DCS: **62.5%**;
+- same-cost raw bundle: **75.0%**;
+- raw maximin: **95.83%**;
+- Fisher sensitivity: **87.5%**;
+- maximum motion: **66.67%**;
+- random: **45.83%**.
 
-The stronger target remains hidden from selection and is used only for scoring.
+The fixed DCS selector corrected the only raw-maximin mirage in this tiny discovery
+partition but introduced enough new ranking errors to remain globally inferior.
+Conclusion: lower-order annihilation by itself is not sufficient.
 
-### D2+ fresh validation
-Status: NOT RUN. Do not pre-populate expected wins.
+### D2 fresh frozen validation
+Status: **COMPLETE — FROZEN FAILURE**.
+
+Protocol:
+`research/benchmarks/DCS_D2_VALIDATION_PROTOCOL.md`
+
+Result:
+`research/status/DCS_D2_VALIDATION_RESULT.md`
+
+- fresh truth worlds: **16 / 16**;
+- candidate families: **4/world**;
+- moment-cancellation contract: PASS;
+- maximum moment residual: **3.886e-16**;
+- frozen observability threshold: standardized separation >= **2.0**;
+- resolved worlds: **0 / 16**;
+- coverage: **0%**;
+- median predicted standardized separation: **0.041578**;
+- median raw nominal-vs-half-dt numerical RMS floor: **6.469e-6 m**.
+
+Decision:
+`freeze_failure_and_do_not_tune_this_partition`.
+
+Killed:
+- fixed hand-designed order-2 witness as flagship;
+- fixed five-point order-2 maximin selector;
+- raw/global numerical-error floor as the final DCS credibility object.
+
+The 16 D2 worlds are permanently frozen and may never be reused to tune the revised
+method.
+
+### D3 witness-space adaptive-order discovery
+Status: **ACTIVE**.
+
+Protocol:
+`research/benchmarks/DCS_D3_DISCOVERY_PROTOCOL.md`
+
+New hypothesis:
+- numerical uncertainty is evaluated **after applying the same annihilating
+  stencil** to nominal and half-timestep responses;
+- intervention basis expands to a fixed 3x3 shear/axial lattice;
+- order 2 and order 3 are both synthesized;
+- the selected mechanism order is whichever maximizes predicted worst-case
+  standardized separation, without truth labels.
+
+Fresh D3 discovery truths:
+- E={13,125;15,125;16,975} Pa;
+- nu={0.26;0.33};
+- 6 worlds, disjoint from all previous discovery/validation truths.
+
+If D3 is not observably stronger, do **not** continue increasing order indefinitely;
+narrow or kill DCS as the flagship.
