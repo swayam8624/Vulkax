@@ -6,6 +6,8 @@
 #include <iomanip>
 #include <limits>
 #include <stdexcept>
+#include <string>
+#include <unordered_set>
 
 namespace vulkax::research {
 namespace {
@@ -49,6 +51,56 @@ void validateCandidateGrid(
 
 } // namespace
 
+CapturedMaterialCalibrationPreflight summarizeCapturedMaterialCalibrationPreflight(
+    const capture::CapturedDeformableDataset& dataset) {
+    CapturedMaterialCalibrationPreflight result;
+    result.minimumTime = std::numeric_limits<double>::infinity();
+
+    std::unordered_set<std::string> markers;
+    std::unordered_set<std::uint64_t> fitInitializationParticles;
+    for (const auto& observation : dataset.observations) {
+        markers.insert(observation.markerId);
+        result.minimumTime = std::min(result.minimumTime, observation.time);
+        result.maximumTime = std::max(result.maximumTime, observation.time);
+
+        const bool dynamic = std::abs(observation.time) > 1.0e-12;
+        if (!dynamic) ++result.initializationSamples;
+
+        if (observation.split == capture::ObservationSplit::Fit) {
+            ++result.fitSamples;
+            if (dynamic) {
+                ++result.fitDynamicSamples;
+            } else {
+                fitInitializationParticles.insert(observation.particleId);
+            }
+        } else {
+            ++result.validationSamples;
+            if (dynamic) ++result.validationDynamicSamples;
+        }
+    }
+
+    result.markerCount = markers.size();
+    result.distinctFitInitializationParticles = fitInitializationParticles.size();
+    if (!std::isfinite(result.minimumTime)) result.minimumTime = 0.0;
+    return result;
+}
+
+void validateCapturedMaterialCalibrationPreflight(
+    const CapturedMaterialCalibrationPreflight& preflight) {
+    if (preflight.markerCount < 4U)
+        throw std::invalid_argument(
+            "captured material calibration requires observations from at least four markers");
+    if (preflight.fitDynamicSamples == 0U)
+        throw std::invalid_argument(
+            "captured material calibration requires at least one nonzero-time fit observation");
+    if (preflight.validationDynamicSamples == 0U)
+        throw std::invalid_argument(
+            "captured material calibration requires at least one nonzero-time validation observation");
+    if (preflight.distinctFitInitializationParticles < 4U)
+        throw std::invalid_argument(
+            "captured material calibration requires at least four distinct t=0 fit particles");
+}
+
 CapturedMaterialCalibrationResult calibrateCapturedMaterialGrid(
     const gaussian::GaussianCloud& world,
     const std::vector<std::size_t>& activeGaussianIndices,
@@ -57,6 +109,8 @@ CapturedMaterialCalibrationResult calibrateCapturedMaterialGrid(
     NonlinearDeformableWorldSettings settings,
     const std::vector<double>& youngModulusCandidates,
     const std::vector<double>& poissonRatioCandidates) {
+    validateCapturedMaterialCalibrationPreflight(
+        summarizeCapturedMaterialCalibrationPreflight(dataset));
     validateCandidateGrid(youngModulusCandidates, poissonRatioCandidates);
 
     CapturedMaterialCalibrationResult result;
