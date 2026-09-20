@@ -57,6 +57,8 @@ struct RunEvidence {
     double maximumActualDt{};
     std::size_t totalSubsteps{};
     std::size_t particles{};
+    std::size_t minimumPrescribedParticles{std::numeric_limits<std::size_t>::max()};
+    std::size_t maximumPrescribedParticles{};
     std::array<std::size_t,3> gridDims{};
     double gridCellSize{};
 };
@@ -390,6 +392,8 @@ int main(int argc,char**argv) {
             const double alpha=static_cast<double>(s)/static_cast<double>(substeps);
             const Vec3 d=driver[f].d+(driver[f+1].d-driver[f].d)*alpha;
             const auto targets=targetsFor(particles,geom,d,v,boundaryLayers,nLong,boundaryThicknessM);
+            evidence.minimumPrescribedParticles=std::min(evidence.minimumPrescribedParticles,targets.size());
+            evidence.maximumPrescribedParticles=std::max(evidence.maximumPrescribedParticles,targets.size());
             const auto ev=vulkax::research::stepMpmWithPrescribedParticles(
                 particles,grid,material,dt,targets,gravity,transfer,0.0);
             evidence.minimumJ=std::min(evidence.minimumJ,ev.unconstrainedStep.minimumDeformationDeterminant);
@@ -425,6 +429,8 @@ int main(int argc,char**argv) {
            <<"  \"boundary_layers\": "<<boundaryLayers<<",\n"
            <<"  \"boundary_mode\": \""<<(boundaryThicknessM>=0.0?"metric_thickness":"particle_layers")<<"\",\n"
            <<"  \"boundary_thickness_m\": "<<boundaryThicknessM<<",\n"
+           <<"  \"minimum_prescribed_particles\": "<<evidence.minimumPrescribedParticles<<",\n"
+           <<"  \"maximum_prescribed_particles\": "<<evidence.maximumPrescribedParticles<<",\n"
            <<"  \"particles\": "<<evidence.particles<<",\n"
            <<"  \"grid\": ["<<evidence.gridDims[0]<<','<<evidence.gridDims[1]<<','<<evidence.gridDims[2]<<"],\n"
            <<"  \"grid_cell_m\": "<<evidence.gridCellSize<<",\n"
