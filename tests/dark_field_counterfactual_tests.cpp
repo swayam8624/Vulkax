@@ -251,5 +251,21 @@ int main() {
         assert(sep>0.0);
     }
 
+    {
+        UncertaintyBudget u0; u0.measurementVariance=0.01;
+        UncertaintyBudget u1; u1.measurementVariance=0.04;
+        const auto spatial=localizeSpatialWitnessResidual(
+            {0.0,0.0,0.0,0.0},
+            {0.2,0.0,0.0,0.4},
+            {0,0,1,1},
+            {u0,u1},
+            1.0);
+        assert(spatial.regions.size()==2);
+        assert(spatial.resolvedRegionCount==1);
+        assert(spatial.regions[0].resolved);
+        assert(!spatial.regions[1].resolved);
+        assert(spatial.maximumStandardizedError>1.0);
+    }
+
     return 0;
 }
