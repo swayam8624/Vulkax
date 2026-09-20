@@ -134,3 +134,10 @@ GAUGE foam tasks require an internal fixed fixture plus a prescribed moving fixt
 Added `stepMpmWithPrescribedParticles` as a research wrapper rather than changing the 1.0 MPM implementation. It executes the ordinary solver first, then projects explicit particle IDs to supplied positions/velocities while reporting constraint impulse, kinetic work, position/velocity correction and momentum-accounting error. Positional projection work is explicitly not mislabeled as complete actuator work.
 
 This is enabling infrastructure only. A driven-slab synthetic benchmark must validate the approximation before GAUGE solver matching.
+
+
+## 2026-09-20 — First measured GAUGE batch succeeded
+
+Run `35511040346`: 60 measured foam trials downloaded ephemerally, adapter exercised, derived evidence uploaded. Initial generic deformation proxy is high-SNR and highly repeatable. However, material labels are multivariate and stretch/compression driver amplitudes differ, so no causal E claim is permitted.
+
+Updated the analysis to GAUGE's own volumetric-deformable generalized trajectory: triangular marker-face areas. Exact duplicated face entries in public metadata are deduplicated before weighting.
