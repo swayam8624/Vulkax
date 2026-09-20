@@ -124,6 +124,15 @@ jobs:
             build/refusal-cause-v4
           cat build/refusal-cause-v4/cause_validation4.json
 
+      - name: Build end-to-end refine-refit Validation-5
+        run: cmake --build build --target vulkax_refusal_validation5_probe --parallel 2
+
+      - name: Run fresh Validation-5 with inverse refitting at refined timesteps
+        run: |
+          build/vulkax_refusal_validation5_probe build/refusal-validation5
+          python3 research/probes/validate_refusal_policy_v5.py build/refusal-validation5
+          cat build/refusal-validation5/analysis.json
+
       - name: Diagnose refusal cause and remediation under domain shift
         run: |
           python3 research/probes/diagnose_refusal_causes.py \
@@ -166,6 +175,7 @@ jobs:
             build/refusal-validation2
             build/refusal-validation3
             build/refusal-validation4
+            build/refusal-validation5
             build/refusal-cause-v4
             build/refusal-policy-v3
             build/policy-shift
