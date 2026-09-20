@@ -15,6 +15,7 @@ on:
       - "research/analysis/gauge_shearing_timestep_forensics.py"
       - "research/analysis/gauge_shearing_structural_forensics.py"
       - "research/analysis/gauge_shearing_constitutive_matrix.py"
+      - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/probes/gauge_shearing_forward_probe.cpp"
       - "CMakeLists.txt"
       - "research/scripts/fetch_gauge_foam_subset.py"
@@ -45,6 +46,11 @@ jobs:
         run: |
           python3 research/analysis/gauge_shearing_contract.py --root build/gauge-download --out build/gauge-shearing-contract
           cat build/gauge-shearing-contract/contract.json
+      - name: Measure whether terminal foam motion supports a hard clamp model
+        run: |
+          python3 research/analysis/gauge_shearing_boundary_attachment.py --root build/gauge-download --out build/gauge-boundary-attachment
+          cat build/gauge-boundary-attachment/summary.json
+
       - name: Run zero-parameter affine-shear null baseline
         run: |
           python3 research/analysis/gauge_shearing_affine_baseline.py --root build/gauge-download --out build/gauge-affine-null
@@ -95,6 +101,7 @@ jobs:
             build/gauge-real
             build/gauge-adapted
             build/gauge-shearing-contract
+            build/gauge-boundary-attachment
             build/gauge-affine-null
             build/gauge-nonaffine
             build/gauge-forward
