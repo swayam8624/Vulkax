@@ -568,6 +568,44 @@ double standardizedDarkFieldDiscrepancy(
     return rms / std::sqrt(variance);
 }
 
+UncertaintyBudget propagateStencilUncertainty(
+    const AnnihilatingStencil& stencil,
+    const UncertaintyBudget& perInterventionUncertainty) {
+    if (stencil.weights.empty() || stencil.weights.size() != stencil.points.size())
+        throw std::invalid_argument("DCS uncertainty propagation requires a valid non-empty stencil");
+    for (const double value : {
+             perInterventionUncertainty.measurementVariance,
+             perInterventionUncertainty.numericalVariance,
+             perInterventionUncertainty.repeatVariance}) {
+        if (!std::isfinite(value) || value < 0.0)
+            throw std::invalid_argument("DCS per-intervention uncertainty must be finite and non-negative");
+    }
+
+    long double l2Squared = 0.0L;
+    long double l1 = 0.0L;
+    for (const double weight : stencil.weights) {
+        if (!std::isfinite(weight))
+            throw std::invalid_argument("DCS stencil weight must be finite");
+        l2Squared += static_cast<long double>(weight) * weight;
+        l1 += std::abs(weight);
+    }
+
+    UncertaintyBudget result;
+    const double independentGainSquared = static_cast<double>(l2Squared);
+    const double conservativeGainSquared =
+        static_cast<double>(l1 * l1);
+    result.measurementVariance =
+        perInterventionUncertainty.measurementVariance * independentGainSquared;
+    result.repeatVariance =
+        perInterventionUncertainty.repeatVariance * independentGainSquared;
+    // Numerical error is generally structured/correlated across intervention
+    // points. Use a conservative triangle-inequality bound rather than assuming
+    // cancellation or independence.
+    result.numericalVariance =
+        perInterventionUncertainty.numericalVariance * conservativeGainSquared;
+    return result;
+}
+
 double worstCaseStandardizedSeparation(
     const std::vector<Response>& modelWitnesses,
     const UncertaintyBudget& uncertainty) {
@@ -705,8 +743,10 @@ SynthesizedStencil synthesizeMaximinAnnihilatingStencil(
         witnesses.reserve(modelResponses.size());
         for (const auto& model : modelResponses)
             witnesses.push_back(applyAnnihilatingStencil(model, candidate.stencil, momentTolerance));
+        const auto witnessUncertainty =
+            propagateStencilUncertainty(candidate.stencil, uncertainty);
         candidate.worstCaseStandardizedSeparation =
-            worstCaseStandardizedSeparation(witnesses, uncertainty);
+            worstCaseStandardizedSeparation(witnesses, witnessUncertainty);
 
         const auto disagreementApplied =
             applyModelDisagreement(candidate.stencil.weights, modelResponses);
@@ -723,8 +763,10 @@ SynthesizedStencil synthesizeMaximinAnnihilatingStencil(
         witnesses.reserve(modelResponses.size());
         for (const auto& model : modelResponses)
             witnesses.push_back(applyAnnihilatingStencil(model, best.stencil, momentTolerance));
+        const auto witnessUncertainty =
+            propagateStencilUncertainty(best.stencil, uncertainty);
         best.worstCaseStandardizedSeparation =
-            worstCaseStandardizedSeparation(witnesses, uncertainty);
+            worstCaseStandardizedSeparation(witnesses, witnessUncertainty);
     }
 
     for (std::size_t modelA = 0; modelA < modelResponses.size(); ++modelA) {
