@@ -171,7 +171,7 @@ int main(int argc,char**argv){
     const std::filesystem::path outDir=argc>1?argv[1]:"build/dcs-active-selection";
     std::filesystem::create_directories(outDir);
     std::ofstream cases(outDir/"cases.csv");
-    cases<<"truth_id,variant,fit_objective_m,dcs_error_m,raw_error_m,maxmotion_error_m,random_error_m,target_error_m,"
+    cases<<"truth_id,variant,fit_objective_m,dcs_error_m,raw_bundle_error_m,raw_error_m,maxmotion_error_m,random_error_m,target_error_m,"
            "dcs_maximin_separation,raw_point,maxmotion_point,random_point,provenance\n";
     std::ofstream stencils(outDir/"stencils.csv");
     stencils<<"truth_id,point_index,shear,axial,weight,provenance\n";
@@ -227,18 +227,19 @@ int main(int argc,char**argv){
             const auto candidateDcs=vulkax::research::dcs::applyAnnihilatingStencil(
                 candidate.probeResponses,dcs.stencil,1.0e-9);
             const double dcsError=rms(candidateDcs,truthDcs);
+            const double rawBundleError=datasetRms(candidate.probeResponses,truthProbe);
             const double rawError=rms(candidate.probeResponses[rawPoint],truthProbe[rawPoint]);
             const double maxMotionError=rms(candidate.probeResponses[maxMotionPoint],truthProbe[maxMotionPoint]);
             const double randomError=rms(candidate.probeResponses[randomPoint],truthProbe[randomPoint]);
             const double targetError=rms(candidate.targetResponse,truthTarget);
             cases<<truthId<<','<<candidate.variant.name<<','<<std::setprecision(17)
-                 <<candidate.fit.objective<<','<<dcsError<<','<<rawError<<','<<maxMotionError<<','<<randomError<<','
+                 <<candidate.fit.objective<<','<<dcsError<<','<<rawBundleError<<','<<rawError<<','<<maxMotionError<<','<<randomError<<','
                  <<targetError<<','<<dcs.worstCaseStandardizedSeparation<<','
                  <<rawPoint<<','<<maxMotionPoint<<','<<randomPoint
                  <<",synthetic-dcs-active-discovery\n";
             ++rows;
             std::cout<<"DCS_ACTIVE truth="<<truthId<<" variant="<<candidate.variant.name
-                     <<" dcs="<<dcsError<<" raw="<<rawError<<" maxmotion="<<maxMotionError
+                     <<" dcs="<<dcsError<<" raw_bundle="<<rawBundleError<<" raw="<<rawError<<" maxmotion="<<maxMotionError
                      <<" random="<<randomError<<" target="<<targetError<<"\n";
         }
     }
