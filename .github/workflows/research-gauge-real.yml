@@ -8,6 +8,7 @@ on:
       - "research/analysis/gauge_foam_descriptive.py"
       - "research/analysis/gauge_shearing_contract.py"
       - "research/analysis/gauge_shearing_affine_baseline.py"
+      - "research/analysis/gauge_shearing_nonaffine.py"
       - "research/scripts/fetch_gauge_foam_subset.py"
       - ".github/workflows/research-gauge-real.yml"
   workflow_dispatch:
@@ -40,6 +41,10 @@ jobs:
         run: |
           python3 research/analysis/gauge_shearing_affine_baseline.py --root build/gauge-download --out build/gauge-affine-null
           cat build/gauge-affine-null/summary.json
+      - name: Quantify non-affine residual across all shearing repeats
+        run: |
+          python3 research/analysis/gauge_shearing_nonaffine.py --root build/gauge-download --out build/gauge-nonaffine
+          cat build/gauge-nonaffine/summary.json
       - name: Upload derived measured-data evidence only
         uses: actions/upload-artifact@v4
         with:
@@ -49,5 +54,6 @@ jobs:
             build/gauge-adapted
             build/gauge-shearing-contract
             build/gauge-affine-null
+            build/gauge-nonaffine
           if-no-files-found: error
           retention-days: 30
