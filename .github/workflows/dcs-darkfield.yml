@@ -20,6 +20,21 @@ on:
       - ".github/workflows/dcs-darkfield.yml"
   pull_request:
     branches: ["research/integration-20260920"]
+    paths:
+      - "include/vulkax/research/dark_field_counterfactual.hpp"
+      - "src/research/dark_field_counterfactual.cpp"
+      - "tests/dark_field_counterfactual_tests.cpp"
+      - "research/probes/dcs_darkfield_synthetic_probe.cpp"
+      - "research/probes/analyze_dcs_darkfield.py"
+      - "research/probes/dcs_solver_native_probe.cpp"
+      - "research/probes/analyze_dcs_solver_native.py"
+      - "research/probes/dcs_active_selection_probe.cpp"
+      - "research/probes/analyze_dcs_active_selection.py"
+      - "research/probes/dcs_d2_validation_probe.cpp"
+      - "research/probes/analyze_dcs_d2_validation.py"
+      - "research/benchmarks/DCS_D2_VALIDATION_PROTOCOL.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/dcs-darkfield.yml"
   workflow_dispatch:
 
 concurrency:
