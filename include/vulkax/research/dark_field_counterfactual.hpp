@@ -79,6 +79,20 @@ struct SynthesizedStencil {
     bool converged{};
 };
 
+struct SpatialWitnessResidual {
+    std::size_t region{};
+    double rmsError{};
+    double standardizedError{};
+    bool resolved{};
+};
+
+struct SpatialWitnessMap {
+    std::vector<SpatialWitnessResidual> regions;
+    double globalRmsError{};
+    double maximumStandardizedError{};
+    std::size_t resolvedRegionCount{};
+};
+
 [[nodiscard]] double responseNorm(const Response& response);
 [[nodiscard]] double responseDistance(const Response& lhs, const Response& rhs);
 
@@ -238,5 +252,16 @@ struct SynthesizedStencil {
     const std::vector<std::vector<Response>>& modelResponses,
     double momentTolerance = 1.0e-9,
     std::size_t maximumIterations = 256);
+
+// Localize a measured-vs-predicted dark-field residual over arbitrary spatial
+// regions (particles, Gaussian groups, surface patches, etc.). componentRegion
+// assigns each scalar response component to a region index. Uncertainty is
+// supplied per region and standardized independently.
+[[nodiscard]] SpatialWitnessMap localizeSpatialWitnessResidual(
+    const Response& measuredWitness,
+    const Response& predictedWitness,
+    const std::vector<std::size_t>& componentRegion,
+    const std::vector<UncertaintyBudget>& regionUncertainty,
+    double resolutionThreshold = 2.0);
 
 } // namespace vulkax::research::dcs
