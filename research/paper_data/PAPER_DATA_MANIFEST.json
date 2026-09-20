@@ -1,0 +1,59 @@
+{
+  "schema": "vulkax.paper_data_map",
+  "version": 1,
+  "as_of": "2026-09-20",
+  "manuscript_prose_included": false,
+  "canonical_results": {
+    "summary": "research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md",
+    "table": "research/results/DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv",
+    "json": "research/results/DCS_FINAL_RESULTS_2026-09-20.json"
+  },
+  "generated_by": "bash run_everything.sh",
+  "generated_roots": {
+    "evidence": "build/paper-evidence",
+    "figures": "build/paper-figures"
+  },
+  "figures": [
+    {
+      "id": "ranking_agreement",
+      "source": "research/results/DCS_FINAL_RESULTS_2026-09-20.json",
+      "status": "discovery"
+    },
+    {
+      "id": "standardized_separation",
+      "source": "research/results/DCS_FINAL_RESULTS_2026-09-20.json",
+      "status": "frozen/discovery"
+    },
+    {
+      "id": "numerical_floor",
+      "source": "research/results/DCS_FINAL_RESULTS_2026-09-20.json",
+      "status": "discovery"
+    },
+    {
+      "id": "d4v_proposals",
+      "source": "research/results/DCS_FINAL_RESULTS_2026-09-20.json",
+      "status": "discovery"
+    },
+    {
+      "id": "gauge_channel_contradiction",
+      "source": "research/results/DCS_FINAL_RESULTS_2026-09-20.json",
+      "status": "retrospective_only"
+    }
+  ],
+  "fresh_run_artifacts": [
+    "build/dcs-positive-control/analysis.json",
+    "build/dcs-solver-native/analysis.json",
+    "build/dcs-active-selection/analysis.json",
+    "build/dcs-d2-validation/analysis.json",
+    "build/dcs-d3-discovery/analysis.json",
+    "build/dcs-d4v-discovery/analysis.json",
+    "build/gauge-effective-span/validation.json",
+    "build/gauge-dcs-retrospective/summary.json",
+    "build/gauge-dcs-retrospective/per_trial.csv",
+    "build/paper-captured-world-run/certificate.json",
+    "build/paper-performance/captured_world_performance_summary.json"
+  ],
+  "scientific_disposition": "implementation_complete_no_positive_flagship_claim",
+  "d5_fresh_measured_confirmation": "not_executed",
+  "warning": "Paper data are complete for the executed DCS research sequence, but no fresh positive D5 confirmation may be inferred."
+}
