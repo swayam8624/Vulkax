@@ -142,7 +142,19 @@ jobs:
             build/refusal-validation2/cases.csv \
             build/refusal-validation3/cases.csv \
             build/refusal-cause-abstain
+            build/observation-support-mismatch
           cat build/refusal-cause-abstain/refusal_cause_abstention.json
+
+
+      - name: Build synthetic observation-support mismatch probe
+        run: cmake --build build --target vulkax_observation_support_mismatch_probe --parallel 2
+
+      - name: Run observation-support mismatch positive control
+        run: |
+          build/vulkax_observation_support_mismatch_probe build/observation-support-mismatch
+          python3 research/probes/validate_observation_support_mismatch.py build/observation-support-mismatch
+          cat build/observation-support-mismatch/cases.csv
+          cat build/observation-support-mismatch/validation.json
 
       - name: Test GAUGE deformable adapter contract
         run: python3 research/adapters/test_gauge_adapter.py
