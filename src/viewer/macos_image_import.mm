@@ -64,10 +64,9 @@ ViewerScene loadMacImageAsSplatCard(const std::filesystem::path& imagePath,
         if (!context)
             throw std::runtime_error("failed to create CoreGraphics RGBA normalization context");
 
-        // Normalize all decoders to top-to-bottom RGBA rows. makeImageSplatCard
-        // maps row zero to +Y, so this keeps PNG/JPEG/WebP orientation identical.
-        CGContextTranslateCTM(context, 0.0, static_cast<CGFloat>(pixelHeight));
-        CGContextScaleCTM(context, 1.0, -1.0);
+        // CGBitmapContext row zero receives the first decoded CGImage scanline.
+        // Do not apply an AppKit-style coordinate flip here: the buffer itself,
+        // not an on-screen view, is the contract consumed by makeImageSplatCard.
         CGContextSetBlendMode(context, kCGBlendModeCopy);
         CGContextDrawImage(context,
                            CGRectMake(0.0, 0.0,
