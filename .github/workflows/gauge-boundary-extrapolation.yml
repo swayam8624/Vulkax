@@ -1,0 +1,29 @@
+name: Vulkax GAUGE boundary extrapolation
+
+on:
+  push:
+    branches: ["research/gauge-boundary-extrapolation"]
+    paths:
+      - "research/analysis/gauge_boundary_end_extrapolation.py"
+      - "research/scripts/fetch_gauge_foam_subset.py"
+      - ".github/workflows/gauge-boundary-extrapolation.yml"
+  workflow_dispatch:
+
+jobs:
+  measured-boundary-extrapolation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch released GAUGE foam evidence
+        run: python3 research/scripts/fetch_gauge_foam_subset.py build/gauge-download
+      - name: Extrapolate measured marker motion to physical foam ends
+        run: |
+          python3 research/analysis/gauge_boundary_end_extrapolation.py --root build/gauge-download --out build/gauge-boundary-extrapolation
+          cat build/gauge-boundary-extrapolation/summary.json
+      - name: Upload measured diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-gauge-boundary-extrapolation-${{ github.sha }}
+          path: build/gauge-boundary-extrapolation
+          if-no-files-found: error
+          retention-days: 30
