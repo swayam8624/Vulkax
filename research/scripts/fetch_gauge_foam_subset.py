@@ -3,6 +3,7 @@ import json,pathlib,sys,time,urllib.parse,urllib.request
 root=pathlib.Path(sys.argv[1] if len(sys.argv)>1 else "build/gauge-download")
 (root/"metadata").mkdir(parents=True,exist_ok=True)
 base="https://huggingface.co/datasets/InternRobotics/GAUGE-Dataset/raw/main"
+asset_base="https://huggingface.co/datasets/InternRobotics/GAUGE-Dataset/resolve/main"
 tasks=(("foam stretching","foam stretching"),("foam compression","foam compressing"),("foam shearing","foam shearing"))
 materials=("soft","hard")
 def get(url,path):
@@ -18,6 +19,8 @@ def get(url,path):
             last=e
             time.sleep(1+attempt)
     raise RuntimeError(f"download failed {url}: {last}")
+get(f"{asset_base}/assets/obj/foam.obj",root/"assets"/"foam.obj")
+if (root/"assets"/"foam.obj").read_bytes()[:40].startswith(b"version https://git-lfs"):\n    raise RuntimeError("GAUGE foam.obj download resolved to an LFS pointer")
 for data_task,metadata_task in tasks:
     data_enc=urllib.parse.quote(data_task,safe="")
     meta_enc=urllib.parse.quote(metadata_task,safe="")
