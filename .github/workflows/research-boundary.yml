@@ -1,0 +1,30 @@
+name: Vulkax prescribed-boundary research
+
+on:
+  push:
+    branches: ["research/**"]
+    paths:
+      - "include/vulkax/research/prescribed_mpm.hpp"
+      - "src/research/prescribed_mpm.cpp"
+      - "tests/prescribed_mpm_tests.cpp"
+      - "research/probes/driven_slab_probe.cpp"
+      - "research/probes/analyze_driven_slab.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/research-boundary.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-boundary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prescribed-boundary:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build regression
+        run: cmake --build build --target vulkax_prescribed_mpm_tests --parallel 2
+      - name: Run regression
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_prescribed_mpm$'

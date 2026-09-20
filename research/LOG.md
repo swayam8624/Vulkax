@@ -141,3 +141,10 @@ This is enabling infrastructure only. A driven-slab synthetic benchmark must val
 Run `35511040346`: 60 measured foam trials downloaded ephemerally, adapter exercised, derived evidence uploaded. Initial generic deformation proxy is high-SNR and highly repeatable. However, material labels are multivariate and stretch/compression driver amplitudes differ, so no causal E claim is permitted.
 
 Updated the analysis to GAUGE's own volumetric-deformable generalized trajectory: triangular marker-face areas. Exact duplicated face entries in public metadata are deduplicated before weighting.
+
+
+## 2026-09-20 — GAUGE native face-area signal + boundary CI repair
+
+Run `35511228092` successfully processed 60 measured GAUGE foam trials with the benchmark-native triangle-area observable. Shearing is selected as the first sim-to-real target because driver travel is nearly matched between soft and hard variants.
+
+The prescribed-boundary executable compiled in discovery run `35511228081`, but a malformed workflow quote prevented ctest from executing. No boundary test failed. Repaired the full discovery workflow and added a dedicated fast `research-boundary.yml` path-gated workflow.
