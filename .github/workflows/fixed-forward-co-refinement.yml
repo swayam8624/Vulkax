@@ -1,0 +1,43 @@
+name: Vulkax fixed-forward particle-grid co-refinement
+
+on:
+  push:
+    branches: ["research/fixed-forward-co-refinement"]
+    paths:
+      - "research/probes/fixed_forward_co_refinement_probe.cpp"
+      - "research/probes/analyze_fixed_forward_co_refinement.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/fixed-forward-co-refinement.yml"
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  particle-grid-corefinement:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate analysis harness
+        run: python3 -m py_compile research/probes/analyze_fixed_forward_co_refinement.py
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+
+      - name: Build co-refinement diagnostic
+        run: cmake --build build --target vulkax_fixed_forward_co_refinement_probe --parallel 2
+
+      - name: Run label-free particle-grid co-refinement
+        run: |
+          build/vulkax_fixed_forward_co_refinement_probe build/fixed-forward-co-refinement
+          python3 research/probes/analyze_fixed_forward_co_refinement.py build/fixed-forward-co-refinement
+          cat build/fixed-forward-co-refinement/analysis.json
+
+      - name: Upload co-refinement evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-fixed-forward-co-refinement-${{ github.sha }}
+          path: build/fixed-forward-co-refinement
+          if-no-files-found: error
+          retention-days: 30
