@@ -319,16 +319,7 @@ python3 research/analysis/generate_paper_assets.py \
   --results research/results/DCS_FINAL_RESULTS_2026-09-20.json \
   --out "$BUILD_DIR/paper-figures"
 
-stage "Assemble paper evidence bundle"
-ARGS=(
-  --repo-root .
-  --build-root "$BUILD_DIR"
-  --out "$PAPER_DIR"
-)
-if [[ "$SKIP_GAUGE" == "1" ]]; then ARGS+=(--allow-missing-gauge); fi
-python3 research/analysis/assemble_paper_evidence.py "${ARGS[@]}"
-
-stage "Final evidence integrity checks"
+stage "Generate flat DCS evidence index"
 EVIDENCE_INPUTS=(
   "$BUILD_DIR/dcs-positive-control/analysis.json"
   "$BUILD_DIR/dcs-solver-native/analysis.json"
@@ -341,9 +332,19 @@ if [[ "$SKIP_GAUGE" == "0" ]]; then
   EVIDENCE_INPUTS+=("$BUILD_DIR/gauge-dcs-retrospective/summary.json")
 fi
 python3 research/analysis/export_dcs_evidence_pack.py \
-  "$PAPER_DIR/generated/dcs-evidence-index.csv" \
+  "$BUILD_DIR/paper-dcs-evidence-index.csv" \
   "${EVIDENCE_INPUTS[@]}"
 
+stage "Assemble paper evidence bundle"
+ARGS=(
+  --repo-root .
+  --build-root "$BUILD_DIR"
+  --out "$PAPER_DIR"
+)
+if [[ "$SKIP_GAUGE" == "1" ]]; then ARGS+=(--allow-missing-gauge); fi
+python3 research/analysis/assemble_paper_evidence.py "${ARGS[@]}"
+
+stage "Final evidence integrity checks"
 python3 - <<PY
 import json, pathlib
 p=pathlib.Path("$PAPER_DIR/manifest.json")
