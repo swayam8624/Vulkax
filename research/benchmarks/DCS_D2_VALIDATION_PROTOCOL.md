@@ -75,7 +75,19 @@ For each fitted candidate model:
    parameters and transfer family;
 3. compute pointwise per-observable RMS disagreement;
 4. use the maximum squared disagreement across candidates/probe points as the
-   numerical-variance term supplied to every selector for that truth world.
+   per-intervention numerical-variance term for that truth world.
+
+For a signed DCS stencil with weights w_i, uncertainty is propagated **before**
+standardized separation is evaluated:
+
+- independent measurement variance: sigma_meas^2 * sum_i w_i^2;
+- independent repeat variance: sigma_repeat^2 * sum_i w_i^2;
+- numerical variance: sigma_num^2 * (sum_i |w_i|)^2.
+
+The numerical term intentionally uses the conservative triangle-inequality bound
+because discretization errors can be correlated across intervention points.
+
+This amendment was frozen before any D2-validation labels/results were generated.
 
 This deliberately favors caution. It uses no truth/target labels.
 
