@@ -128,6 +128,23 @@ int main() {
         assert(resolution.anyObservableOrder);
         assert(resolution.maximumObservableOrder==2);
         assert(resolution.standardizedSignalByOrder.size()==3);
+
+        const auto jet=estimateJetOrderOfContact(
+            {
+                {{0.0},{0.0}},
+                {{0.0},{0.0}},
+                {{0.0},{0.0}},
+            },
+            {
+                {{0.02},{0.01}},
+                {{0.03},{0.04}},
+                {{1.0},{0.02}},
+            },
+            {budget,budget,budget},
+            2.0);
+        assert(jet.separated);
+        assert(jet.separatingOrder==3);
+        assert(jet.witnessCountByOrder[2]==2);
     }
 
     return 0;
