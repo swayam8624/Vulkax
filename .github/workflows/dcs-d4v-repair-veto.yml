@@ -1,0 +1,46 @@
+name: Vulkax DCS D4V repair veto discovery
+
+on:
+  push:
+    branches: ["research/dcs-darkfield"]
+    paths:
+      - "include/vulkax/research/dark_field_counterfactual.hpp"
+      - "src/research/dark_field_counterfactual.cpp"
+      - "tests/dark_field_counterfactual_tests.cpp"
+      - "research/probes/dcs_d4v_repair_veto_probe.cpp"
+      - "research/probes/analyze_dcs_d4v_repair_veto.py"
+      - "research/benchmarks/DCS_D4V_REPAIR_VETO_DISCOVERY_PROTOCOL.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/dcs-d4v-repair-veto.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-dcs-d4v-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  d4v:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate analysis
+        run: python3 -m py_compile research/probes/analyze_dcs_d4v_repair_veto.py
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --target vulkax_dark_field_counterfactual_tests vulkax_dcs_d4v_repair_veto_probe --parallel 2
+      - name: Run math regression
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_dark_field_counterfactual$'
+      - name: Run D4V discovery
+        run: |
+          build/vulkax_dcs_d4v_repair_veto_probe build/dcs-d4v-discovery
+          python3 research/probes/analyze_dcs_d4v_repair_veto.py build/dcs-d4v-discovery
+          cat build/dcs-d4v-discovery/analysis.json
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-dcs-d4v-${{ github.sha }}
+          path: build/dcs-d4v-discovery
+          if-no-files-found: error
+          retention-days: 30

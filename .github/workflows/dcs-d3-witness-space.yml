@@ -1,0 +1,46 @@
+name: Vulkax DCS D3 witness-space discovery
+
+on:
+  push:
+    branches: ["research/dcs-darkfield"]
+    paths:
+      - "include/vulkax/research/dark_field_counterfactual.hpp"
+      - "src/research/dark_field_counterfactual.cpp"
+      - "tests/dark_field_counterfactual_tests.cpp"
+      - "research/probes/dcs_d3_witness_space_probe.cpp"
+      - "research/probes/analyze_dcs_d3_witness_space.py"
+      - "research/benchmarks/DCS_D3_DISCOVERY_PROTOCOL.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/dcs-d3-witness-space.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-dcs-d3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  d3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate scripts
+        run: python3 -m py_compile research/probes/analyze_dcs_d3_witness_space.py
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --target vulkax_dark_field_counterfactual_tests vulkax_dcs_d3_witness_space_probe --parallel 2
+      - name: Run DCS math regression
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_dark_field_counterfactual$'
+      - name: Run D3 discovery
+        run: |
+          build/vulkax_dcs_d3_witness_space_probe build/dcs-d3-discovery
+          python3 research/probes/analyze_dcs_d3_witness_space.py build/dcs-d3-discovery
+          cat build/dcs-d3-discovery/analysis.json
+      - name: Upload D3 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-dcs-d3-${{ github.sha }}
+          path: build/dcs-d3-discovery
+          if-no-files-found: error
+          retention-days: 30

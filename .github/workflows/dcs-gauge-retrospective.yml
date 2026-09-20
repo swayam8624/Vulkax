@@ -1,0 +1,63 @@
+name: Vulkax DCS GAUGE retrospective
+
+on:
+  push:
+    branches: ["research/dcs-darkfield"]
+    paths:
+      - "research/analysis/gauge_dcs_retrospective.py"
+      - "research/analysis/gauge_fixture_overlap_heldout.py"
+      - "research/analysis/gauge_shearing_effective_span.py"
+      - "research/analysis/validate_gauge_effective_span.py"
+      - "research/scripts/fetch_gauge_foam_subset.py"
+      - "research/probes/gauge_shearing_forward_probe.cpp"
+      - "CMakeLists.txt"
+      - ".github/workflows/dcs-gauge-retrospective.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-dcs-gauge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gauge-dcs-retrospective:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate GAUGE DCS scripts
+        run: |
+          python3 -m py_compile research/analysis/gauge_dcs_retrospective.py
+          python3 -m py_compile research/analysis/gauge_fixture_overlap_heldout.py
+          python3 -m py_compile research/analysis/gauge_shearing_effective_span.py
+          python3 -m py_compile research/analysis/validate_gauge_effective_span.py
+
+      - name: Fetch public GAUGE foam subset
+        run: python3 research/scripts/fetch_gauge_foam_subset.py build/gauge-download
+
+      - name: Infer measured-only effective span
+        run: |
+          python3 research/analysis/gauge_shearing_effective_span.py             --root build/gauge-download             --out build/gauge-effective-span
+          python3 research/analysis/validate_gauge_effective_span.py build/gauge-effective-span
+          cat build/gauge-effective-span/validation.json
+
+      - name: Configure GAUGE forward probe
+        run: cmake -S . -B build-forward -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+
+      - name: Build GAUGE forward probe
+        run: cmake --build build-forward --target vulkax_gauge_shearing_forward_probe --parallel 2
+
+      - name: Run retrospective DCS analysis
+        run: |
+          python3 research/analysis/gauge_dcs_retrospective.py             --root build/gauge-download             --exe build-forward/vulkax_gauge_shearing_forward_probe             --effective-span-dir build/gauge-effective-span             --out build/gauge-dcs-retrospective
+          cat build/gauge-dcs-retrospective/summary.json
+
+      - name: Upload retrospective evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-dcs-gauge-retrospective-${{ github.sha }}
+          path: |
+            build/gauge-effective-span
+            build/gauge-dcs-retrospective
+          if-no-files-found: error
+          retention-days: 30

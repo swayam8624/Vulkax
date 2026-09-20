@@ -1,0 +1,43 @@
+# Evidence execution trigger after PR queue cleanup
+name: Vulkax DCS D2 frozen validation
+
+on:
+  workflow_dispatch:
+
+# Frozen D2 partition: do not auto-rerun this validation after method changes.
+concurrency:
+  group: vulkax-dcs-d2-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  d2-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate frozen analysis
+        run: python3 -m py_compile research/probes/analyze_dcs_d2_validation.py
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+
+      - name: Build DCS correctness and D2 validation targets
+        run: cmake --build build --target vulkax_dark_field_counterfactual_tests vulkax_dcs_d2_validation_probe --parallel 2
+
+      - name: Run DCS mathematical regression
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_dark_field_counterfactual$'
+
+      - name: Run frozen D2 validation
+        run: |
+          build/vulkax_dcs_d2_validation_probe build/dcs-d2-validation
+          python3 research/probes/analyze_dcs_d2_validation.py build/dcs-d2-validation
+          cat build/dcs-d2-validation/analysis.json
+
+      - name: Upload D2 validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-dcs-d2-validation-${{ github.sha }}
+          path: build/dcs-d2-validation
+          if-no-files-found: error
+          retention-days: 90

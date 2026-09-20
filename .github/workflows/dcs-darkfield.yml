@@ -1,0 +1,82 @@
+# Evidence execution trigger after PR queue cleanup
+name: Vulkax DCS dark-field research
+
+on:
+  push:
+    branches: ["research/dcs-darkfield"]
+    paths:
+      - "include/vulkax/research/dark_field_counterfactual.hpp"
+      - "src/research/dark_field_counterfactual.cpp"
+      - "tests/dark_field_counterfactual_tests.cpp"
+      - "research/probes/dcs_darkfield_synthetic_probe.cpp"
+      - "research/probes/analyze_dcs_darkfield.py"
+      - "research/probes/dcs_solver_native_probe.cpp"
+      - "research/probes/analyze_dcs_solver_native.py"
+      - "research/probes/dcs_active_selection_probe.cpp"
+      - "research/probes/analyze_dcs_active_selection.py"
+      - "research/probes/dcs_d2_validation_probe.cpp"
+      - "research/probes/analyze_dcs_d2_validation.py"
+      - "research/benchmarks/DCS_D2_VALIDATION_PROTOCOL.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/dcs-darkfield.yml"
+  pull_request:
+    branches: ["research/integration-20260920"]
+    paths:
+      - "include/vulkax/research/dark_field_counterfactual.hpp"
+      - "src/research/dark_field_counterfactual.cpp"
+      - "tests/dark_field_counterfactual_tests.cpp"
+      - "research/probes/dcs_darkfield_synthetic_probe.cpp"
+      - "research/probes/analyze_dcs_darkfield.py"
+      - "research/probes/dcs_solver_native_probe.cpp"
+      - "research/probes/analyze_dcs_solver_native.py"
+      - "research/probes/dcs_active_selection_probe.cpp"
+      - "research/probes/analyze_dcs_active_selection.py"
+      - "research/probes/dcs_d2_validation_probe.cpp"
+      - "research/probes/analyze_dcs_d2_validation.py"
+      - "research/benchmarks/DCS_D2_VALIDATION_PROTOCOL.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/dcs-darkfield.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-dcs-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  dcs-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate analysis scripts
+        run: |
+          python3 -m py_compile research/probes/analyze_dcs_darkfield.py
+          python3 -m py_compile research/probes/analyze_dcs_solver_native.py
+          python3 -m py_compile research/probes/analyze_dcs_active_selection.py
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build DCS targets
+        run: cmake --build build --target vulkax_dark_field_counterfactual_tests vulkax_dcs_darkfield_synthetic_probe vulkax_dcs_active_selection_probe --parallel 2
+      - name: Run DCS mathematical regression
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_dark_field_counterfactual$'
+      - name: Run deceptive-repair positive control
+        run: |
+          build/vulkax_dcs_darkfield_synthetic_probe build/dcs-darkfield-synthetic
+          python3 research/probes/analyze_dcs_darkfield.py build/dcs-darkfield-synthetic
+          cat build/dcs-darkfield-synthetic/analysis.json
+      - name: Run solver-native DCS active-selection discovery
+        run: |
+          build/vulkax_dcs_active_selection_probe build/dcs-active-selection
+          python3 research/probes/analyze_dcs_active_selection.py build/dcs-active-selection
+          cat build/dcs-active-selection/analysis.json
+
+
+      - name: Upload DCS evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-dcs-darkfield-${{ github.sha }}
+          path: |
+            build/dcs-darkfield-synthetic
+            build/dcs-active-selection
+          if-no-files-found: error
+          retention-days: 30
