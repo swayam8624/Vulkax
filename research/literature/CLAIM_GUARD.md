@@ -12,6 +12,7 @@ This file exists to prevent accidental novelty inflation.
 - local Jacobian/sensitivity/condition-number identifiability.
 - Fisher-information / Jacobian optimal experiment design.
 - counterfactual prediction from an inferred physical model.
+- changed-law counterfactual transfer from structured/factored physical models in the abstract (Wang et al., arXiv:2609.19674).
 - hierarchical validation of simulated digital-twin counterfactuals in the abstract (Laudy, *Digital Twin Counterfactual Framework*, arXiv:2604.01325).
 - explicit model discrepancy in inverse calibration.
 - model-form uncertainty embedded in digital-twin calibration in the abstract (Arcones et al., arXiv:2609.10171).
@@ -45,10 +46,11 @@ This file exists to prevent accidental novelty inflation.
 - same-domain synthetic closed-loop repair: promising;
 - Validation-1: risk reduction but unsafe accepted > target;
 - Validation-2: fixed absolute numerical threshold collapsed to zero coverage;
-- Validation-3: calibration-only four-gate convergence-aware policy missed its preregistered target (25% coverage, 12.5% unsafe accepted vs <=10% target) and accepted only coarse-APIC cases; heuristic certificate family is not promoted;
+- Validation-3 adaptive computational-evidence repair restored **59.375% coverage** but still accepted **15.789% unsafe** cases versus the <=10% preregistered target; PIC was rejected 16/16, while constrained-nu/fine-APIC still leaked unsafe cases. The policy is not promoted and Validation-3 labels are not used for retuning;
 - real GAUGE: current no-fit APIC + Neo-Hookean + proxy-geometry + prescribed-boundary instantiation loses to affine null on all 20 shearing repeats;
 - GAUGE timestep refinement: dominant real-data miss is not explained by dt at the current stable baseline.
 - GAUGE structural forensics: all signed gravity axes and a stable fine-resolution run completed. PIC is the only tested one-factor variant that improves both mean face-area NRMSE and mean marker RMSE versus the current Vulkax baseline, but it still loses badly to the zero-fit affine null; no structural variant unlocks inverse fitting.
+- GAUGE constitutive×transfer matrix: 3 transfer schemes × 3 constitutive laws all preserve the soft/hard separation sign, but **0/9** beat the affine null for both materials. Constitutive-law choice is nearly negligible at this operating point; transfer scheme changes the error more, but does not repair model adequacy. Inverse fitting remains locked.
 
 ## Publication claim rule
 
