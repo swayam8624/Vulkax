@@ -206,5 +206,49 @@ int main() {
         assert(std::abs(check-synthesized.worstCaseStandardizedSeparation)<1.0e-12);
     }
 
+    {
+        // Witness-space numerical uncertainty must be evaluated after the same
+        // annihilation. Here refinement adds only degree<3 numerical error, so
+        // an order-3 stencil cancels it while preserving a cubic mechanism split.
+        std::vector<InterventionPoint> points;
+        for (double x : {-1.0, 0.0, 1.0})
+            for (double y : {-1.0, 0.0, 1.0})
+                points.push_back({{x,y}});
+
+        std::vector<std::vector<Response>> nominal(2), refined(2);
+        for (std::size_t m=0;m<2;++m) {
+            const double cubic = m==0 ? 1.0 : -1.0;
+            for (const auto& p:points) {
+                const double x=p.coordinates[0], y=p.coordinates[1];
+                const double base =
+                    4.0 + 2.0*x - 3.0*y + 0.4*x*x + 0.2*x*y + 0.3*y*y;
+                const double mechanism = cubic*x*x*y;
+                const double lowOrderNumerical =
+                    0.7 + 0.1*x - 0.08*y + 0.05*x*x + 0.03*x*y;
+                nominal[m].push_back({base+mechanism});
+                refined[m].push_back({base+mechanism+lowOrderNumerical});
+            }
+        }
+        UncertaintyBudget shared;
+        shared.measurementVariance=1.0e-4;
+        shared.repeatVariance=1.0e-4;
+        shared.numericalVariance=0.0;
+
+        const auto stencil=synthesizeWitnessSpaceMaximinStencil(
+            points,3,nominal,refined,shared);
+        assert(stencil.momentValidation.valid);
+        assert(stencil.worstCaseStandardizedSeparation>0.0);
+
+        std::vector<Response> nw,rw;
+        for(std::size_t m=0;m<2;++m){
+            nw.push_back(applyAnnihilatingStencil(nominal[m],stencil.stencil));
+            rw.push_back(applyAnnihilatingStencil(refined[m],stencil.stencil));
+            assert(responseDistance(nw.back(),rw.back())<1.0e-10);
+        }
+        const double sep=worstCaseWitnessSpaceStandardizedSeparation(
+            nw,rw,shared,stencil.stencil);
+        assert(sep>0.0);
+    }
+
     return 0;
 }
