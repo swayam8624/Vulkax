@@ -174,7 +174,7 @@ Implemented API:
 ## 3. Implementation phases
 
 ### Phase D0 — mathematical core
-Status: IMPLEMENTED on research/dcs-darkfield.
+Status: **IMPLEMENTED and merged into research/integration-20260920**.
 
 - arbitrary-dimensional annihilation validation;
 - arbitrary declared order k;
@@ -369,35 +369,53 @@ Every flagship result must compare against:
   or renormalization individually;
 - negative results remain in the repository.
 
-## 7. Tonight's execution order
+## 7. Execution sequence — completed
 
-1. pass D0/D1 CI;
-2. implement solver-native D2 generator;
-3. implement second-order mixed/symmetric MPM stencils;
-4. benchmark raw-vs-dark-field SNR on fresh synthetic truths;
-5. add Fisher/max-output/random experiment selectors;
-6. run first active-selection ablation;
-7. implement GAUGE retrospective D4 analysis without fitting;
-8. freeze a fresh confirmatory D5 protocol;
-9. only then start paper prose.
+The original same-night implementation sequence is complete:
 
-## 8. Flagship claim shape if successful
+1. D0/D1 mathematical and constructed controls — **PASS**;
+2. solver-native D2 generator — **COMPLETE**;
+3. mixed/symmetric MPM stencils — **COMPLETE**;
+4. raw-vs-dark-field synthetic comparisons — **COMPLETE**;
+5. Fisher/raw/max-motion/random selectors — **COMPLETE**;
+6. active-selection ablations — **COMPLETE**;
+7. GAUGE retrospective D4 analysis without material fitting — **COMPLETE**;
+8. frozen D5 replay protocol/runner — **IMPLEMENTED**;
+9. D6 spatial localization/export — **IMPLEMENTED**.
 
-Allowed claim shape:
+Scientific execution then continued through fresh D2 validation, D3
+witness-space/adaptive-order discovery, and D4V pair-specific repair veto.
+
+## 8. Claim status after execution
+
+Historical hypothetical claim shape, retained for provenance:
 
 > DCS detects and actively falsifies physically deceptive repairs in captured
 > executable worlds by constructing signed intervention ensembles that suppress
 > lower-order/common response and expose irreducible mechanism interactions; the
 > resulting witness is accepted only if it survives numerical fidelity checks.
 
-Forbidden shortcuts:
+**This claim is not currently authorized as a prospective flagship claim.**
+
+D2, D3 and D4V failed their frozen advancement criteria. The only measured GAUGE
+dark-field result is retrospective and channel-specific.
+
+Currently supportable wording is narrower:
+
+> Vulkax implements and evaluates mechanism-selective counterfactual response
+> cancellation for diagnosing deceptive physical repairs. Across frozen synthetic
+> studies, the tested DCS variants did not achieve useful resolved prospective
+> verification coverage, while a retrospective GAUGE study showed that a
+> longitudinal mechanism channel can contradict aggregate observation metrics.
+
+Forbidden shortcuts remain:
 - "first higher-order physics";
 - "first nonlinear system identification";
 - "first intervention decomposition";
 - "first active model discrimination";
 - "first metamorphic simulator test";
-- "guaranteed physical correctness".
-
+- "guaranteed physical correctness";
+- any prospective DCS superiority claim unsupported by a fresh future validation.
 
 ## 9. Elimination chronology — 2026-09-20
 
@@ -428,28 +446,25 @@ floor substantially, but:
 
 Decision: DCS is not supported as a universal candidate-world ranking method.
 
-### Current active hypothesis: pair-specific repair veto
-The only active flagship hypothesis is now narrower:
+### D4V pair-specific repair-veto outcome
+The final narrowed DCS hypothesis was tested on a fresh partition:
 
-> An ordinary held-out metric proposes a repair. Vulkax then synthesizes a
-> pair-specific dark-field experiment between the baseline and that proposed repair,
-> and uses the measured mechanism witness to support, veto, or refuse the repair.
+- ordinary held-out metric generated **36** repair proposals;
+- **14** were deceptive under the hidden stronger target;
+- **22** were beneficial;
+- DCS resolved coverage at the inherited `|z| >= 2` threshold: **0%**;
+- same-cost raw bundle, raw pair probe, Fisher and maximum-motion verification also
+  produced **0% resolved coverage**;
+- annihilation moment contracts passed.
 
-This is evaluated in D4V on a fresh partition with:
-- separate calibration observations;
-- separate ordinary held-out proposal observations;
-- separate 3x3 DCS physical probe;
-- hidden stronger counterfactual target used only for labels;
-- pair-specific order-2 witness-space synthesis;
-- inherited +/-2 standardized support/veto rule.
+Decision: **D4V failed its frozen advancement gate**.
 
-Protocol:
-`research/benchmarks/DCS_D4V_REPAIR_VETO_DISCOVERY_PROTOCOL.md`
+DCS is therefore retained as an implemented diagnostic/falsification laboratory, not
+as a validated flagship repair-verification policy.
 
-If D4V also fails its frozen discovery advancement rule, DCS must be narrowed to a
-diagnostic/visualization contribution or killed as the Vulkax flagship rather than
-rescued by arbitrary higher response orders.
-
+The active research question is no longer an algebraic DCS variant. It is whether a
+new physical information channel can produce mechanism-relevant disagreement that is
+large enough to survive measurement and numerical uncertainty.
 
 ## 10. Implementation-complete boundary
 
