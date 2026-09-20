@@ -12,3 +12,10 @@
 10. Can a counterfactual trust radius be empirically calibrated across scenes and event regimes?
 11. Does trust collapse near contact/event changes in a predictable way?
 12. Is the requested edit's signal larger than discretization uncertainty?
+
+
+13. Can a reason-coded refusal policy distinguish *large but converging* numerical differences from genuinely non-convergent/unstable simulations?
+14. Can a scale-normalized convergence ratio transfer across intervention severity better than an absolute timestep-refinement fraction?
+15. Does model-family disagreement add predictive value beyond held-out residual once numerical convergence is accounted for?
+16. On GAUGE, which unresolved structural assumption dominates the no-fit miss: spatial resolution, transfer dissipation, fixture thickness, cross-section proxy, gravity frame, or constitutive family?
+17. Can any independently justified structural repair beat the affine null on a fresh GAUGE task without tuning material parameters?

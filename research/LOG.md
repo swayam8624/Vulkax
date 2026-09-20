@@ -223,3 +223,12 @@ Do not spend effort tuning timestep or selecting a different repeat. The dominan
 
 ### Next falsification
 Run one-factor no-fit structural ablations over resolution, transfer, fixture thickness, cross-section proxy and gravity frame. These are diagnostics only; no variant may unlock inverse fitting without an independently justified follow-up.
+
+
+## 2026-09-20 — Claim guard tightened against established methodology
+
+Targeted literature attack confirms that Jacobian/Fisher optimal experiment design, structural video identifiability and explicit model-discrepancy calibration are established prior art.
+
+**Decision:** none of those components may be described as Vulkax novelty. The surviving research hypothesis is the closed-loop operational combination: intervention-specific evidence sufficiency, reason-coded refusal, repairable evidence acquisition, disjoint counterfactual re-test, independent verification and commit/rollback.
+
+Added `research/literature/CLAIM_GUARD.md` so future implementation and manuscript work cannot silently broaden claims beyond evidence.

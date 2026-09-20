@@ -2,7 +2,7 @@
   "schema": "vulkax.literature_seed",
   "version": 1,
   "as_of": "2026-09-20",
-  "warning": "Expanded seed audit; full-text/citation-chain review remains required before novelty claims.",
+  "warning": "Expanded seed audit; still not a substitute for full-text/citation-chain novelty review.",
   "papers": [
     {
       "id": "physgaussian-2024",
@@ -427,6 +427,57 @@
       "uncertainty_treatment": "task-specific UQ",
       "validation_method": "comparative uncertainty experiments",
       "relationship_to_vulkax": "Supports the negative finding that a generic uncertainty composite is not justified; certificate scores must be matched to the counterfactual rewrite loss.",
+      "status": "seed-reviewed"
+    },
+    {
+      "id": "asadi-laksari-oed-2025",
+      "title": "Optimal experimental design for repeatable hyperelastic material characterization",
+      "authors": "Amirreza Asadi; Kaveh Laksari",
+      "year": 2025,
+      "venue": "Journal of the Mechanical Behavior of Biomedical Materials 170:107104",
+      "url": "https://doi.org/10.1016/j.jmbbm.2025.107104",
+      "code": "https://github.com/klaksari/optimal_hyperelastic_parameter_ID",
+      "representation": "stress-material Jacobian / Fisher-information analysis",
+      "simulator": "analytic hyperelastic constitutive models (Neo-Hookean, Mooney-Rivlin, Ogden)",
+      "input_observations": "prospective stress measurements under designed loading modes/ranges",
+      "output_parameters": "experiment-design criteria for robust material identification",
+      "uncertainty_treatment": "noise/reproducibility sensitivity through conditioning and Jacobian metrics",
+      "validation_method": "synthetic/noisy hyperelastic parameter-identification studies",
+      "relationship_to_vulkax": "Directly kills generic novelty around choosing deformation/intervention by Jacobian singular values, determinant or condition number. Vulkax can use OED as enabling infrastructure only; contribution must arise from verified rewrite/refusal/counterfactual semantics.",
+      "status": "seed-reviewed"
+    },
+    {
+      "id": "modular-bayesian-model-discrepancy-2024",
+      "title": "Application of the Modular Bayesian Approach for Inverse Uncertainty Quantification in Nuclear Thermal-Hydraulics Systems",
+      "authors": "Chen Wang",
+      "year": 2024,
+      "venue": "arXiv 2404.04774",
+      "url": "https://arxiv.org/abs/2404.04774",
+      "code": "unavailable in seed audit",
+      "representation": "Bayesian calibration with explicit model discrepancy",
+      "simulator": "TRACE thermal-hydraulics",
+      "input_observations": "benchmark experimental data",
+      "output_parameters": "calibrated physical-model parameter uncertainty and predictive uncertainty",
+      "uncertainty_treatment": "explicit model discrepancy separated from calibration parameters",
+      "validation_method": "PSBT benchmark calibration/UQ",
+      "relationship_to_vulkax": "Directly kills generic novelty around saying parameter estimates absorb model inadequacy. Vulkax must operationalize discrepancy into intervention-specific accept/refuse behavior and reason-coded evidence requirements.",
+      "status": "seed-reviewed"
+    },
+    {
+      "id": "physics-from-video-2026-identifiability",
+      "title": "Physics from Video: Identifiability of Time-Invariant Second-Order ODEs under Minimal Trajectory Conditions",
+      "authors": "Yuanyuan Wang; Wenjie Wang; Kun Zhang; Mingming Gong",
+      "year": 2026,
+      "venue": "ICML 2026",
+      "url": "https://arxiv.org/abs/2606.00115",
+      "code": "https://github.com/wenjiewang3/PhysicsFromVideo",
+      "representation": "encoder-only latent physical state",
+      "simulator": "time-invariant second-order linear ODE family",
+      "input_observations": "raw video",
+      "output_parameters": "identified ODE parameters under trajectory-coverage conditions",
+      "uncertainty_treatment": "structural-identifiability conditions and robustness regularization",
+      "validation_method": "theory + synthetic + real video",
+      "relationship_to_vulkax": "Directly kills generic novelty around detecting whether video physics is identifiable. Vulkax must move beyond detection into persistent-world rewrite governance, additional-evidence requests, numerical/model-error separation and calibrated counterfactual trust.",
       "status": "seed-reviewed"
     }
   ]

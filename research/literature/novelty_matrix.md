@@ -49,3 +49,22 @@ Older simulation V&V work (PCMM and related credibility frameworks) already comb
 A 2026 Digital Twin Counterfactual Framework also directly threatens generic claims around hierarchical validation of counterfactual digital-twin outputs.
 
 The remaining candidate gap is narrower: an **executable physical-rewrite loop** in which the requested intervention itself determines the relevant evidence, failed certification produces a concrete additional physical observation/intervention, the world is re-identified, and an independent target counterfactual is re-tested while numerical and model-form inadequacy remain explicit refusal causes.
+
+
+## Claim-guard update — experiment design, identifiability and model discrepancy
+
+Three generic routes are now explicitly closed:
+
+1. **Sensitivity/Jacobian experiment design is established.** Asadi & Laksari (2025) optimize hyperelastic material characterization using stress-material Jacobian determinant/conditioning and Fisher-information ideas across loading modes and constitutive models. Vulkax may use this machinery, but cannot claim novelty for “choose the best deformation from a sensitivity matrix.”
+
+2. **Structural identifiability from video is established and active in 2026.** Physics-from-Video gives explicit conditions for unique recovery of second-order physical laws from video. Null-space/rank detection alone is therefore not a flagship contribution.
+
+3. **Model discrepancy separated from parameter uncertainty is established.** Modular Bayesian inverse-UQ literature explicitly treats model inadequacy/numerical approximation as discrepancy that otherwise contaminates parameter calibration. “Wrong physics gets absorbed into fitted parameters” is an important Vulkax diagnostic, not novelty by itself.
+
+### Surviving claim shape
+
+A potentially defensible Vulkax claim must be operational and intervention-specific:
+
+> A persistent captured-world system can refuse a requested physical rewrite when its counterfactual is not supported, provide a reason code that separates evidence insufficiency from numerical/model-family inadequacy, request an additional observation/intervention when that failure is repairable, and independently re-verify the rewritten world before commit.
+
+Even this remains a hypothesis, not a novelty claim. It must survive fresh-domain validation and direct comparison against selective-prediction/UQ/model-validation baselines.
