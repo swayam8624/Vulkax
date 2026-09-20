@@ -201,10 +201,89 @@ Longitudinal mechanism wins: 0/10.
 Decision: kill finite support as primary explanation; motivating deceptive-repair case.
 
 ### D0 mathematical regression
-Status: CI pending.
+Status: **PASS**.
+
+GitHub Actions run `35525231718` built and passed the deterministic DCS
+mathematical regression.
+
+Interpretation:
+- Boolean-lattice cumulant implementation is correct on polynomial controls;
+- order-2 and order-3 annihilating stencils satisfy their declared moment
+  cancellation contracts;
+- mechanism-order, scale-flow, and deceptive-repair primitives passed regression.
+
+This is implementation correctness only.
 
 ### D1 analytic deceptive-repair positive control
-Status: CI pending.
+Status: **PASS**.
 
-### D2+ results
+GitHub Actions run `35525231718`:
+
+- ordinary metric accepted the constructed repair: **64 / 64**;
+- deceptive-repair ground truth: **64 / 64**;
+- DCS accepted deceptive repair: **0 / 64**;
+- median ordinary observation improvement: **60.88%**;
+- median dark-field witness degradation ratio: **9.375x**.
+
+Decision: positive-control gate passed.
+
+This is constructed evidence and does not count as scientific validation.
+
+### D2a solver-native fixed-witness discovery
+Status: **COMPLETE — MIXED / NEGATIVE FOR A FIXED HAND-PICKED WITNESS**.
+
+GitHub Actions run `35525231718`, 4 off-grid truth worlds x 4 fitted candidate
+families.
+
+Pairwise agreement with stronger unseen-target ranking:
+
+- held-out trajectory RMSE: **62.5%**;
+- fixed hand-designed second-order DCS witness: **62.5%**.
+
+There were **9 ordinary-metric mirage pairs**. The fixed DCS witness corrected
+**9 / 9** of those mirages, but because total pairwise agreement did not improve,
+it necessarily introduced roughly the same number of errors on pairs that ordinary
+held-out error had ranked correctly.
+
+Important conclusion:
+
+> A single hand-picked mixed second-order witness is **not** the DCS method.
+
+The result supports the motivating failure mode (ordinary held-out rankings can be
+wrong and interaction witnesses can expose every observed mirage in this small
+probe), while falsifying the naive hypothesis that one fixed interaction witness
+provides a generally superior world ranking.
+
+This result directly motivates:
+- automatic lower-order-nullspace stencil synthesis;
+- maximin standardized separation rather than raw witness amplitude;
+- mechanism resolution / noise stopping;
+- multi-order adaptive witnesses;
+- numerical witness convergence.
+
+Median candidate behavior from this discovery probe:
+
+| Variant | Held-out RMSE | Fixed DCS witness error | Strong target error |
+|---|---:|---:|---:|
+| APIC | 4.918e-6 m | 5.095e-7 m | 8.674e-6 m |
+| coarse APIC | 4.458e-6 m | 1.138e-6 m | 1.026e-5 m |
+| constrained nu | 9.518e-6 m | 4.868e-7 m | 1.694e-5 m |
+| PIC | 4.519e-6 m | 1.740e-6 m | 1.837e-5 m |
+
+The constrained-nu case is especially instructive: it can have a small fixed
+dark-field witness error while remaining poor on the stronger target. This is a
+specific counterexample to treating low order-2 witness error as sufficient.
+
+### D2b maximin active-selection discovery
+Status: implementation committed; CI pending.
+
+This stage compares:
+- maximin synthesized DCS stencil;
+- raw maximin single intervention;
+- maximum-motion intervention;
+- random intervention.
+
+The stronger target remains hidden from selection and is used only for scoring.
+
+### D2+ fresh validation
 Status: NOT RUN. Do not pre-populate expected wins.
