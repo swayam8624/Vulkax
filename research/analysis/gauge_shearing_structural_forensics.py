@@ -12,7 +12,9 @@ def main():
     here=pathlib.Path(__file__).resolve().parent
     variants=[
       ("baseline",{}),
-      ("resolution_fine",{"n_cross":7,"n_long":19}),
+      # Smaller cells require a smaller explicit time step. This is a CFL/stability
+      # control, not a fit to GAUGE trajectory error.
+      ("resolution_fine",{"n_cross":7,"n_long":19,"dt":1.0/24000.0}),
       ("boundary_two_layers",{"boundary_layers":2}),
       ("transfer_pic",{"transfer":"PIC"}),
       ("transfer_flip",{"transfer":"FLIP"}),
@@ -30,8 +32,15 @@ def main():
         cmd=[sys.executable,str(here/"run_gauge_shearing_forward.py"),
              "--exe",a.exe,"--contract-dir",a.contract_dir,"--out",str(fd)]
         keymap={"n_cross":"--n-cross","n_long":"--n-long","boundary_layers":"--boundary-layers",
-                "transfer":"--transfer","geometry_mode":"--geometry-mode","gravity":"--gravity"}
-        for k,v in opts.items():cmd.extend([keymap[k],str(v)])
+                "transfer":"--transfer","geometry_mode":"--geometry-mode","gravity":"--gravity","dt":"--dt"}
+        for k,v in opts.items():
+            # argparse treats values such as "-x" as option tokens. Use --key=value
+            # for all string controls so negative gravity axes are actual evidence,
+            # not harness failures.
+            if isinstance(v,str):
+                cmd.append(f"{keymap[k]}={v}")
+            else:
+                cmd.extend([keymap[k],str(v)])
         cp=subprocess.run(cmd,text=True,capture_output=True)
         if cp.returncode:
             records[name]={"status":"failed","options":opts,"returncode":cp.returncode,
@@ -61,6 +70,14 @@ def main():
         r["hard_delta_vs_baseline"]=r["hard_nrmse"]-base["hard_nrmse"]
         r["mean_nrmse"]=0.5*(r["soft_nrmse"]+r["hard_nrmse"])
         r["mean_delta_vs_baseline"]=r["mean_nrmse"]-0.5*(base["soft_nrmse"]+base["hard_nrmse"])
+        r["mean_marker_rmse_m"]=0.5*(r["soft_marker_rmse_m"]+r["hard_marker_rmse_m"])
+        base_marker=0.5*(base["soft_marker_rmse_m"]+base["hard_marker_rmse_m"])
+        r["mean_marker_delta_vs_baseline_m"]=r["mean_marker_rmse_m"]-base_marker
+        # A metric-specific gain is not a model improvement if the absolute marker
+        # trajectory gets worse. This diagnostic guard is intentionally strict.
+        r["dual_metric_consistent_improvement"]=(
+            r["mean_delta_vs_baseline"]<0.0 and r["mean_marker_delta_vs_baseline_m"]<=0.0
+        )
     successful=[(n,r) for n,r in records.items() if r["status"]=="success"]
     successful.sort(key=lambda x:x[1]["mean_nrmse"])
     result={
@@ -69,8 +86,13 @@ def main():
       "baseline_material_parameters_modified":False,
       "variants":records,
       "diagnostic_ranking":[{"name":n,"mean_nrmse":r["mean_nrmse"],
-                             "mean_delta_vs_baseline":r["mean_delta_vs_baseline"]} for n,r in successful],
-      "warning":"Ranking is forensic only. It may not be used to select/fix a model or unlock inverse fitting without an independently justified validation gate."
+                             "mean_delta_vs_baseline":r["mean_delta_vs_baseline"],
+                             "mean_marker_rmse_m":r["mean_marker_rmse_m"],
+                             "mean_marker_delta_vs_baseline_m":r["mean_marker_delta_vs_baseline_m"],
+                             "dual_metric_consistent_improvement":r["dual_metric_consistent_improvement"]}
+                            for n,r in successful],
+      "consistent_improvements":[n for n,r in successful if r["dual_metric_consistent_improvement"]],
+      "warning":"Ranking is forensic only. Face-area improvement without marker-trajectory improvement is explicitly not promoted. No structural variant unlocks inverse fitting without an independently justified validation gate."
     }
     (out/"summary.json").write_text(json.dumps(result,indent=2)+"\n")
     print("VALID GAUGE structural forensics")

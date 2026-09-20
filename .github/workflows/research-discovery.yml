@@ -103,6 +103,15 @@ jobs:
           python3 research/probes/diagnose_refusal_policy_shift.py build/refusal-repair/cases.csv build/refusal-validation/cases.csv build/refusal-validation2/cases.csv build/policy-shift
           cat build/policy-shift/shift_diagnostic.json
 
+      - name: Build convergence-aware refusal-policy Validation-3
+        run: cmake --build build --target vulkax_refusal_validation3_probe --parallel 2
+
+      - name: Evaluate calibration-only convergence-aware policy on fresh Validation-3
+        run: |
+          build/vulkax_refusal_validation3_probe build/refusal-validation3
+          python3 research/probes/validate_refusal_policy_v3.py build/refusal-repair/cases.csv build/refusal-validation3/cases.csv build/refusal-policy-v3
+          cat build/refusal-policy-v3/policy_v3.json
+
       - name: Test GAUGE deformable adapter contract
         run: python3 research/adapters/test_gauge_adapter.py
 
@@ -123,6 +132,8 @@ jobs:
             build/refusal-repair
             build/refusal-validation
             build/refusal-validation2
+            build/refusal-validation3
+            build/refusal-policy-v3
             build/policy-shift
           if-no-files-found: error
           retention-days: 30

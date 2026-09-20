@@ -242,3 +242,12 @@ Absolute numerical thresholds are replaced by a two-level convergence diagnostic
 A fresh Validation-3 domain is defined with new off-grid E/nu truths, markers, times, noise, deformations and target intervention. A monotone four-gate policy will be selected from original calibration labels only. Validation-1/2/3 labels are explicitly excluded from threshold selection.
 
 CMake/workflow wiring is deferred until the in-flight GAUGE structural-forensics job finishes so measured evidence is not restarted.
+
+
+## 2026-09-20 — Structural forensic guard tightened; Validation-3 wired
+
+GAUGE structural ablations found sizeable metric sensitivity to transfer and gravity assumptions, but no variant beat the affine null. +Y gravity reduced face-area NRMSE most strongly while worsening absolute marker trajectory, so it is retained as a diagnostic contradiction rather than a candidate model fix.
+
+Fixed negative-axis CLI handling and rerouted the fine spatial-resolution check through a smaller CFL-motivated timestep. Added a strict dual-metric guard: face-area improvement alone cannot count as structural improvement if marker trajectory worsens.
+
+The staged two-level numerical-convergence refusal mechanism is now wired into CI as Validation-3. Policy thresholds remain calibration-only.
