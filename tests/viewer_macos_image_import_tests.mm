@@ -1,12 +1,11 @@
 #import <AppKit/AppKit.h>
-#import <CoreGraphics/CoreGraphics.h>
-
 #include "vulkax/viewer/macos_image_import.hpp"
 
 #include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <vector>
 
 namespace {
@@ -31,38 +30,24 @@ int main() {
         fs::create_directories(root);
         const auto pngPath = root / "orientation.png";
 
-        // Conventional top-to-bottom RGBA rows:
+        // Literal standards-defined PNG with top-to-bottom scanlines:
         //   red   green
-        //   blue  yellow
-        std::vector<std::uint8_t> rgba{
-            255,   0,   0, 255,     0, 255,   0, 255,
-              0,   0, 255, 255,   255, 255,   0, 128,
+        //   blue  yellow(alpha=128)
+        // Keeping the fixture as PNG bytes makes this test independent of
+        // CoreGraphics/AppKit drawing-coordinate and bitmap-layout conventions.
+        static constexpr std::uint8_t pngBytes[] = {
+            137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,2,0,0,0,2,
+            8,6,0,0,0,114,182,13,36,0,0,0,20,73,68,65,84,120,218,99,248,207,
+            192,240,31,12,129,52,16,48,52,0,0,71,75,8,121,195,37,135,235,0,0,
+            0,0,73,69,78,68,174,66,96,130
         };
-
-        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-        assert(colorSpace != nullptr);
-        CGDataProviderRef provider = CGDataProviderCreateWithData(
-            nullptr, rgba.data(), rgba.size(), nullptr);
-        assert(provider != nullptr);
-        CGImageRef image = CGImageCreate(
-            2, 2, 8, 32, 8,
-            colorSpace,
-            kCGBitmapByteOrderDefault | kCGImageAlphaLast,
-            provider,
-            nullptr,
-            false,
-            kCGRenderingIntentDefault);
-        assert(image != nullptr);
-
-        NSBitmapImageRep* rep = [[NSBitmapImageRep alloc] initWithCGImage:image];
-        assert(rep != nil);
-        NSData* png = [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
-        assert(png != nil);
-        assert([png writeToFile:[NSString stringWithUTF8String:pngPath.string().c_str()] atomically:YES]);
-
-        CGImageRelease(image);
-        CGDataProviderRelease(provider);
-        CGColorSpaceRelease(colorSpace);
+        {
+            std::ofstream output(pngPath, std::ios::binary);
+            assert(output);
+            output.write(reinterpret_cast<const char*>(pngBytes),
+                         static_cast<std::streamsize>(sizeof(pngBytes)));
+            assert(output);
+        }
 
         vulkax::viewer::ImageSplatCardSettings settings;
         settings.maxSplats = 4U;
