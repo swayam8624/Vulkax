@@ -173,6 +173,29 @@ struct SynthesizedStencil {
     const std::vector<UncertaintyBudget>& modelNumericalUncertainty,
     const AnnihilatingStencil& stencil);
 
+// Direct witness-space pairwise separation. Numerical uncertainty is
+// measured by applying the same signed stencil to each model at nominal and
+// refined numerical resolution, then comparing those two witnesses. This avoids
+// charging lower-order numerical error that the dark-field contrast itself cancels.
+[[nodiscard]] double worstCaseWitnessSpaceStandardizedSeparation(
+    const std::vector<Response>& nominalModelWitnesses,
+    const std::vector<Response>& refinedModelWitnesses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    const AnnihilatingStencil& stencil);
+
+// Synthesize an annihilating stencil using direct witness-space numerical
+// uncertainty. nominalModelResponses[model][point][observable] and
+// refinedModelResponses use the same fitted physical parameters and intervention
+// points, differing only in numerical fidelity.
+[[nodiscard]] SynthesizedStencil synthesizeWitnessSpaceMaximinStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& nominalModelResponses,
+    const std::vector<std::vector<Response>>& refinedModelResponses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    double momentTolerance = 1.0e-9,
+    std::size_t maximumIterations = 256);
+
 // Highest response order whose measured dark-field signal remains observable
 // above a frozen standardized-signal threshold.
 [[nodiscard]] MechanismResolutionResult mechanismResolution(
