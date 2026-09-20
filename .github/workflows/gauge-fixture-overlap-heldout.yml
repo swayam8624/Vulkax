@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - "research/fixture-overlap-heldout"
+  pull_request:
+    branches:
+      - "main"
     paths:
       - "research/probes/gauge_shearing_forward_probe.cpp"
       - "research/analysis/gauge_shearing_effective_span.py"
