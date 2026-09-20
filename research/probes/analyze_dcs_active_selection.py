@@ -12,6 +12,7 @@ def f(r,k): return float(r[k])
 truth_ids=sorted({int(r["truth_id"]) for r in rows})
 methods={
     "dcs":"dcs_error_m",
+    "raw_bundle_same_cost":"raw_bundle_error_m",
     "raw_maximin":"raw_error_m",
     "max_motion":"maxmotion_error_m",
     "random":"random_error_m",
