@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <vector>
 
 namespace {
@@ -15,9 +16,11 @@ bool near(float a, float b, float tolerance = 0.035F) {
 }
 
 void assertColor(const std::array<float, 3>& actual, float r, float g, float b) {
-    assert(near(actual[0], r));
-    assert(near(actual[1], g));
-    assert(near(actual[2], b));
+    if (!near(actual[0], r) || !near(actual[1], g) || !near(actual[2], b)) {
+        std::cerr << "color mismatch actual=(" << actual[0] << ',' << actual[1] << ',' << actual[2]
+                  << ") expected=(" << r << ',' << g << ',' << b << ")\n";
+        assert(false);
+    }
 }
 
 } // namespace
