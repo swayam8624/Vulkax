@@ -1,0 +1,89 @@
+name: Vulkax DCS implementation complete
+
+on:
+  push:
+    branches: ["research/dcs-darkfield"]
+    paths:
+      - "include/vulkax/research/dark_field_counterfactual.hpp"
+      - "src/research/dark_field_counterfactual.cpp"
+      - "tests/dark_field_counterfactual_tests.cpp"
+      - "research/probes/dcs_*.cpp"
+      - "research/probes/analyze_dcs_*.py"
+      - "research/analysis/dcs_*.py"
+      - "research/analysis/export_dcs_*.py"
+      - "research/status/DCS_*.md"
+      - "research/benchmarks/DCS_*.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/dcs-implementation-complete.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-dcs-implementation-complete-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  implementation-complete:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate reusable Python tooling
+        run: |
+          python3 -m py_compile             research/analysis/dcs_confirmatory_replay.py             research/analysis/export_dcs_spatial_map.py             research/analysis/export_dcs_evidence_pack.py             research/analysis/gauge_dcs_retrospective.py             research/probes/analyze_dcs_darkfield.py             research/probes/analyze_dcs_solver_native.py             research/probes/analyze_dcs_active_selection.py             research/probes/analyze_dcs_d2_validation.py             research/probes/analyze_dcs_d3_witness_space.py             research/probes/analyze_dcs_d4v_repair_veto.py             research/probes/export_dcs_d3_tables.py
+
+      - name: Self-test reusable artifact runners
+        run: |
+          python3 research/analysis/dcs_confirmatory_replay.py --self-test
+          python3 research/analysis/export_dcs_spatial_map.py --self-test
+          python3 research/analysis/export_dcs_evidence_pack.py --self-test
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+
+      - name: Build all DCS implementation targets
+        run: |
+          cmake --build build --target             vulkax_dark_field_counterfactual_tests             vulkax_dcs_darkfield_synthetic_probe             vulkax_dcs_solver_native_probe             vulkax_dcs_active_selection_probe             vulkax_dcs_d2_validation_probe             vulkax_dcs_d3_witness_space_probe             vulkax_dcs_d4v_repair_veto_probe             --parallel 2
+
+      - name: Run DCS mathematical regression
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_dark_field_counterfactual$'
+
+      - name: Run cheap deterministic positive control
+        run: |
+          build/vulkax_dcs_darkfield_synthetic_probe build/dcs-positive-control
+          python3 research/probes/analyze_dcs_darkfield.py build/dcs-positive-control
+          cat build/dcs-positive-control/analysis.json
+
+      - name: Emit implementation-complete marker
+        run: |
+          mkdir -p build/dcs-implementation
+          cat > build/dcs-implementation/implementation.json <<'JSON'
+          {
+            "schema": "vulkax.dcs.implementation_complete",
+            "version": 1,
+            "core_math": true,
+            "automatic_stencil_synthesis": true,
+            "pair_aware_uncertainty": true,
+            "witness_space_uncertainty": true,
+            "mechanism_resolution": true,
+            "deceptive_repair_benchmarks": true,
+            "d2_validation_harness": true,
+            "d3_adaptive_order_harness": true,
+            "d4v_repair_veto_harness": true,
+            "d5_confirmatory_replay": true,
+            "d6_spatial_localization": true,
+            "result_exporters": true,
+            "paper_prose_included": false
+          }
+          JSON
+          cat build/dcs-implementation/implementation.json
+
+      - name: Upload completion artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-dcs-implementation-complete-${{ github.sha }}
+          path: |
+            build/dcs-implementation
+            build/dcs-positive-control
+          if-no-files-found: error
+          retention-days: 30
