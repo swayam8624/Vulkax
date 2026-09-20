@@ -672,6 +672,55 @@ double worstCasePairAwareStandardizedSeparation(
     return worst;
 }
 
+
+double worstCaseWitnessSpaceStandardizedSeparation(
+    const std::vector<Response>& nominalModelWitnesses,
+    const std::vector<Response>& refinedModelWitnesses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    const AnnihilatingStencil& stencil) {
+    requireSameResponseSize(nominalModelWitnesses);
+    requireSameResponseSize(refinedModelWitnesses);
+    if (nominalModelWitnesses.size() < 2 ||
+        nominalModelWitnesses.size() != refinedModelWitnesses.size())
+        throw std::invalid_argument(
+            "DCS witness-space separation requires matched nominal/refined witnesses");
+
+    UncertaintyBudget shared = sharedObservationUncertainty;
+    if (shared.numericalVariance != 0.0)
+        throw std::invalid_argument(
+            "DCS witness-space shared uncertainty may contain measurement/repeat variance only");
+    shared = propagateStencilUncertainty(stencil, shared);
+
+    std::vector<double> numericalVariance(nominalModelWitnesses.size(), 0.0);
+    for (std::size_t model = 0; model < nominalModelWitnesses.size(); ++model) {
+        if (nominalModelWitnesses[model].size() != refinedModelWitnesses[model].size())
+            throw std::invalid_argument("DCS witness-space response width mismatch");
+        const double rms =
+            responseDistance(nominalModelWitnesses[model], refinedModelWitnesses[model]) /
+            std::sqrt(static_cast<double>(nominalModelWitnesses[model].size()));
+        numericalVariance[model] = rms * rms;
+    }
+
+    double worst = std::numeric_limits<double>::infinity();
+    for (std::size_t i = 0; i < nominalModelWitnesses.size(); ++i) {
+        for (std::size_t j = i + 1; j < nominalModelWitnesses.size(); ++j) {
+            const double variance =
+                shared.measurementVariance +
+                shared.repeatVariance +
+                numericalVariance[i] +
+                numericalVariance[j];
+            if (!std::isfinite(variance) || variance <= 0.0)
+                throw std::invalid_argument(
+                    "DCS witness-space separation variance must be positive and finite");
+            const double rms =
+                responseDistance(nominalModelWitnesses[i], nominalModelWitnesses[j]) /
+                std::sqrt(static_cast<double>(nominalModelWitnesses[i].size()));
+            worst = std::min(worst, rms / std::sqrt(variance));
+        }
+    }
+    return worst;
+}
+
 MechanismResolutionResult mechanismResolution(
     const std::vector<Response>& witnessByOrder,
     const std::vector<UncertaintyBudget>& uncertaintyByOrder,
@@ -937,6 +986,86 @@ SynthesizedStencil synthesizePairAwareMaximinStencil(
             } catch (const std::runtime_error&) {
                 // This pair may have no disagreement direction after the
                 // requested lower-order annihilation. Other pairs remain valid.
+            }
+        }
+    }
+    return best;
+}
+
+
+SynthesizedStencil synthesizeWitnessSpaceMaximinStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& nominalModelResponses,
+    const std::vector<std::vector<Response>>& refinedModelResponses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    double momentTolerance,
+    std::size_t maximumIterations) {
+    validateModelResponseGrid(points, nominalModelResponses);
+    validateModelResponseGrid(points, refinedModelResponses);
+    if (nominalModelResponses.size() != refinedModelResponses.size())
+        throw std::invalid_argument(
+            "DCS witness-space synthesis requires matched nominal/refined model sets");
+    if (sharedObservationUncertainty.numericalVariance != 0.0)
+        throw std::invalid_argument(
+            "DCS witness-space synthesis shared uncertainty may not include numerical variance");
+
+    UncertaintyBudget seedUncertainty = sharedObservationUncertainty;
+    if (!(seedUncertainty.totalVariance() > 0.0) ||
+        !std::isfinite(seedUncertainty.totalVariance()))
+        throw std::invalid_argument(
+            "DCS witness-space synthesis needs positive acquisition uncertainty");
+
+    const auto evaluate = [&](SynthesizedStencil candidate) {
+        std::vector<Response> nominalWitnesses;
+        std::vector<Response> refinedWitnesses;
+        nominalWitnesses.reserve(nominalModelResponses.size());
+        refinedWitnesses.reserve(refinedModelResponses.size());
+        for (std::size_t model = 0; model < nominalModelResponses.size(); ++model) {
+            nominalWitnesses.push_back(
+                applyAnnihilatingStencil(
+                    nominalModelResponses[model], candidate.stencil, momentTolerance));
+            refinedWitnesses.push_back(
+                applyAnnihilatingStencil(
+                    refinedModelResponses[model], candidate.stencil, momentTolerance));
+        }
+        candidate.worstCaseStandardizedSeparation =
+            worstCaseWitnessSpaceStandardizedSeparation(
+                nominalWitnesses,
+                refinedWitnesses,
+                sharedObservationUncertainty,
+                candidate.stencil);
+        return candidate;
+    };
+
+    SynthesizedStencil best = evaluate(
+        synthesizeMaximinAnnihilatingStencil(
+            points,
+            order,
+            nominalModelResponses,
+            seedUncertainty,
+            momentTolerance,
+            maximumIterations));
+
+    for (std::size_t i = 0; i < nominalModelResponses.size(); ++i) {
+        for (std::size_t j = i + 1; j < nominalModelResponses.size(); ++j) {
+            std::vector<std::vector<Response>> pair{
+                nominalModelResponses[i], nominalModelResponses[j]
+            };
+            try {
+                auto candidate = evaluate(
+                    synthesizeMaximinAnnihilatingStencil(
+                        points,
+                        order,
+                        pair,
+                        seedUncertainty,
+                        momentTolerance,
+                        maximumIterations));
+                if (candidate.worstCaseStandardizedSeparation >
+                    best.worstCaseStandardizedSeparation)
+                    best = std::move(candidate);
+            } catch (const std::runtime_error&) {
+                // No usable lower-order-nullspace disagreement for this pair.
             }
         }
     }
