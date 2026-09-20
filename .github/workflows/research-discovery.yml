@@ -98,6 +98,15 @@ jobs:
           python3 research/probes/validate_refusal_policy_v2.py build/refusal-repair/cases.csv build/refusal-validation2/cases.csv build/refusal-validation2
           cat build/refusal-validation2/policy_validation2.json
 
+      - name: Build adaptive numerical-repair Validation-3
+        run: cmake --build build --target vulkax_refusal_validation3_probe --parallel 2
+
+      - name: Run fresh Validation-3 with adaptive computational evidence repair
+        run: |
+          build/vulkax_refusal_validation3_probe build/refusal-validation3
+          python3 research/probes/validate_refusal_policy_v3.py build/refusal-validation3
+          cat build/refusal-validation3/analysis.json
+
       - name: Diagnose refusal-policy domain shift without retuning
         run: |
           python3 research/probes/diagnose_refusal_policy_shift.py build/refusal-repair/cases.csv build/refusal-validation/cases.csv build/refusal-validation2/cases.csv build/policy-shift
@@ -123,6 +132,7 @@ jobs:
             build/refusal-repair
             build/refusal-validation
             build/refusal-validation2
+            build/refusal-validation3
             build/policy-shift
           if-no-files-found: error
           retention-days: 30
