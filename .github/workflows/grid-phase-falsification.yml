@@ -1,0 +1,38 @@
+name: Vulkax grid-phase falsification
+
+on:
+  push:
+    branches: ["research/grid-phase-falsification"]
+    paths:
+      - "research/probes/grid_phase_falsification_probe.cpp"
+      - "research/probes/analyze_grid_phase_falsification.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/grid-phase-falsification.yml"
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  grid-phase:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate analysis harness
+        run: python3 -m py_compile research/probes/analyze_grid_phase_falsification.py
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+      - name: Build grid-phase falsification probe
+        run: cmake --build build --target vulkax_grid_phase_falsification_probe --parallel 2
+      - name: Run grid-phase and phase-locked co-refinement
+        run: |
+          build/vulkax_grid_phase_falsification_probe build/grid-phase-falsification
+          python3 research/probes/analyze_grid_phase_falsification.py build/grid-phase-falsification
+          cat build/grid-phase-falsification/analysis.json
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-grid-phase-falsification-${{ github.sha }}
+          path: build/grid-phase-falsification
+          if-no-files-found: error
+          retention-days: 30
