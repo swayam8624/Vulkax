@@ -71,7 +71,9 @@ for name,key in methods.items():
     corrected_mirages=0
     considered_mirages=0
 
-    ids=resolved_ids if name=="dcs" else truth_ids
+    # All selectors are scored on the same DCS-resolved subset for the primary
+    # head-to-head gate. Baselines are also summarized over all truth worlds below.
+    ids=resolved_ids
     for tid in ids:
         g=[r for r in rows if int(r["truth_id"])==tid]
         for a,brow in itertools.combinations(g,2):
@@ -112,19 +114,43 @@ for name,key in methods.items():
       }
     }
 
+
+# Secondary all-world baseline summary, reported separately from the coverage-matched gate.
+result["all_world_baselines"]={}
+for name,key in methods.items():
+    pair_count=correct=0
+    for tid in truth_ids:
+        g=[r for r in rows if int(r["truth_id"])==tid]
+        for a,brow in itertools.combinations(g,2):
+            target_gap=f(a,"target_error_m")-f(brow,"target_error_m")
+            if abs(target_gap)<1e-12: continue
+            target_pref="a" if target_gap<0 else "b"
+            method_pref="a" if f(a,key)<f(brow,key) else "b"
+            pair_count+=1
+            correct+=method_pref==target_pref
+    result["all_world_baselines"][name]={
+      "pair_count":pair_count,
+      "target_ranking_agreement":correct/pair_count if pair_count else None,
+    }
+
 dcs=result["methods"]["dcs"]
 raw=result["methods"]["raw_maximin"]
 bundle=result["methods"]["raw_bundle_same_cost"]
 
-family_success_counts=[]
-for fam,acc in dcs["family_agreement"].items():
-    if acc is not None:
-        family_success_counts.append((fam,acc))
-dominance=False
-if family_success_counts:
-    # Proxy for "not carried by one family": require at least 3 pair families
-    # with >=50% agreement among those actually evaluated.
-    dominance=sum(acc>=0.5 for _,acc in family_success_counts)>=3
+corrected_by_family={}
+for tid,a,brow,target_pref,raw_pref in raw_mirages:
+    if tid not in resolved_ids:
+        continue
+    dcs_pref="a" if f(a,"dcs_error_m")<f(brow,"dcs_error_m") else "b"
+    if dcs_pref==target_pref:
+        fam="|".join(sorted((a["variant"],brow["variant"])))
+        corrected_by_family[fam]=corrected_by_family.get(fam,0)+1
+total_corrected=sum(corrected_by_family.values())
+dominant_fraction=(max(corrected_by_family.values())/total_corrected
+                   if total_corrected else 1.0)
+dominance=(total_corrected>0 and dominant_fraction<=0.80 and len(corrected_by_family)>=2)
+result["corrected_mirage_family_counts"]=corrected_by_family
+result["dominant_corrected_family_fraction"]=dominant_fraction
 
 gate={
   "coverage_at_least_50pct":result["coverage"]>=0.50,
@@ -142,12 +168,14 @@ gate={
   "net_positive_corrections":
       dcs["corrected_mirage_pairs"]>dcs["new_errors_on_raw_correct_pairs"],
   "not_single_family_only":dominance,
-  "all_moment_contracts_assumed_from_probe":True,
+  "all_moment_contracts_pass":
+      max(f(r,"moment_residual") for r in rows) <= 1.0e-9,
 }
 gate["pass"]=all(gate.values())
 result["dcs_gate"]=gate
 result["numerical_rms_median"]=statistics.median(f(r,"numerical_rms_m") for r in rows)
 result["standardized_separation_median"]=statistics.median(f(r,"dcs_maximin_separation") for r in rows)
+result["maximum_moment_residual"]=max(f(r,"moment_residual") for r in rows)
 
 (root/"analysis.json").write_text(json.dumps(result,indent=2)+"\n")
 print("VALID frozen DCS D2 validation")
@@ -159,5 +187,6 @@ for name,data in result["methods"].items():
           "new_errors",data["new_errors_on_raw_correct_pairs"])
 print("NUMERICAL_RMS_MEDIAN",result["numerical_rms_median"])
 print("STANDARDIZED_SEPARATION_MEDIAN",result["standardized_separation_median"])
+print("MAXIMUM_MOMENT_RESIDUAL",result["maximum_moment_residual"])
 print("D2_GATE",gate)
 print("DECISION","advance_dcs" if gate["pass"] else "freeze_failure_and_do_not_tune_this_partition")
