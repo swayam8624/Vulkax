@@ -199,7 +199,7 @@ int main(int argc,char**argv){
     std::filesystem::create_directories(outDir);
     std::ofstream cases(outDir/"cases.csv");
     cases<<"truth_id,variant,fit_objective_m,dcs_error_m,raw_bundle_error_m,raw_error_m,fisher_error_m,maxmotion_error_m,random_error_m,target_error_m,"
-           "dcs_maximin_separation,dcs_resolved,numerical_rms_m,raw_point,fisher_point,maxmotion_point,random_point,provenance\n";
+           "dcs_maximin_separation,dcs_resolved,numerical_rms_m,moment_residual,raw_point,fisher_point,maxmotion_point,random_point,provenance\n";
     std::ofstream stencils(outDir/"stencils.csv");
     stencils<<"truth_id,point_index,shear,axial,weight,provenance\n";
 
@@ -277,6 +277,7 @@ int main(int argc,char**argv){
                  <<candidate.fit.objective<<','<<dcsError<<','<<rawBundleError<<','<<rawError<<','<<fisherError<<','<<maxMotionError<<','<<randomError<<','
                  <<targetError<<','<<dcs.worstCaseStandardizedSeparation<<','
                  <<(dcsResolved?1:0)<<','<<maximumNumericalRms<<','
+                 <<dcs.momentValidation.maximumAbsoluteResidual<<','
                  <<rawPoint<<','<<fisherPoint<<','<<maxMotionPoint<<','<<randomPoint
                  <<",synthetic-dcs-d2-validation\n";
             ++rows;
