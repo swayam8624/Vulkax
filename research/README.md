@@ -5,12 +5,69 @@ Current canonical state: **2026-09-20**
 Canonical branch:
 `research/integration-20260920`
 
+## One-command reproduction
+
+From the repository root:
+
+```bash
+bash run_everything.sh
+```
+
+This performs the current paper-facing research campaign end to end:
+
+- configure/build the complete project;
+- run the full CTest suite;
+- run release/evidence/CLI validation;
+- check the available native backend;
+- generate and execute a controlled captured-world run;
+- reproduce D1, solver-native discovery, D2, D3 and D4V;
+- download and validate the GAUGE foam subset;
+- run the GAUGE retrospective;
+- validate fresh outputs against the frozen canonical result ledger;
+- generate deterministic SVG/CSV paper assets;
+- assemble a SHA-256-indexed paper-evidence bundle.
+
+Primary generated output:
+
+`build/paper-evidence/`
+
+Useful options:
+
+```bash
+bash run_everything.sh --clean
+bash run_everything.sh --backend Metal
+bash run_everything.sh --backend Vulkan
+bash run_everything.sh --backend none
+bash run_everything.sh --skip-gauge
+bash run_everything.sh --skip-performance
+bash run_everything.sh --exhaustive
+```
+
+The GAUGE retrospective now prints live material/trial progress during its 20
+definitive forward simulations.
+
+## Paper-data entrypoints
+
+- `paper_data/README.md`
+- `paper_data/PAPER_DATA_MANIFEST.json`
+- `paper_data/FIGURE_TABLE_SOURCE_MAP.md`
+- `results/README.md`
+
+Generated figure/table assets are written to:
+
+`build/paper-figures/`
+
+A full reproduction is accepted only if
+`research/analysis/validate_paper_reproduction.py` confirms that the fresh outputs
+match the frozen result ledger within the declared cross-platform tolerances.
+
 ## Navigation
 
 ### Current state
 - `status/CURRENT_RESEARCH_STATE_2026-09-20.md`
 - `status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md`
 - `status/BRANCH_CLEANUP_2026-09-20.md`
+- `status/DOCUMENTATION_BENCHMARK_CLEANUP_COMPLETE_2026-09-20.md`
 
 ### Results
 - `results/README.md`
