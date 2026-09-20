@@ -204,6 +204,22 @@ struct SynthesizedStencil {
     double momentTolerance = 1.0e-9,
     std::size_t maximumIterations = 256);
 
+// Numerically guarded maximin synthesis. refinedModelResponses must match
+// modelResponses exactly in [model][point][observable] shape and represent the
+// same fitted candidate worlds at a finer numerical resolution. Candidate
+// stencils are scored using model separation divided by propagated measurement /
+// repeat uncertainty plus the numerical discrepancy measured *after applying the
+// stencil*. This avoids treating large common lower-order discretization error as
+// irreducible dark-field uncertainty.
+[[nodiscard]] SynthesizedStencil synthesizeNumericallyGuardedMaximinStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& modelResponses,
+    const std::vector<std::vector<Response>>& refinedModelResponses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    double momentTolerance = 1.0e-9,
+    std::size_t maximumIterations = 256);
+
 // Automatically synthesize a signed intervention ensemble. The moment
 // constraints define the lower-order response subspace to suppress. Competing
 // model responses define a disagreement operator; the returned weights maximize
