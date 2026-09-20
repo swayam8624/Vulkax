@@ -38,6 +38,22 @@ struct ScaleFlowResult {
     bool finite{};
 };
 
+struct UncertaintyBudget {
+    double measurementVariance{};
+    double numericalVariance{};
+    double repeatVariance{};
+
+    [[nodiscard]] double totalVariance() const noexcept {
+        return measurementVariance + numericalVariance + repeatVariance;
+    }
+};
+
+struct MechanismResolutionResult {
+    std::vector<double> standardizedSignalByOrder;
+    std::size_t maximumObservableOrder{};
+    bool anyObservableOrder{};
+};
+
 struct DeceptiveRepairAssessment {
     bool observationImproved{};
     bool witnessWorsened{};
@@ -111,6 +127,36 @@ struct SynthesizedStencil {
     double numericalVariance,
     double acquisitionCost,
     double costWeight = 1.0);
+
+// Standardized mismatch in units of total witness uncertainty.
+[[nodiscard]] double standardizedDarkFieldDiscrepancy(
+    const Response& measured,
+    const Response& predicted,
+    const UncertaintyBudget& uncertainty);
+
+// Smallest pairwise standardized separation among surviving candidate worlds.
+[[nodiscard]] double worstCaseStandardizedSeparation(
+    const std::vector<Response>& modelWitnesses,
+    const UncertaintyBudget& uncertainty);
+
+// Highest response order whose measured dark-field signal remains observable
+// above a frozen standardized-signal threshold.
+[[nodiscard]] MechanismResolutionResult mechanismResolution(
+    const std::vector<Response>& witnessByOrder,
+    const std::vector<UncertaintyBudget>& uncertaintyByOrder,
+    double minimumStandardizedSignal);
+
+// Maximin DCS experiment synthesis. This searches projected pairwise
+// disagreement directions and keeps the annihilating stencil maximizing the
+// worst-case pairwise standardized separation. It is a deterministic heuristic,
+// not a claim of global non-convex optimality.
+[[nodiscard]] SynthesizedStencil synthesizeMaximinAnnihilatingStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& modelResponses,
+    const UncertaintyBudget& uncertainty,
+    double momentTolerance = 1.0e-9,
+    std::size_t maximumIterations = 256);
 
 // Automatically synthesize a signed intervention ensemble. The moment
 // constraints define the lower-order response subspace to suppress. Competing
