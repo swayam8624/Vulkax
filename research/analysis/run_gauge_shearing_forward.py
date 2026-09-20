@@ -14,6 +14,7 @@ def main():
     p.add_argument("--geometry-mode",choices=("measured_aspect","square_cross","released_asset_aspect"),default="measured_aspect")
     p.add_argument("--gravity",choices=("zero","+x","-x","+y","-y","+z","-z"),default="zero")
     p.add_argument("--constitutive",choices=("neo_hookean_log_j","neo_hookean_quadratic_j","st_venant_kirchhoff"),default="neo_hookean_log_j")
+    p.add_argument("--mapping-neighbors",type=int,default=24)
     a=p.parse_args()
     cdir=pathlib.Path(a.contract_dir); out=pathlib.Path(a.out); out.mkdir(parents=True,exist_ok=True)
     contract=json.loads((cdir/"contract.json").read_text())
@@ -39,6 +40,7 @@ def main():
             a.geometry_mode,
             a.gravity,
             a.constitutive,
+            str(a.mapping_neighbors),
         ]
         cp=subprocess.run(cmd,text=True,capture_output=True)
         if cp.stdout:
@@ -64,7 +66,7 @@ def main():
       "structural_controls":{
         "n_cross":a.n_cross,"n_long":a.n_long,"boundary_layers":a.boundary_layers,
         "transfer":a.transfer,"geometry_mode":a.geometry_mode,"gravity":a.gravity,
-        "constitutive":a.constitutive
+        "constitutive":a.constitutive,"mapping_neighbors":a.mapping_neighbors
       },
       "runs":commands,
       "warning":"Material values come directly from frozen GAUGE metadata. No simulation error is used to choose parameters or representative trials."
