@@ -11,7 +11,9 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
