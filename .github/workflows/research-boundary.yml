@@ -27,4 +27,18 @@ jobs:
       - name: Build regression
         run: cmake --build build --target vulkax_prescribed_mpm_tests --parallel 2
       - name: Run regression
-        run: ctest --test-dir build --output-on-failure -R '^vulkax_prescribed_mpm$'
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_prescribed_mpm
+      - name: Build driven-slab probe
+        run: cmake --build build --target vulkax_driven_slab_probe --parallel 2
+      - name: Run driven-slab probe
+        run: |
+          build/vulkax_driven_slab_probe build/driven-slab
+          python3 research/probes/analyze_driven_slab.py build/driven-slab
+          cat build/driven-slab/driven_slab.csv
+      - name: Upload boundary evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-driven-slab-${{ github.sha }}
+          path: build/driven-slab
+          if-no-files-found: error
+          retention-days: 30

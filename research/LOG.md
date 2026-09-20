@@ -148,3 +148,8 @@ Updated the analysis to GAUGE's own volumetric-deformable generalized trajectory
 Run `35511228092` successfully processed 60 measured GAUGE foam trials with the benchmark-native triangle-area observable. Shearing is selected as the first sim-to-real target because driver travel is nearly matched between soft and hard variants.
 
 The prescribed-boundary executable compiled in discovery run `35511228081`, but a malformed workflow quote prevented ctest from executing. No boundary test failed. Repaired the full discovery workflow and added a dedicated fast `research-boundary.yml` path-gated workflow.
+
+
+## 2026-09-20 — Driven-slab boundary validation launched
+
+The repaired prescribed-boundary CI is green. Added a synthetic driven slab that fixes the bottom face and prescribes a top-face shear for soft/hard Neo-Hookean materials. The test does not assume the hard/soft reaction ratio a priori; it first checks boundary exactness, momentum accounting, orientation preservation and nonzero interior response. The resulting material separation will be treated as diagnostic until convergence is tested.
