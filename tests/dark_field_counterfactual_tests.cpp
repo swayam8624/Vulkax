@@ -256,7 +256,7 @@ int main() {
         UncertaintyBudget u1; u1.measurementVariance=0.04;
         const auto spatial=localizeSpatialWitnessResidual(
             {0.0,0.0,0.0,0.0},
-            {0.2,0.0,0.0,0.4},
+            {0.2,0.0,0.0,0.1},
             {0,0,1,1},
             {u0,u1},
             1.0);
