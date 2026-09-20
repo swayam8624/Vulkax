@@ -15,6 +15,7 @@ def main():
     p.add_argument("--asset-geometry-json")
     p.add_argument("--gravity",choices=("zero","+x","-x","+y","-y","+z","-z"),default="zero")
     p.add_argument("--constitutive",choices=("neo_hookean_log_j","neo_hookean_quadratic_j","st_venant_kirchhoff"),default="neo_hookean_log_j")
+    p.add_argument("--marker-tracking",choices=("MLS24","HUNGARIAN"),default="MLS24")
     a=p.parse_args()
     cdir=pathlib.Path(a.contract_dir); out=pathlib.Path(a.out); out.mkdir(parents=True,exist_ok=True)
     contract=json.loads((cdir/"contract.json").read_text())
@@ -49,6 +50,7 @@ def main():
             a.geometry_mode,
             a.gravity,
             a.constitutive,
+            a.marker_tracking,
         ]
         if asset_geometry is not None:
             cmd.extend(repr(float(x)) for x in asset_geometry["task_translation_m"])
@@ -77,7 +79,7 @@ def main():
       "structural_controls":{
         "n_cross":a.n_cross,"n_long":a.n_long,"boundary_layers":a.boundary_layers,
         "transfer":a.transfer,"geometry_mode":a.geometry_mode,"gravity":a.gravity,
-        "constitutive":a.constitutive,
+        "constitutive":a.constitutive,"marker_tracking":a.marker_tracking,
         "asset_geometry":None if asset_geometry is None else {
           "asset_sha256":asset_geometry["asset_sha256"],
           "task_translation_m":asset_geometry["task_translation_m"],

@@ -17,6 +17,7 @@ on:
       - "research/analysis/gauge_shearing_constitutive_matrix.py"
       - "research/analysis/gauge_asset_geometry.py"
       - "research/analysis/gauge_shearing_asset_geometry_forensics.py"
+      - "research/analysis/gauge_shearing_marker_correspondence.py"
       - "research/probes/gauge_shearing_forward_probe.cpp"
       - "CMakeLists.txt"
       - "research/scripts/fetch_gauge_foam_subset.py"
@@ -98,6 +99,11 @@ jobs:
           python3 research/analysis/gauge_shearing_asset_geometry_forensics.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --asset-geometry-json build/gauge-asset-geometry/geometry.json --out build/gauge-asset-geometry-forensics
           cat build/gauge-asset-geometry-forensics/summary.json
 
+      - name: Run GAUGE marker correspondence x resolution forensic
+        run: |
+          python3 research/analysis/gauge_shearing_marker_correspondence.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --asset-geometry-json build/gauge-asset-geometry/geometry.json --out build/gauge-marker-correspondence
+          cat build/gauge-marker-correspondence/summary.json
+
       - name: Upload derived measured-data evidence only
         uses: actions/upload-artifact@v4
         with:
@@ -116,5 +122,6 @@ jobs:
             build/gauge-structural-forensics
             build/gauge-constitutive-matrix
             build/gauge-asset-geometry-forensics
+            build/gauge-marker-correspondence
           if-no-files-found: error
           retention-days: 30

@@ -48,6 +48,11 @@ struct Geometry {
     double crossA{};
     double crossB{};
 };
+struct MarkerAssignment {
+    std::vector<std::size_t> particleIndex;
+    double rmsInitialError{};
+    double maxInitialError{};
+};
 struct RunEvidence {
     double minimumJ{std::numeric_limits<double>::infinity()};
     double maximumMomentumAccountingError{};
@@ -218,6 +223,71 @@ std::vector<MpmParticle> makeParticles(const Geometry& g,double mass,double dens
     return ps;
 }
 
+double squaredDistance(Vec3 a,Vec3 b) {
+    const double x=a.x-b.x,y=a.y-b.y,z=a.z-b.z;
+    return x*x+y*y+z*z;
+}
+
+// Rectangular Hungarian assignment. Rows are measured markers, columns are
+// simulated particles. GAUGE's published protocol uses a one-to-one initial
+// marker-to-vertex/particle assignment and then tracks the assigned element.
+MarkerAssignment assignMarkersHungarian(
+    const std::vector<Marker>& markers,const std::vector<MpmParticle>& particles) {
+    const std::size_t n=markers.size(),m=particles.size();
+    if(n==0 || n>m) throw std::runtime_error("Hungarian marker assignment requires markers <= particles");
+    const double inf=std::numeric_limits<double>::infinity();
+    std::vector<double> u(n+1,0.0),v(m+1,0.0);
+    std::vector<std::size_t> p(m+1,0U),way(m+1,0U);
+    for(std::size_t i=1;i<=n;++i) {
+        p[0]=i;
+        std::size_t j0=0;
+        std::vector<double> minv(m+1,inf);
+        std::vector<bool> used(m+1,false);
+        do {
+            used[j0]=true;
+            const std::size_t i0=p[j0];
+            double delta=inf;
+            std::size_t j1=0;
+            for(std::size_t j=1;j<=m;++j) if(!used[j]) {
+                const double cur=squaredDistance(markers[i0-1].p,particles[j-1].restPosition)-u[i0]-v[j];
+                if(cur<minv[j]) {minv[j]=cur;way[j]=j0;}
+                if(minv[j]<delta) {delta=minv[j];j1=j;}
+            }
+            if(!std::isfinite(delta)) throw std::runtime_error("Hungarian assignment became non-finite");
+            for(std::size_t j=0;j<=m;++j) {
+                if(used[j]) {u[p[j]]+=delta;v[j]-=delta;}
+                else minv[j]-=delta;
+            }
+            j0=j1;
+        } while(p[j0]!=0U);
+        do {
+            const std::size_t j1=way[j0];
+            p[j0]=p[j1];
+            j0=j1;
+        } while(j0!=0U);
+    }
+    MarkerAssignment out;
+    out.particleIndex.assign(n,std::numeric_limits<std::size_t>::max());
+    for(std::size_t j=1;j<=m;++j) if(p[j]!=0U) out.particleIndex[p[j]-1]=j-1;
+    double ss=0.0;
+    for(std::size_t i=0;i<n;++i) {
+        if(out.particleIndex[i]==std::numeric_limits<std::size_t>::max())
+            throw std::runtime_error("Hungarian assignment left marker unmatched");
+        const double e=std::sqrt(squaredDistance(markers[i].p,particles[out.particleIndex[i]].restPosition));
+        ss+=e*e;
+        out.maxInitialError=std::max(out.maxInitialError,e);
+    }
+    out.rmsInitialError=std::sqrt(ss/static_cast<double>(n));
+    return out;
+}
+
+void updateCloudFromAssignment(
+    const MarkerAssignment& assignment,const std::vector<MpmParticle>& particles,GaussianCloud& cloud) {
+    if(assignment.particleIndex.size()!=cloud.size()) throw std::runtime_error("marker assignment/cloud mismatch");
+    for(std::size_t i=0;i<cloud.size();++i)
+        cloud.splats[i].position=particles.at(assignment.particleIndex[i]).position;
+}
+
 GaussianCloud markerCloud(const std::vector<Marker>& markers) {
     GaussianCloud cloud;
     std::uint32_t local=1;
@@ -314,11 +384,11 @@ void writeFrame(std::ofstream& out,std::size_t frame,double time,
 } // namespace
 
 int main(int argc,char**argv) {
-    if(argc!=10 && argc!=16 && argc!=17 && argc!=23) {
+    if(argc!=10 && argc!=16 && argc!=17 && argc!=18 && argc!=23 && argc!=24) {
         std::cerr<<"usage: vulkax_gauge_shearing_forward_probe markers.csv driver.csv output.csv "
                     "young_pa poisson density_kg_m3 mass_kg requested_dt label "
-                    "[n_cross n_long boundary_layers transfer geometry_mode gravity [constitutive "
-                    "[asset_center_x asset_center_y asset_center_z asset_extent_x asset_extent_y asset_extent_z]]]\n";
+                    "[n_cross n_long boundary_layers transfer geometry_mode gravity [constitutive [marker_tracking "
+                    "[asset_center_x asset_center_y asset_center_z asset_extent_x asset_extent_y asset_extent_z]]]]\n";
         return 2;
     }
     const std::filesystem::path markerPath=argv[1],driverPath=argv[2],outPath=argv[3];
@@ -331,18 +401,24 @@ int main(int argc,char**argv) {
     const std::string transferName=argc>=16?argv[13]:"APIC";
     const std::string geometryMode=argc>=16?argv[14]:"measured_aspect";
     const std::string gravityName=argc>=16?argv[15]:"zero";
-    const std::string constitutiveName=(argc==17 || argc==23)?argv[16]:"neo_hookean_log_j";
+    const std::string constitutiveName=argc>=17?argv[16]:"neo_hookean_log_j";
+    const bool hasMarkerArg=(argc==18 || argc==24);
+    const std::string markerTracking=hasMarkerArg?argv[17]:"MLS24";
     if(!(poisson>-1.0 && poisson<0.5) || !(requestedDt>0.0))
         throw std::runtime_error("invalid material/timestep argument");
     if(geometryMode!="measured_aspect" && geometryMode!="square_cross" && geometryMode!="asset_bbox")
         throw std::runtime_error("unsupported geometry mode");
+    if(markerTracking!="MLS24" && markerTracking!="HUNGARIAN")
+        throw std::runtime_error("unsupported marker tracking mode");
     std::array<double,3> assetCenter{0.0,0.0,0.0};
     std::array<double,3> assetExtent{0.0,0.0,0.0};
     if(geometryMode=="asset_bbox") {
-        if(argc!=23) throw std::runtime_error("asset_bbox requires center and extent arguments");
-        for(int a=0;a<3;++a) assetCenter[static_cast<std::size_t>(a)]=number(argv[17+a]);
-        for(int a=0;a<3;++a) assetExtent[static_cast<std::size_t>(a)]=number(argv[20+a]);
-    } else if(argc==23) {
+        const int start=hasMarkerArg?18:17;
+        const int expected=hasMarkerArg?24:23;
+        if(argc!=expected) throw std::runtime_error("asset_bbox requires center and extent arguments");
+        for(int a=0;a<3;++a) assetCenter[static_cast<std::size_t>(a)]=number(argv[start+a]);
+        for(int a=0;a<3;++a) assetExtent[static_cast<std::size_t>(a)]=number(argv[start+3+a]);
+    } else if(argc==23 || argc==24) {
         throw std::runtime_error("asset geometry arguments supplied for non-asset geometry mode");
     }
     const auto transfer=parseTransfer(transferName);
@@ -355,6 +431,9 @@ int main(int argc,char**argv) {
     auto particles=makeParticles(geom,mass,density,nCross,nLong);
     auto cloud=markerCloud(markers);
     const auto binding=vulkax::coupling::bindGaussianCloudToMpm(cloud,particles,24);
+    MarkerAssignment markerAssignment;
+    if(markerTracking=="HUNGARIAN")
+        markerAssignment=assignMarkersHungarian(markers,particles);
 
     const std::array<double,3> side{
         geom.prismHi[0]-geom.prismLo[0],
@@ -401,7 +480,10 @@ int main(int argc,char**argv) {
             if(!(ev.unconstrainedStep.minimumDeformationDeterminant>0.0))
                 throw std::runtime_error("GAUGE no-fit forward model inverted");
         }
-        vulkax::coupling::updateGaussianCloudFromMpm(binding,particles,cloud);
+        if(markerTracking=="HUNGARIAN")
+            updateCloudFromAssignment(markerAssignment,particles,cloud);
+        else
+            vulkax::coupling::updateGaussianCloudFromMpm(binding,particles,cloud);
         writeFrame(out,f+1,driver[f+1].time,markers,cloud);
     }
     out.close();
@@ -429,6 +511,10 @@ int main(int argc,char**argv) {
            <<"  \"gravity\": ["<<gravity.x<<','<<gravity.y<<','<<gravity.z<<"],\n"
            <<"  \"transfer\": \""<<transferName<<"\",\n"
            <<"  \"constitutive_model\": \""<<constitutiveName<<"\",\n"
+           <<"  \"marker_tracking\": \""<<markerTracking<<"\",\n"
+           <<"  \"marker_match_rms_m\": "<<markerAssignment.rmsInitialError<<",\n"
+           <<"  \"marker_match_max_m\": "<<markerAssignment.maxInitialError<<",\n"
+           <<"  \"marker_match_under_1cm\": "<<((markerTracking!="HUNGARIAN" || markerAssignment.maxInitialError<0.01)?"true":"false")<<",\n"
            <<"  \"n_cross\": "<<nCross<<",\n"
            <<"  \"n_long\": "<<nLong<<",\n"
            <<"  \"boundary_layers\": "<<boundaryLayers<<",\n"
@@ -451,6 +537,8 @@ int main(int argc,char**argv) {
              <<" grid="<<grid.nx<<"x"<<grid.ny<<"x"<<grid.nz
              <<" minJ="<<evidence.minimumJ
              <<" max_dt="<<evidence.maximumActualDt
+             <<" marker_tracking="<<markerTracking
+             <<" marker_match_max_m="<<markerAssignment.maxInitialError
              <<" substeps="<<evidence.totalSubsteps
              <<"\n";
     return 0;

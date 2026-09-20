@@ -40,3 +40,19 @@ A geometry variant is **not** permitted to unlock material fitting merely becaus
 ## Important limitation
 
 This experiment uses the published mesh **bounding box** to define the regular MPM body. It does not yet voxelize the full surface mesh. Therefore a failure does not prove that exact GAUGE geometry is irrelevant; it only falsifies the hypothesis that the dominant miss is caused by gross cuboid dimensions/pose.
+
+
+## Observed result — published asset geometry
+
+CI run 35516693438 completed successfully.
+
+The published `foam.obj` is exactly 0.05 x 0.05 x 0.20 m and its bounding-box volume matches mass/density to numerical precision for both material variants. The mocap marker support spans only about 2/3, 2/3 and 3/4 of those object extents.
+
+Replacing the historical marker-derived body dimensions with the published asset bounding box produced a large dual-metric improvement under APIC:
+
+- mean face-area NRMSE: 1.01058 -> 0.49949;
+- mean marker-position RMSE: 2.3008 mm -> 2.0767 mm.
+
+PIC and FLIP improved face-area error but worsened marker-position RMSE. No published-asset condition beat the affine null for both materials, so inverse fitting remains locked.
+
+Interpretation: gross geometry was a real confounder, but not the full explanation. The remaining miss now moves to benchmark-aligned marker correspondence and then fixture/contact semantics.
