@@ -6,7 +6,9 @@
   "canonical_results": {
     "summary": "research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md",
     "table": "research/results/DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv",
-    "json": "research/results/DCS_FINAL_RESULTS_2026-09-20.json"
+    "json": "research/results/DCS_FINAL_RESULTS_2026-09-20.json",
+    "information_frontier": "research/results/DCS_INFORMATION_FRONTIER_2026-09-20.json",
+    "gauge_paired_diagnostics": "research/results/GAUGE_PAIRED_DIAGNOSTICS_2026-09-20.csv"
   },
   "generated_by": "bash run_everything.sh",
   "generated_roots": {
@@ -38,6 +40,11 @@
       "id": "gauge_channel_contradiction",
       "source": "research/results/DCS_FINAL_RESULTS_2026-09-20.json",
       "status": "retrospective_only"
+    },
+    {
+      "id": "information_frontier",
+      "source": "research/results/DCS_INFORMATION_FRONTIER_2026-09-20.json",
+      "status": "post_hoc_diagnostic"
     }
   ],
   "fresh_run_artifacts": [
