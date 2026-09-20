@@ -1,0 +1,70 @@
+name: Native viewer research checkpoint
+
+on:
+  pull_request:
+    paths:
+      - 'CMakeLists.txt'
+      - 'include/vulkax/viewer/**'
+      - 'src/viewer/**'
+      - 'src/tools/viewer_gpu_sort_benchmark.mm'
+      - '.github/workflows/native-viewer-research-checkpoint.yml'
+      - 'docs/NATIVE_VIEWER_RESEARCH_CHECKPOINT_1.md'
+  workflow_dispatch:
+
+jobs:
+  benchmark-macos:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure release benchmark
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+
+      - name: Build native benchmark
+        run: cmake --build build --target vulkax_viewer_benchmark --parallel 3
+
+      - name: Run benchmark
+        run: |
+          mkdir -p build/research-checkpoint
+          ./build/vulkax_viewer_benchmark \
+            --sizes 10000,50000,100000,200000 \
+            --repeats 5 \
+            --json build/research-checkpoint/native_viewer_benchmark.json \
+            --markdown build/research-checkpoint/native_viewer_benchmark.md
+          cat build/research-checkpoint/native_viewer_benchmark.md
+
+      - name: Validate research checkpoint contract
+        run: |
+          python3 - <<'PY'
+          import json, math
+          from pathlib import Path
+
+          path = Path("build/research-checkpoint/native_viewer_benchmark.json")
+          data = json.loads(path.read_text())
+          assert data["schema"] == "vulkax.native_viewer.research_checkpoint.v1"
+          assert data["repeats"] == 5
+          rows = data["rows"]
+          expected = [10000, 50000, 100000, 200000]
+          assert [row["source_count"] for row in rows] == expected
+          for row in rows:
+              assert row["parity"] is True, row
+              assert row["retained_count"] == row["source_count"], row
+              for key, value in row.items():
+                  if key.endswith("_ms") or key == "speedup_vs_cpu":
+                      assert isinstance(value, (int, float)) and math.isfinite(value), (key, value)
+                      assert value >= 0.0, (key, value)
+              assert row["cpu_sorted_median_ms"] > 0.0
+              assert row["gpu_sort_wall_median_ms"] > 0.0
+              assert row["hybrid_median_ms"] > 0.0
+          print("research_checkpoint_contract: passed")
+          PY
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-viewer-research-checkpoint
+          path: |
+            build/research-checkpoint/native_viewer_benchmark.json
+            build/research-checkpoint/native_viewer_benchmark.md
+          if-no-files-found: error
