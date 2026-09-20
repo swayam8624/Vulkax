@@ -26,8 +26,13 @@ def main():
             repr(a.dt),
             material,
         ]
-        cp=subprocess.run(cmd,check=True,text=True,capture_output=True)
-        print(cp.stdout,end="")
+        cp=subprocess.run(cmd,text=True,capture_output=True)
+        if cp.stdout:
+            print(cp.stdout,end="")
+        if cp.stderr:
+            print(cp.stderr,end="",file=__import__("sys").stderr)
+        if cp.returncode != 0:
+            raise SystemExit(f"GAUGE forward executable failed for {material} with exit code {cp.returncode}")
         commands.append({
             "material":material,
             "young_pa":float(md["young"]),
