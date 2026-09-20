@@ -313,6 +313,9 @@ MpmMaterialScaleAdjointResult differentiateMpmApicMaterialScales(
         throw std::invalid_argument("MPM material-scale adjoint timestep must be positive");
     if (grid.boundaryCells != 0U)
         throw std::invalid_argument("MPM material-scale adjoint currently requires boundaryCells == 0");
+    if (material.constitutiveModel != solvers::MpmConstitutiveModel::NeoHookeanLogJ)
+        throw std::invalid_argument(
+            "MPM material-scale adjoint currently supports only the historical NeoHookeanLogJ model");
     if (!(material.poissonRatio > -1.0 && material.poissonRatio < 0.5) ||
         !std::isfinite(material.youngModulus) || material.youngModulus < 0.0)
         throw std::invalid_argument("MPM material-scale adjoint material is invalid");
