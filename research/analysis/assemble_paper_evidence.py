@@ -23,6 +23,10 @@ CANONICAL = [
     ("research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md", "canonical/result-summary", True),
     ("research/results/DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv", "canonical/result-table", True),
     ("research/results/DCS_FINAL_RESULTS_2026-09-20.json", "canonical/result-ledger", True),
+    ("research/results/DCS_INFORMATION_FRONTIER_2026-09-20.md", "canonical/information-frontier-summary", True),
+    ("research/results/DCS_INFORMATION_FRONTIER_2026-09-20.json", "canonical/information-frontier-json", True),
+    ("research/results/DCS_INFORMATION_FRONTIER_2026-09-20.csv", "canonical/information-frontier-table", True),
+    ("research/results/GAUGE_PAIRED_DIAGNOSTICS_2026-09-20.csv", "canonical/gauge-paired-diagnostics", True),
     ("research/status/CURRENT_RESEARCH_STATE_2026-09-20.md", "canonical/current-state", True),
     ("research/status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md", "canonical/implementation", True),
     ("research/status/DCS_D2_VALIDATION_RESULT.md", "canonical/d2-result", True),
@@ -64,6 +68,9 @@ GENERATED = [
     ("dcs-d4v-discovery/proposals.csv", "generated/d4v-proposals", True),
     ("paper-captured-world-run/certificate.json", "generated/captured-world-certificate", True),
     ("paper-reproduction-validation.json", "generated/reproduction-validation", True),
+    ("paper-diagnostics/information_frontier.json", "generated/information-frontier", True),
+    ("paper-diagnostics/d4v_information_frontier.csv", "generated/d4v-information-frontier", True),
+    ("paper-diagnostics/gauge_paired_diagnostics.csv", "generated/gauge-paired-diagnostics", True),
     ("paper-performance/captured_world_performance.csv", "generated/performance-csv", False),
     ("paper-performance/captured_world_performance_summary.json", "generated/performance-summary", False),
     ("gauge-effective-span/validation.json", "generated/gauge-effective-span-validation", True),
@@ -117,7 +124,7 @@ def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: 
         add_file(src,canonical_root/rel,rel,category,required,artifacts)
 
     for rel,category,required in GENERATED:
-        gauge=rel.startswith("gauge-")
+        gauge=rel.startswith("gauge-") or rel.endswith("gauge_paired_diagnostics.csv")
         effective_required=required and not (allow_missing_gauge and gauge)
         src=build_root/rel
         if not src.is_file():
