@@ -66,6 +66,7 @@ struct SynthesizedStencil {
     AnnihilatingStencil stencil;
     MomentValidation momentValidation;
     double modelDisagreementEnergy{};
+    double worstCaseStandardizedSeparation{};
     double independentNoiseGain{};
     std::size_t powerIterations{};
     bool converged{};
