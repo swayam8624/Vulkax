@@ -64,6 +64,78 @@ The project remains C++20.
 - a real measured DOT C2 benchmark with explicit measured/derived/proxy provenance;
 - a deterministic visual showcase with pinned/hash-validated CC0 presentation assets.
 
+## Research integration and paper-evidence reproduction — 2026-09-20
+
+The release-facing Vulkax 1.0 baseline remains unchanged, while the canonical research
+integration lives on:
+
+`research/integration-20260920`
+
+The research line contains the complete Dark-Field Counterfactual Spectroscopy (DCS)
+implementation, frozen D2/D3/D4V studies, the measured GAUGE retrospective, D5
+confirmatory-replay infrastructure, D6 spatial witness localization, and
+machine-readable result ledgers.
+
+The entire current paper-facing evidence stack can be rebuilt with one command:
+
+```bash
+bash run_everything.sh
+```
+
+On macOS the runner automatically uses Metal. On Linux it selects Vulkan when
+`vulkaninfo` is available, otherwise it runs the research evidence path without a
+native render backend.
+
+Useful variants:
+
+```bash
+bash run_everything.sh --clean
+bash run_everything.sh --backend Metal
+bash run_everything.sh --backend Vulkan
+bash run_everything.sh --skip-gauge
+bash run_everything.sh --exhaustive
+```
+
+The default full run performs:
+
+- Release CMake configuration and a complete repository build;
+- the full CTest suite;
+- evidence-registry, release-claim and CLI-failure validation;
+- native backend conformance when available;
+- a deterministic captured-world run and timing benchmark;
+- DCS D1 positive-control reproduction;
+- solver-native fixed-witness and active-selection discovery;
+- frozen D2 validation;
+- D3 witness-space/adaptive-order discovery;
+- D4V pair-specific repair-veto discovery;
+- GAUGE measured-data download, effective-span validation and the definitive
+  retrospective;
+- deterministic paper-facing SVG/CSV table generation;
+- SHA-256-indexed paper-evidence packaging with system provenance and logs.
+
+Final output is written to:
+
+```text
+build/paper-evidence/
+```
+
+Start with:
+
+```text
+build/paper-evidence/README.md
+build/paper-evidence/manifest.json
+build/paper-evidence/artifact_index.csv
+```
+
+Committed canonical research results live under
+[`research/results/`](research/results/README.md), and the paper-data map is under
+[`research/paper_data/`](research/paper_data/README.md).
+
+**Research-integrity boundary:** implementation completeness is not equivalent to a
+positive prospective verification result. D2, D3 and D4V remain negative/frozen;
+GAUGE is retrospective and channel-specific; no fresh positive D5 measured
+confirmation is claimed.
+
 ## One-command captured-world research + showcase — 0.80
 
 The principal public workflow is:
