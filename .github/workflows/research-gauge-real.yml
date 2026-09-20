@@ -11,6 +11,8 @@ on:
       - "research/analysis/gauge_shearing_nonaffine.py"
       - "research/analysis/run_gauge_shearing_forward.py"
       - "research/analysis/gauge_shearing_forward_analysis.py"
+      - "research/analysis/gauge_shearing_repeat_forensics.py"
+      - "research/analysis/gauge_shearing_timestep_forensics.py"
       - "research/probes/gauge_shearing_forward_probe.cpp"
       - "CMakeLists.txt"
       - "research/scripts/fetch_gauge_foam_subset.py"
@@ -63,6 +65,16 @@ jobs:
           python3 research/analysis/gauge_shearing_forward_analysis.py --contract-dir build/gauge-shearing-contract --forward-dir build/gauge-forward --affine-dir build/gauge-affine-null --out build/gauge-forward-analysis
           cat build/gauge-forward-analysis/summary.json
 
+      - name: Replicate no-fit Vulkax forward test across all 20 shearing repeats
+        run: |
+          python3 research/analysis/gauge_shearing_repeat_forensics.py --root build/gauge-download --exe build-forward/vulkax_gauge_shearing_forward_probe --out build/gauge-repeat-forensics
+          cat build/gauge-repeat-forensics/summary.json
+
+      - name: Test timestep convergence of the frozen no-fit forward miss
+        run: |
+          python3 research/analysis/gauge_shearing_timestep_forensics.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --out build/gauge-timestep-forensics
+          cat build/gauge-timestep-forensics/summary.json
+
       - name: Upload derived measured-data evidence only
         uses: actions/upload-artifact@v4
         with:
@@ -75,5 +87,7 @@ jobs:
             build/gauge-nonaffine
             build/gauge-forward
             build/gauge-forward-analysis
+            build/gauge-repeat-forensics
+            build/gauge-timestep-forensics
           if-no-files-found: error
           retention-days: 30

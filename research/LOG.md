@@ -180,3 +180,15 @@ The physical body is represented by a declared geometry proxy: long extent from 
 Do **not** permit inverse material fitting unless the no-fit Vulkax forward prediction beats the zero-parameter affine null on benchmark-native face-area trajectory RMSE for both soft and hard selected trials and gets the measured soft-vs-hard peak-separation sign correct.
 
 Gravity is intentionally zero in this first pass because the dataset-to-world gravity-axis transform has not yet been verified. Geometry proxy and boundary projection remain explicit limitations, not hidden fitted parameters.
+
+
+## 2026-09-20 — Real GAUGE no-fit constitutive gate failed
+
+**Workflow:** `35513340128`, success.
+**Head:** `3ce813eeb14e50d3363ddb8a8187eec34dabf3a6`.
+
+The metadata-only Vulkax shearing prediction did not beat the affine null for either frozen material trial. Soft NRMSE 0.942 vs affine 0.218; hard 1.079 vs 0.231. The material-separation sign was correct, but magnitude was overpredicted.
+
+**Decision:** inverse fitting remains forbidden.
+
+**Next:** run all-repeat replication and timestep forensics before touching material parameters. If the miss is repeatable and timestep-stable, direct effort toward geometry/boundary/constitutive structure rather than optimizer tuning.
