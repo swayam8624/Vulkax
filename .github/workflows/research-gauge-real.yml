@@ -19,6 +19,7 @@ on:
       - "research/analysis/gauge_shearing_mode_compare.py"
       - "research/analysis/gauge_shearing_effective_span.py"
       - "research/analysis/validate_gauge_effective_span.py"
+      - "research/analysis/gauge_shearing_support_aware_affine.py"
       - "research/analysis/gauge_fixture_envelope_synthetic_control.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/analysis/gauge_foam_asset_geometry.py"
@@ -66,6 +67,11 @@ jobs:
         run: |
           python3 research/analysis/validate_gauge_effective_span.py build/gauge-effective-span
           cat build/gauge-effective-span/validation.json
+
+      - name: Evaluate support-aware affine null on held-out even repeats
+        run: |
+          python3 research/analysis/gauge_shearing_support_aware_affine.py             --root build/gauge-download             --effective-span-dir build/gauge-effective-span             --out build/gauge-support-aware-affine
+          cat build/gauge-support-aware-affine/summary.json
 
       - name: Compare released foam geometry against marker-span proxy
         run: |
@@ -164,6 +170,7 @@ jobs:
             build/gauge-shearing-contract
             build/gauge-boundary-attachment
             build/gauge-effective-span
+            build/gauge-support-aware-affine
             build/gauge-asset-geometry
             build/gauge-affine-null
             build/gauge-nonaffine
