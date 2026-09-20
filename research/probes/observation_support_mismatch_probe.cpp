@@ -260,6 +260,7 @@ struct Row {
     double bodyLength{};
     double fittedYoung{};
     double fitRms{};
+    double fitRelative{};
     double targetRms{};
     double targetRelative{};
     double minimumJ{};
@@ -275,6 +276,7 @@ Row evaluateModel(std::string name,double length,const Trace& trainTruth,const T
         length,
         fit.young,
         fit.rms,
+        fit.rms/std::max(targetEffect(trainTruth),1.0e-15),
         tr,
         tr/std::max(targetEffect(targetTruth),1.0e-15),
         pred.minimumJ,
@@ -284,7 +286,7 @@ Row evaluateModel(std::string name,double length,const Trace& trainTruth,const T
 
 void writeRow(std::ofstream& out,const Row& r) {
     out<<r.model<<','<<std::setprecision(17)
-       <<r.bodyLength<<','<<r.fittedYoung<<','<<r.fitRms<<','
+       <<r.bodyLength<<','<<r.fittedYoung<<','<<r.fitRms<<','<<r.fitRelative<<','
        <<r.targetRms<<','<<r.targetRelative<<','<<r.minimumJ<<','
        <<r.maximumBoundaryError<<",synthetic\n";
 }
@@ -306,7 +308,7 @@ int main(int argc,char** argv) {
 
     std::ofstream out(outDir/"cases.csv");
     if(!out) throw std::runtime_error("cannot create observation-support probe CSV");
-    out<<"model,body_length_m,fitted_young_pa,fit_rms_m,target_rms_m,"
+    out<<"model,body_length_m,fitted_young_pa,fit_rms_m,fit_relative_error,target_rms_m,"
           "target_relative_error,min_J,max_boundary_error_m,provenance\n";
     writeRow(out,correct);
     writeRow(out,truncated);
@@ -332,9 +334,11 @@ int main(int argc,char** argv) {
     std::cout<<std::setprecision(10)
              <<"CORRECT fitted_E="<<correct.fittedYoung
              <<" fit_m="<<correct.fitRms
+             <<" fit_rel="<<correct.fitRelative
              <<" target_rel="<<correct.targetRelative<<"\n"
              <<"TRUNCATED fitted_E="<<truncated.fittedYoung
              <<" fit_m="<<truncated.fitRms
+             <<" fit_rel="<<truncated.fitRelative
              <<" target_rel="<<truncated.targetRelative<<"\n"
              <<"FIT_RATIO="<<fitRatio<<" TARGET_RATIO="<<targetRatio<<"\n";
     return 0;
