@@ -1,82 +1,62 @@
 {
   "schema": "vulkax.hypothesis_priority_queue",
-  "version": 3,
+  "version": 4,
   "as_of": "2026-09-20",
-  "state": "dcs_flagship_locked",
-  "warning": "Priority is an execution order, not a novelty or venue-acceptance guarantee.",
-  "primary": {
+  "state": "implementation_complete_no_flagship_claim",
+  "warning": "Implementation completeness is not scientific validation or venue-acceptance evidence.",
+  "current_primary_status": {
+    "family": "No positive flagship family locked",
+    "status": "OPEN_RESEARCH_SEARCH",
+    "reason": "D2 fresh validation, D3 witness-space/adaptive-order discovery, and D4V pair-specific repair-veto discovery all failed their frozen advancement criteria.",
+    "required_next_property": "A new physical-information channel must create resolved mechanism evidence without tuning any frozen D2/D3/D4V partition."
+  },
+  "implemented_diagnostic_family": {
     "family": "Dark-Field Counterfactual Spectroscopy (DCS)",
-    "status": "LOCKED_PRIMARY",
-    "problem": "Detect and falsify observationally successful but physically deceptive repairs in captured executable worlds.",
-    "solution": "Synthesize signed intervention ensembles that annihilate agreed lower-order response and expose the first irreducible mechanism order where candidate worlds diverge; require numerical witness survival before accepting the repair.",
-    "kill_conditions": [
-      "Deterministic annihilation or solver-native controls fail.",
-      "DCS gives no fresh-domain advantage over held-out residual or raw model disagreement.",
-      "Noise amplification eliminates useful coverage.",
-      "Automatic DCS acquisition does not beat matched-cost raw separation/Fisher baselines on deceptive cases.",
-      "Witness rankings are not stable under numerical refinement.",
-      "No fresh measured-domain confirmatory result survives preregistered evaluation.",
-      "Direct prior art already implements the complete captured-world deceptive-repair mechanism."
+    "status": "IMPLEMENTED_DIAGNOSTIC_NOT_VALIDATED_FLAGSHIP",
+    "supported_role": "Mechanism-isolation, response-cancellation, spatial localization, retrospective falsification analysis, and future confirmatory replay.",
+    "unsupported_roles": [
+      "universal candidate-world ranking",
+      "fixed-order physical rewrite certificate",
+      "adaptive-order physical rewrite certificate",
+      "prospectively validated repair-veto policy"
     ]
   },
   "execution": [
     {
       "priority": 1,
-      "task": "Pass D0 mathematical regression and D1 constructed deceptive-repair positive control",
-      "type": "correctness"
+      "task": "Preserve D2/D3/D4V frozen failures and GAUGE retrospective contradiction as canonical benchmark evidence",
+      "type": "evidence_integrity",
+      "status": "COMPLETE"
     },
     {
       "priority": 2,
-      "task": "Run D2 solver-native MPM discovery and freeze fresh validation protocol",
-      "type": "controlled_evidence"
+      "task": "Complete DCS engineering stack, D5 replay runner, D6 spatial localization and evidence export",
+      "type": "implementation",
+      "status": "COMPLETE"
     },
     {
       "priority": 3,
-      "task": "Implement automatic lower-order-nullspace stencil synthesis and safety/cost constraints",
-      "type": "method"
+      "task": "Search for a genuinely higher-information physical intervention/measurement channel rather than increasing response order",
+      "type": "research",
+      "status": "NEXT"
     },
     {
       "priority": 4,
-      "task": "Compare DCS acquisition against Fisher/Jacobian, raw output separation, max-motion, random and active model discrimination",
-      "type": "baselines"
+      "task": "If a new mechanism survives discovery, freeze a new untouched synthetic validation partition",
+      "type": "validation",
+      "status": "BLOCKED_ON_POSITIVE_DISCOVERY"
     },
     {
       "priority": 5,
-      "task": "Run GAUGE retrospective dark-field study without refitting material parameters",
-      "type": "retrospective_measured"
+      "task": "Only after fresh positive synthetic validation, execute a fresh measured D5 confirmatory dataset with the frozen replay runner",
+      "type": "confirmatory_measured",
+      "status": "BLOCKED_ON_POSITIVE_SYNTHETIC_RESULT"
     },
     {
       "priority": 6,
-      "task": "Run fresh D5 measured-domain confirmatory benchmark",
-      "type": "confirmatory_measured"
-    },
-    {
-      "priority": 7,
-      "task": "Integrate spatial dark-field witnesses into Gaussian captured-world visualization",
-      "type": "systems_visualization"
-    },
-    {
-      "priority": 8,
-      "task": "Begin paper prose only after D0-D2 implementation evidence is recorded; reserve flagship claims until D5",
-      "type": "paper"
-    }
-  ],
-  "secondary_tracks": [
-    {
-      "family": "Counterfactual holonomy / commutators",
-      "status": "DCS_WITNESS_OPTION"
-    },
-    {
-      "family": "Counterfactual isotope perturbations",
-      "status": "DCS_ACTIVE_PROBE_OPTION"
-    },
-    {
-      "family": "many-world GPU verification batching",
-      "status": "ENABLING_ONLY"
-    },
-    {
-      "family": "event-boundary derivative validity",
-      "status": "FUTURE"
+      "task": "Generate final paper figures/videos and write manuscript with all negative evidence preserved",
+      "type": "paper",
+      "status": "READY_FOR_BACKGROUND_METHODS_NEGATIVE_RESULTS; FLAGSHIP_CLAIM_BLOCKED"
     }
   ],
   "retired_primary_families": [
@@ -90,6 +70,28 @@
     "generic simulator credibility",
     "generic counterfactual transfer",
     "finite-support fixture repair as GAUGE explanation",
-    "numerical convergence alone"
+    "numerical convergence alone",
+    "fixed hand-designed order-2 DCS ranking",
+    "automatic order-2 DCS maximin ranking",
+    "witness-space adaptive k=2/3 DCS ranking",
+    "pair-specific DCS repair veto under the tested information regime"
+  ],
+  "secondary_tracks": [
+    {
+      "family": "counterfactual holonomy / ordered path witnesses",
+      "status": "UNVALIDATED_OPTION_ONLY"
+    },
+    {
+      "family": "known calibration/isotope perturbations",
+      "status": "UNVALIDATED_OPTION_ONLY"
+    },
+    {
+      "family": "spatially localized/modal/frequency-domain physical probes",
+      "status": "PRIORITY_INFORMATION_CHANNEL_SEARCH"
+    },
+    {
+      "family": "many-world GPU verification batching",
+      "status": "ENABLING_ONLY"
+    }
   ]
 }
