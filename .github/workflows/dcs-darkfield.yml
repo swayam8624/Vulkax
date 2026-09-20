@@ -19,6 +19,10 @@ on:
     branches: ["research/integration-20260920"]
   workflow_dispatch:
 
+concurrency:
+  group: vulkax-dcs-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   dcs-core:
     runs-on: ubuntu-24.04
