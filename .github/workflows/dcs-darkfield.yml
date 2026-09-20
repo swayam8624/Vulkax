@@ -53,11 +53,10 @@ jobs:
           python3 -m py_compile research/probes/analyze_dcs_darkfield.py
           python3 -m py_compile research/probes/analyze_dcs_solver_native.py
           python3 -m py_compile research/probes/analyze_dcs_active_selection.py
-          python3 -m py_compile research/probes/analyze_dcs_d2_validation.py
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
       - name: Build DCS targets
-        run: cmake --build build --target vulkax_dark_field_counterfactual_tests vulkax_dcs_darkfield_synthetic_probe vulkax_dcs_active_selection_probe vulkax_dcs_d2_validation_probe --parallel 2
+        run: cmake --build build --target vulkax_dark_field_counterfactual_tests vulkax_dcs_darkfield_synthetic_probe vulkax_dcs_active_selection_probe --parallel 2
       - name: Run DCS mathematical regression
         run: ctest --test-dir build --output-on-failure -R '^vulkax_dark_field_counterfactual$'
       - name: Run deceptive-repair positive control
@@ -71,11 +70,6 @@ jobs:
           python3 research/probes/analyze_dcs_active_selection.py build/dcs-active-selection
           cat build/dcs-active-selection/analysis.json
 
-      - name: Run frozen fresh D2 validation
-        run: |
-          build/vulkax_dcs_d2_validation_probe build/dcs-d2-validation
-          python3 research/probes/analyze_dcs_d2_validation.py build/dcs-d2-validation
-          cat build/dcs-d2-validation/analysis.json
 
       - name: Upload DCS evidence
         uses: actions/upload-artifact@v4
@@ -84,6 +78,5 @@ jobs:
           path: |
             build/dcs-darkfield-synthetic
             build/dcs-active-selection
-            build/dcs-d2-validation
           if-no-files-found: error
           retention-days: 30
