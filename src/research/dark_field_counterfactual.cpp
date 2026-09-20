@@ -515,4 +515,231 @@ SynthesizedStencil synthesizeAnnihilatingStencil(
     return result;
 }
 
+double standardizedDarkFieldDiscrepancy(
+    const Response& measured,
+    const Response& predicted,
+    const UncertaintyBudget& uncertainty) {
+    if (measured.empty() || measured.size() != predicted.size())
+        throw std::invalid_argument("DCS standardized discrepancy requires equal non-empty responses");
+    const double variance = uncertainty.totalVariance();
+    if (!std::isfinite(variance) || variance <= 0.0)
+        throw std::invalid_argument("DCS uncertainty variance must be positive and finite");
+    const double rms = responseDistance(measured, predicted) /
+        std::sqrt(static_cast<double>(measured.size()));
+    return rms / std::sqrt(variance);
+}
+
+double worstCaseStandardizedSeparation(
+    const std::vector<Response>& modelWitnesses,
+    const UncertaintyBudget& uncertainty) {
+    requireSameResponseSize(modelWitnesses);
+    if (modelWitnesses.size() < 2)
+        throw std::invalid_argument("DCS maximin separation needs at least two model witnesses");
+    const double variance = uncertainty.totalVariance();
+    if (!std::isfinite(variance) || variance <= 0.0)
+        throw std::invalid_argument("DCS uncertainty variance must be positive and finite");
+    double worst = std::numeric_limits<double>::infinity();
+    for (std::size_t i = 0; i < modelWitnesses.size(); ++i) {
+        for (std::size_t j = i + 1; j < modelWitnesses.size(); ++j) {
+            const double rms = responseDistance(modelWitnesses[i], modelWitnesses[j]) /
+                std::sqrt(static_cast<double>(modelWitnesses[i].size()));
+            worst = std::min(worst, rms / std::sqrt(variance));
+        }
+    }
+    return worst;
+}
+
+MechanismResolutionResult mechanismResolution(
+    const std::vector<Response>& witnessByOrder,
+    const std::vector<UncertaintyBudget>& uncertaintyByOrder,
+    double minimumStandardizedSignal) {
+    if (witnessByOrder.empty() || witnessByOrder.size() != uncertaintyByOrder.size())
+        throw std::invalid_argument("DCS mechanism resolution requires equal non-empty order arrays");
+    if (!std::isfinite(minimumStandardizedSignal) || minimumStandardizedSignal <= 0.0)
+        throw std::invalid_argument("DCS mechanism-resolution threshold must be positive and finite");
+
+    MechanismResolutionResult result;
+    result.standardizedSignalByOrder.reserve(witnessByOrder.size());
+    for (std::size_t order = 0; order < witnessByOrder.size(); ++order) {
+        if (witnessByOrder[order].empty())
+            throw std::invalid_argument("DCS mechanism-resolution witness cannot be empty");
+        const double variance = uncertaintyByOrder[order].totalVariance();
+        if (!std::isfinite(variance) || variance <= 0.0)
+            throw std::invalid_argument("DCS mechanism-resolution variance must be positive and finite");
+        const double rms = responseNorm(witnessByOrder[order]) /
+            std::sqrt(static_cast<double>(witnessByOrder[order].size()));
+        const double standardized = rms / std::sqrt(variance);
+        result.standardizedSignalByOrder.push_back(standardized);
+        if (standardized >= minimumStandardizedSignal) {
+            result.anyObservableOrder = true;
+            result.maximumObservableOrder = order + 1U;
+        }
+    }
+    return result;
+}
+
+SynthesizedStencil synthesizeMaximinAnnihilatingStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& modelResponses,
+    const UncertaintyBudget& uncertainty,
+    double momentTolerance,
+    std::size_t maximumIterations) {
+    if (order == 0 || maximumIterations == 0)
+        throw std::invalid_argument("DCS maximin synthesis order/iteration count must be positive");
+    const double variance = uncertainty.totalVariance();
+    if (!std::isfinite(variance) || variance <= 0.0)
+        throw std::invalid_argument("DCS maximin synthesis uncertainty must be positive and finite");
+    validateModelResponseGrid(points, modelResponses);
+
+    const std::size_t pointCount = points.size();
+    const std::size_t dimension = points.front().coordinates.size();
+    const std::size_t observableCount = modelResponses.front().front().size();
+
+    Matrix moments;
+    for (std::size_t degree = 0; degree < order; ++degree) {
+        for (const auto& exponents : exponentVectors(dimension, degree)) {
+            std::vector<double> row(pointCount, 0.0);
+            for (std::size_t point = 0; point < pointCount; ++point)
+                row[point] = monomial(points[point].coordinates, exponents);
+            moments.push_back(std::move(row));
+        }
+    }
+    if (moments.size() >= pointCount)
+        throw std::invalid_argument("DCS maximin synthesis needs more points than lower-order constraints");
+
+    Matrix gram(moments.size(), std::vector<double>(moments.size(), 0.0));
+    for (std::size_t i = 0; i < moments.size(); ++i)
+        for (std::size_t j = 0; j < moments.size(); ++j)
+            for (std::size_t point = 0; point < pointCount; ++point)
+                gram[i][j] += moments[i][point] * moments[j][point];
+    const Matrix gramInverse = invertSquareMatrix(std::move(gram));
+
+    const auto normalizeL1 = [](std::vector<double> weights) {
+        double l1 = 0.0;
+        for (const double value : weights) l1 += std::abs(value);
+        if (!(l1 > 1.0e-15))
+            throw std::runtime_error("DCS maximin synthesis produced a zero stencil");
+        for (double& value : weights) value /= l1;
+        return weights;
+    };
+
+    const auto pairOperator = [&](const std::vector<double>& weights,
+                                  std::size_t modelA,
+                                  std::size_t modelB) {
+        std::vector<double> result(pointCount, 0.0);
+        for (std::size_t component = 0; component < observableCount; ++component) {
+            double coefficient = 0.0;
+            for (std::size_t point = 0; point < pointCount; ++point) {
+                const double delta =
+                    modelResponses[modelA][point][component] -
+                    modelResponses[modelB][point][component];
+                coefficient += weights[point] * delta;
+            }
+            for (std::size_t point = 0; point < pointCount; ++point) {
+                const double delta =
+                    modelResponses[modelA][point][component] -
+                    modelResponses[modelB][point][component];
+                result[point] += coefficient * delta /
+                    static_cast<double>(observableCount);
+            }
+        }
+        return result;
+    };
+
+    const auto makeResult = [&](const std::vector<double>& rawWeights,
+                                std::size_t iterations,
+                                bool converged) {
+        SynthesizedStencil candidate;
+        candidate.stencil.order = order;
+        candidate.stencil.points = points;
+        candidate.stencil.weights = normalizeL1(rawWeights);
+        candidate.momentValidation =
+            validateAnnihilatingStencil(candidate.stencil, momentTolerance);
+        if (!candidate.momentValidation.valid)
+            throw std::runtime_error("DCS maximin stencil violates annihilation contract");
+        candidate.independentNoiseGain = vectorNorm(candidate.stencil.weights);
+        candidate.powerIterations = iterations;
+        candidate.converged = converged;
+
+        std::vector<Response> witnesses;
+        witnesses.reserve(modelResponses.size());
+        for (const auto& model : modelResponses)
+            witnesses.push_back(applyAnnihilatingStencil(model, candidate.stencil, momentTolerance));
+        candidate.worstCaseStandardizedSeparation =
+            worstCaseStandardizedSeparation(witnesses, uncertainty);
+
+        const auto disagreementApplied =
+            applyModelDisagreement(candidate.stencil.weights, modelResponses);
+        for (std::size_t i = 0; i < candidate.stencil.weights.size(); ++i)
+            candidate.modelDisagreementEnergy +=
+                candidate.stencil.weights[i] * disagreementApplied[i];
+        return candidate;
+    };
+
+    SynthesizedStencil best = synthesizeAnnihilatingStencil(
+        points, order, modelResponses, momentTolerance, maximumIterations);
+    {
+        std::vector<Response> witnesses;
+        witnesses.reserve(modelResponses.size());
+        for (const auto& model : modelResponses)
+            witnesses.push_back(applyAnnihilatingStencil(model, best.stencil, momentTolerance));
+        best.worstCaseStandardizedSeparation =
+            worstCaseStandardizedSeparation(witnesses, uncertainty);
+    }
+
+    for (std::size_t modelA = 0; modelA < modelResponses.size(); ++modelA) {
+        for (std::size_t modelB = modelA + 1; modelB < modelResponses.size(); ++modelB) {
+            std::vector<double> weights(pointCount, 0.0);
+            double bestSeedNorm = -1.0;
+            for (std::size_t seed = 0; seed < pointCount; ++seed) {
+                std::vector<double> basis(pointCount, 0.0);
+                basis[seed] = 1.0;
+                auto projected = projectMomentNullspace(basis, moments, gramInverse);
+                const double norm = vectorNorm(projected);
+                if (norm > bestSeedNorm) {
+                    bestSeedNorm = norm;
+                    weights = std::move(projected);
+                }
+            }
+            normalize(weights);
+
+            bool converged = false;
+            std::size_t iterations = 0;
+            try {
+                for (std::size_t iteration = 0; iteration < maximumIterations; ++iteration) {
+                    auto next = pairOperator(weights, modelA, modelB);
+                    next = projectMomentNullspace(next, moments, gramInverse);
+                    normalize(next);
+
+                    long double same = 0.0L;
+                    long double opposite = 0.0L;
+                    for (std::size_t i = 0; i < pointCount; ++i) {
+                        const long double ds =
+                            static_cast<long double>(next[i]) - weights[i];
+                        const long double do_ =
+                            static_cast<long double>(next[i]) + weights[i];
+                        same += ds * ds;
+                        opposite += do_ * do_;
+                    }
+                    weights = std::move(next);
+                    iterations = iteration + 1U;
+                    if (std::sqrt(static_cast<double>(std::min(same, opposite))) < 1.0e-10) {
+                        converged = true;
+                        break;
+                    }
+                }
+                auto candidate = makeResult(weights, iterations, converged);
+                if (candidate.worstCaseStandardizedSeparation >
+                    best.worstCaseStandardizedSeparation)
+                    best = std::move(candidate);
+            } catch (const std::runtime_error&) {
+                // A particular pair can have no projected disagreement direction.
+                // Other pairs and the global-variance baseline remain valid candidates.
+            }
+        }
+    }
+    return best;
+}
+
 } // namespace vulkax::research::dcs
