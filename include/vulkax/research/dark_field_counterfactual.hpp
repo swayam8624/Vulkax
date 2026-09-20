@@ -32,6 +32,13 @@ struct MechanismContactResult {
     std::vector<double> normalizedDistanceByOrder;
 };
 
+struct JetContactEstimate {
+    std::size_t separatingOrder{};
+    bool separated{};
+    std::vector<double> maximumStandardizedDiscrepancyByOrder;
+    std::vector<std::size_t> witnessCountByOrder;
+};
+
 struct ScaleFlowResult {
     std::vector<double> adjacentLogSlopes;
     double tailLogSlope{};
@@ -101,6 +108,16 @@ struct SynthesizedStencil {
     const std::vector<Response>& candidateByOrder,
     double relativeTolerance = 0.05,
     double absoluteFloor = 1.0e-12);
+
+// Basis-aware operational estimate of response-jet contact. Each order may
+// contain several independent order-selective witnesses. Worlds remain in
+// contact through an order only if every tested witness stays within the frozen
+// standardized-discrepancy threshold.
+[[nodiscard]] JetContactEstimate estimateJetOrderOfContact(
+    const std::vector<std::vector<Response>>& referenceWitnessesByOrder,
+    const std::vector<std::vector<Response>>& candidateWitnessesByOrder,
+    const std::vector<UncertaintyBudget>& uncertaintyByOrder,
+    double separatingStandardizedDiscrepancy);
 
 // Log-log flow of a witness norm over numerical resolution h. This is a
 // diagnostic guard, not a claim that every witness follows an RG power law.
