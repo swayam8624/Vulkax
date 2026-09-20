@@ -18,6 +18,7 @@ on:
       - "research/analysis/gauge_shearing_mode_diagnostic.py"
       - "research/analysis/gauge_shearing_mode_compare.py"
       - "research/analysis/gauge_shearing_effective_span.py"
+      - "research/analysis/validate_gauge_effective_span.py"
       - "research/analysis/gauge_fixture_envelope_synthetic_control.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/analysis/gauge_foam_asset_geometry.py"
@@ -60,6 +61,11 @@ jobs:
         run: |
           python3 research/analysis/gauge_shearing_effective_span.py --root build/gauge-download --out build/gauge-effective-span
           cat build/gauge-effective-span/summary.json
+
+      - name: Apply frozen effective-span survival criteria
+        run: |
+          python3 research/analysis/validate_gauge_effective_span.py build/gauge-effective-span
+          cat build/gauge-effective-span/validation.json
 
       - name: Compare released foam geometry against marker-span proxy
         run: |
