@@ -4,6 +4,7 @@
 #include "vulkax/render/gaussian.hpp"
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -44,6 +45,26 @@ struct alignas(16) GaussianProjectionParameters {
     std::array<float, 4> sigmaTile{};      // cutoff, min sigma px, max sigma px, tile size
 };
 
+// Backend-level result for the 1.1A fused projection -> ordering -> CSR path.
+// `projected` contains only visible records in deterministic back-to-front order.
+// CSR references index that compacted ordered array, not the raw projection buffer.
+struct GaussianFusedProjectionScheduleResult {
+    std::vector<GaussianProjectedSplat> projected;
+    GaussianProjectionStats stats{};
+    std::vector<std::uint32_t> tileOffsets;
+    std::vector<std::uint32_t> projectedSplatIndices;
+    std::size_t splatReferences{};
+    std::size_t maximumSplatsPerTile{};
+    std::size_t paddedOrderCount{};
+    double projectionMilliseconds{};
+    double schedulingMilliseconds{};
+    std::size_t inputBytes{};
+    std::size_t outputBytes{};
+    std::size_t schedulerOutputBytes{};
+    std::size_t schedulerWorkspaceBytes{};
+    std::size_t intermediateReadbackBytes{};
+};
+
 struct GaussianNativeProjectionResult {
     std::vector<GaussianProjectedSplat> projected;
     GaussianProjectionStats stats{};
@@ -53,8 +74,14 @@ struct GaussianNativeProjectionResult {
     std::size_t splatReferences{};
     std::size_t maximumSplatsPerTile{};
     double projectionMilliseconds{};
+    double schedulingMilliseconds{};
     std::size_t inputBytes{};
     std::size_t outputBytes{};
+    std::size_t schedulerInputBytes{};
+    std::size_t schedulerOutputBytes{};
+    std::size_t schedulerWorkspaceBytes{};
+    std::size_t intermediateReadbackBytes{};
+    bool fusedProjectionScheduling{false};
 };
 
 [[nodiscard]] std::vector<GaussianProjectionInput> prepareGaussianProjectionInputs(
@@ -65,9 +92,12 @@ struct GaussianNativeProjectionResult {
     const GaussianRenderSettings& settings,
     std::uint32_t tileSize = 16U);
 
-// Runs the geometric projection/tile-range kernel on the requested native
-// backend, then deterministically compacts/sorts the fixed records on CPU by
-// depth. CPU sorting is deliberately retained as the ordering oracle in 0.50.
+// Runs geometric projection/tile-range generation on the requested native
+// backend. On the 1.1A Vulkan/Metal fused path, raw projected records stay on
+// the device through cull classification, deterministic depth ordering and CSR
+// construction; the host reads only a tiny allocation-metadata block between
+// projection and scheduling. The final ordered visible records are still
+// materialized on the host for CPU-oracle inspection.
 [[nodiscard]] GaussianNativeProjectionResult projectGaussianCloudNative(
     backend::BackendKind backend,
     const gaussian::GaussianCloud& cloud,
@@ -75,6 +105,15 @@ struct GaussianNativeProjectionResult {
     std::uint32_t tileSize = 16U);
 
 [[nodiscard]] GaussianRasterBatch buildGaussianRasterBatchFromProjection(
+    const GaussianNativeProjectionResult& projection,
+    const GaussianRenderSettings& settings = {});
+
+// Rasterizes one fixed projected record per visible splat. Six quad vertices are
+// generated from vertex_id in the native vertex shader, eliminating host-side
+// GaussianRasterVertex expansion while retaining the CPU-expanded path as an
+// independent image oracle.
+[[nodiscard]] GaussianRenderResult renderGaussianProjectionHeadless(
+    backend::BackendKind backend,
     const GaussianNativeProjectionResult& projection,
     const GaussianRenderSettings& settings = {});
 
