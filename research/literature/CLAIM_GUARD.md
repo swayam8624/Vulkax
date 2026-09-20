@@ -25,9 +25,13 @@ This file exists to prevent accidental novelty inflation.
 - held-out validation in the abstract.
 - rollback/transaction semantics without a scientific mechanism/evaluation.
 
-## Candidate research mechanism that is still alive
+## Historical candidate mechanism — no longer a positive flagship lock
 
-**Intervention-specific verified rewrite governance**:
+The intervention-specific governance family below is retained as provenance. It is
+**not currently authorized as the positive flagship mechanism** after the full
+DCS/D2/D3/D4V elimination sequence.
+
+**Historical intervention-specific verified rewrite governance**:
 
 1. receive a requested physical edit/intervention;
 2. evaluate evidence sufficiency for that specific counterfactual;
@@ -65,3 +69,40 @@ No sentence containing “novel”, “first”, “state of the art”, “reli
 - the relevant experiment has an independent held-out domain;
 - numerical and model-form alternatives have been attacked;
 - the repository contains the raw evidence and failure cases.
+
+
+## Final DCS claim guard — 2026-09-20
+
+The completed DCS sequence imposes additional hard restrictions.
+
+Executed facts:
+- D2 fresh validation: **0/16 resolved worlds**;
+- D3 witness-space/adaptive-order: **0/6 resolved worlds**;
+- D4V pair-specific repair veto: **36 proposals**, **14 deceptive**, **22
+  beneficial**, but **0% resolved coverage** for DCS and all matched verification
+  baselines at the inherited credibility threshold;
+- GAUGE retrospective: ordinary face+marker metrics prefer overlap **10/10**,
+  marker dark-field endpoint wins **0/10**, longitudinal dark-field endpoint wins
+  **9/10**.
+
+Therefore do not claim:
+- that DCS prospectively verifies physical repairs;
+- that DCS outperforms Fisher/raw matched-cost baselines;
+- that DCS provides useful deployment coverage under the tested regime;
+- that adaptive response order solves the observability problem;
+- that the GAUGE retrospective demonstrates generalization;
+- that implementation completion implies physical verification.
+
+Currently allowed high-level statement:
+
+> Vulkax implements and systematically falsifies several mechanism-selective
+> counterfactual verification strategies. The tested DCS variants did not achieve
+> resolved prospective verification coverage on fresh synthetic partitions, while a
+> retrospective GAUGE analysis exposed a channel-specific contradiction between
+> aggregate observation metrics and longitudinal mechanism response.
+
+A future positive claim requires:
+1. a new physical-information channel;
+2. a fresh discovery partition;
+3. a newly frozen untouched validation partition;
+4. then a fresh measured D5 confirmation.
