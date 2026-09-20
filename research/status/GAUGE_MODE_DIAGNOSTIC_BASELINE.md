@@ -89,3 +89,34 @@ A meaningful geometry repair must simultaneously:
 If it improves only one scalar benchmark metric while worsening these mechanism-level checks, reject it.
 
 Inverse material fitting remains locked.
+
+
+## Global-affine versus local-non-affine decomposition
+
+A second post-hoc diagnostic was run on the same immutable workflow artifact and same frozen baseline prediction. Each measured and predicted frame is independently decomposed into its best 3D affine map from the initial 28-marker cloud plus the remaining local residual.
+
+This decomposition is kinematic only; no physical parameter is fitted.
+
+| quantity | soft | hard |
+|---|---:|---:|
+| median normalized global deformation-gradient error | **0.121431** | **0.108019** |
+| mean normalized global deformation-gradient error | 0.150657 | 0.236923 |
+| final measured det(F) | 0.985184 | 0.996548 |
+| final predicted det(F) | 1.018259 | 1.012583 |
+| measured mean non-affine marker RMS | 0.7133 mm | 0.6815 mm |
+| predicted mean non-affine marker RMS | 1.1153 mm | 1.0341 mm |
+| predicted / measured non-affine marker amplitude | **1.5635x** | **1.5175x** |
+| measured mean non-affine face-area RMS | 0.018750 | 0.015691 |
+| predicted mean non-affine face-area RMS | 0.044469 | 0.040241 |
+| predicted / measured non-affine face-area amplitude | **2.3716x** | **2.5646x** |
+| mean non-affine face residual-vector RMSE | 0.031100 | 0.031968 |
+
+The important separation is therefore:
+
+- the gross affine deformation is imperfect but comparatively close;
+- the local/non-affine response is much too strong, especially in face-area deformation;
+- this excess local response appears in both materials.
+
+This does **not** identify whether the local excess comes from body geometry, fixture/contact representation, Gaussian-to-volume correspondence, transfer numerics, constitutive inadequacy, or an interaction among them. It does make those hypotheses testable at the correct spatial scale.
+
+The released-asset geometry is pre-registered in `GAUGE_AFFINE_NONAFFINE_PROTOCOL.md` to be classified as macro repair, local repair, both, mixed, or neither.
