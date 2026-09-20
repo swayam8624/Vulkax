@@ -209,3 +209,17 @@ No-fit metadata-only Vulkax lost to the zero-parameter affine null on **20/20** 
 The current APIC + Neo-Hookean + proxy-geometry + prescribed-boundary family is **inadequate for this real benchmark as instantiated**. This is no longer explainable as representative-trial cherry picking. Material inversion remains forbidden.
 
 The first coarse timestep level (dt=1/6000 s) inverted the soft body. This is retained as a numerical-stability negative result. The timestep harness is being repaired to continue baseline->fine evidence even when the coarse level is invalid.
+
+
+## 2026-09-20 — GAUGE repeat and timestep forensics narrow the failure source
+
+**Workflow:** `35513957701`, success.
+**Head:** `0d933954ceb3494196612f4536fdcdf1fe3e2244`.
+
+Vulkax lost to the affine null on every one of 20 measured shearing repeats. Halving dt changed the predicted face-area trajectory by only ~0.55% of the existing sim-to-real misfit for both materials. A 2× coarser step inverted the soft body and is retained as explicit stability evidence.
+
+### Decision
+Do not spend effort tuning timestep or selecting a different repeat. The dominant error is structural/modeling.
+
+### Next falsification
+Run one-factor no-fit structural ablations over resolution, transfer, fixture thickness, cross-section proxy and gravity frame. These are diagnostics only; no variant may unlock inverse fitting without an independently justified follow-up.

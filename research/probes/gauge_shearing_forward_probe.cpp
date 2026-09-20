@@ -121,7 +121,7 @@ std::vector<DriverSample> loadDriver(const std::filesystem::path& path) {
     return out;
 }
 
-Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double density) {
+Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double density,bool squareCrossSection) {
     if(!(mass>0.0) || !(density>0.0)) throw std::runtime_error("mass and density must be positive");
     Geometry g;
     for(int a=0;a<3;++a) {
@@ -143,7 +143,7 @@ Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double den
     for(int a=0;a<3;++a) if(a!=g.longAxis) cross[static_cast<std::size_t>(c++)]=a;
     const double s0=std::max(span[static_cast<std::size_t>(cross[0])],1e-6);
     const double s1=std::max(span[static_cast<std::size_t>(cross[1])],1e-6);
-    const double aspect=s0/s1;
+    const double aspect=squareCrossSection?1.0:(s0/s1);
     g.volume=mass/density;
     const double area=g.volume/g.longSpan;
     g.crossA=std::sqrt(area*aspect);
@@ -159,9 +159,8 @@ Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double den
     return g;
 }
 
-std::vector<MpmParticle> makeParticles(const Geometry& g,double mass,double density) {
-    constexpr int nCross=5;
-    constexpr int nLong=13;
+std::vector<MpmParticle> makeParticles(const Geometry& g,double mass,double density,int nCross,int nLong) {
+    if(nCross<3 || nLong<3) throw std::runtime_error("particle resolution must be at least 3 per axis");
     std::array<int,3> n{nCross,nCross,nCross};
     n[static_cast<std::size_t>(g.longAxis)]=nLong;
     const std::size_t count=static_cast<std::size_t>(n[0]*n[1]*n[2]);
@@ -228,20 +227,42 @@ MpmGridSettings makeGrid(const Geometry& g,const std::vector<DriverSample>& driv
 }
 
 std::vector<PrescribedParticleTarget> targetsFor(
-    const std::vector<MpmParticle>& particles,const Geometry& g,Vec3 driver,Vec3 velocity) {
+    const std::vector<MpmParticle>& particles,const Geometry& g,Vec3 driver,Vec3 velocity,
+    int boundaryLayers,int nLong) {
     std::vector<PrescribedParticleTarget> out;
+    if(boundaryLayers<1 || boundaryLayers*2>=nLong)
+        throw std::runtime_error("invalid prescribed boundary thickness");
     const auto axis=static_cast<std::size_t>(g.longAxis);
     const double lo=g.prismLo[axis],hi=g.prismHi[axis];
-    const double tol=1e-10;
+    const double spacing=(hi-lo)/static_cast<double>(nLong-1);
+    const double extent=(static_cast<double>(boundaryLayers)-0.5)*spacing;
     for(const auto&p:particles) {
         const std::array<double,3> r{p.restPosition.x,p.restPosition.y,p.restPosition.z};
-        if(std::abs(r[axis]-lo)<tol)
+        if(r[axis]<=lo+extent)
             out.push_back({p.id,p.restPosition,{0,0,0},true});
-        else if(std::abs(r[axis]-hi)<tol)
+        else if(r[axis]>=hi-extent)
             out.push_back({p.id,p.restPosition+driver,velocity,true});
     }
     if(out.empty()) throw std::runtime_error("forward probe created no prescribed boundary particles");
     return out;
+}
+
+MpmTransferScheme parseTransfer(const std::string& name) {
+    if(name=="APIC") return MpmTransferScheme::APIC;
+    if(name=="PIC") return MpmTransferScheme::PIC;
+    if(name=="FLIP") return MpmTransferScheme::FLIP;
+    throw std::runtime_error("unsupported GAUGE transfer scheme");
+}
+
+Vec3 parseGravity(const std::string& name) {
+    if(name=="zero") return {0,0,0};
+    if(name=="+x") return {9.81,0,0};
+    if(name=="-x") return {-9.81,0,0};
+    if(name=="+y") return {0,9.81,0};
+    if(name=="-y") return {0,-9.81,0};
+    if(name=="+z") return {0,0,9.81};
+    if(name=="-z") return {0,0,-9.81};
+    throw std::runtime_error("unsupported GAUGE gravity frame");
 }
 
 void writeFrame(std::ofstream& out,std::size_t frame,double time,
@@ -257,22 +278,33 @@ void writeFrame(std::ofstream& out,std::size_t frame,double time,
 } // namespace
 
 int main(int argc,char**argv) {
-    if(argc!=10) {
+    if(argc!=10 && argc!=16) {
         std::cerr<<"usage: vulkax_gauge_shearing_forward_probe markers.csv driver.csv output.csv "
-                    "young_pa poisson density_kg_m3 mass_kg requested_dt label\n";
+                    "young_pa poisson density_kg_m3 mass_kg requested_dt label "
+                    "[n_cross n_long boundary_layers transfer geometry_mode gravity]\n";
         return 2;
     }
     const std::filesystem::path markerPath=argv[1],driverPath=argv[2],outPath=argv[3];
     const double young=number(argv[4]),poisson=number(argv[5]),density=number(argv[6]),mass=number(argv[7]);
     const double requestedDt=number(argv[8]);
     const std::string label=argv[9];
+    const int nCross=argc==16?std::stoi(argv[10]):5;
+    const int nLong=argc==16?std::stoi(argv[11]):13;
+    const int boundaryLayers=argc==16?std::stoi(argv[12]):1;
+    const std::string transferName=argc==16?argv[13]:"APIC";
+    const std::string geometryMode=argc==16?argv[14]:"measured_aspect";
+    const std::string gravityName=argc==16?argv[15]:"zero";
     if(!(poisson>-1.0 && poisson<0.5) || !(requestedDt>0.0))
         throw std::runtime_error("invalid material/timestep argument");
+    if(geometryMode!="measured_aspect" && geometryMode!="square_cross")
+        throw std::runtime_error("unsupported geometry mode");
+    const auto transfer=parseTransfer(transferName);
+    const auto gravity=parseGravity(gravityName);
 
     const auto markers=loadMarkers(markerPath);
     const auto driver=loadDriver(driverPath);
-    const auto geom=inferGeometry(markers,mass,density);
-    auto particles=makeParticles(geom,mass,density);
+    const auto geom=inferGeometry(markers,mass,density,geometryMode=="square_cross");
+    auto particles=makeParticles(geom,mass,density,nCross,nLong);
     auto cloud=markerCloud(markers);
     const auto binding=vulkax::coupling::bindGaussianCloudToMpm(cloud,particles,24);
 
@@ -280,7 +312,12 @@ int main(int argc,char**argv) {
         geom.prismHi[0]-geom.prismLo[0],
         geom.prismHi[1]-geom.prismLo[1],
         geom.prismHi[2]-geom.prismLo[2]};
-    const double cell=std::min({side[0]/4.0,side[1]/4.0,side[2]/12.0});
+    std::array<int,3> particleDims{nCross,nCross,nCross};
+    particleDims[static_cast<std::size_t>(geom.longAxis)]=nLong;
+    const double cell=std::min({
+        side[0]/static_cast<double>(particleDims[0]-1),
+        side[1]/static_cast<double>(particleDims[1]-1),
+        side[2]/static_cast<double>(particleDims[2]-1)});
     const auto grid=makeGrid(geom,driver,cell);
     const MpmMaterial material{density,young,poisson};
 
@@ -306,9 +343,9 @@ int main(int argc,char**argv) {
         for(std::size_t s=1;s<=substeps;++s) {
             const double alpha=static_cast<double>(s)/static_cast<double>(substeps);
             const Vec3 d=driver[f].d+(driver[f+1].d-driver[f].d)*alpha;
-            const auto targets=targetsFor(particles,geom,d,v);
+            const auto targets=targetsFor(particles,geom,d,v,boundaryLayers,nLong);
             const auto ev=vulkax::research::stepMpmWithPrescribedParticles(
-                particles,grid,material,dt,targets,{0,0,0},MpmTransferScheme::APIC,0.0);
+                particles,grid,material,dt,targets,gravity,transfer,0.0);
             evidence.minimumJ=std::min(evidence.minimumJ,ev.unconstrainedStep.minimumDeformationDeterminant);
             evidence.maximumMomentumAccountingError=std::max(evidence.maximumMomentumAccountingError,ev.momentumAccountingError);
             evidence.maximumPositionCorrection=std::max(evidence.maximumPositionCorrection,ev.maximumPositionCorrection);
@@ -332,9 +369,13 @@ int main(int argc,char**argv) {
            <<"  \"poisson\": "<<poisson<<",\n"
            <<"  \"density_kg_m3\": "<<density<<",\n"
            <<"  \"mass_kg\": "<<mass<<",\n"
-           <<"  \"geometry_proxy\": \"mass/density volume + measured marker long span + measured cross-section aspect ratio\",\n"
-           <<"  \"gravity\": [0,0,0],\n"
-           <<"  \"transfer\": \"APIC\",\n"
+           <<"  \"geometry_proxy\": \"mass/density volume + measured marker long span + "<<geometryMode<<"\",\n"
+           <<"  \"gravity_mode\": \""<<gravityName<<"\",\n"
+           <<"  \"gravity\": ["<<gravity.x<<','<<gravity.y<<','<<gravity.z<<"],\n"
+           <<"  \"transfer\": \""<<transferName<<"\",\n"
+           <<"  \"n_cross\": "<<nCross<<",\n"
+           <<"  \"n_long\": "<<nLong<<",\n"
+           <<"  \"boundary_layers\": "<<boundaryLayers<<",\n"
            <<"  \"particles\": "<<evidence.particles<<",\n"
            <<"  \"grid\": ["<<evidence.gridDims[0]<<','<<evidence.gridDims[1]<<','<<evidence.gridDims[2]<<"],\n"
            <<"  \"grid_cell_m\": "<<evidence.gridCellSize<<",\n"
