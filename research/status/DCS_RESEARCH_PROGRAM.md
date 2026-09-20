@@ -1,6 +1,6 @@
 # Dark-Field Counterfactual Spectroscopy (DCS) — Research Program
 
-Status: **flagship research direction, implementation active**
+Status: **implementation complete; flagship scientific claim not established**
 
 Date locked for implementation: 2026-09-20
 
@@ -190,7 +190,7 @@ Kill condition:
 - any primitive fails deterministic polynomial controls.
 
 ### Phase D1 — constructed deceptive-repair positive control
-Status: IMPLEMENTED, CI running.
+Status: **IMPLEMENTED — PASS**.
 
 Construct worlds where:
 - baseline has visible first-order error but near-correct mixed coupling;
@@ -209,7 +209,7 @@ Frozen gate:
 Failure kills the current DCS implementation before any expensive experiments.
 
 ### Phase D2 — solver-native synthetic truth
-Status: NEXT.
+Status: **IMPLEMENTED — completed/frozen negative validation path**.
 
 Use actual Vulkax MPM worlds, not analytic response formulas.
 
@@ -233,7 +233,7 @@ Primary output:
 - deceptive-repair classification dataset with known cause labels.
 
 ### Phase D3 — automatic stencil synthesis
-Status: PLANNED.
+Status: **IMPLEMENTED — global, pair-aware, witness-space, adaptive-order paths completed**.
 
 Candidate primitive interventions:
 - shear +/- amplitude;
@@ -262,7 +262,7 @@ Objectives to compare:
 6. active model discrimination objective where implementable.
 
 ### Phase D4 — GAUGE retrospective mechanism study
-Status: PLANNED; discovery evidence only.
+Status: **IMPLEMENTED AND COMPLETE; retrospective discovery evidence only**.
 
 The current GAUGE fixture result was used to invent/refine DCS and therefore must
 not be presented as confirmatory validation.
@@ -281,7 +281,7 @@ Potential real-data stencils from cyclic shear trajectories:
 Material fitting remains locked.
 
 ### Phase D5 — fresh real confirmatory regime
-Status: REQUIRED BEFORE FLAGSHIP PAPER.
+Status: **RUNNER IMPLEMENTED; fresh independent data execution remains required before any confirmatory claim**.
 
 Need data not used to design thresholds/witnesses.
 
@@ -294,7 +294,7 @@ The confirmatory benchmark must contain at least one ordinary-metric deceptive
 repair or a prospective model-discrimination task.
 
 ### Phase D6 — captured Gaussian-world integration
-Status: PLANNED.
+Status: **IMPLEMENTED at reusable spatial-witness localization/export layer; application to a final successful mechanism remains scientific follow-up**.
 
 Expose DCS witnesses simultaneously in:
 - physical particle coordinates;
@@ -449,3 +449,36 @@ Protocol:
 If D4V also fails its frozen discovery advancement rule, DCS must be narrowed to a
 diagnostic/visualization contribution or killed as the Vulkax flagship rather than
 rescued by arbitrary higher response orders.
+
+
+## 10. Implementation-complete boundary
+
+As of 2026-09-20, the DCS/Vulkax research implementation is considered **100% complete**
+for the currently specified research program.
+
+Implemented:
+- mathematical response/cumulant/jet primitives;
+- arbitrary-order annihilation validation and application;
+- global, pair-aware, and witness-space maximin stencil synthesis;
+- multi-seed nullspace search;
+- uncertainty propagation and mechanism-resolution logic;
+- solver-native synthetic generators;
+- D0/D1/D2/D3/D4V experiment harnesses;
+- Fisher/raw/max-motion/random fair baselines;
+- frozen negative-result analyzers;
+- GAUGE retrospective measured-data runner;
+- generic D5 confirmatory replay format/runner;
+- D6 spatial localization for particles/Gaussians/surface regions;
+- spatial PLY export;
+- unified evidence-pack export;
+- CI completion gate.
+
+Not included in the 100% implementation number:
+- obtaining a positive publishable flagship result;
+- collecting new physical measurements;
+- executing a fresh independent D5 confirmatory dataset;
+- paper prose;
+- final rendered paper figures/videos.
+
+Therefore **100% implementation must never be interpreted as 100% evidence or paper
+readiness**. Negative results remain binding.
