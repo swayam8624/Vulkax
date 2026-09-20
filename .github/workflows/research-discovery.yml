@@ -122,6 +122,16 @@ jobs:
             build/refusal-cause
           cat build/refusal-cause/refusal_cause_diagnostic.json
 
+      - name: Abstain on refusal causes outside calibration support
+        run: |
+          python3 research/probes/diagnose_refusal_causes_abstain.py \
+            build/refusal-repair/cases.csv \
+            build/refusal-validation/cases.csv \
+            build/refusal-validation2/cases.csv \
+            build/refusal-validation3/cases.csv \
+            build/refusal-cause-abstain
+          cat build/refusal-cause-abstain/refusal_cause_abstention.json
+
       - name: Test GAUGE deformable adapter contract
         run: python3 research/adapters/test_gauge_adapter.py
 
@@ -145,5 +155,7 @@ jobs:
             build/refusal-validation3
             build/refusal-policy-v3
             build/policy-shift
+            build/refusal-cause
+            build/refusal-cause-abstain
           if-no-files-found: error
           retention-days: 30
