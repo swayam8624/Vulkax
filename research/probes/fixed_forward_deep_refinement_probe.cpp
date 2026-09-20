@@ -233,7 +233,7 @@ int main(int argc,char** argv) {
         <<"  \"provenance\": \"synthetic-label-free-fixed-physics-numerical-diagnostic\",\n"
         <<"  \"transfer\": \"APIC\",\n"
         <<"  \"grid_cell_m\": 0.08,\n"
-        <<"  \"dt_ladder_s\": [0.0001,0.00005,0.000025,0.0000125,0.00000625,0.000003125,0.0000015625],\n"
+        <<"  \"dt_ladder_s\": [0.0001,0.00005,0.000025,0.0000125,0.00000625,0.000003125,0.0000015625,0.00000078125],\n"
         <<"  \"warning\": \"No inverse fit, safety label, or acceptance-policy tuning is performed. The finest level is a discrete numerical reference, not continuum truth.\"\n"
         <<"}\n";
     return 0;
