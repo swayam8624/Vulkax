@@ -181,7 +181,8 @@ fi
 stage "Validate Python research/release tooling"
 python3 -m py_compile   scripts/validate_evidence_registry.py   scripts/audit_release_claims.py   scripts/test_release_cli_failures.py   scripts/benchmark_captured_world_run.py   research/analysis/dcs_confirmatory_replay.py   research/analysis/export_dcs_spatial_map.py   research/analysis/export_dcs_evidence_pack.py   research/analysis/gauge_dcs_retrospective.py   research/analysis/gauge_shearing_effective_span.py   research/analysis/validate_gauge_effective_span.py   research/probes/analyze_dcs_darkfield.py   research/probes/analyze_dcs_solver_native.py   research/probes/analyze_dcs_active_selection.py   research/probes/analyze_dcs_d2_validation.py   research/probes/analyze_dcs_d3_witness_space.py   research/probes/analyze_dcs_d4v_repair_veto.py   research/probes/export_dcs_d3_tables.py   research/analysis/assemble_paper_evidence.py \
   research/analysis/generate_paper_assets.py \
-  research/analysis/validate_paper_reproduction.py
+  research/analysis/validate_paper_reproduction.py \
+  research/analysis/analyze_information_frontier.py
 
 python3 research/analysis/dcs_confirmatory_replay.py --self-test
 python3 research/analysis/export_dcs_spatial_map.py --self-test
@@ -189,6 +190,7 @@ python3 research/analysis/export_dcs_evidence_pack.py --self-test
 python3 research/analysis/assemble_paper_evidence.py --self-test
 python3 research/analysis/generate_paper_assets.py --self-test
 python3 research/analysis/validate_paper_reproduction.py --self-test
+python3 research/analysis/analyze_information_frontier.py --self-test
 
 stage "Configure Release + tests"
 cmake -S . -B "$BUILD_DIR"   -DCMAKE_BUILD_TYPE=Release   -DVULKAX_BUILD_TESTS=ON
@@ -292,6 +294,15 @@ with negative/falsification outcomes and are therefore executed best-effort.
 They are not used to override the canonical D2/D3/D4V/GAUGE evidence.
 EOF
 fi
+
+stage "Post-hoc information-frontier diagnostics"
+DIAG_ARGS=(
+  --d4v "$BUILD_DIR/dcs-d4v-discovery/proposals.csv"
+  --gauge "$BUILD_DIR/gauge-dcs-retrospective/per_trial.csv"
+  --out "$BUILD_DIR/paper-diagnostics"
+)
+if [[ "$SKIP_GAUGE" == "1" ]]; then DIAG_ARGS+=(--allow-missing-gauge); fi
+python3 research/analysis/analyze_information_frontier.py "${DIAG_ARGS[@]}"
 
 stage "Validate reproduced numbers against frozen paper ledger"
 VALIDATION_ARGS=(
