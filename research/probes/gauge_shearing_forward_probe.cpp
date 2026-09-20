@@ -248,22 +248,38 @@ MpmGridSettings makeGrid(const Geometry& g,const std::vector<DriverSample>& driv
 
 std::vector<PrescribedParticleTarget> targetsFor(
     const std::vector<MpmParticle>& particles,const Geometry& g,Vec3 driver,Vec3 velocity,
-    int boundaryLayers,int nLong) {
+    int boundaryLayers,int nLong,double boundaryThicknessM) {
     std::vector<PrescribedParticleTarget> out;
     if(boundaryLayers<1 || boundaryLayers*2>=nLong)
         throw std::runtime_error("invalid prescribed boundary thickness");
     const auto axis=static_cast<std::size_t>(g.longAxis);
     const double lo=g.prismLo[axis],hi=g.prismHi[axis];
     const double spacing=(hi-lo)/static_cast<double>(nLong-1);
-    const double extent=(static_cast<double>(boundaryLayers)-0.5)*spacing;
+    double extent=(static_cast<double>(boundaryLayers)-0.5)*spacing;
+
+    // Research-only metric support mode. A non-negative thickness represents a
+    // physically interpretable support region measured from each end of the full
+    // body. It is intentionally separate from the historical particle-layer mode
+    // so held-out fixture-support experiments do not silently reinterpret old runs.
+    if(boundaryThicknessM>=0.0) {
+        if(!(boundaryThicknessM>0.0) || !(2.0*boundaryThicknessM < hi-lo))
+            throw std::runtime_error("invalid metric boundary thickness");
+        extent=boundaryThicknessM;
+    }
+
+    std::size_t lowerCount=0U,upperCount=0U;
     for(const auto&p:particles) {
         const std::array<double,3> r{p.restPosition.x,p.restPosition.y,p.restPosition.z};
-        if(r[axis]<=lo+extent)
+        if(r[axis]<=lo+extent+1.0e-12) {
             out.push_back({p.id,p.restPosition,{0,0,0},true});
-        else if(r[axis]>=hi-extent)
+            ++lowerCount;
+        } else if(r[axis]>=hi-extent-1.0e-12) {
             out.push_back({p.id,p.restPosition+driver,velocity,true});
+            ++upperCount;
+        }
     }
-    if(out.empty()) throw std::runtime_error("forward probe created no prescribed boundary particles");
+    if(lowerCount==0U || upperCount==0U)
+        throw std::runtime_error("forward probe boundary support did not constrain both ends");
     return out;
 }
 
@@ -305,10 +321,10 @@ void writeFrame(std::ofstream& out,std::size_t frame,double time,
 } // namespace
 
 int main(int argc,char**argv) {
-    if(argc!=10 && argc!=16 && argc!=17) {
+    if(argc!=10 && argc!=16 && argc!=17 && argc!=18) {
         std::cerr<<"usage: vulkax_gauge_shearing_forward_probe markers.csv driver.csv output.csv "
                     "young_pa poisson density_kg_m3 mass_kg requested_dt label "
-                    "[n_cross n_long boundary_layers transfer geometry_mode gravity [constitutive]]\n";
+                    "[n_cross n_long boundary_layers transfer geometry_mode gravity [constitutive [boundary_thickness_m]]]\n";
         return 2;
     }
     const std::filesystem::path markerPath=argv[1],driverPath=argv[2],outPath=argv[3];
@@ -321,7 +337,8 @@ int main(int argc,char**argv) {
     const std::string transferName=argc>=16?argv[13]:"APIC";
     const std::string geometryMode=argc>=16?argv[14]:"measured_aspect";
     const std::string gravityName=argc>=16?argv[15]:"zero";
-    const std::string constitutiveName=argc==17?argv[16]:"neo_hookean_log_j";
+    const std::string constitutiveName=argc>=17?argv[16]:"neo_hookean_log_j";
+    const double boundaryThicknessM=argc==18?number(argv[17]):-1.0;
     if(!(poisson>-1.0 && poisson<0.5) || !(requestedDt>0.0))
         throw std::runtime_error("invalid material/timestep argument");
     if(geometryMode!="measured_aspect" && geometryMode!="square_cross" && geometryMode!="released_asset_aspect")
@@ -372,7 +389,7 @@ int main(int argc,char**argv) {
         for(std::size_t s=1;s<=substeps;++s) {
             const double alpha=static_cast<double>(s)/static_cast<double>(substeps);
             const Vec3 d=driver[f].d+(driver[f+1].d-driver[f].d)*alpha;
-            const auto targets=targetsFor(particles,geom,d,v,boundaryLayers,nLong);
+            const auto targets=targetsFor(particles,geom,d,v,boundaryLayers,nLong,boundaryThicknessM);
             const auto ev=vulkax::research::stepMpmWithPrescribedParticles(
                 particles,grid,material,dt,targets,gravity,transfer,0.0);
             evidence.minimumJ=std::min(evidence.minimumJ,ev.unconstrainedStep.minimumDeformationDeterminant);
@@ -406,6 +423,8 @@ int main(int argc,char**argv) {
            <<"  \"n_cross\": "<<nCross<<",\n"
            <<"  \"n_long\": "<<nLong<<",\n"
            <<"  \"boundary_layers\": "<<boundaryLayers<<",\n"
+           <<"  \"boundary_mode\": \""<<(boundaryThicknessM>=0.0?"metric_thickness":"particle_layers")<<"\",\n"
+           <<"  \"boundary_thickness_m\": "<<boundaryThicknessM<<",\n"
            <<"  \"particles\": "<<evidence.particles<<",\n"
            <<"  \"grid\": ["<<evidence.gridDims[0]<<','<<evidence.gridDims[1]<<','<<evidence.gridDims[2]<<"],\n"
            <<"  \"grid_cell_m\": "<<evidence.gridCellSize<<",\n"
