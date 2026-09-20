@@ -1,5 +1,6 @@
 #include "vulkax/research/dark_field_counterfactual.hpp"
 
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <vector>
