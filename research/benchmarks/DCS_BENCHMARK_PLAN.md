@@ -76,12 +76,16 @@ These thresholds are a research advancement gate, not a universal physical guara
 Given a fixed candidate set, each selector chooses one allowed experiment.
 
 Selectors:
-1. DCS dark-field dispersion / uncertainty / cost;
-2. Fisher/Jacobian information;
-3. raw maximum model-output separation;
-4. maximum predicted motion;
-5. random;
-6. safe active model-discrimination baseline where implementation permits.
+1. **DCS maximin standardized annihilating stencil** — flagship selector;
+2. **same-cost raw bundle** — sees every DCS intervention but does not cancel lower-order response;
+3. **raw maximin single intervention** — maximum worst-case model separation without annihilation;
+4. **Fisher/Jacobian sensitivity** — maximum local normalized E/nu sensitivity;
+5. **maximum predicted motion**;
+6. **random**;
+7. safe generic active model-discrimination baseline where implementation permits.
+
+The same-cost raw bundle is mandatory for attributing any gain specifically to the
+dark-field algebra rather than to DCS simply consuming more measurements.
 
 Evaluation:
 - whether chosen experiment separates the true model from deceptive candidate;
