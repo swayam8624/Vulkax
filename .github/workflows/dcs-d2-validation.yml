@@ -1,0 +1,45 @@
+name: Vulkax DCS D2 frozen validation
+
+on:
+  push:
+    branches: ["research/dcs-darkfield"]
+    paths:
+      - "include/vulkax/research/dark_field_counterfactual.hpp"
+      - "src/research/dark_field_counterfactual.cpp"
+      - "research/probes/dcs_d2_validation_probe.cpp"
+      - "research/probes/analyze_dcs_d2_validation.py"
+      - "research/benchmarks/DCS_D2_VALIDATION_PROTOCOL.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/dcs-d2-validation.yml"
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-dcs-d2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  d2-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate frozen analysis
+        run: python3 -m py_compile research/probes/analyze_dcs_d2_validation.py
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+      - name: Build D2 validation target
+        run: cmake --build build --target vulkax_dcs_d2_validation_probe --parallel 2
+      - name: Run frozen D2 validation
+        run: |
+          build/vulkax_dcs_d2_validation_probe build/dcs-d2-validation
+          python3 research/probes/analyze_dcs_d2_validation.py build/dcs-d2-validation
+          cat build/dcs-d2-validation/analysis.json
+      - name: Upload D2 validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-dcs-d2-validation-${{ github.sha }}
+          path: build/dcs-d2-validation
+          if-no-files-found: error
+          retention-days: 30
