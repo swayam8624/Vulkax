@@ -166,6 +166,16 @@ def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: 
                     "sha256": sha256(dest),
                 })
 
+    for item in artifacts:
+        try:
+            item["bundle_path"]=str(Path(item["bundle_path"]).resolve().relative_to(out))
+        except ValueError:
+            item["bundle_path"]=str(item["bundle_path"])
+
+    with (out/"SHA256SUMS").open("w") as sums:
+        for item in sorted(artifacts,key=lambda x:x["bundle_path"]):
+            sums.write(f"{item['sha256']}  {item['bundle_path']}\n")
+
     complete=not missing
     manifest={
         "schema":"vulkax.paper_evidence_bundle",
@@ -210,7 +220,8 @@ def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: 
         "- logs/ — command logs when available\n"
         "- system/ — hardware/software provenance when available\n"
         "- manifest.json — SHA-256 indexed artifact manifest\n"
-        "- artifact_index.csv — flat artifact table\n\n"
+        "- artifact_index.csv — flat artifact table
+- SHA256SUMS — portable checksums for every indexed artifact\n\n"
         f"Missing required artifacts: {len(missing)}\n"
     )
     if missing:
