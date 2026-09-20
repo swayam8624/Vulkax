@@ -9,6 +9,7 @@ This is an **asset/source map**, not manuscript text.
 | Numerical floor | same | discovery | show numerical-error reduction from witness-space refinement |
 | D4V proposal composition | same | discovery | show 14 deceptive vs 22 beneficial held-out-improving repairs and zero resolved proposals |
 | GAUGE channel contradiction | same + retrospective per-trial CSV | retrospective measured | show observation-space vs longitudinal-mechanism disagreement |
+| Information frontier | `DCS_INFORMATION_FRONTIER_2026-09-20.json` + D4V proposals | post-hoc diagnostic | quantify signal/uncertainty gap to the frozen |z|=2 reference |
 | Stage outcome table | same | mixed | compact D1–D6 status ledger |
 | Claim-boundary table | claim guard + final result JSON | integrity | separate supported from unsupported conclusions |
 
