@@ -98,6 +98,11 @@ jobs:
           python3 research/probes/validate_refusal_policy_v2.py build/refusal-repair/cases.csv build/refusal-validation2/cases.csv build/refusal-validation2
           cat build/refusal-validation2/policy_validation2.json
 
+      - name: Diagnose refusal-policy domain shift without retuning
+        run: |
+          python3 research/probes/diagnose_refusal_policy_shift.py build/refusal-repair/cases.csv build/refusal-validation/cases.csv build/refusal-validation2/cases.csv build/policy-shift
+          cat build/policy-shift/shift_diagnostic.json
+
       - name: Test GAUGE deformable adapter contract
         run: python3 research/adapters/test_gauge_adapter.py
 
@@ -118,5 +123,6 @@ jobs:
             build/refusal-repair
             build/refusal-validation
             build/refusal-validation2
+            build/policy-shift
           if-no-files-found: error
           retention-days: 30
