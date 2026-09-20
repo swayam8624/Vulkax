@@ -117,3 +117,34 @@ No venue acceptance is guaranteed. The research target is Tier-1 quality only if
 the method becomes an algorithmic contribution with cross-cause, cross-domain,
 independent validation. A paper consisting only of the current diagnostics should
 not be submitted as the flagship Vulkax paper.
+
+
+## Post-DCS execution update
+
+The historical conclusion above predates the complete DCS implementation/elimination
+sequence and is retained for provenance.
+
+Subsequent evidence changed the state:
+
+1. CAR-v1 / generic adequacy routing was superseded by DCS after the definitive
+   GAUGE finite-support metric mirage.
+2. DCS fixed order-2 ranking failed fresh validation.
+3. DCS witness-space uncertainty and adaptive k=2/3 failed to produce resolved
+   prospective coverage.
+4. Pair-specific DCS repair veto also failed its frozen discovery advancement gate.
+5. GAUGE retrospectively demonstrates that mechanism-specific longitudinal
+   dark-field evidence can contradict aggregate marker/face evidence, but this case
+   cannot validate prospective generalization.
+
+Therefore **no family is currently authorized as a positive locked flagship**.
+
+The broad discovery/filtering phase is still closed in the sense that the generic
+families listed above remain killed. The next search is constrained to a narrower
+question:
+
+> What new physical measurement or intervention channel can amplify
+> mechanism-relevant disagreement enough to survive measurement + numerical
+> uncertainty, while retaining an independent target counterfactual and a fresh
+> untouched validation partition?
+
+Frozen D2/D3/D4V partitions may not be reused for method tuning.
