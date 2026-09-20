@@ -36,6 +36,13 @@ CANONICAL = [
     ("research/benchmarks/DCS_D3_DISCOVERY_PROTOCOL.md", "canonical/d3-protocol", True),
     ("research/benchmarks/DCS_D4V_REPAIR_VETO_DISCOVERY_PROTOCOL.md", "canonical/d4v-protocol", True),
     ("research/benchmarks/DCS_BENCHMARK_PLAN.md", "canonical/benchmark-plan", True),
+    ("research/paper_data/README.md", "canonical/paper-data-readme", True),
+    ("research/paper_data/PAPER_DATA_MANIFEST.json", "canonical/paper-data-manifest", True),
+    ("research/paper_data/FIGURE_TABLE_SOURCE_MAP.md", "canonical/figure-table-map", True),
+    ("research/paper_data/EXPERIMENT_MATRIX.csv", "canonical/experiment-matrix", True),
+    ("research/paper_data/ABLATION_MATRIX.md", "canonical/ablation-matrix", True),
+    ("research/paper_data/REPRODUCIBILITY_CHECKLIST.md", "canonical/reproducibility-checklist", True),
+    ("docs/PAPER_EVIDENCE_REPRODUCTION.md", "canonical/reproduction-guide", True),
 ]
 
 GENERATED = [
