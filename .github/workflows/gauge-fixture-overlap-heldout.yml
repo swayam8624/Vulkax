@@ -20,7 +20,7 @@ on:
 jobs:
   heldout-fixture-support:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +48,16 @@ jobs:
           python3 research/analysis/gauge_fixture_overlap_heldout.py             --root build/gauge-download             --exe build-forward/vulkax_gauge_shearing_forward_probe             --effective-span-dir build/gauge-effective-span             --out build/gauge-fixture-overlap-pilot             --mode pilot
           cat build/gauge-fixture-overlap-pilot/summary.json
 
+      - name: Run frozen definitive held-out fixture-support gate
+        run: |
+          python3 research/analysis/gauge_fixture_overlap_heldout.py \
+            --root build/gauge-download \
+            --exe build-forward/vulkax_gauge_shearing_forward_probe \
+            --effective-span-dir build/gauge-effective-span \
+            --out build/gauge-fixture-overlap-definitive \
+            --mode definitive
+          cat build/gauge-fixture-overlap-definitive/summary.json
+
       - name: Upload fixture-support evidence
         uses: actions/upload-artifact@v4
         with:
@@ -55,5 +65,6 @@ jobs:
           path: |
             build/gauge-effective-span
             build/gauge-fixture-overlap-pilot
+            build/gauge-fixture-overlap-definitive
           if-no-files-found: error
           retention-days: 30
