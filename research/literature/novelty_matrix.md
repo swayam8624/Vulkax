@@ -68,3 +68,17 @@ A potentially defensible Vulkax claim must be operational and intervention-speci
 > A persistent captured-world system can refuse a requested physical rewrite when its counterfactual is not supported, provide a reason code that separates evidence insufficiency from numerical/model-family inadequacy, request an additional observation/intervention when that failure is repairable, and independently re-verify the rewritten world before commit.
 
 Even this remains a hypothesis, not a novelty claim. It must survive fresh-domain validation and direct comparison against selective-prediction/UQ/model-validation baselines.
+
+
+## 2026-09-20 changed-law transfer threat
+
+A new direct threat is **Wang et al., “Conservation Buys Stability and Factoring Buys Counterfactuals in Physical World Models” (arXiv:2609.19674, 2026-09-17)**. The paper uses matched structural controls to separate long-horizon stability from changed-law counterfactual transfer: conservation/symplectic structure supports stability, while explicit factorization of the intervened coupling supports transfer to an unseen sign of that coupling.
+
+Consequences for Vulkax:
+
+- do **not** claim that counterfactual transfer itself is new;
+- do **not** claim that stability evidence is sufficient evidence for changed-law transfer;
+- keep numerical convergence and intervention transfer as distinct certificate dimensions;
+- focus the candidate contribution on whether a requested rewrite has enough evidence, why it is refused, which additional physical/computational evidence is appropriate, and whether the repaired world survives an independent target intervention.
+
+This strengthens rather than weakens the current experiment design: the Vulkax mechanism must be evaluated as **rewrite governance under multiple failure causes**, not as generic structured physical generalization.
