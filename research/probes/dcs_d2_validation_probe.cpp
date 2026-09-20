@@ -79,6 +79,20 @@ Matrix3 deformation(double shear,double axial){
     return {1.+axial,shear,0., 0.,1.,0., 0.,0.,1.};
 }
 Response simulate(double E,double nu,double shear,double axial,MpmTransferScheme scheme,double dt){
+    // The exact zero intervention is a valid DCS stencil point but the nonlinear
+    // relaxation harness intentionally rejects zero initial mechanical energy.
+    // Its physical response is simply the rest marker state, so evaluate that
+    // state analytically rather than weakening the solver invariant.
+    if(std::abs(shear)<1.0e-15 && std::abs(axial)<1.0e-15){
+        const auto particles=body();
+        constexpr std::array<std::size_t,4> markers{5U,18U,45U,58U};
+        Response out; out.reserve(12);
+        for(const auto m:markers){
+            const auto&p=particles.at(m).restPosition;
+            out.push_back(p.x);out.push_back(p.y);out.push_back(p.z);
+        }
+        return out;
+    }
     NonlinearDeformableWorldSettings s;
     s.steps=static_cast<std::size_t>(std::llround(kHorizon/dt));
     s.dt=dt; s.material={1000.,E,nu}; s.initialDeformation=deformation(shear,axial);
