@@ -62,6 +62,7 @@ def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--exe",required=True)
     ap.add_argument("--contract-dir",required=True)
+    ap.add_argument("--real-mode-summary",required=True)
     ap.add_argument("--out",required=True)
     a=ap.parse_args()
 
@@ -100,9 +101,15 @@ def main():
         "--out",str(mode_out),
     ])
     modes=json.loads((mode_out/"summary.json").read_text())
+    real_modes=json.loads(pathlib.Path(a.real_mode_summary).read_text())
+
+    def sign(x,eps=1.0e-12):
+        if abs(x)<=eps:
+            return 0
+        return 1 if x>0.0 else -1
 
     materials={}
-    all_long_sign_mismatch=True
+    all_long_direction_match=True
     all_area_over=True
     all_shear_over=True
     for material in ("soft","hard"):
@@ -113,10 +120,25 @@ def main():
         tr=read_positions(truth/f"predicted_{material}.csv")
         br=read_positions(bad/f"predicted_{material}.csv")
         mr=marker_rmse(tr,br)
+        real_md=real_modes["materials"][material]["mode_discrepancy"]
+        real_long=real_md["longitudinal_strain_mean"]
+        real_area=real_md["face_area_rel_rms"]
+        real_shear=real_md["shear_cos_delta_rms"]
         long_sign_mismatch=not bool(longm["final_sign_agrees"])
-        area_over=area["predicted_to_measured_peak_ratio"]>1.0
-        shear_over=shear["predicted_to_measured_peak_ratio"]>1.0
-        all_long_sign_mismatch &= long_sign_mismatch
+        long_direction_match=(
+            long_sign_mismatch and
+            sign(longm["measured_final"])==sign(real_long["measured_final"]) and
+            sign(longm["predicted_final"])==sign(real_long["predicted_final"])
+        )
+        area_over=(
+            area["predicted_to_measured_peak_ratio"]>1.0 and
+            real_area["predicted_to_measured_peak_ratio"]>1.0
+        )
+        shear_over=(
+            shear["predicted_to_measured_peak_ratio"]>1.0 and
+            real_shear["predicted_to_measured_peak_ratio"]>1.0
+        )
+        all_long_direction_match &= long_direction_match
         all_area_over &= area_over
         all_shear_over &= shear_over
         materials[material]={
@@ -124,6 +146,9 @@ def main():
             "longitudinal_final_truth":longm["measured_final"],
             "longitudinal_final_marker_envelope":longm["predicted_final"],
             "longitudinal_final_sign_mismatch":long_sign_mismatch,
+            "longitudinal_sign_direction_matches_real":long_direction_match,
+            "real_longitudinal_final_measured":real_long["measured_final"],
+            "real_longitudinal_final_baseline":real_long["predicted_final"],
             "longitudinal_mean_nrmse":longm["nrmse_to_measured_peak_abs"],
             "face_area_rms_nrmse":area["nrmse_to_measured_peak_abs"],
             "face_area_rms_peak_ratio":area["predicted_to_measured_peak_ratio"],
@@ -131,7 +156,7 @@ def main():
             "shear_rms_peak_ratio":shear["predicted_to_measured_peak_ratio"],
         }
 
-    recreates=all_long_sign_mismatch and all_area_over and all_shear_over
+    recreates=all_long_direction_match and all_area_over and all_shear_over
     result={
         "schema":"vulkax.gauge_fixture_envelope_synthetic_control",
         "version":1,
@@ -150,7 +175,7 @@ def main():
         },
         "materials":materials,
         "qualitative_signature_checks":{
-            "wrong_longitudinal_final_sign_both":all_long_sign_mismatch,
+            "longitudinal_sign_reversal_matches_real_direction_both":all_long_direction_match,
             "face_area_rms_overamplified_both":all_area_over,
             "shear_rms_overamplified_both":all_shear_over,
         },
