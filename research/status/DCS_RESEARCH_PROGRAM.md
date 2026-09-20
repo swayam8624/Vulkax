@@ -397,3 +397,55 @@ Forbidden shortcuts:
 - "first active model discrimination";
 - "first metamorphic simulator test";
 - "guaranteed physical correctness".
+
+
+## 9. Elimination chronology — 2026-09-20
+
+### Fixed-witness discovery
+A hand-designed second-order mixed witness corrected all 9 ordinary-metric mirage
+pairs in the first small solver-native study, but total target-ranking agreement
+remained 62.5%, equal to held-out RMSE. This killed the claim that one fixed mixed
+second-order witness is generally sufficient.
+
+### D2 frozen order-2 validation
+A preregistered 16-world fresh partition produced:
+- 0/16 resolved worlds at the frozen standardized-separation threshold >=2;
+- median predicted separation 0.041578;
+- maximum moment residual 3.886e-16.
+
+The order-2 five-point/global-numerical-floor method was frozen as a failure and may
+not be tuned on those worlds.
+
+### D3 witness-space adaptive-order discovery
+Direct witness-space nominal-vs-half-dt numerical uncertainty reduced the numerical
+floor substantially, but:
+- adaptive resolved worlds: 0/6;
+- adaptive order chose k=2 on all 6 worlds;
+- adaptive DCS ranking agreement: 52.78%;
+- Fisher: 61.11%;
+- same-cost raw bundle: 58.33%;
+- raw pair-aware: 55.56%.
+
+Decision: DCS is not supported as a universal candidate-world ranking method.
+
+### Current active hypothesis: pair-specific repair veto
+The only active flagship hypothesis is now narrower:
+
+> An ordinary held-out metric proposes a repair. Vulkax then synthesizes a
+> pair-specific dark-field experiment between the baseline and that proposed repair,
+> and uses the measured mechanism witness to support, veto, or refuse the repair.
+
+This is evaluated in D4V on a fresh partition with:
+- separate calibration observations;
+- separate ordinary held-out proposal observations;
+- separate 3x3 DCS physical probe;
+- hidden stronger counterfactual target used only for labels;
+- pair-specific order-2 witness-space synthesis;
+- inherited +/-2 standardized support/veto rule.
+
+Protocol:
+`research/benchmarks/DCS_D4V_REPAIR_VETO_DISCOVERY_PROTOCOL.md`
+
+If D4V also fails its frozen discovery advancement rule, DCS must be narrowed to a
+diagnostic/visualization contribution or killed as the Vulkax flagship rather than
+rescued by arbitrary higher response orders.
