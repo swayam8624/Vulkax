@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""Assemble a reproducible, paper-facing Vulkax evidence bundle.
+
+This script copies canonical repository result documents and generated experiment
+artifacts into one self-contained directory, computes SHA-256 hashes, and writes a
+machine-readable manifest. It never changes scientific decisions.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+from pathlib import Path
+import platform
+import shutil
+import subprocess
+import tempfile
+from datetime import datetime, timezone
+
+
+CANONICAL = [
+    ("research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md", "canonical/result-summary", True),
+    ("research/results/DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv", "canonical/result-table", True),
+    ("research/results/DCS_FINAL_RESULTS_2026-09-20.json", "canonical/result-ledger", True),
+    ("research/status/CURRENT_RESEARCH_STATE_2026-09-20.md", "canonical/current-state", True),
+    ("research/status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md", "canonical/implementation", True),
+    ("research/status/DCS_D2_VALIDATION_RESULT.md", "canonical/d2-result", True),
+    ("research/status/DCS_D3_RESULT_2026-09-20.md", "canonical/d3-result", True),
+    ("research/status/DCS_D4V_RESULT_2026-09-20.md", "canonical/d4v-result", True),
+    ("research/status/DCS_GAUGE_RETROSPECTIVE_RESULT_2026-09-20.md", "canonical/gauge-result", True),
+    ("research/status/DCS_LIMITATIONS_AND_KILL_CRITERIA.md", "canonical/limitations", True),
+    ("research/literature/CLAIM_GUARD.md", "canonical/claim-guard", True),
+    ("research/literature/DCS_NOVELTY_THREAT_MAP.md", "canonical/novelty-map", True),
+    ("research/benchmarks/DCS_D2_VALIDATION_PROTOCOL.md", "canonical/d2-protocol", True),
+    ("research/benchmarks/DCS_D3_DISCOVERY_PROTOCOL.md", "canonical/d3-protocol", True),
+    ("research/benchmarks/DCS_D4V_REPAIR_VETO_DISCOVERY_PROTOCOL.md", "canonical/d4v-protocol", True),
+    ("research/benchmarks/DCS_BENCHMARK_PLAN.md", "canonical/benchmark-plan", True),
+]
+
+GENERATED = [
+    ("dcs-positive-control/analysis.json", "generated/d1-analysis", True),
+    ("dcs-positive-control/cases.csv", "generated/d1-cases", False),
+    ("dcs-solver-native/analysis.json", "generated/solver-native-analysis", True),
+    ("dcs-solver-native/cases.csv", "generated/solver-native-cases", False),
+    ("dcs-active-selection/analysis.json", "generated/active-selection-analysis", True),
+    ("dcs-active-selection/cases.csv", "generated/active-selection-cases", False),
+    ("dcs-d2-validation/analysis.json", "generated/d2-analysis", True),
+    ("dcs-d2-validation/cases.csv", "generated/d2-cases", True),
+    ("dcs-d2-validation/stencils.csv", "generated/d2-stencils", True),
+    ("dcs-d3-discovery/analysis.json", "generated/d3-analysis", True),
+    ("dcs-d3-discovery/cases.csv", "generated/d3-cases", True),
+    ("dcs-d3-discovery/stencils.csv", "generated/d3-stencils", True),
+    ("dcs-d3-discovery/method_summary.csv", "generated/d3-method-summary", True),
+    ("dcs-d3-discovery/truth_summary.csv", "generated/d3-truth-summary", True),
+    ("dcs-d4v-discovery/analysis.json", "generated/d4v-analysis", True),
+    ("dcs-d4v-discovery/proposals.csv", "generated/d4v-proposals", True),
+    ("paper-captured-world-run/certificate.json", "generated/captured-world-certificate", True),
+    ("paper-performance/captured_world_performance.csv", "generated/performance-csv", False),
+    ("paper-performance/captured_world_performance_summary.json", "generated/performance-summary", False),
+    ("gauge-effective-span/validation.json", "generated/gauge-effective-span-validation", True),
+    ("gauge-effective-span/effective_span.csv", "generated/gauge-effective-span-table", False),
+    ("gauge-dcs-retrospective/summary.json", "generated/gauge-retrospective-summary", True),
+    ("gauge-dcs-retrospective/per_trial.csv", "generated/gauge-retrospective-per-trial", True),
+]
+
+def sha256(path: Path) -> str:
+    h=hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda:f.read(1024*1024),b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def git_text(root: Path, *args: str) -> str:
+    try:
+        return subprocess.check_output(["git", *args], cwd=root, text=True, stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        return ""
+
+def add_file(src: Path, dest: Path, source_label: str, category: str, required: bool, artifacts: list[dict]) -> None:
+    dest.parent.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(src,dest)
+    artifacts.append({
+        "source": source_label,
+        "bundle_path": str(dest),
+        "category": category,
+        "required": required,
+        "bytes": dest.stat().st_size,
+        "sha256": sha256(dest),
+    })
+
+def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: bool) -> dict:
+    out=out.resolve()
+    out.mkdir(parents=True,exist_ok=True)
+    canonical_root=out/"canonical"
+    generated_root=out/"generated"
+    runtime_root=out/"runtime"
+    for d in (canonical_root,generated_root,runtime_root):
+        d.mkdir(parents=True,exist_ok=True)
+
+    artifacts=[]
+    missing=[]
+
+    for rel,category,required in CANONICAL:
+        src=repo_root/rel
+        if not src.is_file():
+            if required: missing.append(rel)
+            continue
+        add_file(src,canonical_root/rel,rel,category,required,artifacts)
+
+    for rel,category,required in GENERATED:
+        gauge=rel.startswith("gauge-")
+        effective_required=required and not (allow_missing_gauge and gauge)
+        src=build_root/rel
+        if not src.is_file():
+            if effective_required: missing.append("build/"+rel)
+            continue
+        add_file(src,generated_root/rel,"build/"+rel,category,effective_required,artifacts)
+
+    # Copy system provenance/logs when the runner produced them outside this out dir.
+    candidate_sys=build_root/"paper-evidence/system/system-info.txt"
+    target_sys=out/"system/system-info.txt"
+    if candidate_sys.is_file() and candidate_sys.resolve()!=target_sys.resolve():
+        add_file(candidate_sys,target_sys,str(candidate_sys),"runtime/system-info",False,artifacts)
+
+    candidate_logs=build_root/"paper-evidence/logs"
+    target_logs=out/"logs"
+    if candidate_logs.is_dir() and candidate_logs.resolve()!=target_logs.resolve():
+        for src in sorted(candidate_logs.glob("*.log")):
+            add_file(src,target_logs/src.name,str(src),"runtime/log",False,artifacts)
+
+    complete=not missing
+    manifest={
+        "schema":"vulkax.paper_evidence_bundle",
+        "version":1,
+        "created_utc":datetime.now(timezone.utc).isoformat(),
+        "repo_commit":git_text(repo_root,"rev-parse","HEAD"),
+        "repo_branch":git_text(repo_root,"branch","--show-current"),
+        "repo_dirty":bool(git_text(repo_root,"status","--porcelain")),
+        "platform":platform.platform(),
+        "python":platform.python_version(),
+        "allow_missing_gauge":allow_missing_gauge,
+        "complete":complete,
+        "missing_required":missing,
+        "scientific_disposition":"implementation_complete_no_positive_flagship_claim",
+        "claim_guard":"D2/D3/D4V negative outcomes remain binding; GAUGE is retrospective only.",
+        "artifacts":artifacts,
+    }
+    (out/"manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n")
+
+    with (out/"artifact_index.csv").open("w",newline="") as f:
+        fieldnames=["source","bundle_path","category","required","bytes","sha256"]
+        w=csv.DictWriter(f,fieldnames=fieldnames)
+        w.writeheader()
+        for row in artifacts:
+            w.writerow({k:row[k] for k in fieldnames})
+
+    readme=(
+        "# Vulkax Paper Evidence Bundle\n\n"
+        f"Generated from commit: {manifest['repo_commit'] or 'unknown'}\n\n"
+        f"Complete for requested profile: {str(complete).lower()}\n\n"
+        "## Scientific status\n\n"
+        "This bundle reproduces and packages the current Vulkax/DCS evidence. It does not\n"
+        "convert negative or retrospective results into a positive prospective claim.\n\n"
+        "- D2: frozen negative validation\n"
+        "- D3: negative adaptive-order discovery\n"
+        "- D4V: negative repair-veto discovery\n"
+        "- GAUGE: retrospective mechanism-channel contradiction\n"
+        "- D5: replay infrastructure exists, but no fresh positive measured confirmation is claimed\n\n"
+        "## Layout\n\n"
+        "- canonical/ — committed protocols, result ledgers, claim guards and limitations\n"
+        "- generated/ — fresh outputs from the current machine/run\n"
+        "- logs/ — command logs when available\n"
+        "- system/ — hardware/software provenance when available\n"
+        "- manifest.json — SHA-256 indexed artifact manifest\n"
+        "- artifact_index.csv — flat artifact table\n\n"
+        f"Missing required artifacts: {len(missing)}\n"
+    )
+    if missing:
+        readme+="\n## Missing\n\n" + "\n".join("- "+m for m in missing) + "\n"
+    (out/"README.md").write_text(readme)
+
+    if not complete:
+        raise RuntimeError("paper evidence bundle incomplete: "+", ".join(missing))
+    return manifest
+
+def self_test() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root=Path(td)
+        repo=root/"repo"; out=root/"out"
+        repo.mkdir()
+        a=repo/"x.txt"; a.write_text("abc\n")
+        artifacts=[]
+        add_file(a,out/"canonical/x.txt","x.txt","canonical/test",True,artifacts)
+        assert artifacts[0]["sha256"]==hashlib.sha256(b"abc\n").hexdigest()
+        assert (out/"canonical/x.txt").read_text()=="abc\n"
+        print("VALID paper-evidence assembler self-test")
+
+def main() -> int:
+    ap=argparse.ArgumentParser()
+    ap.add_argument("--repo-root",default=".")
+    ap.add_argument("--build-root",default="build")
+    ap.add_argument("--out",default="build/paper-evidence")
+    ap.add_argument("--allow-missing-gauge",action="store_true")
+    ap.add_argument("--self-test",action="store_true")
+    args=ap.parse_args()
+    if args.self_test:
+        self_test(); return 0
+    repo=Path(args.repo_root).resolve()
+    build=(repo/args.build_root).resolve() if not Path(args.build_root).is_absolute() else Path(args.build_root).resolve()
+    out=(repo/args.out).resolve() if not Path(args.out).is_absolute() else Path(args.out).resolve()
+    m=assemble(repo,build,out,args.allow_missing_gauge)
+    print("VALID paper evidence bundle")
+    print("OUT",out)
+    print("ARTIFACTS",len(m["artifacts"]))
+    print("COMMIT",m["repo_commit"])
+    return 0
+
+if __name__=="__main__":
+    raise SystemExit(main())
