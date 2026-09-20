@@ -27,7 +27,7 @@ jobs:
       - name: Build regression
         run: cmake --build build --target vulkax_prescribed_mpm_tests --parallel 2
       - name: Run regression
-        run: ctest --test-dir build --output-on-failure -R '^vulkax_prescribed_mpm
+        run: ctest --test-dir build --output-on-failure -R vulkax_prescribed_mpm
       - name: Build driven-slab probe
         run: cmake --build build --target vulkax_driven_slab_probe --parallel 2
       - name: Run driven-slab probe
