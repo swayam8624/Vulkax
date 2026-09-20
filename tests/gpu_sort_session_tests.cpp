@@ -43,6 +43,36 @@ int main() {
     assert(session.cpuFallback());
     assert(session.note() == "no Metal device");
 
+
+    // Performance-aware promotion requires both correctness and a measurable win.
+    GpuSortSession performancePasses(3U, 0.95);
+    performancePasses.reset(true);
+    performancePasses.recordValidation(true, 8.0, 10.0);
+    assert(performancePasses.validating());
+    performancePasses.recordValidation(true, 9.0, 10.0);
+    assert(performancePasses.validating());
+    performancePasses.recordValidation(true, 8.5, 10.0);
+    assert(performancePasses.gpuTrusted());
+    assert(performancePasses.performanceSamples() == 3U);
+    assert(performancePasses.medianPerformanceRatio() > 0.84);
+    assert(performancePasses.medianPerformanceRatio() < 0.91);
+
+    // Correct-but-slower GPU ordering must stay on the deterministic CPU path.
+    GpuSortSession performanceFallback(3U, 0.95);
+    performanceFallback.reset(true);
+    performanceFallback.recordValidation(true, 8.0, 10.0);
+    performanceFallback.recordValidation(true, 12.0, 10.0);
+    performanceFallback.recordValidation(true, 11.0, 10.0);
+    assert(performanceFallback.cpuFallback());
+    assert(performanceFallback.note().find("median GPU/CPU ratio") != std::string::npos);
+
+    // Invalid timing cannot promote the GPU.
+    GpuSortSession invalidTiming(1U, 0.95);
+    invalidTiming.reset(true);
+    invalidTiming.recordValidation(true, 1.0, 0.0);
+    assert(invalidTiming.cpuFallback());
+    assert(invalidTiming.note().find("invalid performance timing") != std::string::npos);
+
     // A zero requested pass count is normalized to one.
     GpuSortSession onePass(0U);
     onePass.reset(true);
