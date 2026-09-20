@@ -10,6 +10,7 @@ This is a threat map, not a novelty claim. Full-text review and citation expansi
 | Gaussian-based physical-property prediction | **High** | PUGS | Not sufficient. |
 | Gaussian↔generic physics-engine bridging | **High** | GASP | Representation bridge alone is weak. |
 | Online sensory update of deformable physical model | **High** | EMPM | Need a stronger trust/refusal mechanism. |
+| Observation-support / physical-support mismatch or unknown boundary identification | **Very high** | hyperelastic inverse identification with unknown BCs; BC-free inverse elasticity; partial-field FEMU/M-CRE | Kill as standalone novelty. Keep only as a reason-coded failure family inside intervention-specific rewrite governance. |
 | Local identifiability diagnostics inside a persistent visual world | **Medium** | mechanics identifiability literature; MonoPhysics is a direct context threat | Potential only if coupled to refusal, extra-measurement recommendation, or counterfactual reliability. |
 | Active physical intervention chosen to disambiguate competing captured-world models | **Medium** | optimal experiment design literature | Potential gap in graphics/captured-world setting; generic Fisher/Jacobian OED is not novel. |
 | Held-out replay explicitly separated from unseen-intervention transfer | **Medium/unknown** | system ID literature; deformable inverse methods | Promising evaluation contribution; must survey direct precedents. |
@@ -32,6 +33,7 @@ The easy story is gone: Vulkax cannot win by saying “we simulate Gaussian spla
 - **Sensitivity-guided inverse optimization is crowded**: ProJo4D uses parameter sensitivity to structure progressive joint optimization.
 - **Measurement-grounded physical-fidelity diagnosis is now crowded**: GAUGE directly evaluates real physics engines/world models and diagnoses mechanism-specific failures across textiles and volumetric deformables.
 - **Counterfactual reasoning itself is old**: VRDP and counterfactual-physics benchmarks predate Vulkax.
+- **Unknown/uncertain boundary recovery from displacement fields is old**: inverse-elasticity literature jointly estimates material parameters and boundary conditions, supports BC-free formulations, and handles partial-field/sub-domain measurements. A Vulkax observation-support mismatch is therefore evidence for a failure class, not a standalone contribution.
 
 ### Current narrower target
 
