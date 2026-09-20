@@ -1,0 +1,33 @@
+name: Vulkax fixed-forward deep refinement
+
+on:
+  push:
+    branches: ["research/fixed-forward-deep-refinement"]
+    paths:
+      - "research/probes/fixed_forward_deep_refinement_probe.cpp"
+      - "research/probes/analyze_fixed_forward_deep_refinement.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/fixed-forward-deep-refinement.yml"
+  workflow_dispatch:
+
+jobs:
+  fixed-forward-deep-refinement:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+      - name: Build fixed-physics diagnostic
+        run: cmake --build build --target vulkax_fixed_forward_deep_refinement_probe --parallel 2
+      - name: Run deep timestep ladder
+        run: |
+          build/vulkax_fixed_forward_deep_refinement_probe build/fixed-forward-deep-refinement
+          python3 research/probes/analyze_fixed_forward_deep_refinement.py build/fixed-forward-deep-refinement
+          cat build/fixed-forward-deep-refinement/analysis.json
+      - name: Upload raw diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-fixed-forward-deep-refinement-${{ github.sha }}
+          path: build/fixed-forward-deep-refinement
+          if-no-files-found: error
+          retention-days: 30
