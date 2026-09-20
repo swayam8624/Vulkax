@@ -2,6 +2,7 @@
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
 
+#include "vulkax/viewer/asset_export.hpp"
 #include "vulkax/viewer/asset_import.hpp"
 #include "vulkax/viewer/gpu_sort_session.hpp"
 #include "vulkax/viewer/macos_image_import.hpp"
@@ -177,6 +178,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
 - (IBAction)openImage:(id)sender;
 - (IBAction)openRun:(id)sender;
 - (IBAction)capturePng:(id)sender;
+- (IBAction)exportGaussianPly:(id)sender;
 @end
 
 @implementation VulkaxMetalView
@@ -349,7 +351,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
     else if(_gpuSortSession.validating()) sortStatus=[NSString stringWithFormat:@"GPU validate %lu/%lu",(unsigned long)_gpuSortSession.parityPasses(),(unsigned long)_gpuSortSession.requiredParityPasses()];
     else sortStatus=@"CPU fallback";
     NSString* sortNote=_gpuSortSession.note().empty()?@"":[NSString stringWithFormat:@"\nSort note   %@",ns(_gpuSortSession.note())];
-    _stats.stringValue=[NSString stringWithFormat:@"Gaussians   %lu → %lu\nVisible     %lu | %lu\nCulled      %lu | %lu\nBudget      %lu\nParticles   %lu\nRewrite     %lu\nSurface     %@\nMax Δ       %.3e\nSH          %@\nSort        %@\nCull/LOD    %.3f ms\nGPU sort    %.3f ms%@\nFPS         %.1f\n\nDrop .ply/.obj/image or run folder\n1–5 modes · B/A state\nS SH · P capture\nH highlight · G grid\nSpace orbit · R camera",
+    _stats.stringValue=[NSString stringWithFormat:@"Gaussians   %lu → %lu\nVisible     %lu | %lu\nCulled      %lu | %lu\nBudget      %lu\nParticles   %lu\nRewrite     %lu\nSurface     %@\nMax Δ       %.3e\nSH          %@\nSort        %@\nCull/LOD    %.3f ms\nGPU sort    %.3f ms%@\nFPS         %.1f\n\nDrop .ply/.obj/image or run folder\n1–5 modes · B/A state\nS SH · E export · P capture\nH highlight · G grid\nSpace orbit · R camera",
         (unsigned long)_scene.before.size(),(unsigned long)_scene.after.size(),(unsigned long)_beforeVisible,(unsigned long)_afterVisible,
         (unsigned long)_beforeCulled,(unsigned long)_afterCulled,(unsigned long)_splatBudget,(unsigned long)_scene.particles.size(),
         (unsigned long)_scene.rewriteParticleCount,ns(_scene.surfaceKind),_scene.maxGaussianDisplacement,_shEnabled?@"view-dependent":@"DC only",sortStatus,
@@ -370,7 +372,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
     else if([k isEqualToString:@"b"]){_state=WorldState::Before;} else if([k isEqualToString:@"a"]){_state=WorldState::After;}
     else if([k isEqualToString:@"h"])_highlight=!_highlight; else if([k isEqualToString:@"g"])_showGrid=!_showGrid;
     else if([k isEqualToString:@"s"]){_shEnabled=!_shEnabled;[self updateStats];}
-    else if([k isEqualToString:@"p"])[self capturePng:nil];
+    else if([k isEqualToString:@"e"])[self exportGaussianPly:nil]; else if([k isEqualToString:@"p"])[self capturePng:nil];
     else if([k isEqualToString:@"r"])[self resetCamera]; else if([k isEqualToString:@" "])_autoOrbit=!_autoOrbit;
 }
 - (IBAction)modeChanged:(NSSegmentedControl*)s{_mode=(ViewMode)s.selectedSegment;_visibilityDirty=YES;}
@@ -429,6 +431,30 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
     (void)sender; NSSavePanel* p=[NSSavePanel savePanel]; p.nameFieldStringValue=@"vulkax_capture.png";
     if([p runModal]==NSModalResponseOK&&p.URL){_captureURL=p.URL;_captureRequested=YES;}
 }
+- (IBAction)exportGaussianPly:(id)sender {
+    (void)sender;
+    const auto& source = _state == WorldState::Before ? _scene.before : _scene.after;
+    if (source.empty()) {
+        NSAlert* alert=[NSAlert new];
+        alert.messageText=@"Nothing to export";
+        alert.informativeText=@"The current scene contains no Gaussian splats.";
+        [alert runModal];
+        return;
+    }
+    NSSavePanel* panel=[NSSavePanel savePanel];
+    panel.nameFieldStringValue=@"vulkax_splats.ply";
+    if([panel runModal]!=NSModalResponseOK||!panel.URL)return;
+    try {
+        vulkax::viewer::writeViewerGaussianPly(
+            source, std::filesystem::path(panel.URL.path.UTF8String));
+    } catch(const std::exception& e) {
+        NSAlert* alert=[NSAlert new];
+        alert.messageText=@"Could not export Gaussian PLY";
+        alert.informativeText=ns(e.what());
+        [alert runModal];
+    }
+}
+
 
 - (void)updateVisibilityForView:(MTKView*)view {
     if(!_visibilityDirty)return;
@@ -580,7 +606,7 @@ std::vector<vulkax::viewer::GpuDepthKey> referenceDepthKeys(
 
 static NSTextField* label(NSString* text,CGFloat size,NSFontWeight weight){NSTextField* f=[NSTextField labelWithString:text];f.font=[NSFont systemFontOfSize:size weight:weight];f.textColor=[NSColor colorWithCalibratedWhite:0.92 alpha:1];return f;}
 static NSView* sliderRow(NSString* title,double lo,double hi,double value,id target,SEL action){NSStackView* s=[NSStackView stackViewWithViews:@[]];s.orientation=NSUserInterfaceLayoutOrientationVertical;s.spacing=4;NSTextField* c=label(title,11,NSFontWeightMedium);c.textColor=[NSColor colorWithCalibratedRed:.64 green:.73 blue:.86 alpha:1];NSSlider* slider=[NSSlider sliderWithValue:value minValue:lo maxValue:hi target:target action:action];slider.continuous=YES;[s addArrangedSubview:c];[s addArrangedSubview:slider];return s;}
-static NSVisualEffectView* inspector(VulkaxRenderer* r,NSTextField** statsOut){NSVisualEffectView* p=[NSVisualEffectView new];p.material=NSVisualEffectMaterialSidebar;p.blendingMode=NSVisualEffectBlendingModeBehindWindow;p.state=NSVisualEffectStateActive;NSStackView* s=[NSStackView stackViewWithViews:@[]];s.translatesAutoresizingMaskIntoConstraints=NO;s.orientation=NSUserInterfaceLayoutOrientationVertical;s.alignment=NSLayoutAttributeLeading;s.spacing=10;s.edgeInsets=NSEdgeInsetsMake(20,18,18,18);[p addSubview:s];[NSLayoutConstraint activateConstraints:@[[s.leadingAnchor constraintEqualToAnchor:p.leadingAnchor],[s.trailingAnchor constraintEqualToAnchor:p.trailingAnchor],[s.topAnchor constraintEqualToAnchor:p.topAnchor]]];NSTextField* brand=label(@"VULKAX NATIVE VIEWER",11,NSFontWeightSemibold);brand.textColor=[NSColor colorWithCalibratedRed:.52 green:.70 blue:1 alpha:1];[s addArrangedSubview:brand];[s addArrangedSubview:label(@"Interactive Gaussian World",20,NSFontWeightBold)];NSSegmentedControl* m=[NSSegmentedControl segmentedControlWithLabels:@[@"Hybrid",@"Splats",@"Surface",@"Particles",@"Compare"] trackingMode:NSSegmentSwitchTrackingSelectOne target:r action:@selector(modeChanged:)];m.selectedSegment=0;[s addArrangedSubview:m];NSSegmentedControl* st=[NSSegmentedControl segmentedControlWithLabels:@[@"Before",@"Verified After"] trackingMode:NSSegmentSwitchTrackingSelectOne target:r action:@selector(stateChanged:)];st.selectedSegment=1;[s addArrangedSubview:st];NSButton* h=[NSButton checkboxWithTitle:@"Rewrite highlight" target:r action:@selector(highlightChanged:)];h.state=NSControlStateValueOn;NSButton* g=[NSButton checkboxWithTitle:@"Ground grid" target:r action:@selector(gridChanged:)];g.state=NSControlStateValueOn;NSButton* o=[NSButton checkboxWithTitle:@"Auto orbit" target:r action:@selector(orbitChanged:)];NSButton* sh=[NSButton checkboxWithTitle:@"View-dependent SH" target:r action:@selector(shChanged:)];sh.state=NSControlStateValueOn;[s addArrangedSubview:h];[s addArrangedSubview:g];[s addArrangedSubview:o];[s addArrangedSubview:sh];[s addArrangedSubview:sliderRow(@"Splat scale",.2,4,1,r,@selector(splatScaleChanged:))];[s addArrangedSubview:sliderRow(@"Opacity",.05,1,.88,r,@selector(opacityChanged:))];[s addArrangedSubview:sliderRow(@"Exposure",.35,2.4,1,r,@selector(exposureChanged:))];[s addArrangedSubview:sliderRow(@"Splat budget",10000,500000,200000,r,@selector(budgetChanged:))];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Vulkax Run…" target:r action:@selector(openRun:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Gaussian PLY…" target:r action:@selector(openPly:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open OBJ Mesh…" target:r action:@selector(openObj:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Image as 2.5D Splats…" target:r action:@selector(openImage:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Capture PNG…" target:r action:@selector(capturePng:)]];NSTextField* stats=label(@"",11,NSFontWeightRegular);stats.textColor=[NSColor colorWithCalibratedRed:.68 green:.77 blue:.90 alpha:1];stats.maximumNumberOfLines=0;[s addArrangedSubview:stats];*statsOut=stats;return p;}
+static NSVisualEffectView* inspector(VulkaxRenderer* r,NSTextField** statsOut){NSVisualEffectView* p=[NSVisualEffectView new];p.material=NSVisualEffectMaterialSidebar;p.blendingMode=NSVisualEffectBlendingModeBehindWindow;p.state=NSVisualEffectStateActive;NSStackView* s=[NSStackView stackViewWithViews:@[]];s.translatesAutoresizingMaskIntoConstraints=NO;s.orientation=NSUserInterfaceLayoutOrientationVertical;s.alignment=NSLayoutAttributeLeading;s.spacing=10;s.edgeInsets=NSEdgeInsetsMake(20,18,18,18);[p addSubview:s];[NSLayoutConstraint activateConstraints:@[[s.leadingAnchor constraintEqualToAnchor:p.leadingAnchor],[s.trailingAnchor constraintEqualToAnchor:p.trailingAnchor],[s.topAnchor constraintEqualToAnchor:p.topAnchor]]];NSTextField* brand=label(@"VULKAX NATIVE VIEWER",11,NSFontWeightSemibold);brand.textColor=[NSColor colorWithCalibratedRed:.52 green:.70 blue:1 alpha:1];[s addArrangedSubview:brand];[s addArrangedSubview:label(@"Interactive Gaussian World",20,NSFontWeightBold)];NSSegmentedControl* m=[NSSegmentedControl segmentedControlWithLabels:@[@"Hybrid",@"Splats",@"Surface",@"Particles",@"Compare"] trackingMode:NSSegmentSwitchTrackingSelectOne target:r action:@selector(modeChanged:)];m.selectedSegment=0;[s addArrangedSubview:m];NSSegmentedControl* st=[NSSegmentedControl segmentedControlWithLabels:@[@"Before",@"Verified After"] trackingMode:NSSegmentSwitchTrackingSelectOne target:r action:@selector(stateChanged:)];st.selectedSegment=1;[s addArrangedSubview:st];NSButton* h=[NSButton checkboxWithTitle:@"Rewrite highlight" target:r action:@selector(highlightChanged:)];h.state=NSControlStateValueOn;NSButton* g=[NSButton checkboxWithTitle:@"Ground grid" target:r action:@selector(gridChanged:)];g.state=NSControlStateValueOn;NSButton* o=[NSButton checkboxWithTitle:@"Auto orbit" target:r action:@selector(orbitChanged:)];NSButton* sh=[NSButton checkboxWithTitle:@"View-dependent SH" target:r action:@selector(shChanged:)];sh.state=NSControlStateValueOn;[s addArrangedSubview:h];[s addArrangedSubview:g];[s addArrangedSubview:o];[s addArrangedSubview:sh];[s addArrangedSubview:sliderRow(@"Splat scale",.2,4,1,r,@selector(splatScaleChanged:))];[s addArrangedSubview:sliderRow(@"Opacity",.05,1,.88,r,@selector(opacityChanged:))];[s addArrangedSubview:sliderRow(@"Exposure",.35,2.4,1,r,@selector(exposureChanged:))];[s addArrangedSubview:sliderRow(@"Splat budget",10000,500000,200000,r,@selector(budgetChanged:))];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Vulkax Run…" target:r action:@selector(openRun:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Gaussian PLY…" target:r action:@selector(openPly:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open OBJ Mesh…" target:r action:@selector(openObj:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Open Image as 2.5D Splats…" target:r action:@selector(openImage:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Export Current Splats…" target:r action:@selector(exportGaussianPly:)]];[s addArrangedSubview:[NSButton buttonWithTitle:@"Capture PNG…" target:r action:@selector(capturePng:)]];NSTextField* stats=label(@"",11,NSFontWeightRegular);stats.textColor=[NSColor colorWithCalibratedRed:.68 green:.77 blue:.90 alpha:1];stats.maximumNumberOfLines=0;[s addArrangedSubview:stats];*statsOut=stats;return p;}
 
 @interface VulkaxAppDelegate : NSObject <NSApplicationDelegate> { @private ViewerScene _initialScene; }
 @property(nonatomic,strong) NSWindow* window;
