@@ -38,3 +38,14 @@ The easy story is gone: Vulkax cannot win by saying “we simulate Gaussian spla
 The current candidate contribution is therefore not any single word—identifiability, uncertainty, counterfactual, experiment design, physical fidelity, or refusal. The target must be an operational mechanism whose **accept/reject decision for a requested physical rewrite is empirically calibrated against unseen interventions while accounting for model inadequacy and numerical error, and can turn a refusal into a concrete next-evidence request**.
 
 This target remains unproven and may still collide with work not yet reviewed.
+
+
+## Certificate/refusal threat update
+
+The one-shot 108-case experiment produced a useful negative result: generic evidence aggregation is not automatically safer than a single task-relevant held-out metric. This aligns with task-dependent UQ literature.
+
+Older simulation V&V work (PCMM and related credibility frameworks) already combines representation fidelity, physics/material fidelity, code verification, solution verification, validation, UQ and sensitivity for intended-use credibility. Therefore Vulkax cannot claim novelty for "multi-evidence simulation credibility."
+
+A 2026 Digital Twin Counterfactual Framework also directly threatens generic claims around hierarchical validation of counterfactual digital-twin outputs.
+
+The remaining candidate gap is narrower: an **executable physical-rewrite loop** in which the requested intervention itself determines the relevant evidence, failed certification produces a concrete additional physical observation/intervention, the world is re-identified, and an independent target counterfactual is re-tested while numerical and model-form inadequacy remain explicit refusal causes.

@@ -77,3 +77,18 @@ Weak synthetic deformation + 20 μm deterministic measurement noise fit E=16.5 k
 
 ### Next falsification
 Generate a multi-case solver-integrated counterfactual dataset and test whether any pre-truth evidence signal predicts unsafe unseen-intervention error. If held-out, identifiability, numerical refinement and model/scheme disagreement fail to concentrate errors, kill or redesign the certificate direction.
+
+
+## 2026-09-20 — One-shot certificate fails; held-out ranking survives
+
+**Branch/SHA:** research/discovery @ `6f2c67801d7e0467fe1fefd376e50d738f261fb5`
+**Workflow:** `35509956517`, success.
+
+### Outcome
+108 solver-integrated cases: 22 safe / 86 unsafe at the 10% target-counterfactual criterion. Held-out RMS ranked failures strongly (AUC 0.936), but the safest 25% still had 29.6% unsafe cases. The untrained multi-signal composite underperformed held-out alone (AUC 0.780). Raw fit RMS was anti-informative (AUC 0.281).
+
+### Decision
+The simple one-shot certificate is **not sufficient** and is retained as a negative result. Do not tune a threshold on this same dataset and call it solved.
+
+### Next falsification
+Close the loop. Refuse weak-evidence cases, choose the deformation with highest material sensitivity, acquire new evidence, re-fit, then test a *different* target deformation. Determine which failure classes repair (parameter ambiguity) and which persist (numerical/model-class inadequacy).

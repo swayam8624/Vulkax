@@ -2,7 +2,7 @@
   "schema": "vulkax.literature_seed",
   "version": 1,
   "as_of": "2026-09-20",
-  "warning": "Expanded seed audit; still not a substitute for full-text/citation-chain novelty review.",
+  "warning": "Expanded seed audit; full-text/citation-chain review remains required before novelty claims.",
   "papers": [
     {
       "id": "physgaussian-2024",
@@ -376,6 +376,57 @@
       "uncertainty_treatment": "not primary",
       "validation_method": "predictive and counterfactual reasoning benchmarks",
       "relationship_to_vulkax": "Kills any broad claim that counterfactual physical prediction from inferred video physics is new by itself.",
+      "status": "seed-reviewed"
+    },
+    {
+      "id": "pcmm-2007",
+      "title": "Predictive Capability Maturity Model for Computational Modeling and Simulation",
+      "authors": "William L. Oberkampf, Martin Pilch, Timothy G. Trucano",
+      "year": 2007,
+      "venue": "Sandia Report SAND2007-5948",
+      "url": "https://www.sandia.gov/research/publications/details/predictive-capability-maturity-model-for-computational-modeling-and-simulat-2007-10-01/",
+      "code": "unavailable",
+      "representation": "simulation credibility framework",
+      "simulator": "general PDE computational modeling and simulation",
+      "input_observations": "verification, validation, UQ and sensitivity evidence",
+      "output_parameters": "application-specific predictive capability maturity",
+      "uncertainty_treatment": "explicit V&V/UQ maturity axes",
+      "validation_method": "structured maturity assessment",
+      "relationship_to_vulkax": "Kills any broad novelty claim around combining code verification, solution verification, validation and UQ for application-specific simulation credibility. Vulkax must contribute an executable rewrite/refusal mechanism rather than a generic credibility checklist.",
+      "status": "seed-reviewed"
+    },
+    {
+      "id": "dtcf-2026",
+      "title": "The Digital Twin Counterfactual Framework: A Validation Architecture for Simulated Potential Outcomes",
+      "authors": "Olav Laudy",
+      "year": 2026,
+      "venue": "arXiv 2604.01325",
+      "url": "https://arxiv.org/abs/2604.01325",
+      "code": "unavailable in seed audit",
+      "representation": "digital twin counterfactual validation hierarchy",
+      "simulator": "general stochastic digital twin",
+      "input_observations": "observable-arm validation data",
+      "output_parameters": "fidelity assumptions and validated counterfactual estimands",
+      "uncertainty_treatment": "bounding, sensitivity and UQ tools",
+      "validation_method": "hierarchical marginal/joint/structural fidelity tests",
+      "relationship_to_vulkax": "Major 2026 novelty threat to generic 'validated counterfactual digital twin' framing. Vulkax needs graphics/physical rewrite-specific operational evidence acquisition and numerical/model error mechanisms.",
+      "status": "seed-reviewed"
+    },
+    {
+      "id": "uq-one-size-2026",
+      "title": "Uncertainty Quantification for Machine Learning: One Size Does Not Fit All",
+      "authors": "Philipp Hofman, Yusuf Sale, Eyke Hüllermeier",
+      "year": 2026,
+      "venue": "AAAI 2026",
+      "url": "https://ojs.aaai.org/index.php/AAAI/article/view/39323",
+      "code": "unavailable in seed audit",
+      "representation": "task-dependent uncertainty scores",
+      "simulator": "machine-learning predictive models",
+      "input_observations": "model uncertainty signals",
+      "output_parameters": "selective prediction / OOD / active-learning decisions",
+      "uncertainty_treatment": "task-specific UQ",
+      "validation_method": "comparative uncertainty experiments",
+      "relationship_to_vulkax": "Supports the negative finding that a generic uncertainty composite is not justified; certificate scores must be matched to the counterfactual rewrite loss.",
       "status": "seed-reviewed"
     }
   ]

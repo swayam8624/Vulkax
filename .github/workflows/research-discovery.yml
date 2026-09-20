@@ -72,6 +72,15 @@ jobs:
           python3 research/probes/analyze_solver_certificate.py build/solver-certificate
           cat build/solver-certificate/feature_summary.csv
 
+      - name: Build refusal-repair probe
+        run: cmake --build build --target vulkax_refusal_repair_probe --parallel 2
+
+      - name: Run refusal-repair probe
+        run: |
+          build/vulkax_refusal_repair_probe build/refusal-repair
+          python3 research/probes/analyze_refusal_repair.py build/refusal-repair
+          cat build/refusal-repair/cases.csv
+
       - name: Upload raw synthetic evidence
         uses: actions/upload-artifact@v4
         with:
@@ -81,5 +90,6 @@ jobs:
             build/solver-counterfactual
             build/solver-design
             build/solver-certificate
+            build/refusal-repair
           if-no-files-found: error
           retention-days: 30
