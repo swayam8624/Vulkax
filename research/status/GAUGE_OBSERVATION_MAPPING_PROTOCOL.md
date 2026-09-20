@@ -76,10 +76,10 @@ Support this interpretation only if:
 
 - changing mapping support materially changes local/non-affine amplitude errors in the same direction for both materials;
 - at least one non-historical support moves both non-affine marker and face ratios closer to 1 for both materials;
-- global affine deformation-gradient error changes much less than the local/non-affine quantities;
+- for the candidate support, median normalized global deformation-gradient error changes by no more than **10% relative** to the 24-neighbor control for either material;
 - physical solver evidence is invariant.
 
-This remains a forensic result. The best support is **not** automatically adopted.
+The 10% macro-stability bound is frozen before the mapping sweep is evaluated. This remains a forensic result. The best support is **not** automatically adopted.
 
 ### Observation mapping not dominant
 
