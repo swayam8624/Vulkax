@@ -1,0 +1,45 @@
+stage,method,unit_or_population,metric,value,status,interpretation
+D1,DCS,64 constructed repairs,ordinary_accept_rate,1.0,PASS,constructed positive control only
+D1,DCS,64 constructed repairs,deceptive_detection_rate,1.0,PASS,constructed positive control only
+D1,DCS,64 constructed repairs,median_observation_improvement_fraction,0.6088,PASS,constructed positive control only
+D1,DCS,64 constructed repairs,median_witness_degradation_ratio,9.375,PASS,constructed positive control only
+D2a,heldout_rmse,candidate pairs,target_ranking_agreement,0.625,NEGATIVE,fixed-witness discovery
+D2a,DCS_fixed_k2,candidate pairs,target_ranking_agreement,0.625,NEGATIVE,no global ranking gain
+D2a,DCS_fixed_k2,9 ordinary-metric mirage pairs,mirage_correction_rate,1.0,MIXED,corrected mirages but introduced new errors
+D2b,DCS_k2_maximin,candidate pairs,target_ranking_agreement,0.625,NEGATIVE,below matched baselines
+D2b,raw_bundle,candidate pairs,target_ranking_agreement,0.75,BASELINE,
+D2b,raw_maximin,candidate pairs,target_ranking_agreement,0.9583,BASELINE,
+D2b,Fisher,candidate pairs,target_ranking_agreement,0.875,BASELINE,
+D2b,max_motion,candidate pairs,target_ranking_agreement,0.6667,BASELINE,
+D2b,random,candidate pairs,target_ranking_agreement,0.4583,BASELINE,
+D2_frozen,DCS_k2,16 truth worlds,resolved_coverage,0.0,FAIL,frozen validation
+D2_frozen,DCS_k2,16 truth worlds,median_standardized_separation,0.041578,FAIL,threshold was 2.0
+D2_frozen,DCS_k2,16 truth worlds,median_numerical_rms_m,0.000006469,FAIL,
+D2_frozen,DCS_k2,all stencils,maximum_moment_residual,3.886e-16,PASS,annihilation contract passed
+D3,DCS_adaptive,candidate pairs,target_ranking_agreement,0.5278,NEGATIVE,
+D3,DCS_k2,candidate pairs,target_ranking_agreement,0.5278,NEGATIVE,
+D3,DCS_k3,candidate pairs,target_ranking_agreement,0.4722,NEGATIVE,
+D3,raw_bundle,candidate pairs,target_ranking_agreement,0.5833,BASELINE,
+D3,raw_pair_aware,candidate pairs,target_ranking_agreement,0.5556,BASELINE,
+D3,Fisher,candidate pairs,target_ranking_agreement,0.6111,BASELINE,
+D3,max_motion,candidate pairs,target_ranking_agreement,0.5833,BASELINE,
+D3,random,candidate pairs,target_ranking_agreement,0.5278,BASELINE,
+D3,DCS_adaptive,6 truth worlds,resolved_coverage,0.0,FAIL,
+D3,DCS_k2,6 truth worlds,median_standardized_separation,0.0588583,FAIL,threshold reference 2.0
+D3,DCS_k3,6 truth worlds,median_standardized_separation,0.0157173,FAIL,
+D3,DCS_k2,6 truth worlds,median_numerical_rms_m,0.0000008435,MIXED,witness-space uncertainty reduced numerical floor
+D3,DCS_k3,6 truth worlds,median_numerical_rms_m,0.0000002153,MIXED,witness-space uncertainty reduced numerical floor
+D4V,ordinary_proposals,36 proposals,deceptive_count,14,OBSERVATION,labels hidden until evaluation
+D4V,ordinary_proposals,36 proposals,beneficial_count,22,OBSERVATION,labels hidden until evaluation
+D4V,DCS_pair_veto,36 proposals,resolved_coverage,0.0,FAIL,
+D4V,raw_bundle,36 proposals,resolved_coverage,0.0,BASELINE,
+D4V,raw_pair_probe,36 proposals,resolved_coverage,0.0,BASELINE,
+D4V,Fisher,36 proposals,resolved_coverage,0.0,BASELINE,
+D4V,max_motion,36 proposals,resolved_coverage,0.0,BASELINE,
+GAUGE,ordinary_overlap,10 held-out repeats,overlap_preferred_count,10,RETROSPECTIVE,ordinary face+marker metrics
+GAUGE,marker_darkfield,10 held-out repeats,endpoint_preferred_count,0,RETROSPECTIVE,marker channel still prefers overlap
+GAUGE,longitudinal_darkfield,10 held-out repeats,endpoint_preferred_count,9,RETROSPECTIVE,mechanism channel rejects overlap
+GAUGE,marker_darkfield,10 held-out repeats,median_endpoint_error_m,0.0024280231467879694,RETROSPECTIVE,
+GAUGE,marker_darkfield,10 held-out repeats,median_overlap_error_m,0.0017091958992332462,RETROSPECTIVE,
+GAUGE,longitudinal_darkfield,10 held-out repeats,median_endpoint_error,0.003131335884307733,RETROSPECTIVE,
+GAUGE,longitudinal_darkfield,10 held-out repeats,median_overlap_error,0.0055841823898999735,RETROSPECTIVE,
