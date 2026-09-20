@@ -64,12 +64,17 @@ def main():
               "sep",records[name]["separation"])
     base=records["baseline"]
     if base["status"]!="success":raise SystemExit("baseline structural forensic failed")
+    base_face=0.5*(base["soft_nrmse"]+base["hard_nrmse"])
+    base_marker=0.5*(base["soft_marker_rmse_m"]+base["hard_marker_rmse_m"])
     for name,r in records.items():
         if r["status"]!="success":continue
         r["soft_delta_vs_baseline"]=r["soft_nrmse"]-base["soft_nrmse"]
         r["hard_delta_vs_baseline"]=r["hard_nrmse"]-base["hard_nrmse"]
         r["mean_nrmse"]=0.5*(r["soft_nrmse"]+r["hard_nrmse"])
-        r["mean_delta_vs_baseline"]=r["mean_nrmse"]-0.5*(base["soft_nrmse"]+base["hard_nrmse"])
+        r["mean_delta_vs_baseline"]=r["mean_nrmse"]-base_face
+        r["mean_marker_rmse_m"]=0.5*(r["soft_marker_rmse_m"]+r["hard_marker_rmse_m"])
+        r["mean_marker_delta_vs_baseline_m"]=r["mean_marker_rmse_m"]-base_marker
+        r["dual_metric_improvement_vs_baseline"]=(r["mean_nrmse"]<base_face and r["mean_marker_rmse_m"]<base_marker)
         r["mean_marker_rmse_m"]=0.5*(r["soft_marker_rmse_m"]+r["hard_marker_rmse_m"])
         base_marker=0.5*(base["soft_marker_rmse_m"]+base["hard_marker_rmse_m"])
         r["mean_marker_delta_vs_baseline_m"]=r["mean_marker_rmse_m"]-base_marker
@@ -84,6 +89,7 @@ def main():
       "schema":"vulkax.gauge_shearing_structural_forensics","version":1,
       "provenance":"measured+model-prediction","fit_performed":False,
       "baseline_material_parameters_modified":False,
+      "dual_metric_guard":"A forensic variant improves only if both mean face-area NRMSE and mean marker-position RMSE improve versus baseline; this does not unlock inverse fitting.",
       "variants":records,
       "diagnostic_ranking":[{"name":n,"mean_nrmse":r["mean_nrmse"],
                              "mean_delta_vs_baseline":r["mean_delta_vs_baseline"],
