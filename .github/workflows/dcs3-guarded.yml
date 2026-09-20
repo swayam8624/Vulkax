@@ -1,0 +1,29 @@
+name: Vulkax DCS3 guarded core
+
+on:
+  push:
+    branches: ["research/dcs3"]
+    paths:
+      - "include/vulkax/research/dark_field_counterfactual.hpp"
+      - "src/research/dark_field_counterfactual.cpp"
+      - "tests/dark_field_counterfactual_tests.cpp"
+      - ".github/workflows/dcs3-guarded.yml"
+      - "CMakeLists.txt"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-dcs3-core-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  guarded-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build guarded DCS regression
+        run: cmake --build build --target vulkax_dark_field_counterfactual_tests --parallel 2
+      - name: Run guarded DCS regression
+        run: ctest --test-dir build --output-on-failure -R '^vulkax_dark_field_counterfactual$'
