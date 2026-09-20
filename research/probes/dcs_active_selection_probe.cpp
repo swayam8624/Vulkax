@@ -165,14 +165,41 @@ std::size_t selectMaxMotion(const std::vector<std::vector<Response>>&models,std:
         if(motion>bestMotion){bestMotion=motion;best=p;}
     } return best;
 }
+double fisherSmallestSingularValue(double E,double nu,const InterventionPoint&point,double dt){
+    constexpr double relativeE=.01;
+    constexpr double deltaNu=.01;
+    const auto ep=simulate(E*(1.+relativeE),nu,point.coordinates[0],point.coordinates[1],MpmTransferScheme::APIC,dt);
+    const auto em=simulate(E*(1.-relativeE),nu,point.coordinates[0],point.coordinates[1],MpmTransferScheme::APIC,dt);
+    const auto np=simulate(E,nu+deltaNu,point.coordinates[0],point.coordinates[1],MpmTransferScheme::APIC,dt);
+    const auto nm=simulate(E,nu-deltaNu,point.coordinates[0],point.coordinates[1],MpmTransferScheme::APIC,dt);
+    double aa=0.,ab=0.,bb=0.;
+    for(std::size_t i=0;i<ep.size();++i){
+        const double dLogE=(ep[i]-em[i])/(2.*relativeE);
+        const double dNuScaled=((np[i]-nm[i])/(2.*deltaNu))*.1;
+        aa+=dLogE*dLogE;
+        ab+=dLogE*dNuScaled;
+        bb+=dNuScaled*dNuScaled;
+    }
+    const double tr=aa+bb;
+    const double disc=std::sqrt(std::max(0.,(aa-bb)*(aa-bb)+4.*ab*ab));
+    return std::sqrt(std::max(0.,.5*(tr-disc)));
+}
+std::size_t selectFisherPoint(const Candidate&nominal,const std::vector<InterventionPoint>&points){
+    std::size_t best=0;double bestScore=-1.;
+    for(std::size_t p=0;p<points.size();++p){
+        const double score=fisherSmallestSingularValue(nominal.fit.E,nominal.fit.nu,points[p],nominal.variant.dt);
+        if(score>bestScore){bestScore=score;best=p;}
+    }
+    return best;
+}
 }
 
 int main(int argc,char**argv){
     const std::filesystem::path outDir=argc>1?argv[1]:"build/dcs-active-selection";
     std::filesystem::create_directories(outDir);
     std::ofstream cases(outDir/"cases.csv");
-    cases<<"truth_id,variant,fit_objective_m,dcs_error_m,raw_bundle_error_m,raw_error_m,maxmotion_error_m,random_error_m,target_error_m,"
-           "dcs_maximin_separation,raw_point,maxmotion_point,random_point,provenance\n";
+    cases<<"truth_id,variant,fit_objective_m,dcs_error_m,raw_bundle_error_m,raw_error_m,fisher_error_m,maxmotion_error_m,random_error_m,target_error_m,"
+           "dcs_maximin_separation,raw_point,fisher_point,maxmotion_point,random_point,provenance\n";
     std::ofstream stencils(outDir/"stencils.csv");
     stencils<<"truth_id,point_index,shear,axial,weight,provenance\n";
 
@@ -208,6 +235,7 @@ int main(int argc,char**argv){
         const SynthesizedStencil dcs=vulkax::research::dcs::synthesizeMaximinAnnihilatingStencil(
             points,2,modelResponses,budget,1.0e-9,128);
         const std::size_t rawPoint=selectRawMaximin(modelResponses,budget);
+        const std::size_t fisherPoint=selectFisherPoint(candidates.front(),points);
         constexpr std::size_t originIndex=4;
         const std::size_t maxMotionPoint=selectMaxMotion(modelResponses,originIndex);
         const std::size_t randomPoint=static_cast<std::size_t>(truthId)%points.size();
@@ -229,17 +257,18 @@ int main(int argc,char**argv){
             const double dcsError=rms(candidateDcs,truthDcs);
             const double rawBundleError=datasetRms(candidate.probeResponses,truthProbe);
             const double rawError=rms(candidate.probeResponses[rawPoint],truthProbe[rawPoint]);
+            const double fisherError=rms(candidate.probeResponses[fisherPoint],truthProbe[fisherPoint]);
             const double maxMotionError=rms(candidate.probeResponses[maxMotionPoint],truthProbe[maxMotionPoint]);
             const double randomError=rms(candidate.probeResponses[randomPoint],truthProbe[randomPoint]);
             const double targetError=rms(candidate.targetResponse,truthTarget);
             cases<<truthId<<','<<candidate.variant.name<<','<<std::setprecision(17)
-                 <<candidate.fit.objective<<','<<dcsError<<','<<rawBundleError<<','<<rawError<<','<<maxMotionError<<','<<randomError<<','
+                 <<candidate.fit.objective<<','<<dcsError<<','<<rawBundleError<<','<<rawError<<','<<fisherError<<','<<maxMotionError<<','<<randomError<<','
                  <<targetError<<','<<dcs.worstCaseStandardizedSeparation<<','
-                 <<rawPoint<<','<<maxMotionPoint<<','<<randomPoint
+                 <<rawPoint<<','<<fisherPoint<<','<<maxMotionPoint<<','<<randomPoint
                  <<",synthetic-dcs-active-discovery\n";
             ++rows;
             std::cout<<"DCS_ACTIVE truth="<<truthId<<" variant="<<candidate.variant.name
-                     <<" dcs="<<dcsError<<" raw_bundle="<<rawBundleError<<" raw="<<rawError<<" maxmotion="<<maxMotionError
+                     <<" dcs="<<dcsError<<" raw_bundle="<<rawBundleError<<" raw="<<rawError<<" fisher="<<fisherError<<" maxmotion="<<maxMotionError
                      <<" random="<<randomError<<" target="<<targetError<<"\n";
         }
     }
