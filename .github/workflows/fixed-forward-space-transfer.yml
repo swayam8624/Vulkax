@@ -1,0 +1,57 @@
+name: Vulkax fixed-forward numerical attribution
+
+on:
+  push:
+    branches: ["research/fixed-forward-space-transfer"]
+    paths:
+      - "research/probes/fixed_forward_deep_refinement_probe.cpp"
+      - "research/probes/fixed_forward_space_transfer_probe.cpp"
+      - "research/probes/analyze_fixed_forward_deep_refinement.py"
+      - "research/probes/analyze_fixed_forward_space_transfer.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/fixed-forward-space-transfer.yml"
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  numerical-attribution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate analysis harness
+        run: |
+          python3 -m py_compile             research/probes/analyze_fixed_forward_deep_refinement.py             research/probes/analyze_fixed_forward_space_transfer.py
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+
+      - name: Build label-free diagnostics
+        run: |
+          cmake --build build --target vulkax_fixed_forward_deep_refinement_probe --parallel 2
+          cmake --build build --target vulkax_fixed_forward_space_transfer_probe --parallel 2
+
+      - name: Run deep timestep refinement
+        run: |
+          build/vulkax_fixed_forward_deep_refinement_probe build/deep-refinement
+          python3 research/probes/analyze_fixed_forward_deep_refinement.py build/deep-refinement
+          cat build/deep-refinement/analysis.json
+
+      - name: Run spatial and transfer ablation
+        run: |
+          build/vulkax_fixed_forward_space_transfer_probe build/space-transfer
+          python3 research/probes/analyze_fixed_forward_space_transfer.py             --space-transfer build/space-transfer             --deep-analysis build/deep-refinement/analysis.json             --out build/numerical-attribution
+          cat build/numerical-attribution/analysis.json
+
+      - name: Upload numerical attribution evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-fixed-forward-numerical-attribution-${{ github.sha }}
+          path: |
+            build/deep-refinement
+            build/space-transfer
+            build/numerical-attribution
+          if-no-files-found: error
+          retention-days: 30
