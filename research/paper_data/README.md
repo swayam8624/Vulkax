@@ -60,9 +60,11 @@ with:
 3. `fig_numerical_floor.svg` + CSV source
 4. `fig_d4v_proposals.svg` + CSV source
 5. `fig_gauge_channel_contradiction.svg` + CSV source
-6. `table_stage_outcomes.csv`
-7. `table_claim_boundaries.csv`
-8. `figure_manifest.json`
+6. `fig_information_frontier.svg` + CSV source
+7. `table_stage_outcomes.csv`
+8. `table_claim_boundaries.csv`
+9. `table_information_frontier.csv`
+10. `figure_manifest.json`
 
 These are deterministic transforms of the committed result ledger; they do not alter
 the scientific decision.
@@ -113,3 +115,16 @@ confirmation.
 
 The infrastructure to replay and package that future confirmation is already in the
 repository.
+
+## Post-hoc information frontier
+
+Additional diagnostic sources:
+
+- `../results/DCS_INFORMATION_FRONTIER_2026-09-20.md`
+- `../results/DCS_INFORMATION_FRONTIER_2026-09-20.json`
+- `../results/DCS_INFORMATION_FRONTIER_2026-09-20.csv`
+- `../results/GAUGE_PAIRED_DIAGNOSTICS_2026-09-20.csv`
+
+These quantify how far unresolved D4V signals are from the frozen `|z|=2`
+reference and provide paired GAUGE sign-direction summaries. They are explicitly
+post-hoc/retrospective and do not modify any frozen gate.
