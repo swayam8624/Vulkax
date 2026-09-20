@@ -209,7 +209,35 @@ the observation-space channel and the mechanism-specific longitudinal channel gi
 opposite conclusions. The implementation must preserve that contradiction rather
 than average it into one favorable scalar.
 
-## 10. What is supported
+## 10. Post-hoc information frontier
+
+This diagnostic was computed after the frozen D4V/GAUGE outcomes and does not modify
+their gates.
+
+At the inherited `|z| >= 2` reference:
+
+- DCS median `|z|`: **0.05024**
+- DCS maximum `|z|`: **0.17654**
+- median DCS signal amplification required to reach 2: **39.83x**
+- best-case DCS amplification required: **11.33x**
+- raw-point median amplification required: **13.60x**
+- Fisher median amplification required: **30.15x**
+
+This quantifies the final information gap: the tested verification signals were not
+marginally under threshold.
+
+GAUGE paired retrospective diagnostics:
+- ordinary face, ordinary marker and marker dark-field all favor overlap **10/10**;
+- longitudinal dark-field favors endpoint **9/10**;
+- exploratory exact two-sided sign-test for longitudinal direction:
+  **p = 0.02148**.
+
+These statistics are explicitly post-hoc/retrospective.
+
+Canonical diagnostic:
+`research/results/DCS_INFORMATION_FRONTIER_2026-09-20.md`
+
+## 11. What is supported
 
 Supported by executed evidence:
 
@@ -223,7 +251,7 @@ Supported by executed evidence:
    computationally implemented;
 7. DCS is useful as a mechanism-isolation/falsification laboratory.
 
-## 11. What is not supported
+## 12. What is not supported
 
 The executed evidence does **not** support claims that:
 
@@ -235,7 +263,7 @@ The executed evidence does **not** support claims that:
 - DCS has passed fresh measured-domain confirmation;
 - a physically correct rewrite certificate has been achieved.
 
-## 12. Current publication posture
+## 13. Current publication posture
 
 The engineering program is complete, but no positive flagship algorithm has cleared
 fresh prospective validation.
