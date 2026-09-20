@@ -1,0 +1,52 @@
+name: Vulkax GAUGE released-geometry mechanism diagnostic
+
+on:
+  push:
+    branches: ["research/gauge-asset-mechanism"]
+    paths:
+      - "research/analysis/gauge_shearing_mode_diagnostic.py"
+      - "research/analysis/gauge_shearing_contract.py"
+      - "research/analysis/run_gauge_shearing_forward.py"
+      - "research/probes/gauge_shearing_forward_probe.cpp"
+      - "research/scripts/fetch_gauge_foam_subset.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/gauge-asset-mechanism.yml"
+  workflow_dispatch:
+
+jobs:
+  released-geometry-mechanism:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch released GAUGE foam evidence
+        run: python3 research/scripts/fetch_gauge_foam_subset.py build/gauge-download
+      - name: Freeze representative shearing contract
+        run: python3 research/analysis/gauge_shearing_contract.py --root build/gauge-download --out build/gauge-shearing-contract
+      - name: Configure forward model
+        run: cmake -S . -B build-forward -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+      - name: Build forward model
+        run: cmake --build build-forward --target vulkax_gauge_shearing_forward_probe --parallel 2
+      - name: Run no-fit released-geometry prediction
+        run: |
+          python3 research/analysis/run_gauge_shearing_forward.py \
+            --exe build-forward/vulkax_gauge_shearing_forward_probe \
+            --contract-dir build/gauge-shearing-contract \
+            --geometry-mode released_asset_aspect \
+            --out build/gauge-forward-asset
+      - name: Decompose released-geometry mismatch by mode
+        run: |
+          python3 research/analysis/gauge_shearing_mode_diagnostic.py \
+            --contract-dir build/gauge-shearing-contract \
+            --forward-dir build/gauge-forward-asset \
+            --out build/gauge-asset-mode-diagnostic
+          cat build/gauge-asset-mode-diagnostic/summary.json
+      - name: Upload diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-gauge-asset-mechanism-${{ github.sha }}
+          path: |
+            build/gauge-shearing-contract
+            build/gauge-forward-asset
+            build/gauge-asset-mode-diagnostic
+          if-no-files-found: error
+          retention-days: 30
