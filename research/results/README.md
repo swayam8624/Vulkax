@@ -7,6 +7,7 @@ Canonical research state date: **2026-09-20**
 1. [Final benchmark summary](DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md)
 2. [Machine-readable benchmark table](DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv)
 3. [Machine-readable result ledger](DCS_FINAL_RESULTS_2026-09-20.json)
+4. [Post-hoc information frontier](DCS_INFORMATION_FRONTIER_2026-09-20.md)
 4. [Paper-data map](../paper_data/README.md)
 5. [Current research state](../status/CURRENT_RESEARCH_STATE_2026-09-20.md)
 6. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
@@ -59,6 +60,7 @@ Generated paper assets:
 - numerical-witness-floor figure;
 - D4V repair-proposal figure;
 - GAUGE channel-contradiction figure;
+- post-hoc information-frontier figure;
 - stage-outcome table;
 - claim-boundary table.
 
