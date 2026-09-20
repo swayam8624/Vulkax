@@ -35,11 +35,39 @@ enum class MpmTransferScheme {
     return "unknown";
 }
 
+enum class MpmConstitutiveModel {
+    // Historical Vulkax 1.0 model. This remains the default so the scientific
+    // control cannot be silently redefined by research-only model tests.
+    NeoHookeanLogJ,
+    // Compressible Neo-Hookean variant with a quadratic (J-1)^2 volumetric
+    // penalty. It has the same infinitesimal Lamé parameters but a different
+    // finite-deformation volumetric response.
+    NeoHookeanQuadraticJ,
+    // Saint-Venant--Kirchhoff elasticity. Useful as a deliberately different
+    // finite-strain model family; it is not assumed to be appropriate for foam.
+    StVenantKirchhoff,
+};
+
+[[nodiscard]] constexpr std::string_view toString(MpmConstitutiveModel model) noexcept {
+    switch (model) {
+        case MpmConstitutiveModel::NeoHookeanLogJ: return "neo_hookean_log_j";
+        case MpmConstitutiveModel::NeoHookeanQuadraticJ: return "neo_hookean_quadratic_j";
+        case MpmConstitutiveModel::StVenantKirchhoff: return "st_venant_kirchhoff";
+    }
+    return "unknown";
+}
+
 struct MpmMaterial {
     double density{1000.0};
     double youngModulus{1.0e5};
     double poissonRatio{0.3};
+    // Appended to preserve all historical three-field aggregate initializers.
+    MpmConstitutiveModel constitutiveModel{MpmConstitutiveModel::NeoHookeanLogJ};
 };
+
+[[nodiscard]] Matrix3 firstPiolaMpm(
+    const Matrix3& deformationGradient,
+    const MpmMaterial& material);
 
 struct MpmParticle {
     std::uint64_t id{};
