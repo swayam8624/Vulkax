@@ -50,7 +50,7 @@ def curves(d,pred,faces):
     a0=[area(p0[i],p0[j],p0[k]) for i,j,k in faces]
     lo=[min(p[q] for p in p0) for q in range(3)];hi=[max(p[q] for p in p0) for q in range(3)]
     axis=max(range(3),key=lambda q:hi[q]-lo[q]);span=hi[axis]-lo[axis];b0=v3(base,0)
-    measured=[];affine=[];vulkax=[]
+    measured=[];affine=[];vulkax=[];affine_marker_errors=[];vulkax_marker_errors=[]
     for frame in range(n):
         pm=[v3(foam[m],frame) for m in ids]
         aa=[area(pm[i],pm[j],pm[k]) for i,j,k in faces]
@@ -60,9 +60,12 @@ def curves(d,pred,faces):
         aaa=[area(pa[i],pa[j],pa[k]) for i,j,k in faces]
         affine.append(rms([(x-y)/max(y,1e-15) for x,y in zip(aaa,a0)]))
         pp=[pred[frame][m] for m in ids]
+        for measured_p,affine_p,vulkax_p in zip(pm,pa,pp):
+            affine_marker_errors.append(norm(sub(affine_p,measured_p)))
+            vulkax_marker_errors.append(norm(sub(vulkax_p,measured_p)))
         ap=[area(pp[i],pp[j],pp[k]) for i,j,k in faces]
         vulkax.append(rms([(x-y)/max(y,1e-15) for x,y in zip(ap,a0)]))
-    return measured,affine,vulkax
+    return measured,affine,vulkax,rms(affine_marker_errors),rms(vulkax_marker_errors)
 
 def main():
     ap=argparse.ArgumentParser()
@@ -70,6 +73,7 @@ def main():
     ap.add_argument("--exe",required=True)
     ap.add_argument("--out",required=True)
     ap.add_argument("--dt",type=float,default=1.0/12000.0)
+    ap.add_argument("--geometry-mode",choices=("measured_aspect","square_cross","released_asset_aspect"),default="measured_aspect")
     a=ap.parse_args()
     root=pathlib.Path(a.root);out=pathlib.Path(a.out);out.mkdir(parents=True,exist_ok=True)
     md=json.loads((root/"metadata"/"foam shearing.json").read_text());faces=unique_faces(md)
@@ -85,11 +89,12 @@ def main():
                 pred=td/f"{material}_{trial}_pred.csv"
                 write_inputs(d,marker,driver)
                 cmd=[a.exe,str(marker),str(driver),str(pred),str(float(mat["young"])),str(float(mat["poisson"])),
-                     str(float(mat["density"])),str(float(mat["mass"])),repr(a.dt),f"{material}-{trial}"]
+                     str(float(mat["density"])),str(float(mat["mass"])),repr(a.dt),f"{material}-{trial}",
+                     "5","13","1","APIC",a.geometry_mode,"zero","neo_hookean_log_j"]
                 cp=subprocess.run(cmd,text=True,capture_output=True)
                 if cp.returncode:
                     raise SystemExit(f"forward failed {material} trial {trial}: {cp.stderr}\n{cp.stdout}")
-                p=read_pred(pred);meas,aff,vkx=curves(d,p,faces)
+                p=read_pred(pred);meas,aff,vkx,affine_marker_rmse,vulkax_marker_rmse=curves(d,p,faces)
                 peak=max(meas)
                 vr=rms([x-y for x,y in zip(vkx,meas)]);ar=rms([x-y for x,y in zip(aff,meas)])
                 rows.append({
@@ -98,7 +103,9 @@ def main():
                     "vulkax_rmse":vr,"affine_rmse":ar,
                     "vulkax_nrmse":vr/max(peak,1e-15),"affine_nrmse":ar/max(peak,1e-15),
                     "vulkax_corr":corr(meas,vkx),"affine_corr":corr(meas,aff),
-                    "beats_affine":int(vr<ar)
+                    "vulkax_marker_rmse_m":vulkax_marker_rmse,"affine_marker_rmse_m":affine_marker_rmse,
+                    "beats_affine":int(vr<ar),
+                    "dual_metric_beats_affine":int(vr<ar and vulkax_marker_rmse<=affine_marker_rmse)
                 })
     fields=list(rows[0])
     with (out/"per_trial.csv").open("w",newline="") as f:
@@ -115,13 +122,17 @@ def main():
             "sd_affine_nrmse":statistics.stdev(r["affine_nrmse"] for r in g),
             "mean_vulkax_corr":statistics.fmean(r["vulkax_corr"] for r in g),
             "mean_affine_corr":statistics.fmean(r["affine_corr"] for r in g),
+            "mean_vulkax_marker_rmse_m":statistics.fmean(r["vulkax_marker_rmse_m"] for r in g),
+            "mean_affine_marker_rmse_m":statistics.fmean(r["affine_marker_rmse_m"] for r in g),
+            "dual_metric_wins":sum(r["dual_metric_beats_affine"] for r in g),
         }
     summary={
       "schema":"vulkax.gauge_shearing_repeat_forward","version":1,
       "provenance":"measured+model-prediction","fit_performed":False,
-      "dt_s":a.dt,"trial_count":len(rows),"groups":groups,
+      "dt_s":a.dt,"geometry_mode":a.geometry_mode,"trial_count":len(rows),"groups":groups,
       "overall_vulkax_wins":sum(r["beats_affine"] for r in rows),
-      "decision":"model_family_still_inadequate" if sum(r["beats_affine"] for r in rows)<16 else "repeatability_gate_passed",
+      "overall_dual_metric_wins":sum(r["dual_metric_beats_affine"] for r in rows),
+      "decision":"model_family_still_inadequate" if sum(r["dual_metric_beats_affine"] for r in rows)<16 else "repeatability_gate_passed",
       "warning":"No inverse fitting. Same GAUGE metadata-only material model is evaluated independently on all 20 measured shearing repeats."
     }
     (out/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
@@ -129,7 +140,9 @@ def main():
     for m,g in groups.items():
         print("REPEATS",m,"wins",g["vulkax_wins"],"/",g["trials"],
               "vulkax_nrmse",g["mean_vulkax_nrmse"],"+/-",g["sd_vulkax_nrmse"],
-              "affine_nrmse",g["mean_affine_nrmse"],"+/-",g["sd_affine_nrmse"])
+              "affine_nrmse",g["mean_affine_nrmse"],"+/-",g["sd_affine_nrmse"],
+              "marker_m",g["mean_vulkax_marker_rmse_m"],"affine_marker_m",g["mean_affine_marker_rmse_m"],
+              "dual_wins",g["dual_metric_wins"])
     print("DECISION",summary["decision"])
 
 if __name__=="__main__": main()

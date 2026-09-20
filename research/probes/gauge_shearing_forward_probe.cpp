@@ -122,7 +122,7 @@ std::vector<DriverSample> loadDriver(const std::filesystem::path& path) {
     return out;
 }
 
-Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double density,bool squareCrossSection) {
+Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double density,const std::string& geometryMode) {
     if(!(mass>0.0) || !(density>0.0)) throw std::runtime_error("mass and density must be positive");
     Geometry g;
     for(int a=0;a<3;++a) {
@@ -136,16 +136,35 @@ Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double den
     std::array<double,3> span{};
     for(int a=0;a<3;++a) span[a]=g.hi[a]-g.lo[a];
     g.longAxis=static_cast<int>(std::distance(span.begin(),std::max_element(span.begin(),span.end())));
-    g.longSpan=span[static_cast<std::size_t>(g.longAxis)];
-    if(!(g.longSpan>0.05)) throw std::runtime_error("marker long axis is unexpectedly short");
-
     std::array<int,2> cross{};
     int c=0;
     for(int a=0;a<3;++a) if(a!=g.longAxis) cross[static_cast<std::size_t>(c++)]=a;
+    g.volume=mass/density;
+
+    if(geometryMode=="released_asset_aspect") {
+        // GAUGE's released foam.obj bbox is 0.05 x 0.05 x 0.20 (1:1:4).
+        // Use only that unit-free aspect here; absolute scale is independently
+        // recovered from measured mass/density volume. The measured marker bbox
+        // supplies orientation and a center proxy, but no trajectory error enters.
+        const double crossSpan=std::cbrt(g.volume/4.0);
+        g.crossA=crossSpan;
+        g.crossB=crossSpan;
+        g.longSpan=4.0*crossSpan;
+        for(int a=0;a<3;++a) {
+            const double center=0.5*(g.lo[a]+g.hi[a]);
+            const double physicalSpan=(a==g.longAxis)?g.longSpan:crossSpan;
+            g.prismLo[a]=center-0.5*physicalSpan;
+            g.prismHi[a]=center+0.5*physicalSpan;
+        }
+        return g;
+    }
+
+    g.longSpan=span[static_cast<std::size_t>(g.longAxis)];
+    if(!(g.longSpan>0.05)) throw std::runtime_error("marker long axis is unexpectedly short");
     const double s0=std::max(span[static_cast<std::size_t>(cross[0])],1e-6);
     const double s1=std::max(span[static_cast<std::size_t>(cross[1])],1e-6);
+    const bool squareCrossSection=geometryMode=="square_cross";
     const double aspect=squareCrossSection?1.0:(s0/s1);
-    g.volume=mass/density;
     const double area=g.volume/g.longSpan;
     g.crossA=std::sqrt(area*aspect);
     g.crossB=std::sqrt(area/aspect);
@@ -305,7 +324,7 @@ int main(int argc,char**argv) {
     const std::string constitutiveName=argc==17?argv[16]:"neo_hookean_log_j";
     if(!(poisson>-1.0 && poisson<0.5) || !(requestedDt>0.0))
         throw std::runtime_error("invalid material/timestep argument");
-    if(geometryMode!="measured_aspect" && geometryMode!="square_cross")
+    if(geometryMode!="measured_aspect" && geometryMode!="square_cross" && geometryMode!="released_asset_aspect")
         throw std::runtime_error("unsupported geometry mode");
     const auto transfer=parseTransfer(transferName);
     const auto gravity=parseGravity(gravityName);
@@ -313,7 +332,7 @@ int main(int argc,char**argv) {
 
     const auto markers=loadMarkers(markerPath);
     const auto driver=loadDriver(driverPath);
-    const auto geom=inferGeometry(markers,mass,density,geometryMode=="square_cross");
+    const auto geom=inferGeometry(markers,mass,density,geometryMode);
     auto particles=makeParticles(geom,mass,density,nCross,nLong);
     auto cloud=markerCloud(markers);
     const auto binding=vulkax::coupling::bindGaussianCloudToMpm(cloud,particles,24);

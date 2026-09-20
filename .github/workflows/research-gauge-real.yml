@@ -84,6 +84,11 @@ jobs:
           python3 research/analysis/gauge_shearing_repeat_forensics.py --root build/gauge-download --exe build-forward/vulkax_gauge_shearing_forward_probe --out build/gauge-repeat-forensics
           cat build/gauge-repeat-forensics/summary.json
 
+      - name: Run released-asset geometry over all 20 shearing repeats
+        run: |
+          python3 research/analysis/gauge_shearing_repeat_forensics.py --root build/gauge-download --exe build-forward/vulkax_gauge_shearing_forward_probe --geometry-mode released_asset_aspect --out build/gauge-asset-repeat-forensics
+          cat build/gauge-asset-repeat-forensics/summary.json
+
       - name: Test timestep convergence of the frozen no-fit forward miss
         run: |
           python3 research/analysis/gauge_shearing_timestep_forensics.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --out build/gauge-timestep-forensics
@@ -114,6 +119,7 @@ jobs:
             build/gauge-forward
             build/gauge-forward-analysis
             build/gauge-repeat-forensics
+            build/gauge-asset-repeat-forensics
             build/gauge-timestep-forensics
             build/gauge-structural-forensics
             build/gauge-constitutive-matrix

@@ -19,6 +19,7 @@ def main():
       ("transfer_pic",{"transfer":"PIC"}),
       ("transfer_flip",{"transfer":"FLIP"}),
       ("square_cross_section",{"geometry_mode":"square_cross"}),
+      ("released_asset_aspect",{"geometry_mode":"released_asset_aspect"}),
       ("gravity_pos_x",{"gravity":"+x"}),
       ("gravity_neg_x",{"gravity":"-x"}),
       ("gravity_pos_y",{"gravity":"+y"}),
