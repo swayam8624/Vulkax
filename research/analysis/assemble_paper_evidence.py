@@ -134,8 +134,8 @@ def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: 
             )
 
     # Copy system provenance/logs when the runner produced them outside this out dir.
-    candidate_sys=build_root/"paper-evidence/system/system-info.txt"
     target_sys=out/"system/system-info.txt"
+    candidate_sys=target_sys if target_sys.is_file() else build_root/"paper-evidence/system/system-info.txt"
     if candidate_sys.is_file():
         if candidate_sys.resolve()!=target_sys.resolve():
             add_file(candidate_sys,target_sys,str(candidate_sys),"runtime/system-info",False,artifacts)
@@ -149,8 +149,8 @@ def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: 
                 "sha256": sha256(target_sys),
             })
 
-    candidate_logs=build_root/"paper-evidence/logs"
     target_logs=out/"logs"
+    candidate_logs=target_logs if target_logs.is_dir() else build_root/"paper-evidence/logs"
     if candidate_logs.is_dir():
         for src in sorted(candidate_logs.glob("*.log")):
             dest=target_logs/src.name
