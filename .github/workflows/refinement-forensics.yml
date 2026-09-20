@@ -1,0 +1,33 @@
+name: Vulkax label-free refinement forensics
+
+on:
+  push:
+    branches: ["research/refinement-forensics"]
+    paths:
+      - "research/probes/refinement_forensics_probe.cpp"
+      - "research/probes/analyze_refinement_forensics.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/refinement-forensics.yml"
+  workflow_dispatch:
+
+jobs:
+  refinement-forensics:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+      - name: Build diagnostic
+        run: cmake --build build --target vulkax_refinement_forensics_probe --parallel 2
+      - name: Run label-free timestep and inverse refinement ladder
+        run: |
+          build/vulkax_refinement_forensics_probe build/refinement-forensics
+          python3 research/probes/analyze_refinement_forensics.py build/refinement-forensics
+          cat build/refinement-forensics/analysis.json
+      - name: Upload raw diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-refinement-forensics-${{ github.sha }}
+          path: build/refinement-forensics
+          if-no-files-found: error
+          retention-days: 30
