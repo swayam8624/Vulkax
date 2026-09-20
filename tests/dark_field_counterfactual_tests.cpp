@@ -110,7 +110,13 @@ int main() {
         assert(maximin.worstCaseStandardizedSeparation>0.0);
         const auto m0=applyAnnihilatingStencil(models[0],maximin.stencil);
         const auto m1=applyAnnihilatingStencil(models[1],maximin.stencil);
-        assert(worstCaseStandardizedSeparation({m0,m1},budget)>0.0);
+        const auto effective=propagateStencilUncertainty(maximin.stencil,budget);
+        assert(worstCaseStandardizedSeparation({m0,m1},effective)>0.0);
+        double l2sq=0.0,l1=0.0;
+        for(const double w:maximin.stencil.weights){l2sq+=w*w;l1+=std::abs(w);}
+        assert(std::abs(effective.measurementVariance-budget.measurementVariance*l2sq)<1.0e-12);
+        assert(std::abs(effective.repeatVariance-budget.repeatVariance*l2sq)<1.0e-12);
+        assert(std::abs(effective.numericalVariance-budget.numericalVariance*l1*l1)<1.0e-12);
     }
 
     {
