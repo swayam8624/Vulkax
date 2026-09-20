@@ -3,7 +3,7 @@ import json,pathlib,sys,time,urllib.parse,urllib.request
 root=pathlib.Path(sys.argv[1] if len(sys.argv)>1 else "build/gauge-download")
 (root/"metadata").mkdir(parents=True,exist_ok=True)
 base="https://huggingface.co/datasets/InternRobotics/GAUGE-Dataset/raw/main"
-tasks=("foam stretching","foam compressing","foam shearing")
+tasks=(("foam stretching","foam stretching"),("foam compression","foam compressing"),("foam shearing","foam shearing"))
 materials=("soft","hard")
 def get(url,path):
     path.parent.mkdir(parents=True,exist_ok=True)
@@ -18,13 +18,14 @@ def get(url,path):
             last=e
             time.sleep(1+attempt)
     raise RuntimeError(f"download failed {url}: {last}")
-for task in tasks:
-    enc=urllib.parse.quote(task,safe="")
-    get(f"{base}/metadata/deformable/{enc}.json",root/"metadata"/f"{task}.json")
+for data_task,metadata_task in tasks:
+    data_enc=urllib.parse.quote(data_task,safe="")
+    meta_enc=urllib.parse.quote(metadata_task,safe="")
+    get(f"{base}/metadata/deformable/{meta_enc}.json",root/"metadata"/f"{data_task}.json")
     for material in materials:
         for trial in range(1,11):
-            get(f"{base}/data/deformable/{enc}/json/{material}/{trial}.json",
-                root/"data"/task/material/f"{trial}.json")
+            get(f"{base}/data/deformable/{data_enc}/json/{material}/{trial}.json",
+                root/"data"/data_task/material/f"{trial}.json")
 files=list((root/"data").glob("*/*/*.json"))
 if len(files)!=60: raise SystemExit(f"expected 60 GAUGE trials, got {len(files)}")
 for p in files:

@@ -21,8 +21,8 @@ jobs:
         run: |
           python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam stretching.json" --trial "build/gauge-download/data/foam stretching/soft/1.json" --material soft --out "build/gauge-adapted/stretch-soft"
           python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam stretching.json" --trial "build/gauge-download/data/foam stretching/hard/1.json" --material hard --out "build/gauge-adapted/stretch-hard"
-          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam compressing.json" --trial "build/gauge-download/data/foam compressing/soft/1.json" --material soft --out "build/gauge-adapted/compress-soft"
-          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam compressing.json" --trial "build/gauge-download/data/foam compressing/hard/1.json" --material hard --out "build/gauge-adapted/compress-hard"
+          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam compression.json" --trial "build/gauge-download/data/foam compression/soft/1.json" --material soft --out "build/gauge-adapted/compress-soft"
+          python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam compression.json" --trial "build/gauge-download/data/foam compression/hard/1.json" --material hard --out "build/gauge-adapted/compress-hard"
           python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam shearing.json" --trial "build/gauge-download/data/foam shearing/soft/1.json" --material soft --out "build/gauge-adapted/shear-soft"
           python3 research/adapters/gauge_deformable_to_vulkax.py --metadata "build/gauge-download/metadata/foam shearing.json" --trial "build/gauge-download/data/foam shearing/hard/1.json" --material hard --out "build/gauge-adapted/shear-hard"
       - name: Analyze measured repeatability and material signal

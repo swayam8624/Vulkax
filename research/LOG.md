@@ -120,3 +120,8 @@ Run `35510654019` succeeded. Calibration-locked policy moved off-grid validation
 **Decision:** Validation-1 becomes development evidence. Do not tune on it and call it external validation.
 
 **Real-data escalation:** created a dedicated GAUGE job that fetches only 60 public measured foam trajectory JSONs (stretch/compress/shear × soft/hard × ten repeats), keeps raw data ephemeral, exercises the measured-evidence adapter, and uploads only derived statistics/provenance.
+
+
+## 2026-09-20 — GAUGE fetch schema mismatch fixed
+
+First measured-data run failed before analysis because the public dataset uses `metadata/deformable/foam compressing.json` but `data/deformable/foam compression/...`. The downloader now encodes this mapping explicitly. No scientific result was produced by the failed run.

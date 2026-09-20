@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse,csv,hashlib,json,math,pathlib,statistics
 from itertools import combinations
-TASKS=("foam stretching","foam compressing","foam shearing")
+TASKS=("foam stretching","foam compression","foam shearing")
 MATERIALS=("soft","hard")
 def sha256(p):
     h=hashlib.sha256()
