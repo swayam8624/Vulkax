@@ -626,6 +626,52 @@ double worstCaseStandardizedSeparation(
     return worst;
 }
 
+double worstCasePairAwareStandardizedSeparation(
+    const std::vector<Response>& modelWitnesses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    const std::vector<UncertaintyBudget>& modelNumericalUncertainty,
+    const AnnihilatingStencil& stencil) {
+    requireSameResponseSize(modelWitnesses);
+    if (modelWitnesses.size() < 2 ||
+        modelWitnesses.size() != modelNumericalUncertainty.size())
+        throw std::invalid_argument(
+            "DCS pair-aware separation requires one numerical budget per model");
+
+    UncertaintyBudget shared = sharedObservationUncertainty;
+    // Shared acquisition uncertainty is propagated once through the signed
+    // measurement contrast.
+    shared.numericalVariance = 0.0;
+    shared = propagateStencilUncertainty(stencil, shared);
+
+    std::vector<UncertaintyBudget> numerical;
+    numerical.reserve(modelNumericalUncertainty.size());
+    for (const auto& budget : modelNumericalUncertainty) {
+        if (budget.measurementVariance != 0.0 || budget.repeatVariance != 0.0)
+            throw std::invalid_argument(
+                "DCS model-specific budgets may contain numerical variance only");
+        numerical.push_back(propagateStencilUncertainty(stencil, budget));
+    }
+
+    double worst = std::numeric_limits<double>::infinity();
+    for (std::size_t i = 0; i < modelWitnesses.size(); ++i) {
+        for (std::size_t j = i + 1; j < modelWitnesses.size(); ++j) {
+            const double variance =
+                shared.measurementVariance +
+                shared.repeatVariance +
+                numerical[i].numericalVariance +
+                numerical[j].numericalVariance;
+            if (!std::isfinite(variance) || variance <= 0.0)
+                throw std::invalid_argument(
+                    "DCS pair-aware separation variance must be positive and finite");
+            const double rms =
+                responseDistance(modelWitnesses[i], modelWitnesses[j]) /
+                std::sqrt(static_cast<double>(modelWitnesses[i].size()));
+            worst = std::min(worst, rms / std::sqrt(variance));
+        }
+    }
+    return worst;
+}
+
 MechanismResolutionResult mechanismResolution(
     const std::vector<Response>& witnessByOrder,
     const std::vector<UncertaintyBudget>& uncertaintyByOrder,
