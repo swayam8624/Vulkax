@@ -1,0 +1,108 @@
+{
+  "schema": "vulkax.dcs.final_results",
+  "version": 1,
+  "date": "2026-09-20",
+  "scientific_disposition": "implementation_complete_no_positive_flagship_claim",
+  "stages": {
+    "D1": {
+      "status": "pass_constructed_only",
+      "cases": 64,
+      "ordinary_accept": 64,
+      "deceptive": 64,
+      "dcs_accept_deceptive": 0,
+      "median_observation_improvement": 0.6088,
+      "median_witness_degradation_ratio": 9.375
+    },
+    "D2a": {
+      "status": "mixed_negative",
+      "ranking_agreement": {
+        "heldout_rmse": 0.625,
+        "dcs_fixed_k2": 0.625
+      },
+      "ordinary_mirage_pairs": 9,
+      "dcs_corrected_mirages": 9
+    },
+    "D2b": {
+      "status": "negative",
+      "ranking_agreement": {
+        "dcs_k2_maximin": 0.625,
+        "raw_bundle": 0.75,
+        "raw_maximin": 0.9583,
+        "fisher": 0.875,
+        "max_motion": 0.6667,
+        "random": 0.4583
+      }
+    },
+    "D2_frozen": {
+      "status": "fail_frozen",
+      "truth_worlds": 16,
+      "resolved_worlds": 0,
+      "coverage": 0,
+      "median_standardized_separation": 0.041578,
+      "median_numerical_rms_m": 0.000006469,
+      "maximum_moment_residual": 3.886e-16
+    },
+    "D3": {
+      "status": "negative",
+      "truth_worlds": 6,
+      "resolved_worlds": 0,
+      "adaptive_order_counts": {
+        "2": 6,
+        "3": 0
+      },
+      "median_separation": {
+        "adaptive": 0.0588583,
+        "k2": 0.0588583,
+        "k3": 0.0157173
+      },
+      "median_numerical_rms_m": {
+        "k2": 8.435e-7,
+        "k3": 2.153e-7
+      },
+      "ranking_agreement": {
+        "adaptive_dcs": 0.5278,
+        "k2_dcs": 0.5278,
+        "k3_dcs": 0.4722,
+        "raw_bundle": 0.5833,
+        "raw_pair_aware": 0.5556,
+        "fisher": 0.6111,
+        "max_motion": 0.5833,
+        "random": 0.5278
+      }
+    },
+    "D4V": {
+      "status": "negative",
+      "proposals": 36,
+      "deceptive": 14,
+      "beneficial": 22,
+      "resolved_coverage": {
+        "dcs": 0,
+        "raw_bundle": 0,
+        "raw_pair": 0,
+        "fisher": 0,
+        "max_motion": 0
+      }
+    },
+    "GAUGE": {
+      "status": "retrospective_only",
+      "trials": 10,
+      "ordinary_overlap_wins": 10,
+      "marker_darkfield_endpoint_wins": 0,
+      "longitudinal_darkfield_endpoint_wins": 9,
+      "median_marker_error_m": {
+        "endpoint": 0.0024280231467879694,
+        "overlap": 0.0017091958992332462
+      },
+      "median_longitudinal_error": {
+        "endpoint": 0.003131335884307733,
+        "overlap": 0.0055841823898999735
+      }
+    },
+    "D5": {
+      "status": "runner_implemented_fresh_confirmation_not_executed"
+    },
+    "D6": {
+      "status": "spatial_localization_implemented_not_scientific_validation"
+    }
+  }
+}
