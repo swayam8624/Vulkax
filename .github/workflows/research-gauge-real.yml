@@ -15,6 +15,7 @@ on:
       - "research/analysis/gauge_shearing_timestep_forensics.py"
       - "research/analysis/gauge_shearing_structural_forensics.py"
       - "research/analysis/gauge_shearing_constitutive_matrix.py"
+      - "research/analysis/gauge_shearing_mode_diagnostic.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/probes/gauge_shearing_forward_probe.cpp"
       - "CMakeLists.txt"
@@ -93,6 +94,11 @@ jobs:
           python3 research/analysis/gauge_shearing_constitutive_matrix.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --out build/gauge-constitutive-matrix
           cat build/gauge-constitutive-matrix/summary.json
 
+      - name: Decompose measured vs Vulkax deformation modes
+        run: |
+          python3 research/analysis/gauge_shearing_mode_diagnostic.py --contract-dir build/gauge-shearing-contract --forward-dir build/gauge-forward --out build/gauge-mode-diagnostic
+          cat build/gauge-mode-diagnostic/summary.json
+
       - name: Upload derived measured-data evidence only
         uses: actions/upload-artifact@v4
         with:
@@ -110,5 +116,6 @@ jobs:
             build/gauge-timestep-forensics
             build/gauge-structural-forensics
             build/gauge-constitutive-matrix
+            build/gauge-mode-diagnostic
           if-no-files-found: error
           retention-days: 30
