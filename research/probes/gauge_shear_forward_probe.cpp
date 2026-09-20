@@ -43,7 +43,10 @@ struct Result {
 
 std::vector<std::string> split(const std::string& s) {
     std::vector<std::string> out; std::stringstream ss(s); std::string x;
-    while(std::getline(ss,x,',')) out.push_back(x);
+    while(std::getline(ss,x,',')) {
+        if(!x.empty() && x.back()=='\r') x.pop_back();
+        out.push_back(x);
+    }
     return out;
 }
 double d(const std::string& x){ return std::stod(x); }
