@@ -107,6 +107,15 @@ jobs:
           python3 research/probes/validate_refusal_policy_v3.py build/refusal-validation3
           cat build/refusal-validation3/analysis.json
 
+      - name: Build fresh reason-coded Validation-4
+        run: cmake --build build --target vulkax_refusal_validation4_probe --parallel 2
+
+      - name: Run calibration-locked reason-coded policy on Validation-4
+        run: |
+          build/vulkax_refusal_validation4_probe build/refusal-validation4
+          python3 research/probes/validate_refusal_policy_v4.py build/refusal-repair/cases.csv build/refusal-validation4
+          cat build/refusal-validation4/analysis.json
+
       - name: Diagnose refusal-policy domain shift without retuning
         run: |
           python3 research/probes/diagnose_refusal_policy_shift.py build/refusal-repair/cases.csv build/refusal-validation/cases.csv build/refusal-validation2/cases.csv build/policy-shift
@@ -133,6 +142,7 @@ jobs:
             build/refusal-validation
             build/refusal-validation2
             build/refusal-validation3
+            build/refusal-validation4
             build/policy-shift
           if-no-files-found: error
           retention-days: 30
