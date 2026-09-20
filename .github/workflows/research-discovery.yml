@@ -81,6 +81,17 @@ jobs:
           python3 research/probes/analyze_refusal_repair.py build/refusal-repair
           cat build/refusal-repair/cases.csv
 
+      - name: Build independent refusal-policy validation
+        run: cmake --build build --target vulkax_refusal_validation_probe --parallel 2
+
+      - name: Validate locked refusal policy on off-grid truths
+        run: |
+          build/vulkax_refusal_validation_probe build/refusal-validation
+          python3 research/probes/validate_refusal_policy.py build/refusal-repair/cases.csv build/refusal-validation/cases.csv build/refusal-validation
+
+      - name: Test GAUGE deformable adapter contract
+        run: python3 research/adapters/test_gauge_adapter.py
+
       - name: Upload raw synthetic evidence
         uses: actions/upload-artifact@v4
         with:
@@ -91,5 +102,6 @@ jobs:
             build/solver-design
             build/solver-certificate
             build/refusal-repair
+            build/refusal-validation
           if-no-files-found: error
           retention-days: 30

@@ -84,6 +84,8 @@ add_executable(vulkax_solver_certificate_probe research/probes/solver_certificat
 target_link_libraries(vulkax_solver_certificate_probe PRIVATE vulkax_core)
 add_executable(vulkax_refusal_repair_probe research/probes/refusal_repair_probe.cpp)
 target_link_libraries(vulkax_refusal_repair_probe PRIVATE vulkax_core)
+add_executable(vulkax_refusal_validation_probe research/probes/refusal_repair_validation_probe.cpp)
+target_link_libraries(vulkax_refusal_validation_probe PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()

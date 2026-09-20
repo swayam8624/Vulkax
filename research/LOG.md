@@ -98,3 +98,16 @@ Close the loop. Refuse weak-evidence cases, choose the deformation with highest 
 Expanded the machine-readable hypothesis bank from 180 to 360 while keeping every entry explicitly unvetted. The new matrix crosses representation, uncertainty source, intervention, diagnostic and rewrite-decision dimensions.
 
 Priority remains on the closed-loop refusal/evidence-repair family. The expanded bank exists to prevent premature convergence on the first promising result, not to manufacture novelty by enumeration.
+
+
+## 2026-09-20 — Closed-loop repair separates evidence insufficiency from model inadequacy
+
+**Workflow:** `35510444329`, success at `40eaf379ed2eaea3e9fac800f1b5291241142abb`.
+
+Sensitivity-selected evidence repaired fine APIC and coarse APIC target predictions to 100% safe under the 10% diagnostic criterion, while PIC remained 0% safe and constrained-nu improved only modestly. A fixed evidence/noise + timestep-refinement gate achieved 63.9% coverage with 8.7% unsafe cases.
+
+### Interpretation
+This is the first result that supports the *closed-loop* research family rather than a component in isolation. It is still synthetic and same-domain.
+
+### Next falsification
+Lock a policy on these cases and test it on off-grid E/nu truths, new evidence deformations, new noise phases and a distinct target deformation. In parallel, add an adapter for the released GAUGE foam marker/metadata schema so real-data transfer can start without relabeling measured evidence as synthetic.
