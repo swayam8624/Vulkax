@@ -479,6 +479,23 @@
       "validation_method": "theory + synthetic + real video",
       "relationship_to_vulkax": "Directly kills generic novelty around detecting whether video physics is identifiable. Vulkax must move beyond detection into persistent-world rewrite governance, additional-evidence requests, numerical/model-error separation and calibrated counterfactual trust.",
       "status": "seed-reviewed"
+    },
+    {
+      "id": "conservation-factoring-counterfactuals-2026",
+      "title": "Conservation Buys Stability and Factoring Buys Counterfactuals in Physical World Models",
+      "authors": "Yufeng Wang, Parivesh Priye, Lu Wei, Haibin Ling",
+      "year": 2026,
+      "venue": "arXiv 2609.19674",
+      "url": "https://arxiv.org/abs/2609.19674",
+      "code": "unavailable in seed audit",
+      "representation": "structured learned physical world models",
+      "simulator": "learned Hamiltonian/Lagrangian/symplectic dynamics with matched controls",
+      "input_observations": "physical state and pixel-derived state settings",
+      "output_parameters": "long-horizon rollouts and changed-law counterfactual response",
+      "uncertainty_treatment": "not the primary contribution in seed audit",
+      "validation_method": "matched structural ablations across stability and unseen changed-law interventions",
+      "relationship_to_vulkax": "Direct threat to vague novelty claims that counterfactual transfer follows from generic physical structure or stability. Vulkax must distinguish intervention-specific evidence sufficiency, numerical/model inadequacy, reason-coded refusal and evidence acquisition rather than claim counterfactual generalization itself.",
+      "status": "seed-reviewed"
     }
   ]
 }
