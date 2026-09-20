@@ -90,6 +90,8 @@ add_executable(vulkax_refusal_validation2_probe research/probes/refusal_repair_v
 target_link_libraries(vulkax_refusal_validation2_probe PRIVATE vulkax_core)
 add_executable(vulkax_driven_slab_probe research/probes/driven_slab_probe.cpp)
 target_link_libraries(vulkax_driven_slab_probe PRIVATE vulkax_core)
+add_executable(vulkax_gauge_shearing_forward_probe research/probes/gauge_shearing_forward_probe.cpp)
+target_link_libraries(vulkax_gauge_shearing_forward_probe PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()

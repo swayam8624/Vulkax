@@ -51,6 +51,16 @@ def write_markers(rec,path):
         w=csv.writer(f);w.writerow(["marker_id","x_m","y_m","z_m"])
         for mid,p in zip(rec["marker_ids"],rec["marker_initial_m"]): w.writerow([mid,*p])
 
+def write_marker_trajectory(rec,path):
+    d=rec["raw"];foam=d["foam"];ids=sorted(foam)
+    n=min(len(foam[mid][axis]) for mid in ids for axis in ("x","y","z"))
+    with path.open("w",newline="") as f:
+        w=csv.writer(f);w.writerow(["frame","time_s","marker_id","x_m","y_m","z_m"])
+        for frame in range(n):
+            for mid in ids:
+                p=v3(foam[mid],frame)
+                w.writerow([frame,frame/rec["fps"],mid,*p])
+
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--root",required=True);ap.add_argument("--out",required=True)
     a=ap.parse_args();root=pathlib.Path(a.root);out=pathlib.Path(a.out);out.mkdir(parents=True,exist_ok=True)
@@ -67,6 +77,7 @@ def main():
         records[material]=rows;selected[material]=pick
         write_driver(pick,out/f"driver_{material}.csv")
         write_markers(pick,out/f"markers_initial_{material}.csv")
+        write_marker_trajectory(pick,out/f"markers_measured_{material}.csv")
     faces=unique_faces(md)
     summary={}
     for material in ("soft","hard"):

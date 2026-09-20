@@ -168,3 +168,15 @@ Validation-1 is treated as development evidence only. Added a second independent
 ## 2026-09-20 — GAUGE zero-parameter affine null launched
 
 Added a no-fit affine shear baseline using only measured driver displacement and initial marker geometry. This is a kill test for the real-data direction: a strong affine match would indicate that benchmark-native face-area change is largely kinematic and weak as evidence for constitutive inference.
+
+
+## 2026-09-20 — GAUGE metadata-only forward constitutive sanity launched
+
+The affine kinematic null left a repeatable non-affine residual, so the next gate is now implemented without any inverse fitting. For the frozen soft/hard GAUGE shearing repeats, Vulkax consumes the measured driver trajectory plus GAUGE E, nu, density and mass exactly as metadata.
+
+The physical body is represented by a declared geometry proxy: long extent from the measured marker span, total volume from mass/density, and cross-section aspect ratio from the measured marker cloud. A regular MPM volume is coupled back to the measured marker locations through the existing affine-MLS Gaussian↔MPM correspondence. The low end is fixed and the high end follows the measured driver with the research-only prescribed-particle operator.
+
+### Kill rule
+Do **not** permit inverse material fitting unless the no-fit Vulkax forward prediction beats the zero-parameter affine null on benchmark-native face-area trajectory RMSE for both soft and hard selected trials and gets the measured soft-vs-hard peak-separation sign correct.
+
+Gravity is intentionally zero in this first pass because the dataset-to-world gravity-axis transform has not yet been verified. Geometry proxy and boundary projection remain explicit limitations, not hidden fitted parameters.

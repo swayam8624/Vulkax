@@ -9,6 +9,10 @@ on:
       - "research/analysis/gauge_shearing_contract.py"
       - "research/analysis/gauge_shearing_affine_baseline.py"
       - "research/analysis/gauge_shearing_nonaffine.py"
+      - "research/analysis/run_gauge_shearing_forward.py"
+      - "research/analysis/gauge_shearing_forward_analysis.py"
+      - "research/probes/gauge_shearing_forward_probe.cpp"
+      - "CMakeLists.txt"
       - "research/scripts/fetch_gauge_foam_subset.py"
       - ".github/workflows/research-gauge-real.yml"
   workflow_dispatch:
@@ -45,6 +49,20 @@ jobs:
         run: |
           python3 research/analysis/gauge_shearing_nonaffine.py --root build/gauge-download --out build/gauge-nonaffine
           cat build/gauge-nonaffine/summary.json
+      - name: Configure metadata-only Vulkax forward model
+        run: cmake -S . -B build-forward -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+      - name: Build metadata-only Vulkax forward model
+        run: cmake --build build-forward --target vulkax_gauge_shearing_forward_probe --parallel 2
+      - name: Run no-fit Vulkax GAUGE shearing forward prediction
+        run: |
+          python3 research/analysis/run_gauge_shearing_forward.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --out build/gauge-forward
+          cat build/gauge-forward/predicted_soft_summary.json
+          cat build/gauge-forward/predicted_hard_summary.json
+      - name: Compare Vulkax forward prediction against affine null
+        run: |
+          python3 research/analysis/gauge_shearing_forward_analysis.py --contract-dir build/gauge-shearing-contract --forward-dir build/gauge-forward --affine-dir build/gauge-affine-null --out build/gauge-forward-analysis
+          cat build/gauge-forward-analysis/summary.json
+
       - name: Upload derived measured-data evidence only
         uses: actions/upload-artifact@v4
         with:
@@ -55,5 +73,7 @@ jobs:
             build/gauge-shearing-contract
             build/gauge-affine-null
             build/gauge-nonaffine
+            build/gauge-forward
+            build/gauge-forward-analysis
           if-no-files-found: error
           retention-days: 30
