@@ -869,4 +869,158 @@ SynthesizedStencil synthesizeMaximinAnnihilatingStencil(
     return best;
 }
 
+SynthesizedStencil synthesizePairAwareMaximinStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& modelResponses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    const std::vector<UncertaintyBudget>& modelNumericalUncertainty,
+    double momentTolerance,
+    std::size_t maximumIterations) {
+    validateModelResponseGrid(points, modelResponses);
+    if (modelResponses.size() != modelNumericalUncertainty.size())
+        throw std::invalid_argument(
+            "DCS pair-aware synthesis needs one numerical budget per model");
+
+    UncertaintyBudget generatorUncertainty = sharedObservationUncertainty;
+    generatorUncertainty.numericalVariance = 0.0;
+    if (!(generatorUncertainty.totalVariance() > 0.0))
+        throw std::invalid_argument(
+            "DCS pair-aware synthesis requires positive observation uncertainty");
+
+    const auto score = [&](SynthesizedStencil candidate) {
+        std::vector<Response> witnesses;
+        witnesses.reserve(modelResponses.size());
+        for (const auto& model : modelResponses)
+            witnesses.push_back(
+                applyAnnihilatingStencil(model, candidate.stencil, momentTolerance));
+        candidate.worstCaseStandardizedSeparation =
+            worstCasePairAwareStandardizedSeparation(
+                witnesses,
+                generatorUncertainty,
+                modelNumericalUncertainty,
+                candidate.stencil);
+        return candidate;
+    };
+
+    SynthesizedStencil best = score(synthesizeMaximinAnnihilatingStencil(
+        points, order, modelResponses, generatorUncertainty,
+        momentTolerance, maximumIterations));
+
+    for (std::size_t a = 0; a < modelResponses.size(); ++a) {
+        for (std::size_t b = a + 1; b < modelResponses.size(); ++b) {
+            std::vector<std::vector<Response>> pair{
+                modelResponses[a], modelResponses[b]};
+            try {
+                auto candidate = score(synthesizeMaximinAnnihilatingStencil(
+                    points, order, pair, generatorUncertainty,
+                    momentTolerance, maximumIterations));
+                if (candidate.worstCaseStandardizedSeparation >
+                    best.worstCaseStandardizedSeparation)
+                    best = std::move(candidate);
+            } catch (const std::runtime_error&) {
+                // This pair can have no usable projected disagreement direction.
+            }
+        }
+    }
+    return best;
+}
+
+SynthesizedStencil synthesizeNumericallyGuardedMaximinStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& modelResponses,
+    const std::vector<std::vector<Response>>& refinedModelResponses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    double momentTolerance,
+    std::size_t maximumIterations) {
+    validateModelResponseGrid(points, modelResponses);
+    validateModelResponseGrid(points, refinedModelResponses);
+    if (modelResponses.size() != refinedModelResponses.size())
+        throw std::invalid_argument(
+            "DCS guarded synthesis nominal/refined model counts must match");
+    for (std::size_t model = 0; model < modelResponses.size(); ++model) {
+        if (modelResponses[model].size() != refinedModelResponses[model].size())
+            throw std::invalid_argument(
+                "DCS guarded synthesis nominal/refined point counts must match");
+        for (std::size_t point = 0; point < modelResponses[model].size(); ++point)
+            if (modelResponses[model][point].size() !=
+                refinedModelResponses[model][point].size())
+                throw std::invalid_argument(
+                    "DCS guarded synthesis nominal/refined observables must match");
+    }
+
+    UncertaintyBudget observation = sharedObservationUncertainty;
+    observation.numericalVariance = 0.0;
+    if (!(observation.totalVariance() > 0.0))
+        throw std::invalid_argument(
+            "DCS guarded synthesis requires positive observation uncertainty");
+
+    const auto score = [&](SynthesizedStencil candidate) {
+        std::vector<Response> nominalWitnesses;
+        std::vector<Response> refinedWitnesses;
+        nominalWitnesses.reserve(modelResponses.size());
+        refinedWitnesses.reserve(modelResponses.size());
+        for (std::size_t model = 0; model < modelResponses.size(); ++model) {
+            nominalWitnesses.push_back(applyAnnihilatingStencil(
+                modelResponses[model], candidate.stencil, momentTolerance));
+            refinedWitnesses.push_back(applyAnnihilatingStencil(
+                refinedModelResponses[model], candidate.stencil, momentTolerance));
+        }
+
+        UncertaintyBudget witnessObservation =
+            propagateStencilUncertainty(candidate.stencil, observation);
+        witnessObservation.numericalVariance = 0.0;
+
+        std::vector<double> numericalVariance(modelResponses.size(), 0.0);
+        for (std::size_t model = 0; model < modelResponses.size(); ++model) {
+            const double rms = responseDistance(
+                nominalWitnesses[model], refinedWitnesses[model]) /
+                std::sqrt(static_cast<double>(nominalWitnesses[model].size()));
+            numericalVariance[model] = rms * rms;
+        }
+
+        double worst = std::numeric_limits<double>::infinity();
+        for (std::size_t a = 0; a < nominalWitnesses.size(); ++a) {
+            for (std::size_t b = a + 1; b < nominalWitnesses.size(); ++b) {
+                const double separation = responseDistance(
+                    nominalWitnesses[a], nominalWitnesses[b]) /
+                    std::sqrt(static_cast<double>(nominalWitnesses[a].size()));
+                const double variance =
+                    witnessObservation.measurementVariance +
+                    witnessObservation.repeatVariance +
+                    numericalVariance[a] + numericalVariance[b];
+                if (!std::isfinite(variance) || variance <= 0.0)
+                    throw std::runtime_error(
+                        "DCS guarded synthesis produced invalid witness variance");
+                worst = std::min(worst, separation / std::sqrt(variance));
+            }
+        }
+        candidate.worstCaseStandardizedSeparation = worst;
+        return candidate;
+    };
+
+    SynthesizedStencil best = score(synthesizeMaximinAnnihilatingStencil(
+        points, order, modelResponses, observation,
+        momentTolerance, maximumIterations));
+
+    for (std::size_t a = 0; a < modelResponses.size(); ++a) {
+        for (std::size_t b = a + 1; b < modelResponses.size(); ++b) {
+            std::vector<std::vector<Response>> pair{
+                modelResponses[a], modelResponses[b]};
+            try {
+                auto candidate = score(synthesizeMaximinAnnihilatingStencil(
+                    points, order, pair, observation,
+                    momentTolerance, maximumIterations));
+                if (candidate.worstCaseStandardizedSeparation >
+                    best.worstCaseStandardizedSeparation)
+                    best = std::move(candidate);
+            } catch (const std::runtime_error&) {
+                // Other pair/global candidates can still define the experiment.
+            }
+        }
+    }
+    return best;
+}
+
 } // namespace vulkax::research::dcs
