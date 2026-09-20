@@ -43,11 +43,20 @@ def cosine_between(a,b):
     return max(-1.0,min(1.0,dot(a,b)/(na*nb)))
 
 def infer_strip(ids,faces):
-    # GAUGE foam face topology is a connected 2xN strip. Infer the two marker rows
-    # from the canonical triangle pattern rather than hard-coding marker names.
-    n=len(ids)
+    # GAUGE publishes more tracked foam markers than are referenced by the released
+    # triangular surface-face topology. Existing benchmark-native analyses interpret
+    # each face index against sorted marker IDs, so restrict this mode decomposition
+    # to exactly the topology-supported prefix instead of pretending all markers form
+    # one 2xN strip.
+    if not faces:
+        raise ValueError("GAUGE face topology is empty")
+    support_count=max(max(map(int,f)) for f in faces)+1
+    if support_count>len(ids):
+        raise ValueError("GAUGE face topology references a marker outside the measured marker set")
+    topology_ids=ids[:support_count]
+    n=len(topology_ids)
     if n<6 or n%2:
-        raise ValueError(f"expected an even strip marker count, got {n}")
+        raise ValueError(f"expected an even topology-supported strip marker count, got {n}")
     half=n//2
     expected=set()
     for i in range(half-1):
@@ -56,7 +65,7 @@ def infer_strip(ids,faces):
     actual={tuple(sorted(map(int,f))) for f in faces}
     if expected != actual:
         raise ValueError("GAUGE face topology is not the expected 2xN strip; refusing to invent a decomposition")
-    return list(range(half)),list(range(half,n))
+    return topology_ids,list(range(half)),list(range(half,n))
 
 def mode_frame(points,rest,row0,row1,faces):
     long_edges=[]
@@ -97,13 +106,13 @@ def curves(frames,ids,faces):
     keys=sorted(frames)
     if not keys or keys[0]!=0:
         raise ValueError("marker series must begin at frame 0")
-    rest=[frames[0][m] for m in ids]
-    row0,row1=infer_strip(ids,faces)
+    topology_ids,row0,row1=infer_strip(ids,faces)
+    rest=[frames[0][m] for m in topology_ids]
     out=[]
     for fr in keys:
-        pts=[frames[fr][m] for m in ids]
+        pts=[frames[fr][m] for m in topology_ids]
         out.append(mode_frame(pts,rest,row0,row1,faces))
-    return out
+    return out,topology_ids
 
 def discrepancy(measured,predicted,key):
     n=min(len(measured),len(predicted))
@@ -158,13 +167,18 @@ def main():
                 raise SystemExit(f"marker identity mismatch: {material} frame {fr}")
         measured={fr:measured[fr] for fr in range(common)}
         predicted={fr:predicted[fr] for fr in range(common)}
-        mc=curves(measured,ids,faces)
-        pc=curves(predicted,ids,faces)
+        mc,topology_ids=curves(measured,ids,faces)
+        pc,predicted_topology_ids=curves(predicted,ids,faces)
+        if predicted_topology_ids!=topology_ids:
+            raise SystemExit(f"topology marker subset mismatch: {material}")
         disc={k:discrepancy(mc,pc,k) for k in metrics}
         # Ranking is diagnostic only: it points to the largest observable mode mismatch.
         ranking=sorted(metrics,key=lambda k:disc[k]["nrmse_to_measured_peak_abs"],reverse=True)
         result["materials"][material]={
             "frames":common,
+            "measured_marker_count":len(ids),
+            "topology_marker_count":len(topology_ids),
+            "topology_marker_ids":topology_ids,
             "mode_discrepancy":disc,
             "diagnostic_mismatch_ranking":ranking,
         }
