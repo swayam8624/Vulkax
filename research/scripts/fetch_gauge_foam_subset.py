@@ -18,6 +18,9 @@ def get(url,path):
             last=e
             time.sleep(1+attempt)
     raise RuntimeError(f"download failed {url}: {last}")
+# The published foam mesh is part of GAUGE's simulation-ready asset bundle.
+# Fetch it once so geometry adequacy can be tested without fitting trajectory data.
+get(f"{base}/assets/obj/foam.obj",root/"assets"/"foam.obj")
 for data_task,metadata_task in tasks:
     data_enc=urllib.parse.quote(data_task,safe="")
     meta_enc=urllib.parse.quote(metadata_task,safe="")

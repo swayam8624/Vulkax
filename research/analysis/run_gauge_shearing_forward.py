@@ -11,13 +11,23 @@ def main():
     p.add_argument("--n-long",type=int,default=13)
     p.add_argument("--boundary-layers",type=int,default=1)
     p.add_argument("--transfer",choices=("APIC","PIC","FLIP"),default="APIC")
-    p.add_argument("--geometry-mode",choices=("measured_aspect","square_cross"),default="measured_aspect")
+    p.add_argument("--geometry-mode",choices=("measured_aspect","square_cross","asset_bbox"),default="measured_aspect")
+    p.add_argument("--asset-geometry-json")
     p.add_argument("--gravity",choices=("zero","+x","-x","+y","-y","+z","-z"),default="zero")
     p.add_argument("--constitutive",choices=("neo_hookean_log_j","neo_hookean_quadratic_j","st_venant_kirchhoff"),default="neo_hookean_log_j")
     a=p.parse_args()
     cdir=pathlib.Path(a.contract_dir); out=pathlib.Path(a.out); out.mkdir(parents=True,exist_ok=True)
     contract=json.loads((cdir/"contract.json").read_text())
     if contract.get("provenance")!="measured": raise SystemExit("GAUGE forward contract must be measured")
+    asset_geometry=None
+    if a.geometry_mode=="asset_bbox":
+        if not a.asset_geometry_json:
+            raise SystemExit("--asset-geometry-json is required for asset_bbox geometry")
+        asset_geometry=json.loads(pathlib.Path(a.asset_geometry_json).read_text())
+        if asset_geometry.get("provenance")!="published-asset+measured-metadata":
+            raise SystemExit("asset geometry must come from the published GAUGE asset audit")
+        if len(asset_geometry["task_translation_m"])!=3 or len(asset_geometry["asset_bbox"]["extent_m"])!=3:
+            raise SystemExit("invalid asset geometry dimensions")
     commands=[]
     for material in ("soft","hard"):
         md=contract["materials"][material]["material_metadata"]
@@ -40,6 +50,9 @@ def main():
             a.gravity,
             a.constitutive,
         ]
+        if asset_geometry is not None:
+            cmd.extend(repr(float(x)) for x in asset_geometry["task_translation_m"])
+            cmd.extend(repr(float(x)) for x in asset_geometry["asset_bbox"]["extent_m"])
         cp=subprocess.run(cmd,text=True,capture_output=True)
         if cp.stdout:
             print(cp.stdout,end="")
@@ -64,7 +77,12 @@ def main():
       "structural_controls":{
         "n_cross":a.n_cross,"n_long":a.n_long,"boundary_layers":a.boundary_layers,
         "transfer":a.transfer,"geometry_mode":a.geometry_mode,"gravity":a.gravity,
-        "constitutive":a.constitutive
+        "constitutive":a.constitutive,
+        "asset_geometry":None if asset_geometry is None else {
+          "asset_sha256":asset_geometry["asset_sha256"],
+          "task_translation_m":asset_geometry["task_translation_m"],
+          "extent_m":asset_geometry["asset_bbox"]["extent_m"]
+        }
       },
       "runs":commands,
       "warning":"Material values come directly from frozen GAUGE metadata. No simulation error is used to choose parameters or representative trials."

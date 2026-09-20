@@ -122,7 +122,10 @@ std::vector<DriverSample> loadDriver(const std::filesystem::path& path) {
     return out;
 }
 
-Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double density,bool squareCrossSection) {
+Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double density,
+                       const std::string& geometryMode,
+                       const std::array<double,3>& assetCenter,
+                       const std::array<double,3>& assetExtent) {
     if(!(mass>0.0) || !(density>0.0)) throw std::runtime_error("mass and density must be positive");
     Geometry g;
     for(int a=0;a<3;++a) {
@@ -135,6 +138,31 @@ Geometry inferGeometry(const std::vector<Marker>& markers,double mass,double den
     }
     std::array<double,3> span{};
     for(int a=0;a<3;++a) span[a]=g.hi[a]-g.lo[a];
+    if(geometryMode=="asset_bbox") {
+        for(int a=0;a<3;++a) {
+            if(!(assetExtent[static_cast<std::size_t>(a)]>0.0) ||
+               !std::isfinite(assetCenter[static_cast<std::size_t>(a)]) ||
+               !std::isfinite(assetExtent[static_cast<std::size_t>(a)]))
+                throw std::runtime_error("invalid published-asset geometry argument");
+        }
+        g.longAxis=static_cast<int>(std::distance(assetExtent.begin(),std::max_element(assetExtent.begin(),assetExtent.end())));
+        g.longSpan=assetExtent[static_cast<std::size_t>(g.longAxis)];
+        g.volume=mass/density;
+        std::array<int,2> cross{};
+        int c=0;
+        for(int a=0;a<3;++a) if(a!=g.longAxis) cross[static_cast<std::size_t>(c++)]=a;
+        g.crossA=assetExtent[static_cast<std::size_t>(cross[0])];
+        g.crossB=assetExtent[static_cast<std::size_t>(cross[1])];
+        for(int a=0;a<3;++a) {
+            g.prismLo[static_cast<std::size_t>(a)]=assetCenter[static_cast<std::size_t>(a)]-0.5*assetExtent[static_cast<std::size_t>(a)];
+            g.prismHi[static_cast<std::size_t>(a)]=assetCenter[static_cast<std::size_t>(a)]+0.5*assetExtent[static_cast<std::size_t>(a)];
+        }
+        return g;
+    }
+
+    const bool squareCrossSection=geometryMode=="square_cross";
+    if(geometryMode!="measured_aspect" && !squareCrossSection)
+        throw std::runtime_error("unsupported geometry mode");
     g.longAxis=static_cast<int>(std::distance(span.begin(),std::max_element(span.begin(),span.end())));
     g.longSpan=span[static_cast<std::size_t>(g.longAxis)];
     if(!(g.longSpan>0.05)) throw std::runtime_error("marker long axis is unexpectedly short");
@@ -286,10 +314,11 @@ void writeFrame(std::ofstream& out,std::size_t frame,double time,
 } // namespace
 
 int main(int argc,char**argv) {
-    if(argc!=10 && argc!=16 && argc!=17) {
+    if(argc!=10 && argc!=16 && argc!=17 && argc!=23) {
         std::cerr<<"usage: vulkax_gauge_shearing_forward_probe markers.csv driver.csv output.csv "
                     "young_pa poisson density_kg_m3 mass_kg requested_dt label "
-                    "[n_cross n_long boundary_layers transfer geometry_mode gravity [constitutive]]\n";
+                    "[n_cross n_long boundary_layers transfer geometry_mode gravity [constitutive "
+                    "[asset_center_x asset_center_y asset_center_z asset_extent_x asset_extent_y asset_extent_z]]]\n";
         return 2;
     }
     const std::filesystem::path markerPath=argv[1],driverPath=argv[2],outPath=argv[3];
@@ -302,18 +331,27 @@ int main(int argc,char**argv) {
     const std::string transferName=argc>=16?argv[13]:"APIC";
     const std::string geometryMode=argc>=16?argv[14]:"measured_aspect";
     const std::string gravityName=argc>=16?argv[15]:"zero";
-    const std::string constitutiveName=argc==17?argv[16]:"neo_hookean_log_j";
+    const std::string constitutiveName=(argc==17 || argc==23)?argv[16]:"neo_hookean_log_j";
     if(!(poisson>-1.0 && poisson<0.5) || !(requestedDt>0.0))
         throw std::runtime_error("invalid material/timestep argument");
-    if(geometryMode!="measured_aspect" && geometryMode!="square_cross")
+    if(geometryMode!="measured_aspect" && geometryMode!="square_cross" && geometryMode!="asset_bbox")
         throw std::runtime_error("unsupported geometry mode");
+    std::array<double,3> assetCenter{0.0,0.0,0.0};
+    std::array<double,3> assetExtent{0.0,0.0,0.0};
+    if(geometryMode=="asset_bbox") {
+        if(argc!=23) throw std::runtime_error("asset_bbox requires center and extent arguments");
+        for(int a=0;a<3;++a) assetCenter[static_cast<std::size_t>(a)]=number(argv[17+a]);
+        for(int a=0;a<3;++a) assetExtent[static_cast<std::size_t>(a)]=number(argv[20+a]);
+    } else if(argc==23) {
+        throw std::runtime_error("asset geometry arguments supplied for non-asset geometry mode");
+    }
     const auto transfer=parseTransfer(transferName);
     const auto gravity=parseGravity(gravityName);
     const auto constitutive=parseConstitutive(constitutiveName);
 
     const auto markers=loadMarkers(markerPath);
     const auto driver=loadDriver(driverPath);
-    const auto geom=inferGeometry(markers,mass,density,geometryMode=="square_cross");
+    const auto geom=inferGeometry(markers,mass,density,geometryMode,assetCenter,assetExtent);
     auto particles=makeParticles(geom,mass,density,nCross,nLong);
     auto cloud=markerCloud(markers);
     const auto binding=vulkax::coupling::bindGaussianCloudToMpm(cloud,particles,24);
@@ -379,7 +417,14 @@ int main(int argc,char**argv) {
            <<"  \"poisson\": "<<poisson<<",\n"
            <<"  \"density_kg_m3\": "<<density<<",\n"
            <<"  \"mass_kg\": "<<mass<<",\n"
-           <<"  \"geometry_proxy\": \"mass/density volume + measured marker long span + "<<geometryMode<<"\",\n"
+           <<"  \"geometry_proxy\": \""<<(geometryMode=="asset_bbox"?
+                "published GAUGE foam.obj bounding box + task translation":
+                ("mass/density volume + measured marker long span + "+geometryMode))<<"\",\n"
+           <<"  \"geometry_mode\": \""<<geometryMode<<"\",\n"
+           <<"  \"prism_lo_m\": ["<<geom.prismLo[0]<<','<<geom.prismLo[1]<<','<<geom.prismLo[2]<<"],\n"
+           <<"  \"prism_hi_m\": ["<<geom.prismHi[0]<<','<<geom.prismHi[1]<<','<<geom.prismHi[2]<<"],\n"
+           <<"  \"asset_center_arg_m\": ["<<assetCenter[0]<<','<<assetCenter[1]<<','<<assetCenter[2]<<"],\n"
+           <<"  \"asset_extent_arg_m\": ["<<assetExtent[0]<<','<<assetExtent[1]<<','<<assetExtent[2]<<"],\n"
            <<"  \"gravity_mode\": \""<<gravityName<<"\",\n"
            <<"  \"gravity\": ["<<gravity.x<<','<<gravity.y<<','<<gravity.z<<"],\n"
            <<"  \"transfer\": \""<<transferName<<"\",\n"

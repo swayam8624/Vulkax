@@ -15,6 +15,8 @@ on:
       - "research/analysis/gauge_shearing_timestep_forensics.py"
       - "research/analysis/gauge_shearing_structural_forensics.py"
       - "research/analysis/gauge_shearing_constitutive_matrix.py"
+      - "research/analysis/gauge_asset_geometry.py"
+      - "research/analysis/gauge_shearing_asset_geometry_forensics.py"
       - "research/probes/gauge_shearing_forward_probe.cpp"
       - "CMakeLists.txt"
       - "research/scripts/fetch_gauge_foam_subset.py"
@@ -45,6 +47,10 @@ jobs:
         run: |
           python3 research/analysis/gauge_shearing_contract.py --root build/gauge-download --out build/gauge-shearing-contract
           cat build/gauge-shearing-contract/contract.json
+      - name: Audit published GAUGE foam asset geometry
+        run: |
+          python3 research/analysis/gauge_asset_geometry.py --root build/gauge-download --out build/gauge-asset-geometry
+          cat build/gauge-asset-geometry/geometry.json
       - name: Run zero-parameter affine-shear null baseline
         run: |
           python3 research/analysis/gauge_shearing_affine_baseline.py --root build/gauge-download --out build/gauge-affine-null
@@ -87,6 +93,11 @@ jobs:
           python3 research/analysis/gauge_shearing_constitutive_matrix.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --out build/gauge-constitutive-matrix
           cat build/gauge-constitutive-matrix/summary.json
 
+      - name: Run published-asset geometry x transfer forensic
+        run: |
+          python3 research/analysis/gauge_shearing_asset_geometry_forensics.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --asset-geometry-json build/gauge-asset-geometry/geometry.json --out build/gauge-asset-geometry-forensics
+          cat build/gauge-asset-geometry-forensics/summary.json
+
       - name: Upload derived measured-data evidence only
         uses: actions/upload-artifact@v4
         with:
@@ -95,6 +106,7 @@ jobs:
             build/gauge-real
             build/gauge-adapted
             build/gauge-shearing-contract
+            build/gauge-asset-geometry
             build/gauge-affine-null
             build/gauge-nonaffine
             build/gauge-forward
@@ -103,5 +115,6 @@ jobs:
             build/gauge-timestep-forensics
             build/gauge-structural-forensics
             build/gauge-constitutive-matrix
+            build/gauge-asset-geometry-forensics
           if-no-files-found: error
           retention-days: 30
