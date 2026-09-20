@@ -1,7 +1,7 @@
 # Vulkax flagship problem/solution lock — DCS
 
 Date: 2026-09-20
-Status: **LOCKED FOR IMPLEMENTATION**
+Status: **SUPERSEDED AS A POSITIVE FLAGSHIP LOCK; retained as historical DCS implementation record**
 Supersedes: CAR-v1 / generic adequacy routing.
 
 ## Why the previous lock was superseded
@@ -107,3 +107,31 @@ Paper prose may begin once:
 - the benchmark/limitations/novelty boundaries are frozen.
 
 Flagship claims must wait for D5 fresh measured validation.
+
+
+## Post-execution outcome — 2026-09-20
+
+The DCS implementation was completed, but the locked positive flagship thesis did
+**not** survive the full elimination sequence.
+
+- D2 fresh frozen order-2 validation: **0 / 16 resolved worlds**.
+- D3 witness-space/adaptive-order discovery: **0 / 6 resolved worlds**; adaptive
+  target-ranking agreement **52.78%**, below Fisher and matched-cost raw baselines.
+- D4V pair-specific repair-veto discovery: **36 proposals**, including **14
+  deceptive repairs**, but **0% resolved coverage** for DCS and all matched
+  verification baselines at the inherited `|z| >= 2` standard.
+- GAUGE retrospective: aggregate face+marker metrics prefer the finite-overlap
+  repair **10/10**, while longitudinal dark-field residual prefers the original
+  endpoint model **9/10**. This is retrospective and channel-specific, not
+  prospective confirmation.
+
+Therefore the original DCS problem remains real, and the implementation remains
+useful, but **DCS is no longer locked as the validated flagship solution**.
+
+The current research state is:
+> no positive flagship family is locked; the next mechanism must increase the
+> physical information content rather than tune frozen D2/D3/D4V thresholds or
+> merely increase response order.
+
+Canonical result summary:
+`research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md`
