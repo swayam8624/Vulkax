@@ -1,0 +1,56 @@
+name: Vulkax GAUGE held-out fixture support
+
+on:
+  push:
+    branches:
+      - "research/fixture-overlap-heldout"
+    paths:
+      - "research/probes/gauge_shearing_forward_probe.cpp"
+      - "research/analysis/gauge_shearing_effective_span.py"
+      - "research/analysis/validate_gauge_effective_span.py"
+      - "research/analysis/gauge_fixture_overlap_heldout.py"
+      - "research/scripts/fetch_gauge_foam_subset.py"
+      - "CMakeLists.txt"
+      - ".github/workflows/gauge-fixture-overlap-heldout.yml"
+  workflow_dispatch:
+
+jobs:
+  heldout-fixture-support:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Python research harness
+        run: |
+          python3 -m py_compile             research/analysis/gauge_shearing_effective_span.py             research/analysis/validate_gauge_effective_span.py             research/analysis/gauge_fixture_overlap_heldout.py
+
+      - name: Fetch public GAUGE foam subset
+        run: python3 research/scripts/fetch_gauge_foam_subset.py build/gauge-download
+
+      - name: Infer measured-only effective span
+        run: |
+          python3 research/analysis/gauge_shearing_effective_span.py             --root build/gauge-download             --out build/gauge-effective-span
+          python3 research/analysis/validate_gauge_effective_span.py             build/gauge-effective-span
+          cat build/gauge-effective-span/validation.json
+
+      - name: Configure GAUGE research probe
+        run: cmake -S . -B build-forward -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+
+      - name: Build GAUGE research probe
+        run: cmake --build build-forward --target vulkax_gauge_shearing_forward_probe --parallel 2
+
+      - name: Run parity-held-out fixture-support pilot
+        run: |
+          python3 research/analysis/gauge_fixture_overlap_heldout.py             --root build/gauge-download             --exe build-forward/vulkax_gauge_shearing_forward_probe             --effective-span-dir build/gauge-effective-span             --out build/gauge-fixture-overlap-pilot             --mode pilot
+          cat build/gauge-fixture-overlap-pilot/summary.json
+
+      - name: Upload fixture-support evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-gauge-fixture-overlap-${{ github.sha }}
+          path: |
+            build/gauge-effective-span
+            build/gauge-fixture-overlap-pilot
+          if-no-files-found: error
+          retention-days: 30
