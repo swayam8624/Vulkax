@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: vulkax-dcs-${{ github.ref }}
+  group: vulkax-dcs-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
