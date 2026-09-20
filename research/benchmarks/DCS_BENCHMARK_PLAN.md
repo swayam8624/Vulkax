@@ -1,7 +1,7 @@
 # DCS Benchmark Plan and Result Ledger
 
 Date: 2026-09-20
-Status: preregistered implementation plan; update this file only by appending results.
+Status: **execution complete for D0-D4V and GAUGE retrospective; D5 fresh confirmation not executed.** Historical preregistration text is retained below.
 
 ## A. Benchmark ladder
 
@@ -145,32 +145,57 @@ Minimum evidence needed:
 - one example where DCS admits uncertainty because the witness is numerically or
   observationally unresolved.
 
-## G. Ablation table to fill
+## G. Executed method-comparison summary
 
-| Method | Deceptive AUROC | AUPRC | False accept @50% cov. | Median SNR | Experiments | Notes |
-|---|---:|---:|---:|---:|---:|---|
-| Held-out RMSE | TBD | TBD | TBD | n/a | 0 | |
-| Physical scalar metric | TBD | TBD | TBD | n/a | 0 | |
-| Identifiability s_min | TBD | TBD | TBD | n/a | 0 | |
-| Ensemble disagreement | TBD | TBD | TBD | TBD | 0 | |
-| Fisher/Jacobian OED | TBD | TBD | TBD | TBD | TBD | |
-| Raw max model separation | TBD | TBD | TBD | TBD | TBD | |
-| DCS k=2 fixed | TBD | TBD | TBD | TBD | TBD | |
-| DCS adaptive k | TBD | TBD | TBD | TBD | TBD | |
-| DCS no numerical guard | TBD | TBD | TBD | TBD | TBD | |
-| Full DCS | TBD | TBD | TBD | TBD | TBD | |
+The original AUROC/AUPRC table was not completed as planned because the research
+program hit **zero resolved coverage** before a deployable binary verifier existed.
+Reporting post-hoc AUROC/AUPRC for an unresolved verifier would be misleading.
 
-## H. Cause-stratified table to fill
+Executed target-ranking comparisons:
 
-| Failure cause | Cases | RMSE false accepts | DCS false accepts | Median separating order |
-|---|---:|---:|---:|---:|
-| parameter | TBD | TBD | TBD | TBD |
-| support/boundary | TBD | TBD | TBD | TBD |
-| transfer | TBD | TBD | TBD | TBD |
-| timestep | TBD | TBD | TBD | TBD |
-| spatial discretization | TBD | TBD | TBD | TBD |
-| constitutive | TBD | TBD | TBD | TBD |
-| correspondence | TBD | TBD | TBD | TBD |
+| Method | D2b discovery | D3 discovery |
+|---|---:|---:|
+| DCS fixed/adaptive | **62.50%** | **52.78%** |
+| same-cost raw bundle | **75.00%** | **58.33%** |
+| raw maximin / pair-aware | **95.83%** | **55.56%** |
+| Fisher/Jacobian | **87.50%** | **61.11%** |
+| maximum motion | **66.67%** | **58.33%** |
+| random | **45.83%** | **52.78%** |
+| fixed order-3 DCS | n/a | **47.22%** |
+
+Frozen resolved-coverage results:
+
+| Stage | Truth worlds / proposals | DCS resolved coverage | Frozen decision |
+|---|---:|---:|---|
+| D2 fresh validation | 16 worlds | **0%** | fail / freeze |
+| D3 adaptive-order discovery | 6 worlds | **0%** | do not validate |
+| D4V repair-veto discovery | 36 proposals | **0%** | do not validate |
+
+D4V proposal labels:
+- deceptive: **14**
+- beneficial: **22**
+
+Every matched D4V verification baseline also produced 0% resolved coverage at
+`|z| >= 2`.
+
+## H. Cause-stratified benchmark disposition
+
+The originally planned full cause-stratified AUROC/AUPRC benchmark was **not
+expanded after the frozen D2/D3/D4V gates failed**. This is intentional: expanding
+the benchmark after failure would consume new labels without a surviving method
+configuration.
+
+Cause-specific evidence that was executed before the DCS flagship sequence remains
+available in the historical research logs:
+- parameter/model compensation;
+- timestep confounding;
+- transfer-scheme mismatch;
+- support/boundary mismatch;
+- spatial/grid refinement pathology;
+- correspondence/support diagnostics.
+
+These observations remain valid as failure analyses, but no final DCS
+cause-stratified false-accept table is claimed.
 
 ## I. Required figures/animations
 
@@ -324,7 +349,7 @@ The 16 D2 worlds are permanently frozen and may never be reused to tune the revi
 method.
 
 ### D3 witness-space adaptive-order discovery
-Status: **ACTIVE**.
+Status: **COMPLETE — NEGATIVE DISCOVERY**.
 
 Protocol:
 `research/benchmarks/DCS_D3_DISCOVERY_PROTOCOL.md`
@@ -342,5 +367,56 @@ Fresh D3 discovery truths:
 - nu={0.26;0.33};
 - 6 worlds, disjoint from all previous discovery/validation truths.
 
-If D3 is not observably stronger, do **not** continue increasing order indefinitely;
-narrow or kill DCS as the flagship.
+D3 result:
+- adaptive order selected k=2 on **6/6** worlds;
+- resolved worlds: **0/6**;
+- median adaptive separation: **0.0588583**;
+- adaptive target-ranking agreement: **52.78%**;
+- order-3 target-ranking agreement: **47.22%**;
+- decision: `d3_not_yet_strong_enough_for_validation`.
+
+Do **not** continue increasing response order indefinitely.
+
+### D4V pair-specific repair-veto discovery
+Status: **COMPLETE — NEGATIVE DISCOVERY**.
+
+- fresh truth worlds: **6**
+- ordinary repair proposals: **36**
+- deceptive: **14**
+- beneficial: **22**
+- DCS resolved coverage at inherited `|z| >= 2`: **0%**
+- all matched verification baselines: **0% resolved coverage**
+- moment contract: PASS
+- decision: `d4v_not_strong_enough`
+
+### GAUGE retrospective DCS analysis
+Status: **COMPLETE — RETROSPECTIVE ONLY**.
+
+Across 10 held-out even repeats:
+- ordinary face+marker metrics prefer overlap: **10/10**
+- marker dark-field endpoint wins: **0/10**
+- longitudinal dark-field endpoint wins: **9/10**
+
+Median marker dark-field error:
+- endpoint **2.4280 mm**
+- overlap **1.7092 mm**
+
+Median longitudinal dark-field error:
+- endpoint **0.0031313**
+- overlap **0.0055842**
+
+This is a channel-specific retrospective contradiction, not prospective
+confirmation.
+
+### D5 / D6 implementation disposition
+
+D5 fresh measured confirmation was **not executed** because no positive prospective
+DCS configuration survived synthetic gates.
+
+The generic D5 frozen confirmatory replay runner is implemented and self-tested.
+
+D6 spatial Gaussian/particle witness localization and PLY export are implemented and
+self-tested.
+
+Canonical consolidated result:
+`research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md`
