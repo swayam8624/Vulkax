@@ -20,6 +20,7 @@ on:
       - "research/analysis/gauge_shearing_effective_span.py"
       - "research/analysis/validate_gauge_effective_span.py"
       - "research/analysis/gauge_shearing_support_aware_affine.py"
+      - "research/analysis/gauge_shearing_affine_nonaffine.py"
       - "research/analysis/gauge_fixture_envelope_synthetic_control.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/analysis/gauge_foam_asset_geometry.py"
@@ -131,6 +132,15 @@ jobs:
             echo "released_asset_aspect forward result unavailable; retaining this as a structural-forensic failure"
           fi
 
+      - name: Decompose baseline and released-asset predictions into affine and non-affine response
+        run: |
+          python3 research/analysis/gauge_shearing_affine_nonaffine.py             --contract-dir build/gauge-shearing-contract             --forward-dir build/gauge-structural-forensics/forward_baseline             --out build/gauge-affine-nonaffine-baseline
+          cat build/gauge-affine-nonaffine-baseline/summary.json
+          if [ -d build/gauge-structural-forensics/forward_released_asset_aspect ]; then
+            python3 research/analysis/gauge_shearing_affine_nonaffine.py               --contract-dir build/gauge-shearing-contract               --forward-dir build/gauge-structural-forensics/forward_released_asset_aspect               --out build/gauge-affine-nonaffine-released-asset
+            cat build/gauge-affine-nonaffine-released-asset/summary.json
+          fi
+
       - name: Compare released-asset geometry against pre-registered mechanism checks
         run: |
           if [ -f build/gauge-mode-released-asset/summary.json ]; then
@@ -183,6 +193,8 @@ jobs:
             build/gauge-mode-baseline
             build/gauge-mode-released-asset
             build/gauge-mode-compare
+            build/gauge-affine-nonaffine-baseline
+            build/gauge-affine-nonaffine-released-asset
             build/gauge-fixture-envelope-synthetic
             build/gauge-constitutive-matrix
           if-no-files-found: error
