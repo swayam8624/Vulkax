@@ -66,23 +66,69 @@ void addScaled(Matrix3& target, const Matrix3& value, double scale) noexcept {
             (matrix[0] * matrix[4] - matrix[1] * matrix[3]) * inv};
 }
 
-[[nodiscard]] Matrix3 firstPiolaNeoHookean(const Matrix3& deformationGradient, const MpmMaterial& material) {
-    if (material.youngModulus < 0.0) throw std::invalid_argument("MPM Young's modulus cannot be negative");
+[[nodiscard]] Matrix3 firstPiolaForMaterial(
+    const Matrix3& deformationGradient,
+    const MpmMaterial& material) {
+    if (!std::isfinite(material.youngModulus) || material.youngModulus < 0.0)
+        throw std::invalid_argument("MPM Young's modulus must be finite and non-negative");
     if (!(material.poissonRatio > -1.0 && material.poissonRatio < 0.5))
         throw std::invalid_argument("MPM Poisson ratio must lie in (-1, 0.5)");
     const double determinantValue = determinant(deformationGradient);
     if (!std::isfinite(determinantValue) || determinantValue <= 1.0e-12)
         throw std::runtime_error("MPM deformation gradient became singular or inverted");
+
     const double mu = material.youngModulus / (2.0 * (1.0 + material.poissonRatio));
     const double lambda = material.youngModulus * material.poissonRatio /
                           ((1.0 + material.poissonRatio) * (1.0 - 2.0 * material.poissonRatio));
     const Matrix3 inverseTranspose = transpose(inverse(deformationGradient));
-    Matrix3 result{};
-    const double logJ = std::log(determinantValue);
-    for (std::size_t index = 0; index < result.size(); ++index)
-        result[index] = mu * (deformationGradient[index] - inverseTranspose[index]) +
-                        lambda * logJ * inverseTranspose[index];
-    return result;
+
+    switch (material.constitutiveModel) {
+        case MpmConstitutiveModel::NeoHookeanLogJ: {
+            // Historical Vulkax 1.0 compressible Neo-Hookean model:
+            // psi = mu/2 (I1-3) - mu log(J) + lambda/2 log(J)^2.
+            Matrix3 result{};
+            const double logJ = std::log(determinantValue);
+            for (std::size_t index = 0; index < result.size(); ++index)
+                result[index] = mu * (deformationGradient[index] - inverseTranspose[index]) +
+                                lambda * logJ * inverseTranspose[index];
+            return result;
+        }
+        case MpmConstitutiveModel::NeoHookeanQuadraticJ: {
+            // psi = mu/2 (I1-3-2 log(J)) + lambda/2 (J-1)^2.
+            // This shares the infinitesimal Lamé parameters with the historical
+            // model but changes the finite-deformation volumetric response.
+            Matrix3 result{};
+            const double volumetric = lambda * (determinantValue - 1.0) * determinantValue;
+            for (std::size_t index = 0; index < result.size(); ++index)
+                result[index] = mu * (deformationGradient[index] - inverseTranspose[index]) +
+                                volumetric * inverseTranspose[index];
+            return result;
+        }
+        case MpmConstitutiveModel::StVenantKirchhoff: {
+            // E_G = 1/2 (F^T F - I), S = lambda tr(E_G) I + 2 mu E_G,
+            // P = F S. This is intentionally included as a distinct finite
+            // strain family, not asserted to be a suitable foam model.
+            const Matrix3 c = multiply(transpose(deformationGradient), deformationGradient);
+            Matrix3 green{};
+            double traceGreen = 0.0;
+            for (std::size_t row = 0; row < 3; ++row) {
+                for (std::size_t column = 0; column < 3; ++column) {
+                    const std::size_t index = at(row, column);
+                    green[index] = 0.5 * (c[index] - (row == column ? 1.0 : 0.0));
+                }
+                traceGreen += green[at(row, row)];
+            }
+            Matrix3 secondPiola{};
+            for (std::size_t row = 0; row < 3; ++row)
+                for (std::size_t column = 0; column < 3; ++column) {
+                    const std::size_t index = at(row, column);
+                    secondPiola[index] = 2.0 * mu * green[index] +
+                        (row == column ? lambda * traceGreen : 0.0);
+                }
+            return multiply(deformationGradient, secondPiola);
+        }
+    }
+    throw std::logic_error("unsupported MPM constitutive model");
 }
 
 struct AxisKernel {
@@ -170,6 +216,10 @@ void applyBoundary(math::Vec3& velocity, std::size_t x, std::size_t y, std::size
 
 } // namespace
 
+Matrix3 firstPiolaMpm(const Matrix3& deformationGradient, const MpmMaterial& material) {
+    return firstPiolaForMaterial(deformationGradient, material);
+}
+
 double deformationDeterminant(const MpmParticle& particle) noexcept { return determinant(particle.deformationGradient); }
 
 math::Vec3 totalMpmMomentum(const std::vector<MpmParticle>& particles) noexcept {
@@ -203,7 +253,7 @@ MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles,
         const ParticleStencil stencil = stencilFor(particle, settings);
         MpmMaterial localMaterial = material;
         localMaterial.youngModulus *= particle.youngModulusScale;
-        const Matrix3 firstPiola = firstPiolaNeoHookean(particle.deformationGradient, localMaterial);
+        const Matrix3 firstPiola = firstPiolaMpm(particle.deformationGradient, localMaterial);
         const Matrix3 kirchhoff = multiply(firstPiola, transpose(particle.deformationGradient));
         visitStencil(particle, settings, stencil,
             [&](std::size_t x, std::size_t y, std::size_t z, double weight, math::Vec3 gradient, math::Vec3 nodeOffset) {
