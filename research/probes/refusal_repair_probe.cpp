@@ -289,11 +289,20 @@ double targetRelativeError(const Fit& fit,const Matrix3& target,double truthE,do
     return rms(pred,truth)/std::max(effect,1.0e-15);
 }
 
-double numericalFraction(const Fit& fit,const Matrix3& target) {
+struct NumericalConvergence {
+    double coarseFraction{};
+    double fineFraction{};
+    double ratio{};
+};
+
+NumericalConvergence numericalConvergence(const Fit& fit,const Matrix3& target) {
     const auto base=observe(simulate(fit.E,fit.nu,target,fit.dt,fit.scheme),0,5);
-    const auto fine=observe(simulate(fit.E,fit.nu,target,0.5*fit.dt,fit.scheme),0,5);
+    const auto half=observe(simulate(fit.E,fit.nu,target,0.5*fit.dt,fit.scheme),0,5);
+    const auto quarter=observe(simulate(fit.E,fit.nu,target,0.25*fit.dt,fit.scheme),0,5);
     const double effect=rms(base,initialObservable(target,0,5));
-    return rms(base,fine)/std::max(effect,1.0e-15);
+    const double coarse=rms(base,half)/std::max(effect,1.0e-15);
+    const double fine=rms(half,quarter)/std::max(effect,1.0e-15);
+    return {coarse,fine,fine/std::max(coarse,1.0e-15)};
 }
 
 double schemeFraction(const Fit& fit,const Matrix3& target) {
@@ -315,7 +324,8 @@ int main(int argc,char** argv) {
           "initial_fit_rms_m,initial_heldout_rms_m,repaired_fit_rms_m,repaired_heldout_rms_m,"
           "evidence_rms_m,evidence_noise_ratio,selected_smin,selected_condition,"
           "relative_E_shift,absolute_nu_shift,pre_target_relative_error,post_target_relative_error,"
-          "numerical_fraction,scheme_fraction,post_safe_10pct,provenance\n";
+          "heldout_noise_ratio,numerical_fraction,numerical_fine_fraction,numerical_convergence_ratio,"
+          "scheme_fraction,post_safe_10pct,provenance\n";
 
     const Matrix3 train{1.030,0.008,0, 0,0.985,0.003, 0,0,0.985};
     const std::array<Intervention,4> evidenceCandidates{{
@@ -359,7 +369,7 @@ int main(int argc,char** argv) {
 
             const double preTarget=targetRelativeError(before,target,truthE,truthNu);
             const double postTarget=targetRelativeError(after,target,truthE,truthNu);
-            const double numFrac=numericalFraction(after,target);
+            const auto num=numericalConvergence(after,target);
             const double schFrac=schemeFraction(after,target);
             const double eShift=std::abs(after.E-before.E)/std::max(std::abs(before.E),1.0);
             const double nuShift=std::abs(after.nu-before.nu);
@@ -371,7 +381,8 @@ int main(int argc,char** argv) {
                <<after.evidenceRms<<','<<after.evidenceRms/kNoise<<','
                <<selectedSpectrum.smin<<','<<selectedSpectrum.condition<<','
                <<eShift<<','<<nuShift<<','<<preTarget<<','<<postTarget<<','
-               <<numFrac<<','<<schFrac<<','<<(postTarget<=0.10?1:0)<<",synthetic\n";
+               <<after.heldoutRms/kNoise<<','<<num.coarseFraction<<','<<num.fineFraction<<','<<num.ratio<<','
+               <<schFrac<<','<<(postTarget<=0.10?1:0)<<",synthetic\n";
         }
     }
     out.close();

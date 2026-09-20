@@ -9,7 +9,8 @@ def f(r,k): return float(r[k])
 for r in rows:
     if r["provenance"]!="synthetic": raise SystemExit("bad provenance")
     for k in ("pre_target_relative_error","post_target_relative_error","evidence_noise_ratio",
-              "numerical_fraction","scheme_fraction","relative_E_shift","absolute_nu_shift"):
+              "numerical_fraction","numerical_fine_fraction","numerical_convergence_ratio",
+              "scheme_fraction","relative_E_shift","absolute_nu_shift"):
         if not math.isfinite(f(r,k)): raise SystemExit(f"non-finite {k}")
 
 def summarize(group):
@@ -21,6 +22,8 @@ def summarize(group):
       "median_post_target_relative_error":statistics.median(f(r,"post_target_relative_error") for r in group),
       "median_evidence_noise_ratio":statistics.median(f(r,"evidence_noise_ratio") for r in group),
       "median_numerical_fraction":statistics.median(f(r,"numerical_fraction") for r in group),
+      "median_numerical_fine_fraction":statistics.median(f(r,"numerical_fine_fraction") for r in group),
+      "median_numerical_convergence_ratio":statistics.median(f(r,"numerical_convergence_ratio") for r in group),
       "median_scheme_fraction":statistics.median(f(r,"scheme_fraction") for r in group),
     }
 

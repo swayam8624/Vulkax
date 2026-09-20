@@ -232,3 +232,13 @@ Targeted literature attack confirms that Jacobian/Fisher optimal experiment desi
 **Decision:** none of those components may be described as Vulkax novelty. The surviving research hypothesis is the closed-loop operational combination: intervention-specific evidence sufficiency, reason-coded refusal, repairable evidence acquisition, disjoint counterfactual re-test, independent verification and commit/rollback.
 
 Added `research/literature/CLAIM_GUARD.md` so future implementation and manuscript work cannot silently broaden claims beyond evidence.
+
+
+## 2026-09-20 — Validation-3 mechanism staged without touching measured GAUGE run
+
+Absolute numerical thresholds are replaced by a two-level convergence diagnostic:
+`dt -> dt/2` and `dt/2 -> dt/4`, summarized by a scale-normalized convergence ratio.
+
+A fresh Validation-3 domain is defined with new off-grid E/nu truths, markers, times, noise, deformations and target intervention. A monotone four-gate policy will be selected from original calibration labels only. Validation-1/2/3 labels are explicitly excluded from threshold selection.
+
+CMake/workflow wiring is deferred until the in-flight GAUGE structural-forensics job finishes so measured evidence is not restarted.
