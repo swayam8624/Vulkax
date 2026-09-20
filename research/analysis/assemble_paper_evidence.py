@@ -220,8 +220,8 @@ def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: 
         "- logs/ — command logs when available\n"
         "- system/ — hardware/software provenance when available\n"
         "- manifest.json — SHA-256 indexed artifact manifest\n"
-        "- artifact_index.csv — flat artifact table
-- SHA256SUMS — portable checksums for every indexed artifact\n\n"
+        "- artifact_index.csv — flat artifact table\n"
+        "- SHA256SUMS — portable checksums for every indexed artifact\n\n"
         f"Missing required artifacts: {len(missing)}\n"
     )
     if missing:
