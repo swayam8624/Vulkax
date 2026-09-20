@@ -16,6 +16,7 @@ on:
       - "research/analysis/gauge_shearing_structural_forensics.py"
       - "research/analysis/gauge_shearing_constitutive_matrix.py"
       - "research/analysis/gauge_shearing_mode_diagnostic.py"
+      - "research/analysis/gauge_shearing_mode_compare.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/analysis/gauge_foam_asset_geometry.py"
       - "research/probes/gauge_shearing_forward_probe.cpp"
@@ -111,6 +112,21 @@ jobs:
             echo "released_asset_aspect forward result unavailable; retaining this as a structural-forensic failure"
           fi
 
+      - name: Compare released-asset geometry against pre-registered mechanism checks
+        run: |
+          if [ -f build/gauge-mode-released-asset/summary.json ]; then
+            python3 research/analysis/gauge_shearing_mode_compare.py \
+              --baseline build/gauge-mode-baseline/summary.json \
+              --candidate build/gauge-mode-released-asset/summary.json \
+              --structural-summary build/gauge-structural-forensics/summary.json \
+              --out build/gauge-mode-compare
+            cat build/gauge-mode-compare/summary.json
+          else
+            mkdir -p build/gauge-mode-compare
+            printf '%s\n' '{"schema":"vulkax.gauge_fixture_envelope_mode_comparison","version":1,"decision":"candidate_unavailable"}' > build/gauge-mode-compare/summary.json
+            cat build/gauge-mode-compare/summary.json
+          fi
+
       - name: Run no-fit constitutive x transfer adequacy matrix
         run: |
           python3 research/analysis/gauge_shearing_constitutive_matrix.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --out build/gauge-constitutive-matrix
@@ -136,6 +152,7 @@ jobs:
             build/gauge-structural-forensics
             build/gauge-mode-baseline
             build/gauge-mode-released-asset
+            build/gauge-mode-compare
             build/gauge-constitutive-matrix
           if-no-files-found: error
           retention-days: 30
