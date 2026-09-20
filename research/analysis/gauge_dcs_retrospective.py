@@ -103,6 +103,7 @@ def main():
         for material in ("soft","hard"):
             mat=md["assets"]["foam"]["material"][material]
             for trial in (2,4,6,8,10):
+                print(f"\n[DCS] START material={material} trial={trial}", flush=True)
                 d=json.loads((root/"data"/"foam shearing"/material/f"{trial}.json").read_text())
                 marker=td/f"{material}_{trial}_markers.csv"
                 driver=td/f"{material}_{trial}_driver.csv"
@@ -111,10 +112,14 @@ def main():
 
                 endpoint_path=td/f"{material}_{trial}_endpoint.csv"
                 overlap_path=td/f"{material}_{trial}_overlap.csv"
+                print("[DCS]   endpoint simulation...", flush=True)
                 run_arm(a.exe,marker,driver,endpoint_path,mat,dt,n_cross,n_long,
                         f"dcs-{material}-{trial}-endpoint")
+                print("[DCS]   endpoint DONE", flush=True)
+                print("[DCS]   overlap simulation...", flush=True)
                 run_arm(a.exe,marker,driver,overlap_path,mat,dt,n_cross,n_long,
                         f"dcs-{material}-{trial}-overlap",overlap)
+                print("[DCS]   overlap DONE", flush=True)
 
                 measured=measured_frames(d,ids,n)
                 endpoint=read_pred(endpoint_path)
@@ -124,6 +129,15 @@ def main():
                 ordinary_overlap=arm_metrics(d,overlap_pred,ids,faces,n)
                 dcs_endpoint=darkfield_errors(measured,endpoint,ids,faces,n,mid)
                 dcs_overlap=darkfield_errors(measured,overlap_pred,ids,faces,n,mid)
+
+                print(
+                    f"[DCS] DONE material={material} trial={trial} "
+                    f"endpoint_marker={dcs_endpoint['marker_second_difference_error_m']:.6g} "
+                    f"overlap_marker={dcs_overlap['marker_second_difference_error_m']:.6g} "
+                    f"endpoint_long={dcs_endpoint['longitudinal_second_difference_abs_error']:.6g} "
+                    f"overlap_long={dcs_overlap['longitudinal_second_difference_abs_error']:.6g}",
+                    flush=True,
+                )
 
                 rows.append({
                     "material":material,
