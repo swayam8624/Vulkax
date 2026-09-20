@@ -7,6 +7,7 @@ on:
       - "research/adapters/**"
       - "research/analysis/gauge_foam_descriptive.py"
       - "research/analysis/gauge_shearing_contract.py"
+      - "research/analysis/gauge_shearing_affine_baseline.py"
       - "research/scripts/fetch_gauge_foam_subset.py"
       - ".github/workflows/research-gauge-real.yml"
   workflow_dispatch:
@@ -35,6 +36,10 @@ jobs:
         run: |
           python3 research/analysis/gauge_shearing_contract.py --root build/gauge-download --out build/gauge-shearing-contract
           cat build/gauge-shearing-contract/contract.json
+      - name: Run zero-parameter affine-shear null baseline
+        run: |
+          python3 research/analysis/gauge_shearing_affine_baseline.py --root build/gauge-download --out build/gauge-affine-null
+          cat build/gauge-affine-null/summary.json
       - name: Upload derived measured-data evidence only
         uses: actions/upload-artifact@v4
         with:
@@ -43,5 +48,6 @@ jobs:
             build/gauge-real
             build/gauge-adapted
             build/gauge-shearing-contract
+            build/gauge-affine-null
           if-no-files-found: error
           retention-days: 30

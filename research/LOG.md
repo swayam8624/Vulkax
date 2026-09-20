@@ -163,3 +163,8 @@ Added a measured-only contract stage before simulation. Representative soft/hard
 ## 2026-09-20 — Validation-2 frozen and launched
 
 Validation-1 is treated as development evidence only. Added a second independent synthetic validation domain with new off-grid E/nu values, marker locations, 25 μm noise, train/evidence/target deformations and noise phases. The gate is still locked from original calibration data only. No Validation-1 label is allowed to tune Validation-2.
+
+
+## 2026-09-20 — GAUGE zero-parameter affine null launched
+
+Added a no-fit affine shear baseline using only measured driver displacement and initial marker geometry. This is a kill test for the real-data direction: a strong affine match would indicate that benchmark-native face-area change is largely kinematic and weak as evidence for constitutive inference.
