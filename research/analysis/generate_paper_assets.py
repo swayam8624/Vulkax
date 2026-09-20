@@ -216,6 +216,32 @@ def generate(result_path: Path, out: Path) -> dict:
     figures.append({"id":"gauge_channel_contradiction","svg":p.name,"data":"fig_gauge_channel_contradiction.csv",
                     "status":"retrospective_only","claim":"Aggregate/marker evidence and longitudinal mechanism evidence disagree."})
 
+    # Figure 6: post-hoc information frontier.
+    frontier=data.get("post_hoc_information_frontier",{}).get("d4v",{}).get("methods",{})
+    if frontier:
+        method_keys=["dcs","raw_bundle","raw_point","fisher","max_motion"]
+        labels=["DCS","raw bundle","raw point","Fisher","max motion"]
+        vals=[float(frontier[k]["median_required_signal_amplification_to_z2"]) for k in method_keys]
+        p=out/"fig_information_frontier.svg"
+        bar_chart(
+            p,
+            "Information gap to frozen credibility reference",
+            "Post-hoc D4V diagnostic; median signal amplification required to reach |z| = 2",
+            labels,vals,max(45.0,max(vals)*1.08),"required signal amplification (x)"
+        )
+        write_csv(
+            out/"fig_information_frontier.csv",
+            ["method","median_required_signal_amplification_to_z2","analysis_class"],
+            [[lab,val,"post_hoc_diagnostic"] for lab,val in zip(labels,vals)]
+        )
+        figures.append({
+            "id":"information_frontier",
+            "svg":p.name,
+            "data":"fig_information_frontier.csv",
+            "status":"post_hoc_diagnostic",
+            "claim":"The tested D4V verification channels were far below, not marginally below, the frozen |z|=2 reference."
+        })
+
     # Paper-facing tables.
     write_csv(out/"table_stage_outcomes.csv",
               ["stage","status","population","resolved_coverage","paper_role"],
@@ -237,12 +263,31 @@ def generate(result_path: Path, out: Path) -> dict:
                 ["fresh measured prospective DCS confirmation","no"],
               ])
 
+    if frontier:
+        write_csv(
+            out/"table_information_frontier.csv",
+            ["method","median_abs_z","max_abs_z","median_required_signal_amplification_to_z2","analysis_class"],
+            [[
+                label,
+                frontier[key]["median_abs_z"],
+                frontier[key]["max_abs_z"],
+                frontier[key]["median_required_signal_amplification_to_z2"],
+                "post_hoc_diagnostic",
+            ] for key,label in zip(
+                ["dcs","raw_bundle","raw_point","fisher","max_motion"],
+                ["DCS","raw bundle","raw point","Fisher","max motion"]
+            )]
+        )
+    else:
+        write_csv(out/"table_information_frontier.csv",
+                  ["method","median_abs_z","max_abs_z","median_required_signal_amplification_to_z2","analysis_class"],[])
+
     manifest={
         "schema":"vulkax.paper_assets",
         "version":1,
         "source":str(result_path),
         "figures":figures,
-        "tables":["table_stage_outcomes.csv","table_claim_boundaries.csv"],
+        "tables":["table_stage_outcomes.csv","table_claim_boundaries.csv","table_information_frontier.csv"],
         "paper_prose_generated":False,
         "warning":"Assets visualize frozen results; they do not change claim status.",
     }
@@ -260,9 +305,17 @@ def self_test() -> None:
                   "median_separation":{"k2":.05,"k3":.01},"median_numerical_rms_m":{"k2":8e-7,"k3":2e-7}},
             "D4V":{"deceptive":14,"beneficial":22},
             "GAUGE":{"ordinary_overlap_wins":10,"marker_darkfield_endpoint_wins":0,"longitudinal_darkfield_endpoint_wins":9}
-          }}))
+          },
+          "post_hoc_information_frontier":{"d4v":{"methods":{
+            "dcs":{"median_abs_z":.05,"max_abs_z":.18,"median_required_signal_amplification_to_z2":40.0},
+            "raw_bundle":{"median_abs_z":.05,"max_abs_z":.41,"median_required_signal_amplification_to_z2":40.0},
+            "raw_point":{"median_abs_z":.15,"max_abs_z":.63,"median_required_signal_amplification_to_z2":13.6},
+            "fisher":{"median_abs_z":.07,"max_abs_z":.63,"median_required_signal_amplification_to_z2":30.0},
+            "max_motion":{"median_abs_z":.06,"max_abs_z":.58,"median_required_signal_amplification_to_z2":34.6}
+          }}}
+        }))
         m=generate(source,out)
-        assert len(m["figures"])==5
+        assert len(m["figures"])==6
         assert (out/"fig_ranking_agreement.svg").is_file()
         assert (out/"table_stage_outcomes.csv").is_file()
         print("VALID paper asset generator self-test")
