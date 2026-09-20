@@ -16,6 +16,8 @@ This file exists to prevent accidental novelty inflation.
 - hierarchical validation of simulated digital-twin counterfactuals in the abstract (Laudy, *Digital Twin Counterfactual Framework*, arXiv:2604.01325).
 - explicit model discrepancy in inverse calibration.
 - generic source-of-error indicators, model/mesh adequacy diagnosis, or adaptive model/mesh selection from full-field measurements; modified Constitutive Relation Error work already does this (Computational Mechanics 2025, DOI: 10.1007/s00466-025-02598-1).
+- unknown/uncertain boundary-condition identification from interior/full-field displacement data, including joint hyperelastic material + boundary identification; this is established inverse-mechanics work (e.g. ASME J. Applied Mechanics 2018, DOI: 10.1115/1.4039170; BC-free inverse elasticity / coupled adjoint-state formulations in CMAME 2019).
+- partial-field/sub-domain material identification specifically designed to handle uncertain or inaccessible supports/boundaries; established FEMU/M-CRE/Bayesian literature already treats this. Observation-support/body-support mismatch is therefore not a standalone novelty claim.
 - model-form uncertainty embedded in digital-twin calibration in the abstract (Arcones et al., arXiv:2609.10171).
 - abstention/selective prediction in the abstract.
 - finite-sample selective-risk calibration in the abstract (Learn-Then-Test, arXiv:2110.01052; SCoRE, arXiv:2603.24704).
