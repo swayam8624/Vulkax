@@ -17,6 +17,7 @@ on:
       - "research/analysis/gauge_shearing_constitutive_matrix.py"
       - "research/analysis/gauge_shearing_mode_diagnostic.py"
       - "research/analysis/gauge_shearing_mode_compare.py"
+      - "research/analysis/gauge_fixture_envelope_synthetic_control.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/analysis/gauge_foam_asset_geometry.py"
       - "research/probes/gauge_shearing_forward_probe.cpp"
@@ -127,6 +128,14 @@ jobs:
             cat build/gauge-mode-compare/summary.json
           fi
 
+      - name: Falsify fixture-envelope mechanism in a controlled synthetic world
+        run: |
+          python3 research/analysis/gauge_fixture_envelope_synthetic_control.py \
+            --exe build-forward/vulkax_gauge_shearing_forward_probe \
+            --contract-dir build/gauge-shearing-contract \
+            --out build/gauge-fixture-envelope-synthetic
+          cat build/gauge-fixture-envelope-synthetic/summary.json
+
       - name: Run no-fit constitutive x transfer adequacy matrix
         run: |
           python3 research/analysis/gauge_shearing_constitutive_matrix.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --out build/gauge-constitutive-matrix
@@ -153,6 +162,7 @@ jobs:
             build/gauge-mode-baseline
             build/gauge-mode-released-asset
             build/gauge-mode-compare
+            build/gauge-fixture-envelope-synthetic
             build/gauge-constitutive-matrix
           if-no-files-found: error
           retention-days: 30
