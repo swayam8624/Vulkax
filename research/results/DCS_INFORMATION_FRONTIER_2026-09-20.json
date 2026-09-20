@@ -1,0 +1,131 @@
+{
+  "schema": "vulkax.dcs.information_frontier",
+  "version": 1,
+  "date": "2026-09-20",
+  "analysis_class": "post_hoc_diagnostic",
+  "d4v": {
+    "proposal_count": 36,
+    "deceptive": 14,
+    "beneficial": 22,
+    "threshold_abs_z": 2.0,
+    "methods": {
+      "dcs": {
+        "median_abs_z": 0.0502368362695058,
+        "p90_abs_z": 0.1424445904452196,
+        "max_abs_z": 0.1765438680006307,
+        "resolved_count_at_abs_z_ge_2": 0,
+        "median_required_signal_amplification_to_z2": 39.832159447383674,
+        "minimum_required_signal_amplification_to_z2": 11.32862909740289,
+        "median_required_sigma_fraction_to_z2": 0.0251184181347529,
+        "median_required_variance_fraction_to_z2": 0.0006309349295922833,
+        "sign_accuracy_all": 0.5833333333333334,
+        "deceptive_negative_fraction": 0.7857142857142857,
+        "beneficial_positive_fraction": 0.45454545454545453,
+        "median_z_deceptive": -0.04833875182300125,
+        "median_z_beneficial": -0.01633509312780925
+      },
+      "raw_bundle": {
+        "median_abs_z": 0.0499095477459188,
+        "p90_abs_z": 0.2819379375621889,
+        "max_abs_z": 0.4061535567688481,
+        "resolved_count_at_abs_z_ge_2": 0,
+        "median_required_signal_amplification_to_z2": 40.098676097440816,
+        "minimum_required_signal_amplification_to_z2": 4.9242459327722905,
+        "median_required_sigma_fraction_to_z2": 0.0249547738729594,
+        "median_required_variance_fraction_to_z2": 0.000622740739050537,
+        "sign_accuracy_all": 0.6944444444444444,
+        "deceptive_negative_fraction": 0.35714285714285715,
+        "beneficial_positive_fraction": 0.9090909090909091,
+        "median_z_deceptive": 0.024264575587114097,
+        "median_z_beneficial": 0.06734666563354005
+      },
+      "raw_point": {
+        "median_abs_z": 0.14707093736228743,
+        "p90_abs_z": 0.40526172893466283,
+        "max_abs_z": 0.6314213171695398,
+        "resolved_count_at_abs_z_ge_2": 0,
+        "median_required_signal_amplification_to_z2": 13.59990735800135,
+        "minimum_required_signal_amplification_to_z2": 3.1674572042726745,
+        "median_required_sigma_fraction_to_z2": 0.07353546868114372,
+        "median_required_variance_fraction_to_z2": 0.005407465154155469,
+        "sign_accuracy_all": 0.7777777777777778,
+        "deceptive_negative_fraction": 0.6428571428571429,
+        "beneficial_positive_fraction": 0.8636363636363636,
+        "median_z_deceptive": -0.0512694125438184,
+        "median_z_beneficial": 0.16524880651956952
+      },
+      "fisher": {
+        "median_abs_z": 0.0663679631040366,
+        "p90_abs_z": 0.48510492662821425,
+        "max_abs_z": 0.6314213171695398,
+        "resolved_count_at_abs_z_ge_2": 0,
+        "median_required_signal_amplification_to_z2": 30.150174372377187,
+        "minimum_required_signal_amplification_to_z2": 3.1674572042726745,
+        "median_required_sigma_fraction_to_z2": 0.0331839815520183,
+        "median_required_variance_fraction_to_z2": 0.001101176631644691,
+        "sign_accuracy_all": 0.6388888888888888,
+        "deceptive_negative_fraction": 0.2857142857142857,
+        "beneficial_positive_fraction": 0.8636363636363636,
+        "median_z_deceptive": 0.0183576150857983,
+        "median_z_beneficial": 0.10675573916909945
+      },
+      "max_motion": {
+        "median_abs_z": 0.05773474089993585,
+        "p90_abs_z": 0.3984891044487112,
+        "max_abs_z": 0.5750533076545649,
+        "resolved_count_at_abs_z_ge_2": 0,
+        "median_required_signal_amplification_to_z2": 34.64145387363821,
+        "minimum_required_signal_amplification_to_z2": 3.4779384334945904,
+        "median_required_sigma_fraction_to_z2": 0.028867370449967924,
+        "median_required_variance_fraction_to_z2": 0.0008333250766956813,
+        "sign_accuracy_all": 0.5833333333333334,
+        "deceptive_negative_fraction": 0.2857142857142857,
+        "beneficial_positive_fraction": 0.7727272727272727,
+        "median_z_deceptive": 0.039172235591435,
+        "median_z_beneficial": 0.08983017699237075
+      }
+    }
+  },
+  "gauge": {
+    "trial_count": 10,
+    "paired": {
+      "face_nrmse": {
+        "difference_definition": "endpoint_minus_overlap",
+        "median_difference": 0.0783805928651507,
+        "mean_difference": 0.07957436995149633,
+        "endpoint_better_count": 0,
+        "overlap_better_count": 10,
+        "ties": 0,
+        "exact_two_sided_sign_test_p": 0.001953125
+      },
+      "marker_rmse_m": {
+        "difference_definition": "endpoint_minus_overlap",
+        "median_difference": 0.00013077325192415,
+        "mean_difference": 0.00012530393557317,
+        "endpoint_better_count": 0,
+        "overlap_better_count": 10,
+        "ties": 0,
+        "exact_two_sided_sign_test_p": 0.001953125
+      },
+      "dcs_marker_error_m": {
+        "difference_definition": "endpoint_minus_overlap",
+        "median_difference": 0.0007517904340945,
+        "mean_difference": 0.00074479894006964,
+        "endpoint_better_count": 0,
+        "overlap_better_count": 10,
+        "ties": 0,
+        "exact_two_sided_sign_test_p": 0.001953125
+      },
+      "dcs_longitudinal_error": {
+        "difference_definition": "endpoint_minus_overlap",
+        "median_difference": -0.00266595776944405,
+        "mean_difference": -0.002151225936031444,
+        "endpoint_better_count": 9,
+        "overlap_better_count": 1,
+        "ties": 0,
+        "exact_two_sided_sign_test_p": 0.021484375
+      }
+    }
+  },
+  "warning": "Post-hoc diagnostics only. These results do not modify any frozen D2/D3/D4V gate and do not convert GAUGE into prospective confirmation."
+}
