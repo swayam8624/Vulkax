@@ -92,6 +92,22 @@ jobs:
       - name: Test GAUGE deformable adapter contract
         run: python3 research/adapters/test_gauge_adapter.py
 
+      - name: Build and run prescribed-boundary regression
+        run: |
+          cmake --build build --target vulkax_prescribed_mpm_tests --parallel 2
+          ctest --test-dir build --output-on-failure -R '^vulkax_prescribed_mpm        with:
+          name: vulkax-discovery-cheap-probes-${{ github.sha }}
+          path: |
+            build/research-cheap-probes
+            build/solver-counterfactual
+            build/solver-design
+            build/solver-certificate
+            build/refusal-repair
+            build/refusal-validation
+          if-no-files-found: error
+          retention-days: 30
+
+
       - name: Upload raw synthetic evidence
         uses: actions/upload-artifact@v4
         with:

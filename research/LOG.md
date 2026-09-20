@@ -125,3 +125,12 @@ Run `35510654019` succeeded. Calibration-locked policy moved off-grid validation
 ## 2026-09-20 — GAUGE fetch schema mismatch fixed
 
 First measured-data run failed before analysis because the public dataset uses `metadata/deformable/foam compressing.json` but `data/deformable/foam compression/...`. The downloader now encodes this mapping explicitly. No scientific result was produced by the failed run.
+
+
+## 2026-09-20 — Research-only prescribed MPM boundary operator added
+
+GAUGE foam tasks require an internal fixed fixture plus a prescribed moving fixture. Core `stepMpm` only provides domain-wall velocity clipping and cannot represent that honestly.
+
+Added `stepMpmWithPrescribedParticles` as a research wrapper rather than changing the 1.0 MPM implementation. It executes the ordinary solver first, then projects explicit particle IDs to supplied positions/velocities while reporting constraint impulse, kinetic work, position/velocity correction and momentum-accounting error. Positional projection work is explicitly not mislabeled as complete actuator work.
+
+This is enabling infrastructure only. A driven-slab synthetic benchmark must validate the approximation before GAUGE solver matching.
