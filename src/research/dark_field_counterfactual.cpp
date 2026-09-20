@@ -335,6 +335,45 @@ MechanismContactResult mechanismOrderOfContact(
     return result;
 }
 
+JetContactEstimate estimateJetOrderOfContact(
+    const std::vector<std::vector<Response>>& referenceWitnessesByOrder,
+    const std::vector<std::vector<Response>>& candidateWitnessesByOrder,
+    const std::vector<UncertaintyBudget>& uncertaintyByOrder,
+    double separatingStandardizedDiscrepancy) {
+    if (referenceWitnessesByOrder.empty() ||
+        referenceWitnessesByOrder.size() != candidateWitnessesByOrder.size() ||
+        referenceWitnessesByOrder.size() != uncertaintyByOrder.size())
+        throw std::invalid_argument("DCS jet contact requires equal non-empty order arrays");
+    if (!std::isfinite(separatingStandardizedDiscrepancy) ||
+        separatingStandardizedDiscrepancy <= 0.0)
+        throw std::invalid_argument("DCS jet-contact threshold must be positive and finite");
+
+    JetContactEstimate result;
+    result.maximumStandardizedDiscrepancyByOrder.reserve(referenceWitnessesByOrder.size());
+    result.witnessCountByOrder.reserve(referenceWitnessesByOrder.size());
+
+    for (std::size_t order = 0; order < referenceWitnessesByOrder.size(); ++order) {
+        const auto& reference = referenceWitnessesByOrder[order];
+        const auto& candidate = candidateWitnessesByOrder[order];
+        if (reference.empty() || reference.size() != candidate.size())
+            throw std::invalid_argument("DCS jet-contact witness bases must match and be non-empty");
+        double maximum = 0.0;
+        for (std::size_t witness = 0; witness < reference.size(); ++witness) {
+            maximum = std::max(
+                maximum,
+                standardizedDarkFieldDiscrepancy(
+                    reference[witness], candidate[witness], uncertaintyByOrder[order]));
+        }
+        result.maximumStandardizedDiscrepancyByOrder.push_back(maximum);
+        result.witnessCountByOrder.push_back(reference.size());
+        if (!result.separated && maximum >= separatingStandardizedDiscrepancy) {
+            result.separated = true;
+            result.separatingOrder = order + 1U;
+        }
+    }
+    return result;
+}
+
 ScaleFlowResult analyzeWitnessScaleFlow(
     const std::vector<double>& scales,
     const std::vector<double>& witnessNorms) {
