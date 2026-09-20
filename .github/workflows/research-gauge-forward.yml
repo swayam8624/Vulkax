@@ -1,0 +1,66 @@
+name: Vulkax GAUGE no-fit forward probe
+
+on:
+  push:
+    branches: ["research/gauge-forward"]
+    paths:
+      - "research/analysis/prepare_gauge_shear_forward.py"
+      - "research/analysis/gauge_shearing_nonaffine.py"
+      - "research/probes/gauge_shear_forward_probe.cpp"
+      - "research/scripts/fetch_gauge_foam_subset.py"
+      - "src/research/prescribed_mpm.cpp"
+      - "include/vulkax/research/prescribed_mpm.hpp"
+      - "CMakeLists.txt"
+      - ".github/workflows/research-gauge-forward.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-gauge-forward-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  no-fit-forward:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch GAUGE foam subset
+        run: python3 research/scripts/fetch_gauge_foam_subset.py build/gauge-download
+      - name: Recompute non-affine measured target
+        run: |
+          python3 research/analysis/gauge_shearing_nonaffine.py --root build/gauge-download --out build/gauge-nonaffine
+          cat build/gauge-nonaffine/summary.json
+      - name: Freeze no-fit forward configuration
+        run: |
+          python3 research/analysis/prepare_gauge_shear_forward.py --root build/gauge-download --nonaffine build/gauge-nonaffine/summary.json --out build/gauge-forward-config
+          cat build/gauge-forward-config/forward_config.csv
+      - name: Configure Vulkax
+        run: cmake -S . -B build/core -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+      - name: Build no-fit forward probe
+        run: cmake --build build/core --target vulkax_gauge_forward_probe --parallel 2
+      - name: Run no-fit forward probe
+        run: |
+          build/core/vulkax_gauge_forward_probe build/gauge-forward-config/forward_config.csv build/gauge-forward
+          cat build/gauge-forward/forward_results.csv
+      - name: Validate evidence is finite and non-inverted
+        run: |
+          python3 - <<'PY'
+          import csv,math
+          rows=list(csv.DictReader(open("build/gauge-forward/forward_results.csv")))
+          assert {r["material"] for r in rows}=={"soft","hard"}
+          for r in rows:
+              for k in ("min_J","max_momentum_accounting_error","particle_nonaffine_time_rms_m","sim_to_measured_marker_ratio"):
+                  assert math.isfinite(float(r[k])), (k,r)
+              assert float(r["min_J"])>0, r
+              assert float(r["max_momentum_accounting_error"])<1e-8, r
+          print("VALID GAUGE no-fit Vulkax forward evidence")
+          PY
+      - name: Upload no-fit forward evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-gauge-forward-\${{ github.sha }}
+          path: |
+            build/gauge-forward-config
+            build/gauge-nonaffine
+            build/gauge-forward
+          if-no-files-found: error
+          retention-days: 30
