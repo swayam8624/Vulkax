@@ -38,6 +38,15 @@ Claim boundaries:
 - `../status/DCS_LIMITATIONS_AND_KILL_CRITERIA.md`
 - `../literature/DCS_NOVELTY_THREAT_MAP.md`
 
+## Structured paper-support sources
+
+- `EXPERIMENT_MATRIX.csv` — complete D0–D6 experiment/evidence matrix
+- `ABLATION_MATRIX.md` — executed method/ablation comparisons and frozen outcomes
+- `REPRODUCIBILITY_CHECKLIST.md` — repository/data/reproduction completeness checklist
+- `FIGURE_TABLE_SOURCE_MAP.md` — exact source mapping for figures and tables
+- `PAPER_DATA_MANIFEST.json` — machine-readable package map
+- [full reproduction guide](../../docs/PAPER_EVIDENCE_REPRODUCTION.md)
+
 ## Generated paper assets
 
 The one-command runner generates:
