@@ -1,59 +1,75 @@
 {
   "schema": "vulkax.hypothesis_priority_queue",
-  "version": 2,
+  "version": 3,
   "as_of": "2026-09-20",
-  "state": "problem_solution_locked",
-  "warning": "Execution priority is not a publication or acceptance guarantee.",
+  "state": "dcs_flagship_locked",
+  "warning": "Priority is an execution order, not a novelty or venue-acceptance guarantee.",
   "primary": {
-    "family": "Counterfactual Adequacy Router (CAR): intervention-conditioned adequacy graph, repair routing, disjoint re-verification",
+    "family": "Dark-Field Counterfactual Spectroscopy (DCS)",
     "status": "LOCKED_PRIMARY",
-    "reason": "Only surviving family after solver falsification, GAUGE measured-data forensics, numerical convergence analysis, and 2026 novelty threat sweep.",
+    "problem": "Detect and falsify observationally successful but physically deceptive repairs in captured executable worlds.",
+    "solution": "Synthesize signed intervention ensembles that annihilate agreed lower-order response and expose the first irreducible mechanism order where candidate worlds diverge; require numerical witness survival before accepting the repair.",
     "kill_conditions": [
-      "Direct prior art already performs requested-edit-specific multi-cause adequacy attribution, cause-specific repair routing, and independent post-repair re-verification.",
-      "Reason-coded routing fails to beat scalar UQ / held-out residual / selective-prediction baselines.",
-      "Cause attribution does not transfer to fresh synthetic domains.",
-      "No measured-data repair survives a disjoint held-out gate.",
-      "Target-risk evidence acquisition does not beat generic OED/max-motion/random baselines."
+      "Deterministic annihilation or solver-native controls fail.",
+      "DCS gives no fresh-domain advantage over held-out residual or raw model disagreement.",
+      "Noise amplification eliminates useful coverage.",
+      "Automatic DCS acquisition does not beat matched-cost raw separation/Fisher baselines on deceptive cases.",
+      "Witness rankings are not stable under numerical refinement.",
+      "No fresh measured-domain confirmatory result survives preregistered evaluation.",
+      "Direct prior art already implements the complete captured-world deceptive-repair mechanism."
     ]
   },
   "execution": [
     {
       "priority": 1,
-      "task": "Complete definitive GAUGE finite-support gate and record immutable result",
-      "type": "measured_validation"
+      "task": "Pass D0 mathematical regression and D1 constructed deceptive-repair positive control",
+      "type": "correctness"
     },
     {
       "priority": 2,
-      "task": "Implement unified Counterfactual Adequacy Graph data model and prerequisite-aware witness evaluator",
-      "type": "method"
+      "task": "Run D2 solver-native MPM discovery and freeze fresh validation protocol",
+      "type": "controlled_evidence"
     },
     {
       "priority": 3,
-      "task": "Implement target-risk-reduction evidence acquisition and compare to Fisher/Jacobian, max-motion and random",
+      "task": "Implement automatic lower-order-nullspace stencil synthesis and safety/cost constraints",
       "type": "method"
     },
     {
       "priority": 4,
-      "task": "Build fresh post-lock synthetic multi-cause benchmark with reason-code ground truth",
-      "type": "validation"
-    },
-    {
-      "priority": 5,
-      "task": "Add second measured regime (prefer IRIS/simple dynamics) for cross-domain routing transfer",
-      "type": "measured_validation"
-    },
-    {
-      "priority": 6,
-      "task": "Benchmark CAR against scalar certificate, selective prediction, active model discrimination and V&V-style scores",
+      "task": "Compare DCS acquisition against Fisher/Jacobian, raw output separation, max-motion, random and active model discrimination",
       "type": "baselines"
     },
     {
+      "priority": 5,
+      "task": "Run GAUGE retrospective dark-field study without refitting material parameters",
+      "type": "retrospective_measured"
+    },
+    {
+      "priority": 6,
+      "task": "Run fresh D5 measured-domain confirmatory benchmark",
+      "type": "confirmatory_measured"
+    },
+    {
       "priority": 7,
-      "task": "Only after all gates, build publication figures/animations and paper",
+      "task": "Integrate spatial dark-field witnesses into Gaussian captured-world visualization",
+      "type": "systems_visualization"
+    },
+    {
+      "priority": 8,
+      "task": "Begin paper prose only after D0-D2 implementation evidence is recorded; reserve flagship claims until D5",
       "type": "paper"
     }
   ],
   "secondary_tracks": [
+    {
+      "family": "Counterfactual holonomy / commutators",
+      "status": "DCS_WITNESS_OPTION"
+    },
+    {
+      "family": "Counterfactual isotope perturbations",
+      "status": "DCS_ACTIVE_PROBE_OPTION"
+    },
     {
       "family": "many-world GPU verification batching",
       "status": "ENABLING_ONLY"
@@ -61,26 +77,19 @@
     {
       "family": "event-boundary derivative validity",
       "status": "FUTURE"
-    },
-    {
-      "family": "native Gaussian execution",
-      "status": "SYSTEMS_INFRASTRUCTURE"
     }
   ],
-  "killed_flagship_families": [
+  "retired_primary_families": [
+    "CAR-v1 generic adequacy routing",
     "Gaussian+MPM as novelty",
     "material inference from video",
-    "monocular geometry+appearance+physics",
     "generic identifiability",
     "generic optimal experiment design",
     "generic active model discrimination",
     "generic selective prediction/refusal",
     "generic simulator credibility",
     "generic counterfactual transfer",
-    "unknown boundary recovery",
-    "Poynting effect",
-    "one-shot certificate",
-    "absolute-threshold certificate",
+    "finite-support fixture repair as GAUGE explanation",
     "numerical convergence alone"
   ]
 }
