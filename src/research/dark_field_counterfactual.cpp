@@ -869,4 +869,78 @@ SynthesizedStencil synthesizeMaximinAnnihilatingStencil(
     return best;
 }
 
+SynthesizedStencil synthesizePairAwareMaximinStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& modelResponses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    const std::vector<UncertaintyBudget>& modelNumericalUncertainty,
+    double momentTolerance,
+    std::size_t maximumIterations) {
+    if (modelResponses.size() < 2 ||
+        modelResponses.size() != modelNumericalUncertainty.size())
+        throw std::invalid_argument(
+            "DCS pair-aware synthesis requires one numerical budget per model");
+
+    UncertaintyBudget seedUncertainty = sharedObservationUncertainty;
+    seedUncertainty.numericalVariance = 0.0;
+    if (!(seedUncertainty.totalVariance() > 0.0) ||
+        !std::isfinite(seedUncertainty.totalVariance()))
+        throw std::invalid_argument(
+            "DCS pair-aware synthesis needs positive shared acquisition uncertainty");
+
+    const auto evaluate = [&](SynthesizedStencil candidate) {
+        std::vector<Response> witnesses;
+        witnesses.reserve(modelResponses.size());
+        for (const auto& model : modelResponses)
+            witnesses.push_back(
+                applyAnnihilatingStencil(model, candidate.stencil, momentTolerance));
+        candidate.worstCaseStandardizedSeparation =
+            worstCasePairAwareStandardizedSeparation(
+                witnesses,
+                sharedObservationUncertainty,
+                modelNumericalUncertainty,
+                candidate.stencil);
+        return candidate;
+    };
+
+    SynthesizedStencil best = evaluate(
+        synthesizeMaximinAnnihilatingStencil(
+            points,
+            order,
+            modelResponses,
+            seedUncertainty,
+            momentTolerance,
+            maximumIterations));
+
+    // A maximin optimum frequently lies near a direction that strongly exposes
+    // one currently limiting pair. Generate one exact-nullspace candidate per
+    // pair, then score every candidate against all surviving worlds using the
+    // pair-aware uncertainty objective.
+    for (std::size_t i = 0; i < modelResponses.size(); ++i) {
+        for (std::size_t j = i + 1; j < modelResponses.size(); ++j) {
+            std::vector<std::vector<Response>> pair{
+                modelResponses[i], modelResponses[j]
+            };
+            try {
+                auto candidate = evaluate(
+                    synthesizeMaximinAnnihilatingStencil(
+                        points,
+                        order,
+                        pair,
+                        seedUncertainty,
+                        momentTolerance,
+                        maximumIterations));
+                if (candidate.worstCaseStandardizedSeparation >
+                    best.worstCaseStandardizedSeparation)
+                    best = std::move(candidate);
+            } catch (const std::runtime_error&) {
+                // This pair may have no disagreement direction after the
+                // requested lower-order annihilation. Other pairs remain valid.
+            }
+        }
+    }
+    return best;
+}
+
 } // namespace vulkax::research::dcs
