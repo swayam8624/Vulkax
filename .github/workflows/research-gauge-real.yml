@@ -15,6 +15,7 @@ on:
       - "research/analysis/gauge_shearing_timestep_forensics.py"
       - "research/analysis/gauge_shearing_structural_forensics.py"
       - "research/analysis/gauge_shearing_constitutive_matrix.py"
+      - "research/analysis/gauge_shearing_mode_diagnostic.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/analysis/gauge_foam_asset_geometry.py"
       - "research/probes/gauge_shearing_forward_probe.cpp"
@@ -99,6 +100,17 @@ jobs:
           python3 research/analysis/gauge_shearing_structural_forensics.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --out build/gauge-structural-forensics
           cat build/gauge-structural-forensics/summary.json
 
+      - name: Diagnose deformation modes for baseline and released-asset geometry
+        run: |
+          python3 research/analysis/gauge_shearing_mode_diagnostic.py --contract-dir build/gauge-shearing-contract --forward-dir build/gauge-structural-forensics/forward_baseline --out build/gauge-mode-baseline
+          cat build/gauge-mode-baseline/summary.json
+          if [ -d build/gauge-structural-forensics/forward_released_asset_aspect ]; then
+            python3 research/analysis/gauge_shearing_mode_diagnostic.py --contract-dir build/gauge-shearing-contract --forward-dir build/gauge-structural-forensics/forward_released_asset_aspect --out build/gauge-mode-released-asset
+            cat build/gauge-mode-released-asset/summary.json
+          else
+            echo "released_asset_aspect forward result unavailable; retaining this as a structural-forensic failure"
+          fi
+
       - name: Run no-fit constitutive x transfer adequacy matrix
         run: |
           python3 research/analysis/gauge_shearing_constitutive_matrix.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --out build/gauge-constitutive-matrix
@@ -122,6 +134,8 @@ jobs:
             build/gauge-asset-repeat-forensics
             build/gauge-timestep-forensics
             build/gauge-structural-forensics
+            build/gauge-mode-baseline
+            build/gauge-mode-released-asset
             build/gauge-constitutive-matrix
           if-no-files-found: error
           retention-days: 30
