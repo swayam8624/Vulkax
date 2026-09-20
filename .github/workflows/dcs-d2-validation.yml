@@ -14,6 +14,15 @@ on:
       - ".github/workflows/dcs-d2-validation.yml"
   pull_request:
     branches: ["research/integration-20260920"]
+    paths:
+      - "include/vulkax/research/dark_field_counterfactual.hpp"
+      - "src/research/dark_field_counterfactual.cpp"
+      - "tests/dark_field_counterfactual_tests.cpp"
+      - "research/probes/dcs_d2_validation_probe.cpp"
+      - "research/probes/analyze_dcs_d2_validation.py"
+      - "research/benchmarks/DCS_D2_VALIDATION_PROTOCOL.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/dcs-d2-validation.yml"
   workflow_dispatch:
 
 concurrency:
