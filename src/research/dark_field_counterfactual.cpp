@@ -1097,4 +1097,74 @@ SynthesizedStencil synthesizeWitnessSpaceMaximinStencil(
     return best;
 }
 
+SpatialWitnessMap localizeSpatialWitnessResidual(
+    const Response& measuredWitness,
+    const Response& predictedWitness,
+    const std::vector<std::size_t>& componentRegion,
+    const std::vector<UncertaintyBudget>& regionUncertainty,
+    double resolutionThreshold) {
+    if (measuredWitness.empty() ||
+        measuredWitness.size() != predictedWitness.size() ||
+        measuredWitness.size() != componentRegion.size())
+        throw std::invalid_argument(
+            "DCS spatial localization requires equal non-empty response/region arrays");
+    if (!std::isfinite(resolutionThreshold) || resolutionThreshold <= 0.0)
+        throw std::invalid_argument(
+            "DCS spatial localization threshold must be positive and finite");
+    if (regionUncertainty.empty())
+        throw std::invalid_argument(
+            "DCS spatial localization requires at least one region uncertainty");
+
+    std::vector<long double> squared(regionUncertainty.size(), 0.0L);
+    std::vector<std::size_t> counts(regionUncertainty.size(), 0U);
+    long double globalSquared = 0.0L;
+
+    for (std::size_t i = 0; i < measuredWitness.size(); ++i) {
+        const std::size_t region = componentRegion[i];
+        if (region >= regionUncertainty.size())
+            throw std::invalid_argument(
+                "DCS spatial component references an out-of-range region");
+        if (!std::isfinite(measuredWitness[i]) || !std::isfinite(predictedWitness[i]))
+            throw std::invalid_argument(
+                "DCS spatial localization response contains a non-finite value");
+        const long double delta =
+            static_cast<long double>(predictedWitness[i]) - measuredWitness[i];
+        squared[region] += delta * delta;
+        globalSquared += delta * delta;
+        ++counts[region];
+    }
+
+    SpatialWitnessMap result;
+    result.globalRmsError = std::sqrt(
+        static_cast<double>(globalSquared /
+            static_cast<long double>(measuredWitness.size())));
+    result.regions.reserve(regionUncertainty.size());
+
+    for (std::size_t region = 0; region < regionUncertainty.size(); ++region) {
+        SpatialWitnessResidual item;
+        item.region = region;
+        if (counts[region] == 0U) {
+            item.rmsError = 0.0;
+            item.standardizedError = 0.0;
+            item.resolved = false;
+            result.regions.push_back(item);
+            continue;
+        }
+        const double variance = regionUncertainty[region].totalVariance();
+        if (!std::isfinite(variance) || variance <= 0.0)
+            throw std::invalid_argument(
+                "DCS spatial localization variance must be positive and finite");
+        item.rmsError = std::sqrt(
+            static_cast<double>(squared[region] /
+                static_cast<long double>(counts[region])));
+        item.standardizedError = item.rmsError / std::sqrt(variance);
+        item.resolved = item.standardizedError >= resolutionThreshold;
+        if (item.resolved) ++result.resolvedRegionCount;
+        result.maximumStandardizedError =
+            std::max(result.maximumStandardizedError, item.standardizedError);
+        result.regions.push_back(item);
+    }
+    return result;
+}
+
 } // namespace vulkax::research::dcs
