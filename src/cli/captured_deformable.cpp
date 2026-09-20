@@ -117,6 +117,50 @@ namespace {
     return settings;
 }
 
+[[nodiscard]] int preflightCommand(int argc, char** argv) {
+    if (argc < 2 || std::string_view(argv[1]) != "captured-deformable-check") return -1;
+    if (argc < 5 || argc > 6)
+        throw std::invalid_argument(
+            "usage: vulkax captured-deformable-check <object.ply> <particles.csv> "
+            "<observations.csv> [cell-size]");
+
+    const auto cloud = gaussian::load3dgsPly(argv[2]);
+    const auto dataset = capture::loadCapturedDeformableDataset(argv[3], argv[4]);
+    const auto preflight = research::summarizeCapturedMaterialCalibrationPreflight(dataset);
+    research::validateCapturedMaterialCalibrationPreflight(preflight);
+
+    const double spacing = characteristicParticleSpacing(dataset.particles);
+    const double cellSize = argc >= 6
+        ? parsePositiveDouble(argv[5], "cell size")
+        : spacing * (2.0 / 3.0);
+    const auto grid = makeGrid(dataset, cellSize);
+    const long double gridNodes = static_cast<long double>(grid.nx) *
+                                  static_cast<long double>(grid.ny) *
+                                  static_cast<long double>(grid.nz);
+
+    std::cout << std::setprecision(10)
+              << "Captured deformable dataset preflight\n"
+              << "  status: READY_FOR_CALIBRATION\n"
+              << "  appearance_gaussians: " << cloud.size() << '\n'
+              << "  physical_particles: " << dataset.particles.size() << '\n'
+              << "  markers: " << preflight.markerCount << '\n'
+              << "  observations: " << dataset.observations.size() << '\n'
+              << "  initialization_samples: " << preflight.initializationSamples << '\n'
+              << "  fit_samples: " << preflight.fitSamples << '\n'
+              << "  fit_dynamic_samples: " << preflight.fitDynamicSamples << '\n'
+              << "  validation_samples: " << preflight.validationSamples << '\n'
+              << "  validation_dynamic_samples: " << preflight.validationDynamicSamples << '\n'
+              << "  distinct_fit_initialization_particles: "
+              << preflight.distinctFitInitializationParticles << '\n'
+              << "  time_range_seconds: [" << preflight.minimumTime << ", "
+              << preflight.maximumTime << "]\n"
+              << "  characteristic_particle_spacing: " << spacing << '\n'
+              << "  grid_cell_size: " << cellSize << '\n'
+              << "  grid_nodes: " << grid.nx << 'x' << grid.ny << 'x' << grid.nz
+              << " (" << static_cast<double>(gridNodes) << ")\n";
+    return 0;
+}
+
 [[nodiscard]] int bundleValidationCommand(int argc, char** argv) {
     if (argc < 2 || std::string_view(argv[1]) != "captured-deformable-validate-bundle") return -1;
     if (argc != 3)
@@ -227,6 +271,9 @@ namespace {
 int capturedDeformableCommand(int argc, char** argv) {
     const int worldRun = capturedWorldRunCommand(argc, argv);
     if (worldRun >= 0) return worldRun;
+
+    const int preflight = preflightCommand(argc, argv);
+    if (preflight >= 0) return preflight;
 
     const int bundleValidation = bundleValidationCommand(argc, argv);
     if (bundleValidation >= 0) return bundleValidation;
