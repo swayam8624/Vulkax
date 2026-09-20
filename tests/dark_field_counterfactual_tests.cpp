@@ -153,5 +153,58 @@ int main() {
         assert(jet.witnessCountByOrder[2]==2);
     }
 
+    {
+        AnnihilatingStencil stencil;
+        stencil.order=1;
+        stencil.points={{{0.0}},{{1.0}}};
+        stencil.weights={-0.5,0.5};
+
+        UncertaintyBudget shared;
+        shared.measurementVariance=1.0;
+
+        UncertaintyBudget n0;
+        n0.numericalVariance=1.0;
+        UncertaintyBudget n1;
+        n1.numericalVariance=4.0;
+
+        const double separation=worstCasePairAwareStandardizedSeparation(
+            {{0.0},{1.0}},shared,{n0,n1},stencil);
+        // shared measurement gain = 0.5, numerical L1 gain = 1 for each model.
+        assert(std::abs(separation-1.0/std::sqrt(5.5))<1.0e-12);
+    }
+
+    {
+        std::vector<InterventionPoint> points{
+            {{1.0,1.0}},{{1.0,-1.0}},{{-1.0,1.0}},{{-1.0,-1.0}}
+        };
+        std::vector<std::vector<Response>> models(3);
+        const std::array<double,3> couplings{1.0,0.6,-1.0};
+        for(std::size_t m=0;m<models.size();++m){
+            for(const auto& point:points){
+                const double x=point.coordinates[0],y=point.coordinates[1];
+                models[m].push_back({2.0+x-y+couplings[m]*x*y});
+            }
+        }
+        UncertaintyBudget shared;
+        shared.measurementVariance=1.0e-4;
+        shared.repeatVariance=1.0e-4;
+        std::vector<UncertaintyBudget> numerical(3);
+        numerical[0].numericalVariance=1.0e-5;
+        numerical[1].numericalVariance=2.0e-5;
+        numerical[2].numericalVariance=5.0e-4;
+
+        const auto synthesized=synthesizePairAwareMaximinStencil(
+            points,2,models,shared,numerical);
+        assert(synthesized.momentValidation.valid);
+        assert(synthesized.worstCaseStandardizedSeparation>0.0);
+
+        std::vector<Response> witnesses;
+        for(const auto& model:models)
+            witnesses.push_back(applyAnnihilatingStencil(model,synthesized.stencil));
+        const double check=worstCasePairAwareStandardizedSeparation(
+            witnesses,shared,numerical,synthesized.stencil);
+        assert(std::abs(check-synthesized.worstCaseStandardizedSeparation)<1.0e-12);
+    }
+
     return 0;
 }
