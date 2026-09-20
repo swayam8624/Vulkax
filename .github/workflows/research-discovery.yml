@@ -112,6 +112,16 @@ jobs:
           python3 research/probes/validate_refusal_policy_v3.py build/refusal-repair/cases.csv build/refusal-validation3/cases.csv build/refusal-policy-v3
           cat build/refusal-policy-v3/policy_v3.json
 
+      - name: Diagnose refusal cause and remediation under domain shift
+        run: |
+          python3 research/probes/diagnose_refusal_causes.py \
+            build/refusal-repair/cases.csv \
+            build/refusal-validation/cases.csv \
+            build/refusal-validation2/cases.csv \
+            build/refusal-validation3/cases.csv \
+            build/refusal-cause
+          cat build/refusal-cause/refusal_cause_diagnostic.json
+
       - name: Test GAUGE deformable adapter contract
         run: python3 research/adapters/test_gauge_adapter.py
 
