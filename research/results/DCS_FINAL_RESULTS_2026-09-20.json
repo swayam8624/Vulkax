@@ -104,5 +104,46 @@
     "D6": {
       "status": "spatial_localization_implemented_not_scientific_validation"
     }
+  },
+  "post_hoc_information_frontier": {
+    "analysis_class": "post_hoc_diagnostic",
+    "source_json": "research/results/DCS_INFORMATION_FRONTIER_2026-09-20.json",
+    "d4v": {
+      "threshold_abs_z": 2,
+      "methods": {
+        "dcs": {
+          "median_abs_z": 0.0502368362695058,
+          "max_abs_z": 0.1765438680006307,
+          "median_required_signal_amplification_to_z2": 39.832159447383674
+        },
+        "raw_bundle": {
+          "median_abs_z": 0.0499095477459188,
+          "max_abs_z": 0.4061535567688481,
+          "median_required_signal_amplification_to_z2": 40.098676097440816
+        },
+        "raw_point": {
+          "median_abs_z": 0.14707093736228743,
+          "max_abs_z": 0.6314213171695398,
+          "median_required_signal_amplification_to_z2": 13.59990735800135
+        },
+        "fisher": {
+          "median_abs_z": 0.0663679631040366,
+          "max_abs_z": 0.6314213171695398,
+          "median_required_signal_amplification_to_z2": 30.150174372377187
+        },
+        "max_motion": {
+          "median_abs_z": 0.05773474089993585,
+          "max_abs_z": 0.5750533076545649,
+          "median_required_signal_amplification_to_z2": 34.64145387363821
+        }
+      }
+    },
+    "gauge": {
+      "longitudinal_endpoint_better_count": 9,
+      "longitudinal_overlap_better_count": 1,
+      "longitudinal_median_endpoint_minus_overlap": -0.00266595776944405,
+      "longitudinal_exact_two_sided_sign_test_p": 0.021484375
+    },
+    "warning": "Post-hoc/retrospective diagnostic only; does not alter frozen D2/D3/D4V gates or establish prospective confirmation."
   }
 }
