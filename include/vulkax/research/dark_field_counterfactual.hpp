@@ -162,6 +162,17 @@ struct SynthesizedStencil {
     const std::vector<Response>& modelWitnesses,
     const UncertaintyBudget& uncertainty);
 
+// Pair-aware standardized separation. sharedObservationUncertainty contains
+// measurement/repeat uncertainty common to the physical acquisition. Each entry
+// in modelNumericalUncertainty supplies that candidate world's numerical
+// uncertainty before stencil propagation. The pair denominator contains the
+// shared observation variance plus both candidate numerical variances.
+[[nodiscard]] double worstCasePairAwareStandardizedSeparation(
+    const std::vector<Response>& modelWitnesses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    const std::vector<UncertaintyBudget>& modelNumericalUncertainty,
+    const AnnihilatingStencil& stencil);
+
 // Highest response order whose measured dark-field signal remains observable
 // above a frozen standardized-signal threshold.
 [[nodiscard]] MechanismResolutionResult mechanismResolution(
@@ -178,6 +189,18 @@ struct SynthesizedStencil {
     std::size_t order,
     const std::vector<std::vector<Response>>& modelResponses,
     const UncertaintyBudget& uncertainty,
+    double momentTolerance = 1.0e-9,
+    std::size_t maximumIterations = 256);
+
+// Pair-aware variant used when candidate numerical uncertainty differs
+// materially across model families. The synthesis objective is the minimum
+// pairwise standardized separation after exact lower-order annihilation.
+[[nodiscard]] SynthesizedStencil synthesizePairAwareMaximinStencil(
+    const std::vector<InterventionPoint>& points,
+    std::size_t order,
+    const std::vector<std::vector<Response>>& modelResponses,
+    const UncertaintyBudget& sharedObservationUncertainty,
+    const std::vector<UncertaintyBudget>& modelNumericalUncertainty,
     double momentTolerance = 1.0e-9,
     std::size_t maximumIterations = 256);
 
