@@ -15,6 +15,7 @@ This file exists to prevent accidental novelty inflation.
 - changed-law counterfactual transfer from structured/factored physical models in the abstract (Wang et al., arXiv:2609.19674).
 - hierarchical validation of simulated digital-twin counterfactuals in the abstract (Laudy, *Digital Twin Counterfactual Framework*, arXiv:2604.01325).
 - explicit model discrepancy in inverse calibration.
+- generic source-of-error indicators, model/mesh adequacy diagnosis, or adaptive model/mesh selection from full-field measurements; modified Constitutive Relation Error work already does this (Computational Mechanics 2025, DOI: 10.1007/s00466-025-02598-1).
 - model-form uncertainty embedded in digital-twin calibration in the abstract (Arcones et al., arXiv:2609.10171).
 - abstention/selective prediction in the abstract.
 - finite-sample selective-risk calibration in the abstract (Learn-Then-Test, arXiv:2110.01052; SCoRE, arXiv:2603.24704).
@@ -34,6 +35,7 @@ This file exists to prevent accidental novelty inflation.
    - transfer/discretization disagreement,
    - model-family inadequacy,
    - unsupported geometry/boundary assumptions;
+   - observation-support/body-support mismatch (e.g. tracked markers do not reach the physical fixture);
 4. if repairable, request the next measurement/intervention using established experiment-design machinery;
 5. refit only after the new evidence is acquired;
 6. evaluate a disjoint target intervention;
@@ -51,6 +53,8 @@ This file exists to prevent accidental novelty inflation.
 - GAUGE timestep refinement: dominant real-data miss is not explained by dt at the current stable baseline.
 - GAUGE structural forensics: all signed gravity axes and a stable fine-resolution run completed. PIC is the only tested one-factor variant that improves both mean face-area NRMSE and mean marker RMSE versus the current Vulkax baseline, but it still loses badly to the zero-fit affine null; no structural variant unlocks inverse fitting.
 - GAUGE constitutive×transfer matrix: 3 transfer schemes × 3 constitutive laws all preserve the soft/hard separation sign, but **0/9** beat the affine null for both materials. Constitutive-law choice is nearly negligible at this operating point; transfer scheme changes the error more, but does not repair model adequacy. Inverse fitting remains locked.
+- GAUGE mode diagnostic on frozen run 35514461226: baseline Vulkax preserves much of average shear/transverse timing but over-amplifies shear/face-area heterogeneity and predicts the **wrong-sign longitudinal mean response** in both soft and hard foam. This is a mechanism-level inadequacy signal, not a Poynting-effect novelty claim.
+- GAUGE fixture-envelope hypothesis: released foam aspect + mass/density imply a 50×50×200 mm body while the selected marker envelope spans only ~150–152 mm longitudinally. The historical proxy therefore put prescribed boundary layers at interior observation support. A no-fit released-asset geometry repair is pre-registered to require simultaneous benchmark, marker-trajectory, and mode-signature improvement before promotion.
 
 ## Publication claim rule
 
