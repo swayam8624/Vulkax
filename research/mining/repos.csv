@@ -1,0 +1,13 @@
+repository,default_branch,license,implementation_language,simulator,benchmark_role,integration_feasibility
+"XPandora/PhysGaussian","main","unavailable","C++/CUDA/Python ecosystem","MPM","physical Gaussian baseline","read/benchmark; license must be verified before reuse"
+"xuan-li/PAC-NeRF","main","unavailable","Python/CUDA ecosystem","differentiable MPM","visual system-identification baseline","read/benchmark; license must be verified before reuse"
+"a1600012888/PhysDreamer","main","unavailable","Python ecosystem","MPM-related","physical interaction baseline","read/benchmark; license must be verified before reuse"
+"zhuomanliu/PhysFlow","main","unavailable","Python ecosystem","differentiable MPM","material-refinement/physical simulation baseline","read/benchmark; license must be verified before reuse"
+"EverNorif/PUGS","main","unavailable","Python ecosystem","property prediction","Gaussian physical-understanding baseline","read/benchmark; license must be verified before reuse"
+"waczjoan/GASP","main","unavailable","Python/C++ ecosystem","external physics engines","Gaussian-to-physics representation baseline","read/benchmark; license must be verified before reuse"
+"daniel03c1/MonoPhysics","main","unavailable","Python ecosystem","differentiable MPM","monocular inverse-physics baseline","high-priority direct novelty threat"
+"RobotiX101/i-physgaussian","main","unavailable","Python/CUDA ecosystem","implicit MPM","large-timestep physical-Gaussian baseline","systems/solver threat"
+"taichi-dev/difftaichi","master","unavailable","Python/Taichi","differentiable simulation","gradient implementation reference","foundational; do not treat autodiff as novelty"
+"yuanming-hu/ChainQueen","master","unavailable","C++/CUDA","differentiable MPM","differentiable MPM reference","foundational"
+"KurbanIntelligenceLab/iris-bench","main","MIT code reported by project; dataset CC-BY-NC-4.0 reported","Python","ODE physics models","real monocular inverse-physics benchmark","high-priority evaluation dataset; license constraints must be obeyed"
+"wenjiewang3/PhysicsFromVideo","main","unavailable","Python ecosystem","second-order ODE identification","structural-identifiability baseline","direct threat to generic identifiability novelty"

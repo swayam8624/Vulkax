@@ -75,6 +75,9 @@ add_executable(vulkax_gaussian_identity_benchmark src/tools/gaussian_identity_be
 target_link_libraries(vulkax_gaussian_identity_benchmark PRIVATE vulkax_core)
 add_executable(vulkax_captured_rewrite src/tools/captured_verified_rewrite.cpp)
 target_link_libraries(vulkax_captured_rewrite PRIVATE vulkax_core)
+# Research-only discovery executable. This target is intentionally isolated from the 1.0 control.
+add_executable(vulkax_solver_counterfactual_probe research/probes/solver_counterfactual_probe.cpp)
+target_link_libraries(vulkax_solver_counterfactual_probe PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()
