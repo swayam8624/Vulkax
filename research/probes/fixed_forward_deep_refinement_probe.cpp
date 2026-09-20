@@ -25,8 +25,8 @@ using vulkax::solvers::MpmParticle;
 using vulkax::solvers::MpmTransferScheme;
 
 constexpr double kHorizon = 0.0064;
-const std::array<double,7> kDt{
-    1.0e-4,5.0e-5,2.5e-5,1.25e-5,6.25e-6,3.125e-6,1.5625e-6};
+const std::array<double,8> kDt{
+    1.0e-4,5.0e-5,2.5e-5,1.25e-5,6.25e-6,3.125e-6,1.5625e-6,7.8125e-7};
 const std::array<double,5> kTimes{0.0009,0.0018,0.0031,0.0047,0.0062};
 const std::array<std::size_t,2> kMarkers{9U,54U};
 
