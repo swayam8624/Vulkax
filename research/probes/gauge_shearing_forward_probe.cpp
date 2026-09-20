@@ -79,10 +79,13 @@ std::vector<Marker> loadMarkers(const std::filesystem::path& path) {
     std::ifstream in(path);
     if(!in) throw std::runtime_error("cannot open marker CSV");
     std::string line;
-    if(!std::getline(in,line) || line!="marker_id,x_m,y_m,z_m")
+    if(!std::getline(in,line)) throw std::runtime_error("missing marker CSV header");
+    if(!line.empty() && line.back()=='\r') line.pop_back();
+    if(line!="marker_id,x_m,y_m,z_m")
         throw std::runtime_error("unexpected marker CSV header");
     std::vector<Marker> out;
     while(std::getline(in,line)) {
+        if(!line.empty() && line.back()=='\r') line.pop_back();
         if(line.empty()) continue;
         const auto f=split(line);
         if(f.size()!=4) throw std::runtime_error("malformed marker CSV row");
@@ -96,7 +99,9 @@ std::vector<DriverSample> loadDriver(const std::filesystem::path& path) {
     std::ifstream in(path);
     if(!in) throw std::runtime_error("cannot open driver CSV");
     std::string line;
-    if(!std::getline(in,line) || line!="frame,time_s,dx_m,dy_m,dz_m,magnitude_m")
+    if(!std::getline(in,line)) throw std::runtime_error("missing driver CSV header");
+    if(!line.empty() && line.back()=='\r') line.pop_back();
+    if(line!="frame,time_s,dx_m,dy_m,dz_m,magnitude_m")
         throw std::runtime_error("unexpected driver CSV header");
     std::vector<DriverSample> out;
     while(std::getline(in,line)) {
