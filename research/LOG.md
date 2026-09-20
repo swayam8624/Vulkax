@@ -153,3 +153,8 @@ The prescribed-boundary executable compiled in discovery run `35511228081`, but 
 ## 2026-09-20 — Driven-slab boundary validation launched
 
 The repaired prescribed-boundary CI is green. Added a synthetic driven slab that fixes the bottom face and prescribes a top-face shear for soft/hard Neo-Hookean materials. The test does not assume the hard/soft reaction ratio a priori; it first checks boundary exactness, momentum accounting, orientation preservation and nonzero interior response. The resulting material separation will be treated as diagnostic until convergence is tested.
+
+
+## 2026-09-20 — GAUGE shearing evaluation contract frozen
+
+Added a measured-only contract stage before simulation. Representative soft/hard repeats are chosen by driver amplitude relative to the within-material median, with no access to Vulkax prediction error. The contract records source hashes, marker geometry, unique face topology, driver path and boundary-role metadata. This prevents tuning trial selection after seeing sim-to-real error.
