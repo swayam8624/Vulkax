@@ -12,8 +12,11 @@ This file exists to prevent accidental novelty inflation.
 - local Jacobian/sensitivity/condition-number identifiability.
 - Fisher-information / Jacobian optimal experiment design.
 - counterfactual prediction from an inferred physical model.
+- hierarchical validation of simulated digital-twin counterfactuals in the abstract (Laudy, *Digital Twin Counterfactual Framework*, arXiv:2604.01325).
 - explicit model discrepancy in inverse calibration.
+- model-form uncertainty embedded in digital-twin calibration in the abstract (Arcones et al., arXiv:2609.10171).
 - abstention/selective prediction in the abstract.
+- finite-sample selective-risk calibration in the abstract (Learn-Then-Test, arXiv:2110.01052; SCoRE, arXiv:2603.24704).
 - numerical convergence testing in the abstract.
 - held-out validation in the abstract.
 - rollback/transaction semantics without a scientific mechanism/evaluation.
@@ -42,8 +45,10 @@ This file exists to prevent accidental novelty inflation.
 - same-domain synthetic closed-loop repair: promising;
 - Validation-1: risk reduction but unsafe accepted > target;
 - Validation-2: fixed absolute numerical threshold collapsed to zero coverage;
+- Validation-3: calibration-only four-gate convergence-aware policy missed its preregistered target (25% coverage, 12.5% unsafe accepted vs <=10% target) and accepted only coarse-APIC cases; heuristic certificate family is not promoted;
 - real GAUGE: current no-fit APIC + Neo-Hookean + proxy-geometry + prescribed-boundary instantiation loses to affine null on all 20 shearing repeats;
 - GAUGE timestep refinement: dominant real-data miss is not explained by dt at the current stable baseline.
+- GAUGE structural forensics: all signed gravity axes and a stable fine-resolution run completed. PIC is the only tested one-factor variant that improves both mean face-area NRMSE and mean marker RMSE versus the current Vulkax baseline, but it still loses badly to the zero-fit affine null; no structural variant unlocks inverse fitting.
 
 ## Publication claim rule
 
