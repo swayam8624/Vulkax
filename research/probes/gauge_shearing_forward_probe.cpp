@@ -305,10 +305,10 @@ void writeFrame(std::ofstream& out,std::size_t frame,double time,
 } // namespace
 
 int main(int argc,char**argv) {
-    if(argc!=10 && argc!=16 && argc!=17) {
+    if(argc!=10 && argc!=16 && argc!=17 && argc!=18) {
         std::cerr<<"usage: vulkax_gauge_shearing_forward_probe markers.csv driver.csv output.csv "
                     "young_pa poisson density_kg_m3 mass_kg requested_dt label "
-                    "[n_cross n_long boundary_layers transfer geometry_mode gravity [constitutive]]\n";
+                    "[n_cross n_long boundary_layers transfer geometry_mode gravity [constitutive [mapping_neighbors]]]\n";
         return 2;
     }
     const std::filesystem::path markerPath=argv[1],driverPath=argv[2],outPath=argv[3];
@@ -321,9 +321,12 @@ int main(int argc,char**argv) {
     const std::string transferName=argc>=16?argv[13]:"APIC";
     const std::string geometryMode=argc>=16?argv[14]:"measured_aspect";
     const std::string gravityName=argc>=16?argv[15]:"zero";
-    const std::string constitutiveName=argc==17?argv[16]:"neo_hookean_log_j";
+    const std::string constitutiveName=argc>=17?argv[16]:"neo_hookean_log_j";
+    const std::size_t mappingNeighbors=argc>=18?static_cast<std::size_t>(std::stoull(argv[17])):24U;
     if(!(poisson>-1.0 && poisson<0.5) || !(requestedDt>0.0))
         throw std::runtime_error("invalid material/timestep argument");
+    if(mappingNeighbors<4U)
+        throw std::runtime_error("GAUGE marker mapping requires at least four MLS neighbors");
     if(geometryMode!="measured_aspect" && geometryMode!="square_cross" && geometryMode!="released_asset_aspect")
         throw std::runtime_error("unsupported geometry mode");
     const auto transfer=parseTransfer(transferName);
@@ -335,7 +338,7 @@ int main(int argc,char**argv) {
     const auto geom=inferGeometry(markers,mass,density,geometryMode);
     auto particles=makeParticles(geom,mass,density,nCross,nLong);
     auto cloud=markerCloud(markers);
-    const auto binding=vulkax::coupling::bindGaussianCloudToMpm(cloud,particles,24);
+    const auto binding=vulkax::coupling::bindGaussianCloudToMpm(cloud,particles,mappingNeighbors);
 
     const std::array<double,3> side{
         geom.prismHi[0]-geom.prismLo[0],
@@ -406,6 +409,9 @@ int main(int argc,char**argv) {
            <<"  \"n_cross\": "<<nCross<<",\n"
            <<"  \"n_long\": "<<nLong<<",\n"
            <<"  \"boundary_layers\": "<<boundaryLayers<<",\n"
+           <<"  \"mapping_neighbors\": "<<mappingNeighbors<<",\n"
+           <<"  \"mapping_max_partition_error\": "<<binding.embedding.maximumPartitionOfUnityError<<",\n"
+           <<"  \"mapping_max_affine_reproduction_error_m\": "<<binding.embedding.maximumAffineReproductionError<<",\n"
            <<"  \"particles\": "<<evidence.particles<<",\n"
            <<"  \"grid\": ["<<evidence.gridDims[0]<<','<<evidence.gridDims[1]<<','<<evidence.gridDims[2]<<"],\n"
            <<"  \"grid_cell_m\": "<<evidence.gridCellSize<<",\n"
