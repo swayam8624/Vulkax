@@ -153,5 +153,48 @@ int main() {
         assert(jet.witnessCountByOrder[2]==2);
     }
 
+    {
+        // Numerical-guard regression: the refined solver differs from nominal by
+        // a large common affine response. Order-2 annihilation should remove that
+        // lower-order numerical component when uncertainty is measured in witness
+        // space rather than inherited from raw per-intervention error.
+        std::vector<InterventionPoint> points{
+            {{1.0,1.0}},{{1.0,-1.0}},{{-1.0,1.0}},{{-1.0,-1.0}}
+        };
+        std::vector<std::vector<Response>> nominal(3), refined(3);
+        const std::array<double,3> coupling{1.0,-1.0,0.25};
+        for(std::size_t m=0;m<nominal.size();++m){
+            for(const auto& point:points){
+                const double x=point.coordinates[0],y=point.coordinates[1];
+                const double base=4.0+2.0*x-3.0*y+coupling[m]*x*y;
+                const double commonNumerical=7.0+5.0*x-4.0*y;
+                nominal[m].push_back({base});
+                refined[m].push_back({base+commonNumerical});
+            }
+        }
+        UncertaintyBudget observation;
+        observation.measurementVariance=0.01;
+        observation.repeatVariance=0.01;
+
+        const auto guarded=synthesizeNumericallyGuardedMaximinStencil(
+            points,2,nominal,refined,observation);
+        assert(guarded.momentValidation.valid);
+        assert(guarded.worstCaseStandardizedSeparation>1.0);
+
+        std::vector<UncertaintyBudget> rawNumerical(3);
+        for(auto& b:rawNumerical)b.numericalVariance=25.0;
+        const auto conservative=synthesizePairAwareMaximinStencil(
+            points,2,nominal,observation,rawNumerical);
+        assert(conservative.momentValidation.valid);
+        assert(guarded.worstCaseStandardizedSeparation>
+               conservative.worstCaseStandardizedSeparation);
+
+        for(std::size_t m=0;m<nominal.size();++m){
+            const auto a=applyAnnihilatingStencil(nominal[m],guarded.stencil);
+            const auto b=applyAnnihilatingStencil(refined[m],guarded.stencil);
+            assert(responseDistance(a,b)<1.0e-10);
+        }
+    }
+
     return 0;
 }
