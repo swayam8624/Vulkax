@@ -112,6 +112,18 @@ jobs:
           python3 research/probes/validate_refusal_policy_v3.py build/refusal-repair/cases.csv build/refusal-validation3/cases.csv build/refusal-policy-v3
           cat build/refusal-policy-v3/policy_v3.json
 
+      - name: Build fresh convergence-aware cause Validation-4
+        run: cmake --build build --target vulkax_refusal_validation4_probe --parallel 2
+
+      - name: Evaluate convergence-aware cause signal on fresh Validation-4
+        run: |
+          build/vulkax_refusal_validation4_probe build/refusal-validation4
+          python3 research/probes/diagnose_refusal_causes_v4.py \
+            build/refusal-repair/cases.csv \
+            build/refusal-validation4/cases.csv \
+            build/refusal-cause-v4
+          cat build/refusal-cause-v4/cause_validation4.json
+
       - name: Diagnose refusal cause and remediation under domain shift
         run: |
           python3 research/probes/diagnose_refusal_causes.py \
@@ -153,6 +165,8 @@ jobs:
             build/refusal-validation
             build/refusal-validation2
             build/refusal-validation3
+            build/refusal-validation4
+            build/refusal-cause-v4
             build/refusal-policy-v3
             build/policy-shift
             build/refusal-cause
