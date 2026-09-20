@@ -23,6 +23,7 @@ on:
       - "research/analysis/gauge_shearing_affine_nonaffine.py"
       - "research/analysis/gauge_shearing_affine_nonaffine_compare.py"
       - "research/analysis/gauge_shearing_mapping_forensics.py"
+      - "research/analysis/gauge_shearing_structural_fingerprints.py"
       - "research/analysis/gauge_fixture_envelope_synthetic_control.py"
       - "research/analysis/gauge_shearing_boundary_attachment.py"
       - "research/analysis/gauge_foam_asset_geometry.py"
@@ -123,6 +124,14 @@ jobs:
           python3 research/analysis/gauge_shearing_structural_forensics.py --exe build-forward/vulkax_gauge_shearing_forward_probe --contract-dir build/gauge-shearing-contract --affine-dir build/gauge-affine-null --out build/gauge-structural-forensics
           cat build/gauge-structural-forensics/summary.json
 
+      - name: Fingerprint existing structural arms at macro and local scales
+        run: |
+          python3 research/analysis/gauge_shearing_structural_fingerprints.py \
+            --contract-dir build/gauge-shearing-contract \
+            --structural-dir build/gauge-structural-forensics \
+            --out build/gauge-structural-fingerprints
+          cat build/gauge-structural-fingerprints/summary.json
+
       - name: Diagnose deformation modes for baseline and released-asset geometry
         run: |
           python3 research/analysis/gauge_shearing_mode_diagnostic.py --contract-dir build/gauge-shearing-contract --forward-dir build/gauge-structural-forensics/forward_baseline --out build/gauge-mode-baseline
@@ -192,6 +201,7 @@ jobs:
             build/gauge-asset-repeat-forensics
             build/gauge-timestep-forensics
             build/gauge-structural-forensics
+            build/gauge-structural-fingerprints
             build/gauge-mode-baseline
             build/gauge-mode-released-asset
             build/gauge-mode-compare
