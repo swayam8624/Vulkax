@@ -28,7 +28,8 @@ jobs:
 
       - name: Validate paper/research Python tooling
         run: |
-          python3 -m py_compile             research/analysis/assemble_paper_evidence.py             research/analysis/generate_paper_assets.py             research/analysis/validate_paper_reproduction.py             research/analysis/dcs_confirmatory_replay.py             research/analysis/export_dcs_spatial_map.py             research/analysis/export_dcs_evidence_pack.py             research/analysis/gauge_dcs_retrospective.py
+          python3 -m py_compile             research/analysis/assemble_paper_evidence.py             research/analysis/generate_paper_assets.py             research/analysis/validate_paper_reproduction.py             research/analysis/dcs_confirmatory_replay.py             research/analysis/export_dcs_spatial_map.py             research/analysis/export_dcs_evidence_pack.py             research/analysis/gauge_dcs_retrospective.py \
+            research/analysis/analyze_information_frontier.py
 
       - name: Self-test paper/research tooling
         run: |
@@ -38,6 +39,7 @@ jobs:
           python3 research/analysis/dcs_confirmatory_replay.py --self-test
           python3 research/analysis/export_dcs_spatial_map.py --self-test
           python3 research/analysis/export_dcs_evidence_pack.py --self-test
+          python3 research/analysis/analyze_information_frontier.py --self-test
 
       - name: Validate committed JSON ledgers
         run: |
