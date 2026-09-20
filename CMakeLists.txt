@@ -98,6 +98,11 @@ if(APPLE)
     target_link_libraries(vulkax_viewer PRIVATE vulkax_viewer_common
         ${VULKAX_METAL_FRAMEWORK} ${VULKAX_METALKIT_FRAMEWORK} ${VULKAX_APPKIT_FRAMEWORK}
         ${VULKAX_QUARTZCORE_FRAMEWORK} ${VULKAX_FOUNDATION_FRAMEWORK})
+
+    add_executable(vulkax_viewer_benchmark src/tools/viewer_gpu_sort_benchmark.mm)
+    set_source_files_properties(src/tools/viewer_gpu_sort_benchmark.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+    target_link_libraries(vulkax_viewer_benchmark PRIVATE vulkax_viewer_common
+        ${VULKAX_METAL_FRAMEWORK} ${VULKAX_FOUNDATION_FRAMEWORK})
 endif()
 
 if(VULKAX_BUILD_TESTS)
