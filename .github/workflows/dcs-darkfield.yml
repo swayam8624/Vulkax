@@ -14,7 +14,7 @@ on:
       - "CMakeLists.txt"
       - ".github/workflows/dcs-darkfield.yml"
   pull_request:
-    branches: ["main"]
+    branches: ["research/integration-20260920"]
   workflow_dispatch:
 
 jobs:
