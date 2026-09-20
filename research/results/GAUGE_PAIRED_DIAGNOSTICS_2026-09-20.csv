@@ -1,0 +1,5 @@
+channel,median_endpoint_minus_overlap,mean_endpoint_minus_overlap,endpoint_better_count,overlap_better_count,ties,exact_two_sided_sign_test_p,evidence_class
+face_nrmse,0.0783805928651507,0.07957436995149633,0,10,0,0.001953125,retrospective_post_hoc
+marker_rmse_m,0.00013077325192415,0.00012530393557317,0,10,0,0.001953125,retrospective_post_hoc
+dcs_marker_error_m,0.0007517904340945,0.00074479894006964,0,10,0,0.001953125,retrospective_post_hoc
+dcs_longitudinal_error,-0.00266595776944405,-0.002151225936031444,9,1,0,0.021484375,retrospective_post_hoc
