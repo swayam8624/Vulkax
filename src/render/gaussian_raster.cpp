@@ -47,7 +47,14 @@ GaussianRenderResult renderGaussianRasterBatchHeadless(
         case backend::BackendKind::OpenGL:
             throw std::runtime_error("OpenGL Gaussian rendering is not implemented yet");
     }
-    return {std::move(image), batch.stats};
+
+    GaussianRenderResult result;
+    result.image = std::move(image);
+    result.stats = batch.stats;
+    result.directProjectedRaster = false;
+    result.nativeRasterInputBytes = batch.vertices.size() * sizeof(GaussianRasterVertex);
+    result.cpuExpandedVertexBytes = result.nativeRasterInputBytes;
+    return result;
 }
 
 } // namespace vulkax::render
