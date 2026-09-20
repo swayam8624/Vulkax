@@ -68,6 +68,7 @@ GENERATED = [
     ("dcs-d4v-discovery/proposals.csv", "generated/d4v-proposals", True),
     ("paper-captured-world-run/certificate.json", "generated/captured-world-certificate", True),
     ("paper-reproduction-validation.json", "generated/reproduction-validation", True),
+    ("paper-dcs-evidence-index.csv", "generated/dcs-evidence-index", True),
     ("paper-diagnostics/information_frontier.json", "generated/information-frontier", True),
     ("paper-diagnostics/d4v_information_frontier.csv", "generated/d4v-information-frontier", True),
     ("paper-diagnostics/gauge_paired_diagnostics.csv", "generated/gauge-paired-diagnostics", True),
