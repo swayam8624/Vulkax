@@ -486,7 +486,8 @@ SynthesizedStencil synthesizeAnnihilatingStencil(
         }
     }
     if (moments.size() >= pointCount)
-        throw std::invalid_argument("DCS synthesis needs more intervention points than lower-order moment constraints");
+        throw std::invalid_argument(
+            "DCS synthesis needs more intervention points than lower-order moment constraints");
 
     Matrix gram(moments.size(), std::vector<double>(moments.size(), 0.0));
     for (std::size_t i = 0; i < moments.size(); ++i)
@@ -495,63 +496,87 @@ SynthesizedStencil synthesizeAnnihilatingStencil(
                 gram[i][j] += moments[i][point] * moments[j][point];
     const Matrix gramInverse = invertSquareMatrix(std::move(gram));
 
-    std::vector<double> weights(pointCount, 0.0);
-    double bestSeedNorm = -1.0;
+    bool found = false;
+    SynthesizedStencil best;
+    double bestEnergy = -std::numeric_limits<double>::infinity();
+
     for (std::size_t seed = 0; seed < pointCount; ++seed) {
         std::vector<double> basis(pointCount, 0.0);
         basis[seed] = 1.0;
-        auto projected = projectMomentNullspace(basis, moments, gramInverse);
-        const double norm = vectorNorm(projected);
-        if (norm > bestSeedNorm) {
-            bestSeedNorm = norm;
-            weights = std::move(projected);
+        auto weights = projectMomentNullspace(basis, moments, gramInverse);
+        const double seedNorm = vectorNorm(weights);
+        if (!(seedNorm > 1.0e-15))
+            continue;
+        for (double& value : weights) value /= seedNorm;
+
+        SynthesizedStencil candidate;
+        bool usable = true;
+        for (std::size_t iteration = 0; iteration < maximumIterations; ++iteration) {
+            const auto projectedWeights =
+                projectMomentNullspace(weights, moments, gramInverse);
+            auto next = applyModelDisagreement(projectedWeights, modelResponses);
+            next = projectMomentNullspace(next, moments, gramInverse);
+            const double norm = vectorNorm(next);
+            if (!(norm > 1.0e-15)) {
+                usable = false;
+                break;
+            }
+            for (double& value : next) value /= norm;
+
+            long double same = 0.0L;
+            long double opposite = 0.0L;
+            for (std::size_t i = 0; i < pointCount; ++i) {
+                const long double ds =
+                    static_cast<long double>(next[i]) - weights[i];
+                const long double do_ =
+                    static_cast<long double>(next[i]) + weights[i];
+                same += ds * ds;
+                opposite += do_ * do_;
+            }
+            weights = std::move(next);
+            candidate.powerIterations = iteration + 1U;
+            if (std::sqrt(static_cast<double>(std::min(same, opposite))) < 1.0e-10) {
+                candidate.converged = true;
+                break;
+            }
+        }
+        if (!usable)
+            continue;
+
+        double l1 = 0.0;
+        for (const double value : weights) l1 += std::abs(value);
+        if (!(l1 > 1.0e-15))
+            continue;
+        for (double& value : weights) value /= l1;
+
+        candidate.stencil.order = order;
+        candidate.stencil.points = points;
+        candidate.stencil.weights = weights;
+        candidate.momentValidation =
+            validateAnnihilatingStencil(candidate.stencil, momentTolerance);
+        if (!candidate.momentValidation.valid)
+            continue;
+
+        const auto disagreementApplied =
+            applyModelDisagreement(weights, modelResponses);
+        for (std::size_t i = 0; i < weights.size(); ++i)
+            candidate.modelDisagreementEnergy +=
+                weights[i] * disagreementApplied[i];
+        candidate.independentNoiseGain = vectorNorm(weights);
+
+        if (!std::isfinite(candidate.modelDisagreementEnergy))
+            continue;
+        if (!found || candidate.modelDisagreementEnergy > bestEnergy) {
+            found = true;
+            bestEnergy = candidate.modelDisagreementEnergy;
+            best = std::move(candidate);
         }
     }
-    normalize(weights);
 
-    SynthesizedStencil result;
-    for (std::size_t iteration = 0; iteration < maximumIterations; ++iteration) {
-        const auto projectedWeights = projectMomentNullspace(weights, moments, gramInverse);
-        auto next = applyModelDisagreement(projectedWeights, modelResponses);
-        next = projectMomentNullspace(next, moments, gramInverse);
-        const double norm = vectorNorm(next);
-        if (!(norm > 1.0e-15))
-            throw std::runtime_error("DCS synthesis found no model disagreement after lower-order annihilation");
-        for (double& value : next) value /= norm;
-
-        long double same = 0.0L;
-        long double opposite = 0.0L;
-        for (std::size_t i = 0; i < pointCount; ++i) {
-            const long double ds = static_cast<long double>(next[i]) - weights[i];
-            const long double do_ = static_cast<long double>(next[i]) + weights[i];
-            same += ds * ds;
-            opposite += do_ * do_;
-        }
-        weights = std::move(next);
-        result.powerIterations = iteration + 1U;
-        if (std::sqrt(static_cast<double>(std::min(same, opposite))) < 1.0e-10) {
-            result.converged = true;
-            break;
-        }
-    }
-
-    double l1 = 0.0;
-    for (const double value : weights) l1 += std::abs(value);
-    if (!(l1 > 1.0e-15)) throw std::runtime_error("DCS synthesis produced a zero stencil");
-    for (double& value : weights) value /= l1;
-
-    result.stencil.order = order;
-    result.stencil.points = points;
-    result.stencil.weights = weights;
-    result.momentValidation = validateAnnihilatingStencil(result.stencil, momentTolerance);
-    if (!result.momentValidation.valid)
-        throw std::runtime_error("DCS synthesized stencil violates its annihilation contract");
-
-    const auto disagreementApplied = applyModelDisagreement(weights, modelResponses);
-    for (std::size_t i = 0; i < weights.size(); ++i)
-        result.modelDisagreementEnergy += weights[i] * disagreementApplied[i];
-    result.independentNoiseGain = vectorNorm(weights);
-    return result;
+    if (!found)
+        throw std::runtime_error(
+            "DCS synthesis found no model disagreement after lower-order annihilation");
+    return best;
 }
 
 double standardizedDarkFieldDiscrepancy(
