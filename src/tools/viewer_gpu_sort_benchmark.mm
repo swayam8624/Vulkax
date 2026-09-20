@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -120,8 +121,13 @@ std::vector<ViewerGaussian> makeScene(std::size_t count) {
     std::vector<ViewerGaussian> scene;
     scene.reserve(count);
     constexpr double golden = 2.39996322972865332;
+    std::size_t stride = 48271U;
+    while (std::gcd(stride, count) != 1U) stride += 2U;
     for (std::size_t i = 0U; i < count; ++i) {
-        const double t = (static_cast<double>(i) + 0.5) / static_cast<double>(count);
+        // A coprime modular permutation makes depth independent of source order,
+        // preventing an accidentally near-sorted CPU baseline.
+        const std::size_t rank = (i * stride) % count;
+        const double t = (static_cast<double>(rank) + 0.5) / static_cast<double>(count);
         const double radial = 0.72 * std::sqrt(
             std::fmod(static_cast<double>(i) * 0.6180339887498949, 1.0));
         const double angle = golden * static_cast<double>(i);
