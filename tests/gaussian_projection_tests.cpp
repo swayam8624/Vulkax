@@ -1,12 +1,16 @@
 #include "vulkax/render/gaussian_projection.hpp"
+#include "vulkax/render/gaussian_scheduler.hpp"
 #include "vulkax/render/gaussian_tiles.hpp"
 #include "vulkax/render/image_metrics.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
+#include <vector>
 
 namespace {
 
@@ -73,10 +77,41 @@ void compareBatch(
     assert(maximum < 2.0e-4);
 }
 
+vulkax::render::GaussianNativeProjectionResult makeUnsortedTieProjection() {
+    using namespace vulkax;
+    render::GaussianNativeProjectionResult projection;
+    projection.tileSize = 16U;
+    projection.tileColumns = 1U;
+    projection.tileRows = 1U;
+    projection.projected.resize(4U);
+    projection.stats.visibleSplats = 4U;
+    projection.splatReferences = 4U;
+    projection.maximumSplatsPerTile = 4U;
+    const std::array<float, 4> depths{2.0F, 4.0F, 4.0F, 1.0F};
+    for (std::size_t index = 0U; index < depths.size(); ++index) {
+        projection.projected[index].minorDepth[2] = depths[index];
+        projection.projected[index].tileBounds = {0.0F, 0.0F, 0.0F, 0.0F};
+    }
+    return projection;
+}
+
+void verifyDeterministicScheduleOracle() {
+    using namespace vulkax;
+    const auto projection = makeUnsortedTieProjection();
+    const auto schedule = render::buildGaussianTileScheduleOracle(projection);
+    render::validateGaussianTileSchedule(schedule, projection);
+    assert(schedule.tileOffsets == std::vector<std::uint32_t>({0U, 4U}));
+    assert(schedule.projectedSplatIndices ==
+           std::vector<std::uint32_t>({1U, 2U, 0U, 3U}));
+    assert(schedule.maximumSplatsPerTile == 4U);
+}
+
 } // namespace
 
 int main() {
     using namespace vulkax;
+    verifyDeterministicScheduleOracle();
+
     const auto cloud = makeScene();
 
     render::GaussianRenderSettings settings;
@@ -110,6 +145,11 @@ int main() {
 
         const auto projection = render::projectGaussianCloudNative(
             backendKind, cloud, settings, 16U);
+        assert(projection.fusedProjectionScheduling);
+        assert(projection.intermediateReadbackBytes == 8U * sizeof(std::uint32_t));
+        assert(projection.schedulerInputBytes == 0U);
+        assert(projection.schedulerOutputBytes > 0U);
+        assert(projection.schedulerWorkspaceBytes > 0U);
         assert(projection.projected.size() == reference.stats.visibleSplats);
         assert(projection.stats.inputSplats == reference.stats.inputSplats);
         assert(projection.stats.visibleSplats == reference.stats.visibleSplats);
@@ -122,8 +162,53 @@ int main() {
         assert(projection.maximumSplatsPerTile == referenceTiles.maximumSplatsPerTile);
         assert(std::isfinite(projection.projectionMilliseconds));
         assert(projection.projectionMilliseconds >= 0.0);
+        assert(std::isfinite(projection.schedulingMilliseconds));
+        assert(projection.schedulingMilliseconds >= 0.0);
         assert(projection.inputBytes == cloud.size() * sizeof(render::GaussianProjectionInput));
         assert(projection.outputBytes == cloud.size() * sizeof(render::GaussianProjectedSplat));
+
+        const auto oracleSchedule = render::buildGaussianTileScheduleOracle(projection);
+        render::validateGaussianTileSchedule(oracleSchedule, projection);
+        assert(oracleSchedule.splatReferences == referenceTiles.splatReferences);
+        assert(oracleSchedule.maximumSplatsPerTile == referenceTiles.maximumSplatsPerTile);
+        assert(oracleSchedule.tileOffsets.size() == referenceTiles.tiles.size() + 1U);
+        for (std::uint32_t row = 0U; row < oracleSchedule.rows; ++row) {
+            for (std::uint32_t column = 0U; column < oracleSchedule.columns; ++column) {
+                const std::size_t tileId = static_cast<std::size_t>(row) * oracleSchedule.columns + column;
+                const auto& referenceTile = referenceTiles.at(column, row);
+                const std::uint32_t begin = oracleSchedule.tileOffsets[tileId];
+                const std::uint32_t end = oracleSchedule.tileOffsets[tileId + 1U];
+                assert(static_cast<std::size_t>(end - begin) == referenceTile.splatIndices.size());
+                for (std::uint32_t offset = 0U; offset < end - begin; ++offset) {
+                    assert(oracleSchedule.projectedSplatIndices[begin + offset] ==
+                           referenceTile.splatIndices[offset]);
+                }
+            }
+        }
+
+        const auto nativeSchedule = render::scheduleGaussianProjectionNative(backendKind, projection);
+        assert(std::isfinite(nativeSchedule.schedulingMilliseconds));
+        assert(nativeSchedule.schedulingMilliseconds >= 0.0);
+        assert(nativeSchedule.inputBytes ==
+               projection.projected.size() * sizeof(render::GaussianProjectedSplat));
+        assert(nativeSchedule.outputBytes ==
+               projection.projected.size() * sizeof(std::uint32_t) +
+               oracleSchedule.tileOffsets.size() * sizeof(std::uint32_t) +
+               oracleSchedule.projectedSplatIndices.size() * sizeof(std::uint32_t) +
+               4U * sizeof(std::uint32_t));
+        assert(nativeSchedule.paddedOrderCount >= std::max<std::size_t>(projection.projected.size(), 1U));
+        assert((nativeSchedule.paddedOrderCount & (nativeSchedule.paddedOrderCount - 1U)) == 0U);
+        assert(nativeSchedule.schedule.tileOffsets == oracleSchedule.tileOffsets);
+        assert(nativeSchedule.schedule.projectedSplatIndices == oracleSchedule.projectedSplatIndices);
+        assert(nativeSchedule.schedule.splatReferences == oracleSchedule.splatReferences);
+        assert(nativeSchedule.schedule.maximumSplatsPerTile == oracleSchedule.maximumSplatsPerTile);
+
+        const auto unsorted = makeUnsortedTieProjection();
+        const auto nativeUnsorted = render::scheduleGaussianProjectionNative(backendKind, unsorted);
+        assert(nativeUnsorted.depthOrder == std::vector<std::uint32_t>({1U, 2U, 0U, 3U}));
+        assert(nativeUnsorted.schedule.tileOffsets == std::vector<std::uint32_t>({0U, 4U}));
+        assert(nativeUnsorted.schedule.projectedSplatIndices ==
+               std::vector<std::uint32_t>({1U, 2U, 0U, 3U}));
 
         const auto acceleratedBatch = render::buildGaussianRasterBatchFromProjection(
             projection, settings);
