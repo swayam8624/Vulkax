@@ -78,6 +78,8 @@ target_link_libraries(vulkax_captured_rewrite PRIVATE vulkax_core)
 # Research-only discovery executable. This target is intentionally isolated from the 1.0 control.
 add_executable(vulkax_solver_counterfactual_probe research/probes/solver_counterfactual_probe.cpp)
 target_link_libraries(vulkax_solver_counterfactual_probe PRIVATE vulkax_core)
+add_executable(vulkax_solver_active_design_probe research/probes/solver_active_design_probe.cpp)
+target_link_libraries(vulkax_solver_active_design_probe PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
     include(CTest)
     enable_testing()

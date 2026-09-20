@@ -44,3 +44,25 @@ Generic identifiability is also demoted as novelty: 2026 Physics-from-Video work
 
 ### Next falsification
 Move the same questions into Vulkax's actual nonlinear APIC/MPM + Neo-Hookean solver, intentionally introduce model and timestep mismatch, re-fit stiffness, and measure whether apparent fit quality survives a new deformation.
+
+## 2026-09-20 — Solver-integrated model/numerics confounding confirmed
+
+**Branch/SHA:** research/discovery @ `4127023ecba81532a368b8a2249968d84d041c9a`
+
+**Workflow:** run `35509364792`, success.
+
+### Experiment
+Actual Vulkax nonlinear APIC/MPM + Neo-Hookean. Synthetic truth E=15 kPa, nu=0.35. Fit model intentionally forced to nu=0.08 and allowed to compensate through E.
+
+### Outcome
+E moved to 17.5 kPa (+16.67%). Early fit RMS was 8.543 μm; later same-intervention RMS 65.427 μm; unseen-deformation RMS 122.249 μm.
+
+Independent timestep-refit sweep moved E from 15.0 kPa at dt=1e-4 to 15.75 kPa at dt=5e-4 (+5%) while fitting the same fine-dt truth.
+
+### Interpretation
+The mechanism survives escalation from an analytic toy into the Vulkax solver: physical-parameter estimates can absorb both model and numerical error. This remains a known general phenomenon, so novelty must come from an operational verified-rewrite policy, not from merely observing bias.
+
+The truth run's ~9.73% maximum mechanical-energy drift is recorded as a correctness risk. No counterfactual certificate may ignore solver convergence/dissipation.
+
+### Next falsification
+Run an actual-solver intervention-design positive test for E/nu observability, then build a many-case certificate dataset to test whether held-out error, identifiability, nonlinear trust error, numerical uncertainty and model disagreement predict unseen-intervention failure.

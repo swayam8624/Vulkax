@@ -23,3 +23,18 @@ This is a threat map, not a novelty claim. Full-text review and citation expansi
 ## Current search conclusion
 
 The easy story is gone: Vulkax cannot win by saying “we simulate Gaussian splats with physics” or “we infer a material parameter from video.” The research must move one level up: **when is the inferred physical world actually knowable, when does it generalize to interventions, what additional experiment resolves ambiguity, and when should the system refuse to commit a rewrite?**
+
+## 2026-09-20 threat expansion after first solver experiment
+
+- **Generic identifiability from video is no longer a plausible flagship**: ICML 2026 *Physics from Video* gives explicit structural-identifiability conditions.
+- **Generic extrapolation evaluation is crowded**: IRIS explicitly includes extrapolation and identifiability; MPMWorlds studies physical-dynamics extrapolation.
+- **Multi-material Gaussian physical inference is crowded**: CVPR 2026 M-PhyGs estimates material segmentation, Young's modulus and density from real interaction video.
+- **Sensitivity-guided inverse optimization is crowded**: ProJo4D uses parameter sensitivity to structure progressive joint optimization.
+- **Measurement-grounded physical-fidelity diagnosis is now crowded**: GAUGE directly evaluates real physics engines/world models and diagnoses mechanism-specific failures across textiles and volumetric deformables.
+- **Counterfactual reasoning itself is old**: VRDP and counterfactual-physics benchmarks predate Vulkax.
+
+### Current narrower target
+
+The current candidate contribution is therefore not any single word—identifiability, uncertainty, counterfactual, experiment design, physical fidelity, or refusal. The target must be an operational mechanism whose **accept/reject decision for a requested physical rewrite is empirically calibrated against unseen interventions while accounting for model inadequacy and numerical error, and can turn a refusal into a concrete next-evidence request**.
+
+This target remains unproven and may still collide with work not yet reviewed.

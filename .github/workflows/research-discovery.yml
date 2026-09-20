@@ -54,6 +54,15 @@ jobs:
           python3 research/probes/validate_solver_counterfactual.py build/solver-counterfactual
           cat build/solver-counterfactual/solver_counterfactual.csv
 
+      - name: Build solver active-design probe
+        run: cmake --build build --target vulkax_solver_active_design_probe --parallel 2
+
+      - name: Run solver active-design probe
+        run: |
+          build/vulkax_solver_active_design_probe build/solver-design
+          python3 research/probes/validate_solver_active_design.py build/solver-design
+          cat build/solver-design/solver_design.csv
+
       - name: Upload raw synthetic evidence
         uses: actions/upload-artifact@v4
         with:
@@ -61,5 +70,6 @@ jobs:
           path: |
             build/research-cheap-probes
             build/solver-counterfactual
+            build/solver-design
           if-no-files-found: error
           retention-days: 30
