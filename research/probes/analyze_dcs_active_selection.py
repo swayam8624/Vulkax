@@ -14,6 +14,7 @@ methods={
     "dcs":"dcs_error_m",
     "raw_bundle_same_cost":"raw_bundle_error_m",
     "raw_maximin":"raw_error_m",
+    "fisher_sensitivity":"fisher_error_m",
     "max_motion":"maxmotion_error_m",
     "random":"random_error_m",
 }
