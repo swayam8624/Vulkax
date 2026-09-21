@@ -47,28 +47,44 @@ jobs:
 
       - name: Package tracked README assets
         run: |
+          cp docs/readme_assets/reality_probe_explainer.mp4 /tmp/reality_probe_explainer.mp4
           rm -rf docs/readme_assets
           mkdir -p docs/readme_assets
+          cp /tmp/reality_probe_explainer.mp4 docs/readme_assets/
           cp build/reality-probe-explainer/storyboard.png docs/readme_assets/
           cp build/reality-probe-explainer/figures/*.png docs/readme_assets/
           cp build/reality-probe-explainer/figures/*.svg docs/readme_assets/
 
-      - name: Build animated README preview
+      - name: Build full-length animated README explainer
         run: |
-          ffmpeg -y \
-            -loop 1 -t 1.2 -i docs/readme_assets/02_deceptive_repair.png \
-            -loop 1 -t 1.2 -i docs/readme_assets/04_same_probe.png \
-            -loop 1 -t 1.2 -i docs/readme_assets/06_fingerprint.png \
-            -loop 1 -t 1.2 -i docs/readme_assets/07_residual_field.png \
-            -loop 1 -t 1.2 -i docs/readme_assets/10_signal_gain.png \
-            -loop 1 -t 1.2 -i docs/readme_assets/11_information_limit.png \
-            -filter_complex "[0:v][1:v][2:v][3:v][4:v][5:v]concat=n=6:v=1:a=0,fps=10,scale=960:540:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3" \
+          ffmpeg -hide_banner -loglevel warning -y \
+            -i docs/readme_assets/reality_probe_explainer.mp4 \
+            -vf "fps=8,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4" \
+            docs/readme_assets/reality_probe_explainer_full.gif
+          ffmpeg -hide_banner -loglevel warning -y \
+            -i docs/readme_assets/reality_probe_explainer.mp4 \
+            -vf "fps=10,scale=960:-1:flags=lanczos" \
+            -t 8 \
             docs/readme_assets/reality_probe_explainer_preview.gif
 
       - name: Validate README asset package
         run: |
+          test -s docs/readme_assets/reality_probe_explainer.mp4
+          test -s docs/readme_assets/reality_probe_explainer_full.gif
           test -s docs/readme_assets/reality_probe_explainer_preview.gif
           test -s docs/readme_assets/storyboard.png
+          duration="$(ffprobe -v error -show_entries format=duration -of default=nk=1:nw=1 docs/readme_assets/reality_probe_explainer_full.gif)"
+          python3 - <<'PY'
+from pathlib import Path
+import subprocess
+duration=float(subprocess.check_output([
+    'ffprobe','-v','error','-show_entries','format=duration',
+    '-of','default=nk=1:nw=1','docs/readme_assets/reality_probe_explainer_full.gif'
+], text=True).strip())
+if duration < 115:
+    raise SystemExit(f'full README GIF too short: {duration:.3f}s')
+print(f'full README GIF duration: {duration:.3f}s')
+PY
           for n in 01_question 02_deceptive_repair 03_deception_map 04_same_probe 05_response_overlay 06_fingerprint 07_residual_field 08_dcs_intuition 09_standardization 10_signal_gain 11_information_limit 12_conclusion; do
             test -s "docs/readme_assets/${n}.png"
             test -s "docs/readme_assets/${n}.svg"
