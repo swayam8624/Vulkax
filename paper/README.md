@@ -42,17 +42,20 @@ plot in a way that changes its scientific meaning.
 
 The primary rule remains the prospectively frozen `|z| >= 2` decision magnitude.
 
-The manuscript now records a post-hoc robustness audit that follows directly from the
-frozen aggregate maxima:
+The manuscript now records a post-hoc robustness audit generated from the frozen
+per-proposal ledger `visualization/data/ofc_proposals_visualization_2026-09-21.csv`
+using `research/analysis/threshold_sensitivity_ofc.py`.
 
-- fresh DCS max `|z| = 0.172788679...`, therefore 0/36 crossings even at tau=1;
-- fresh force max `|z| = 1.319111318...`, therefore 0/36 crossings for every
-  tau >= 1.5;
-- at tau=1, at least one force case crosses, but the aggregate publication ledger does
-  not retain the full signed per-proposal vector, so the exact count is intentionally
-  not asserted.
+The exact sweep is stored in
+`research/paper_data/THRESHOLD_SENSITIVITY_OFC_2026-09-21.csv`:
 
-This audit does not replace or weaken the frozen tau=2 primary decision rule.
+- DCS: 0/36 crossings at tau = 1, 1.5, 2, 2.5, and 3;
+- force at tau=1: 14/36 crossings (6 support, 8 veto), with 5/12 deceptive repairs
+  vetoed and 3/24 beneficial repairs falsely vetoed;
+- force at tau >= 1.5: 0/36 crossings.
+
+This diagnostic does not replace or weaken the frozen tau=2 primary decision rule and
+was not used to retune the preregistered advancement gate.
 
 ## Remaining submission engineering
 

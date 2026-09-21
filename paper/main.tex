@@ -598,17 +598,19 @@ Best-case factor to $|z|=2$ & 11.57$\times$ & 1.52$\times$ \\
 The primary decision magnitude remains the prospectively frozen
 $\tau=2$. To check whether the central negative conclusion is merely an
 artifact of that particular number, we also inspect nearby thresholds
-without changing the primary rule. The aggregate frozen ledger records
-the population size and the maximum absolute standardized evidence for
-each fresh channel. Because fresh DCS has maximum $|z|=0.17279$, it
-crosses neither support nor veto at $\tau=1$. Because force compliance
-has maximum $|z|=1.31911$, it has zero crossings for every
-$\tau\ge1.5$. At $\tau=1$, the aggregate ledger proves that at least
-one force case crosses but does not retain the complete signed
-per-proposal vector needed to report an exact count; we therefore do not
-invent one post hoc. This robustness check leaves the primary conclusion
-unchanged: under the frozen $\tau=2$ rule, and for all audited
-$\tau\ge1.5$, the fresh population remains uncertified.
+without changing the primary rule. The frozen per-proposal OFC visualization ledger retains the complete
+signed DCS and force progress scores, so the diagnostic sweep can be
+reported exactly. Fresh DCS crosses neither support nor veto even at
+$\tau=1$. At $\tau=1$, force compliance resolves 14/36 proposals:
+6 support and 8 veto. Five of the 12 deceptive repairs are vetoed
+(41.7\% recall), while 3 of 24 beneficial repairs are falsely vetoed
+(12.5\%). The result therefore remains below the preregistered
+advancement target even under this looser post-hoc threshold. At
+$\tau=1.5$ and above, force coverage returns to 0/36. This robustness
+check leaves the primary conclusion unchanged: under the frozen
+$\tau=2$ rule the fresh population remains uncertified, and the
+observed transition between $\tau=1$ and $\tau=1.5$ makes the
+threshold dependence explicit rather than hiding it.
 
 \begin{table}[t]
 \centering
@@ -620,7 +622,7 @@ post-hoc sensitivity checks and do not redefine the decision policy.}
 \toprule
 Decision magnitude $\tau$ & DCS crossings & Force crossings \\
 \midrule
-1.0 & 0/36 & $\geq$1/36 \\
+1.0 & 0/36 & 14/36 \\
 1.5 & 0/36 & 0/36 \\
 2.0 & 0/36 & 0/36 \\
 2.5 & 0/36 & 0/36 \\
@@ -630,6 +632,9 @@ Decision magnitude $\tau$ & DCS crossings & Force crossings \\
 \end{table}
 
 The ratio of the aggregate median evidence magnitudes is 11.455x.
+The full post-hoc sweep is generated from the frozen per-proposal ledger
+by \texttt{research/analysis/threshold\_sensitivity\_ofc.py} and stored
+as \texttt{research/paper\_data/THRESHOLD\_SENSITIVITY\_OFC\_2026-09-21.csv}.
 
 The protocol includes an advancement gate requiring at least 30\%
 resolved coverage, at least 50\% veto recall over deceptive repairs, no

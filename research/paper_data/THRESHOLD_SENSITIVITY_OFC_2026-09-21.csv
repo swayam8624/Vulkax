@@ -1,0 +1,11 @@
+channel,tau,support_n,veto_n,resolved_n,coverage,deceptive_veto_n,deceptive_veto_recall,beneficial_false_veto_n,beneficial_false_veto_rate,deceptive_false_support_n,beneficial_support_n
+DCS,1.0,0,0,0,0.0,0,0.0,0,0.0,0,0
+DCS,1.5,0,0,0,0.0,0,0.0,0,0.0,0,0
+DCS,2.0,0,0,0,0.0,0,0.0,0,0.0,0,0
+DCS,2.5,0,0,0,0.0,0,0.0,0,0.0,0,0
+DCS,3.0,0,0,0,0.0,0,0.0,0,0.0,0,0
+Force,1.0,6,8,14,0.3888888888888889,5,0.4166666666666667,3,0.125,0,6
+Force,1.5,0,0,0,0.0,0,0.0,0,0.0,0,0
+Force,2.0,0,0,0,0.0,0,0.0,0,0.0,0,0
+Force,2.5,0,0,0,0.0,0,0.0,0,0.0,0,0
+Force,3.0,0,0,0,0.0,0,0.0,0,0.0,0,0

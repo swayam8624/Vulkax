@@ -26,11 +26,11 @@ It distinguishes manuscript hardening from new scientific evidence.
    literal broken `Eq. [eq:second]` text.
 
 5. **Decision-threshold sensitivity added without retuning.**  
-   The frozen primary magnitude remains tau=2. A post-hoc audit records that DCS has
-   zero fresh crossings even at tau=1 and force compliance has zero fresh crossings
-   for all tau>=1.5. At tau=1 the aggregate ledger proves at least one force crossing,
-   but an exact count is not asserted because the frozen publication ledger does not
-   retain the complete signed per-proposal vector.
+   The frozen primary magnitude remains tau=2. The retained per-proposal OFC ledger
+   permits an exact post-hoc sweep: DCS has 0/36 crossings even at tau=1; force has
+   14/36 crossings at tau=1 (6 support, 8 veto), with 5/12 deceptive repairs vetoed
+   and 3/24 beneficial repairs falsely vetoed; force returns to 0/36 crossings at
+   tau>=1.5. The analysis script and generated CSV are committed for reproduction.
 
 6. **Classical experiment-design positioning strengthened.**  
    The manuscript now directly situates the work relative to model discrimination and
@@ -64,7 +64,7 @@ It distinguishes manuscript hardening from new scientific evidence.
 - No threshold was lowered.
 - No force amplitude, truth world, candidate grid, or seed was retuned.
 - No retrospective GAUGE evidence was relabeled as prospective.
-- No exact tau=1 force crossing count was invented.
+- The exact tau=1 force crossing count is derived from the frozen per-proposal ledger, not inferred from aggregate maxima.
 - No measured prospective force experiment is claimed to have occurred.
 
 ## Still valuable before a venue submission
