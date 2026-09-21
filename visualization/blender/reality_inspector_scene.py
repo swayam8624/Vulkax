@@ -144,7 +144,7 @@ def setup_world():
     scene.render.resolution_y = 1080
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
-    scene.world.color = DARK
+    scene.world.color = DARK[:3]
     scene.frame_start = 1
     scene.frame_end = 240
     return scene
