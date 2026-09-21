@@ -36,6 +36,7 @@ safe=()
 divergent=()
 
 while IFS= read -r ref; do
+  [[ "$ref" == "origin" ]] && continue
   branch="${ref#origin/}"
   [[ "$branch" == "HEAD" ]] && continue
   is_protected "$branch" && continue
