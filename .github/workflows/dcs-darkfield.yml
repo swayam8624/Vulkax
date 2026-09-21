@@ -20,7 +20,7 @@ on:
       - "CMakeLists.txt"
       - ".github/workflows/dcs-darkfield.yml"
   pull_request:
-    branches: ["research/integration-20260920"]
+    branches: ["main", "research/integration-20260920"]
     paths:
       - "include/vulkax/research/dark_field_counterfactual.hpp"
       - "src/research/dark_field_counterfactual.cpp"
