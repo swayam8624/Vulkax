@@ -255,15 +255,17 @@ def four_direction_residual_scale(csv_path):
 def residual_color(t):
     """Perceptually ordered cool->light->warm response color."""
     t = min(max(float(t), 0.0), 1.0)
-    if t < 0.5:
-        a = t / 0.5
-        lo = Vector((0.035, 0.28, 0.46))
-        hi = Vector((0.80, 0.90, 0.94))
+    # Avoid a white midpoint: the disagreement field must remain perceptually
+    # visible even when most samples cluster near the middle of the common scale.
+    if t < 0.55:
+        a = t / 0.55
+        lo = Vector((0.020, 0.090, 0.260))
+        hi = Vector((0.020, 0.620, 0.760))
         rgb = lo.lerp(hi, a)
     else:
-        a = (t - 0.5) / 0.5
-        lo = Vector((0.80, 0.90, 0.94))
-        hi = Vector((1.00, 0.30, 0.055))
+        a = (t - 0.55) / 0.45
+        lo = Vector((0.020, 0.620, 0.760))
+        hi = Vector((1.000, 0.180, 0.030))
         rgb = lo.lerp(hi, a)
     return (rgb.x, rgb.y, rgb.z, 1.0)
 
