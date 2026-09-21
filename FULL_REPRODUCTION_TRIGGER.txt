@@ -1,14 +1,12 @@
-Trigger the full Vulkax paper-evidence reproduction on the canonical integrated research branch.
+Trigger the final Vulkax Phase I paper-freeze reproduction.
 
-Requested profile:
-- full build
-- full CTest
-- release/evidence validation
-- controlled captured-world run
-- D1 / solver-native / active-selection / D2 / D3 / D4V
-- GAUGE measured retrospective
-- frozen-result reproduction validation
-- deterministic paper figures/tables
-- SHA-256 evidence bundle + archive
+Purpose:
+- verify exact frozen main commit
+- execute full build/test/research reproduction
+- reproduce D1/D2/D3/D4V/GAUGE evidence
+- validate numbers against frozen ledgers
+- generate final SVG/CSV publication assets
+- assemble SHA-256 evidence bundle and archive
 
-Trigger date: 2026-09-20
+This trigger belongs to the Phase I manuscript freeze.
+Date: 2026-09-21
