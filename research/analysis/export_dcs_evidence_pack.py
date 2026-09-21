@@ -13,7 +13,7 @@ FIELDS=[
  "source","schema","provenance","decision","proposal_count","deceptive_count",
  "beneficial_count","truth_count","candidate_count","trial_count",
  "ordinary_dual_overlap_wins","dcs_marker_endpoint_wins","dcs_long_endpoint_wins",
- "resolved_worlds","coverage","notes"
+ "resolved_worlds","coverage","orthogonal_force_coverage","force_to_dcs_median_abs_z_ratio","notes"
 ]
 
 def flatten(path):
@@ -30,9 +30,14 @@ def flatten(path):
     methods=d.get("methods",{})
     if "dcs" in methods and isinstance(methods["dcs"],dict):
         if "coverage" in methods["dcs"]: row["coverage"]=methods["dcs"]["coverage"]
+    if isinstance(d.get("force"),dict) and "coverage" in d["force"]:
+        row["orthogonal_force_coverage"]=d["force"]["coverage"]
+    if "force_to_dcs_median_abs_z_ratio" in d:
+        row["force_to_dcs_median_abs_z_ratio"]=d["force_to_dcs_median_abs_z_ratio"]
     gate=d.get("advancement_gate") or d.get("frozen_gate")
     if isinstance(gate,dict):
-        row["notes"]="gate_pass="+str(gate.get("pass"))
+        gate_pass=d.get("advancement_gate_pass",gate.get("pass"))
+        row["notes"]="gate_pass="+str(gate_pass)
     return row
 
 def export(out,inputs):
