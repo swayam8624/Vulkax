@@ -164,13 +164,14 @@ def add_cylinder(name, location, radius, depth, mat, vertices=96):
     return obj
 
 
-def add_torus(name, location, major, minor, mat):
+def add_torus(name, location, major, minor, mat, rotation=(0.0, 0.0, 0.0)):
     bpy.ops.mesh.primitive_torus_add(
         major_radius=major,
         minor_radius=minor,
         major_segments=128,
         minor_segments=16,
         location=location,
+        rotation=rotation,
     )
     obj = bpy.context.object
     obj.name = name
@@ -421,6 +422,10 @@ def add_residual_vectors(groups, frame, offset_x, scale, truth_mat, repair_mat):
     repair = groups[("repair_pic", frame)]
     for pid in sorted(truth):
         tr = truth[pid]
+        # Keep the X-ray legible: show the physically important top layer plus
+        # a deterministic sparse interior sample instead of all 64 endpoints.
+        if not (tr["top"] or pid % 6 == 0):
+            continue
         rr = repair[pid]
         tr_rest = Vector((tr["rest"].x, tr["rest"].z, tr["rest"].y))
         tr_disp = Vector(((tr["pos"] - tr["rest"]).x, (tr["pos"] - tr["rest"]).z, (tr["pos"] - tr["rest"]).y))
@@ -428,11 +433,25 @@ def add_residual_vectors(groups, frame, offset_x, scale, truth_mat, repair_mat):
         base = Vector((tr_rest.x * 5.2 + offset_x, tr_rest.y * 4.1, tr_rest.z * 6.5 + 1.38))
         a = base + tr_disp * scale
         b = base + rr_disp * scale
-        cylinder_between(f"residual_{pid}", a, b, 0.012, repair_mat, 16)
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.032, location=a)
+        delta = b - a
+        if delta.length <= 1e-6:
+            continue
+        cylinder_between(f"residual_{pid}", a, b, 0.009, repair_mat, 16)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.025, location=a)
         bpy.context.object.data.materials.append(truth_mat)
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.040, location=b)
-        bpy.context.object.data.materials.append(repair_mat)
+        # A small arrowhead makes each residual read as a vector, not confetti.
+        unit = delta.normalized()
+        bpy.ops.mesh.primitive_cone_add(
+            vertices=16,
+            radius1=0.034,
+            radius2=0.0,
+            depth=0.085,
+            location=b - unit * 0.03,
+        )
+        cone = bpy.context.object
+        cone.rotation_mode = "QUATERNION"
+        cone.rotation_quaternion = delta.to_track_quat("Z", "Y")
+        cone.data.materials.append(repair_mat)
 
 
 def add_pedestal(x, metal, glow):
@@ -449,15 +468,17 @@ def add_probe(center_x, direction, metal, glow):
         "py": Vector((0, 0, 1)),
         "pz": Vector((0, 1, 0)),
     }[direction]
-    tip = Vector((center_x, -0.20, 1.55))
-    start = tip - force * 3.1
-    cylinder_between("probe_body", start, tip - force * 0.32, 0.19, metal)
-    for k in (0.25, 0.65, 1.05):
-        c = start + force * k
-        # emissive short collars
-        cylinder_between(f"probe_ring_{k}", c - force * 0.04, c + force * 0.04, 0.225, glow)
-    cylinder_between("probe_tip", tip - force * 0.50, tip, 0.065, glow)
-    add_arrow("force_vector", tip - force * 0.25, tip + force * 1.05, 0.032, glow)
+    # Contact the surface from outside instead of running a giant cylinder
+    # through the subject. This remains aligned with the frozen force direction.
+    center = Vector((center_x, -0.30, 1.72))
+    tip = center - force * 0.92
+    start = tip - force * 1.60
+    cylinder_between("probe_body", start, tip - force * 0.22, 0.115, metal)
+    for k in (0.28, 0.62, 0.96):
+        collar = start + force * k
+        cylinder_between(f"probe_ring_{k}", collar - force * 0.03, collar + force * 0.03, 0.145, glow)
+    cylinder_between("probe_tip", tip - force * 0.34, tip, 0.040, glow)
+    add_arrow("force_vector", tip - force * 0.05, tip + force * 1.15, 0.022, glow)
 
 
 def add_light_bar(location, scale, mat):
@@ -465,17 +486,17 @@ def add_light_bar(location, scale, mat):
 
 
 def set_camera(scene):
-    bpy.ops.object.camera_add(location=(0.0, -21.0, 6.1))
+    bpy.ops.object.camera_add(location=(0.0, -21.8, 5.85))
     cam = bpy.context.object
-    cam.data.lens = 50
+    cam.data.lens = 49
     cam.data.sensor_width = 36
-    target = Vector((0.0, 0.0, 1.20))
+    target = Vector((0.0, 0.0, 1.35))
     cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
     scene.camera = cam
 
     # Very subtle cinematic drift.
     cam.keyframe_insert(data_path="location", frame=1)
-    cam.location = (0.5, -20.0, 5.85)
+    cam.location = (0.35, -21.0, 5.70)
     cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
     cam.keyframe_insert(data_path="location", frame=181)
     cam.keyframe_insert(data_path="rotation_euler", frame=181)
@@ -501,8 +522,10 @@ def setup_lighting(mats):
         lamp.data.size = 5.0
         lamp.rotation_euler = (math.radians(65), 0, math.radians(180))
 
-    for x in (-7.0, -3.5, 0.0, 3.5, 7.0):
-        add_light_bar((x, 3.15, 4.55), (1.15, 0.025, 0.025), mats["cyan_glow"])
+    # Architectural strips frame each bay without crossing the title/subtitle.
+    for x in (-8.0, -3.0, 3.0, 8.0):
+        add_light_bar((x, 3.18, 2.15), (0.018, 0.025, 1.55), mats["cyan_glow"])
+    add_light_bar((0.0, 3.18, 0.02), (8.8, 0.025, 0.012), mats["cyan_glow"])
 
 
 def render_animation_52(scene, output):
@@ -546,7 +569,7 @@ def main():
         "cyan_glow": material("cyan_glow", CYAN_SOFT, metallic=0.1, roughness=0.18, emission=5.0),
         "orange": material("orange", ORANGE, metallic=0.15, roughness=0.22, emission=0.7),
         "orange_glow": material("orange_glow", AMBER, metallic=0.1, roughness=0.18, emission=5.0),
-        "pearl": material("pearl", PEARL, metallic=0.72, roughness=0.16),
+        "pearl": material("pearl", (0.78, 0.84, 0.92, 1), metallic=0.34, roughness=0.12, emission=0.04),
         "white": material("white", WHITE, metallic=0.2, roughness=0.22),
         "green": material("green", GREEN, metallic=0.1, roughness=0.18, emission=2.0),
         "red": material("red", RED, metallic=0.1, roughness=0.18, emission=3.0),
@@ -559,6 +582,13 @@ def main():
     add_box("back_wall", (0, 3.35, 2.3), (10.2, 0.06, 3.1), mats["stage2"], bevel=0.03)
     for x in STATIONS:
         add_pedestal(x, mats["stage"], mats["cyan_glow"] if x < 3 else mats["orange_glow"])
+
+    # Vertical "portal" rings give every stage a strong silhouette and keep the
+    # composition from reading as three isolated objects on a blank wall.
+    portal_rotation = (math.radians(90), 0.0, 0.0)
+    add_torus("observe_portal", (STATIONS[0], 0.65, 1.48), 1.88, 0.018, mats["cyan_glow"], portal_rotation)
+    add_torus("repair_portal", (STATIONS[1], 0.65, 1.48), 1.88, 0.018, mats["green"], portal_rotation)
+    add_torus("interrogate_portal", (STATIONS[2], 0.65, 1.48), 1.88, 0.018, mats["orange_glow"], portal_rotation)
 
     # Import only once, copy its mesh for all visual states.
     source = import_ply(args.bunny)
@@ -587,7 +617,7 @@ def main():
         "repair_pic", last, STATIONS[1], args.motion_scale, mats["pearl"],
         animate=True,
     )
-    add_torus("repair_halo", (STATIONS[1], 0, 1.25), 1.95, 0.018, mats["green"])
+    # No horizontal ring through the animal; the rear portal supplies the halo.
 
     # INTERROGATE: exact same repair overlaid with truth and residual field.
     create_deformed_bunny(
@@ -609,28 +639,30 @@ def main():
     ordinary_improvement = 100.0 * (row["baseline_holdout_m"] - row["repair_holdout_m"]) / row["baseline_holdout_m"]
     hidden_worsening = 100.0 * (row["repair_target_m"] - row["baseline_target_m"]) / row["baseline_target_m"]
 
-    # Headline and stage labels.
-    add_text("LOOKS RIGHT.  PHYSICS SAYS NO.", (0, 3.20, 5.10), 0.48, mats["white"])
-    add_text("VULKAX  —  VERIFYING PHYSICAL REPAIR MECHANISMS", (0, 3.18, 4.54), 0.20, mats["cyan_glow"])
+    # Headline and stage labels — intentionally split so the scientific conflict
+    # reads instantly, and lowered enough to stay inside the 16:9 safe frame.
+    add_text("LOOKS RIGHT.", (-2.55, 3.16, 4.72), 0.40, mats["white"])
+    add_text("PHYSICS SAYS NO.", (2.45, 3.16, 4.72), 0.40, mats["orange_glow"])
+    add_text("VULKAX  //  MECHANISM-SELECTIVE PHYSICAL VERIFICATION", (0, 3.15, 4.24), 0.16, mats["cyan_glow"])
 
-    add_text("01  OBSERVE", (STATIONS[0], 2.55, 3.62), 0.26, mats["cyan_glow"])
-    add_text("captured / fitted state", (STATIONS[0], 2.55, 3.27), 0.16, mats["white"])
+    add_text("01  OBSERVE", (STATIONS[0], 2.55, 3.55), 0.25, mats["cyan_glow"])
+    add_text("CAPTURED / FITTED STATE", (STATIONS[0], 2.55, 3.23), 0.13, mats["white"])
 
-    add_text("02  REPAIR", (STATIONS[1], 2.55, 3.62), 0.26, mats["green"])
-    add_text(f"ordinary error improves  {ordinary_improvement:.2f}%", (STATIONS[1], 2.55, 3.27), 0.16, mats["white"])
+    add_text("02  REPAIR", (STATIONS[1], 2.55, 3.55), 0.25, mats["green"])
+    add_text(f"LOOKS BETTER   -{ordinary_improvement:.2f}% ORDINARY ERROR", (STATIONS[1], 2.55, 3.23), 0.13, mats["green"])
 
-    add_text("03  INTERROGATE", (STATIONS[2], 2.55, 3.62), 0.26, mats["orange_glow"])
-    add_text(f"untouched target worsens  {hidden_worsening:.2f}%", (STATIONS[2], 2.55, 3.27), 0.16, mats["white"])
-    add_text(f"DCS z={row['dcs_progress_z']:.4f}   force z={row['force_progress_z']:.4f}", (STATIONS[2], 2.55, -0.72), 0.15, mats["orange_glow"])
-    add_text("REFUSE  —  insufficient physical information", (STATIONS[2], 2.55, -1.02), 0.16, mats["red"])
+    add_text("03  INTERROGATE", (STATIONS[2], 2.55, 3.55), 0.25, mats["orange_glow"])
+    add_text(f"PHYSICS WORSE   +{hidden_worsening:.2f}% HIDDEN TARGET", (STATIONS[2], 2.55, 3.23), 0.13, mats["red"])
+    add_text(f"DCS z={row['dcs_progress_z']:.4f}  //  FORCE z={row['force_progress_z']:.4f}", (STATIONS[2], 2.55, 0.48), 0.12, mats["orange_glow"])
+    add_text("REFUSE  //  INSUFFICIENT PHYSICAL INFORMATION", (STATIONS[2], 2.55, 0.20), 0.13, mats["red"])
 
     add_text(
-        f"SOLVER FIELD DISPLAY MAGNIFIED x{args.motion_scale:g}  |  NUMERICAL VALUES UNSCALED",
-        (0, 3.18, -1.12), 0.15, mats["orange_glow"]
+        f"DISPLAY x{args.motion_scale:g}  //  VALUES UNSCALED",
+        (-6.60, 3.14, -0.40), 0.10, mats["orange_glow"], align="LEFT"
     )
     add_text(
-        "Stanford Bunny: visualization carrier only  |  credit: Stanford Computer Graphics Laboratory",
-        (0, 3.18, -1.43), 0.12, mats["white"]
+        "STANFORD BUNNY VISUALIZATION CARRIER  //  STANFORD COMPUTER GRAPHICS LAB",
+        (2.10, 3.14, -0.40), 0.085, mats["white"], align="LEFT"
     )
 
     setup_lighting(mats)
