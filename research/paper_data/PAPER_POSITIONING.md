@@ -81,9 +81,10 @@ Fresh result:
 - force best |z|: 1.31911;
 - force resolved coverage: 0%.
 
-This is causal evidence for the information-content interpretation: changing the
-physical channel dramatically increases observability, but the tested channel still
-does not reach credible decision coverage.
+This strongly supports the information-content interpretation: changing the physical
+channel dramatically increases the observed standardized evidence scale, but the
+tested channel still does not reach credible decision coverage. The result does not
+establish information content as the unique possible limiting cause.
 
 ### C6 — Measured retrospective contradiction
 
