@@ -1,6 +1,6 @@
 # Vulkax Research Workspace
 
-Current canonical state: **2026-09-20**
+Current canonical state: **2026-09-21**
 
 Canonical stable branch:
 `main`
@@ -21,6 +21,7 @@ This performs the current paper-facing research campaign end to end:
 - check the available native backend;
 - generate and execute a controlled captured-world run;
 - reproduce D1, solver-native discovery, D2, D3 and D4V;
+- reproduce the fresh preregistered orthogonal force-compliance test;
 - download and validate the GAUGE foam subset;
 - run the GAUGE retrospective;
 - validate fresh outputs against the frozen canonical result ledger;
@@ -64,13 +65,17 @@ match the frozen result ledger within the declared cross-platform tolerances.
 ## Navigation
 
 ### Current state
-- `status/CURRENT_RESEARCH_STATE_2026-09-20.md`
+- `status/CURRENT_RESEARCH_STATE_2026-09-21.md`
+- `status/CURRENT_RESEARCH_STATE_2026-09-20.md` — historical pre-force snapshot
 - `status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md`
 - `status/BRANCH_CLEANUP_2026-09-20.md`
 - `status/DOCUMENTATION_BENCHMARK_CLEANUP_COMPLETE_2026-09-20.md`
 
 ### Results
 - `results/README.md`
+- `results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md`
+- `results/VULKAX_FINAL_RESULTS_2026-09-21.json`
+- `results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md`
 - `results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md`
 - `results/DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv`
 - `results/DCS_FINAL_RESULTS_2026-09-20.json`
@@ -82,12 +87,16 @@ match the frozen result ledger within the declared cross-platform tolerances.
 - `status/DCS_GAUGE_RETROSPECTIVE_RESULT_2026-09-20.md`
 
 ### Method and limits
+- `status/DCS_MATH_IMPLEMENTATION_AUDIT_2026-09-21.md`
+- `paper_data/PAPER_POSITIONING.md`
+- `status/PAPER_FREEZE_2026-09-21.md`
 - `status/DCS_RESEARCH_PROGRAM.md`
 - `status/DCS_LIMITATIONS_AND_KILL_CRITERIA.md`
 - `literature/DCS_NOVELTY_THREAT_MAP.md`
 - `literature/CLAIM_GUARD.md`
 
 ### Protocols
+- `benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md`
 - `benchmarks/DCS_BENCHMARK_PLAN.md`
 - `benchmarks/DCS_D2_VALIDATION_PROTOCOL.md`
 - `benchmarks/DCS_D3_DISCOVERY_PROTOCOL.md`
@@ -101,15 +110,23 @@ match the frozen result ledger within the declared cross-platform tolerances.
 
 ## Current conclusion
 
-DCS is fully implemented, but the tested prospective formulations did not achieve
+The research story is frozen.
+
+DCS is fully implemented, but its tested prospective formulations did not achieve
 useful resolved verification coverage.
 
-Do not interpret:
-- implementation success,
-- constructed positive controls,
-- or the retrospective GAUGE result
+A separately preregistered known-force compliance channel was then tested on fresh
+truth worlds. It increased median standardized discriminating signal by **11.455×**
+relative to fresh kinematic DCS, but still produced **0% resolved coverage** and a
+maximum `|z|` of **1.319 < 2**.
 
-as fresh prospective validation.
+Therefore the final result is stronger and more specific than “DCS failed”:
 
-The next positive research mechanism must create a genuinely higher-information
-physical channel and must use new untouched validation data.
+> **physical verification is information-limited; changing the physical
+> information channel can dramatically improve observability without necessarily
+> providing enough evidence for a credible support/veto decision.**
+
+GAUGE remains a retrospective measured channel contradiction.
+
+For the frozen paper, do not retune DCS, the force amplitude, or the decision
+threshold. Future real sensing experiments are separate follow-on work.
