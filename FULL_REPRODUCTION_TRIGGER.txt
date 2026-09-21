@@ -12,3 +12,5 @@ The full workflow must:
 7. create the annotated tag phase1-paper-freeze-2026-09-21 on this exact commit.
 
 Date: 2026-09-21
+
+Retry: clear stale concurrency-pending state; this commit is the final exact-head freeze target.
