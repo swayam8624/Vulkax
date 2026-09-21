@@ -11,6 +11,8 @@ This is an **asset/source map**, not manuscript text.
 | GAUGE channel contradiction | same + retrospective per-trial CSV | retrospective measured | show observation-space vs longitudinal-mechanism disagreement |
 | Information frontier | `DCS_INFORMATION_FRONTIER_2026-09-20.json` + D4V proposals | post-hoc diagnostic | quantify signal/uncertainty gap to the frozen |z|=2 reference |
 | Orthogonal force information gain | `ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.json` | fresh synthetic follow-on | show 11.46× median signal gain while remaining below |z|=2 |
+| Reality Inspector evidence figure | `VULKAX_FINAL_RESULTS_2026-09-21.json` via `visualization/scripts/render_paper_visuals.py` | mixed frozen/fresh synthetic summary | deterministic non-AI visual explanation; schematic geometry is labelled as such |
+| Reality Inspector cinematic scene | same ledger via `visualization/blender/reality_inspector_scene.py` | schematic storyboard | procedural video language only until motion is driven by exported solver state |
 | Stage outcome table | same | mixed | compact D1–D6 status ledger |
 | Claim-boundary table | claim guard + final result JSON | integrity | separate supported from unsupported conclusions |
 
@@ -33,5 +35,6 @@ This is an **asset/source map**, not manuscript text.
 - `build/paper-evidence/logs/`
 - `build/paper-evidence/manifest.json`
 - `build/paper-evidence/artifact_index.csv`
+- `visualization/manifest.json`
 
-Every bundle artifact receives a SHA-256 digest.
+Every bundle artifact receives a SHA-256 digest. Presentation assets additionally pass the frozen-evidence guard before rendering.

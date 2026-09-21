@@ -1,0 +1,45 @@
+name: visualization-smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "visualization/**"
+      - "research/paper_data/FIGURE_TABLE_SOURCE_MAP.md"
+      - ".github/workflows/visualization-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-visuals:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout including immutable paper tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compile presentation Python
+        run: |
+          python3 -m py_compile visualization/scripts/verify_frozen_evidence.py
+          python3 -m py_compile visualization/scripts/render_paper_visuals.py
+
+      - name: Verify frozen evidence and render SVGs
+        run: ./visualization/render_all.sh
+
+      - name: Confirm expected visual surfaces
+        run: |
+          test -s build/visualization/fig_information_frontier.svg
+          test -s build/visualization/fig_evidence_story.svg
+          test -s build/visualization/fig_reality_inspector_storyboard.svg
+          grep -q "11.46" build/visualization/fig_information_frontier.svg
+          grep -q "SCHEMATIC\|schematic" build/visualization/fig_reality_inspector_storyboard.svg
+
+      - name: Upload deterministic SVG package
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-visualization-svg
+          path: build/visualization/*.svg
+          retention-days: 14
