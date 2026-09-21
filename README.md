@@ -454,26 +454,32 @@ subject to moment annihilation, experiment cost and physical safety constraints.
 
 # System architecture
 
-```mermaid
-flowchart LR
-    A[Captured appearance<br/>+ observations]
-    B[Stable appearance ↔ physics identity]
-    C[Executable physical world]
-    D[Fit-only calibration]
-    E[Held-out replay]
-    F[Candidate physical rewrite]
-    G[Counterfactual witness synthesis]
-    H[Measurement + numerical uncertainty]
-    I{Evidence sufficient?}
-    J[Commit rewrite]
-    K[Refuse / rollback]
-    L[Certificate + provenance]
-    M[Native Metal / Vulkan render]
-
-    A --> B --> C --> D --> E --> F
-    F --> G --> H --> I
-    I -->|yes| J --> L --> M
-    I -->|no| K --> L
+```text
+captured appearance + observations
+                ↓
+stable appearance / physics identity
+                ↓
+      executable physical world
+                ↓
+         fit-only calibration
+                ↓
+           held-out replay
+                ↓
+      candidate physical rewrite
+                ↓
+ counterfactual witness synthesis
+                ↓
+measurement + numerical uncertainty
+                ↓
+        evidence sufficient?
+          ↙             ↘
+        yes              no
+         ↓                ↓
+ commit rewrite      refuse / rollback
+          \              /
+           certificate + provenance
+                     ↓
+          native Metal / Vulkan render
 ```
 
 The renderer and physical solver are intentionally not treated as one monolithic
