@@ -1,8 +1,9 @@
-# Vulkax
+# Reality Probe
 
 <p align="center">
-  <strong>Verified Rewritable Reality</strong><br/>
-  Captured scenes → executable physical worlds → counterfactual edits → evidence → commit or refuse.
+  <strong>Counterfactual Physical Verification of Captured Worlds</strong><br/>
+  Paper-facing research identity of the <code>VULKAX</code> verified-rewritable-reality repository.<br/>
+  <strong>Looks right ≠ physically verified.</strong>
 </p>
 
 <p align="center">
@@ -33,6 +34,108 @@ Start with:
 The `main` branch may receive documentation/presentation corrections after the
 freeze; scientific claims and frozen result ledgers must continue to trace back to
 the immutable tag.
+
+---
+
+## Reality Probe — paper-facing visual atlas
+
+> **Naming:** `VULKAX` remains the repository/system codename. **Reality Probe** is
+> the paper-facing research identity. The scientific freeze remains
+> `paper-freeze-2026-09-21` at commit
+> `a9da8c0aa8689ebeea0d84baf95a74907659a837`; presentation work on `main` may
+> change how the result is explained, but not the frozen experiment, thresholds,
+> force protocol, proposal labels or claims.
+
+The visual story is intentionally mechanism-first rather than cinematic:
+
+```mermaid
+flowchart LR
+    A[Ordinary observation] --> B[Plausible repair]
+    B --> C{Looks better?}
+    C -->|yes| D[Apply known physical probe]
+    D --> E[Truth response]
+    D --> F[Repair response]
+    E --> G[Mechanism residual]
+    F --> G
+    G --> H[Standardized evidence]
+    H --> I{|z| ≥ 2?}
+    I -->|no| J[Unresolved → refuse certification]
+    I -->|yes| K[Evidence sufficient for decision]
+```
+
+### Visual suite
+
+| Visualization | What it explains | Source / generator | Generated output |
+|---|---|---|---|
+| **Deceptive-repair hero** | Observe → plausible repair → physical interrogation | `visualization/blender/paper_plate_scene.py`, `visualization/scripts/compose_hero_svg.py` | `build/paper-visuals/vector/reality_probe_hero.svg` |
+| **Brightfield → diagnostic texture → darkfield** | Same-looking surface, different response under the same physical question | `compose_darkfield_intuition_svg.py` + solver-driven plates | `reality_probe_darkfield_intuition.svg` |
+| **Mechanism fingerprints** | +X, -X, +Y and +Z response signatures on one common residual scale | `compose_fingerprints_svg.py` | `reality_probe_mechanism_fingerprints.svg` |
+| **Deception map** | All 36 fresh OFC proposals; the `looks better / physics worse` region | `compose_deception_map_svg.py` + frozen proposal CSV | `reality_probe_deception_map.svg` |
+| **Mechanism darkfield / X-ray** | Surface field `|u_repair - u_truth|` and sparse solver-derived residual vectors | `compose_xray_svg.py` | `reality_probe_mechanism_darkfield.svg` |
+| **Method explainer** | Capture → repair → perturb → decide | `compose_explainer_svg.py` | `reality_probe_method_explainer.svg` |
+| **Raw paper plates** | Observe, repair, interrogate, brightfield, truth/repair textures, darkfield, four X-rays, wireframe | `paper_plate_scene.py` | `build/paper-visuals/plates/`, `build/paper-visuals/intuition/` |
+| **Deterministic evidence story** | Hero case, information frontier, evidence story, solver trajectories and residual views | `visualization/render_all.sh` | `build/visualization/*.svg` |
+| **Paper-data figures** | Ranking agreement, standardized separation, numerical floor, D4V, GAUGE contradiction, information frontier | `research/analysis/generate_paper_assets.py` | `build/paper-figures/*.svg` |
+| **Reality Probe mathematical explainer film** | 116 s vector explanation of deceptive repair, probes, fingerprints, darkfield, standardized evidence and refusal | `visualization/explainer/render.py` | `build/reality-probe-explainer/reality_probe_explainer.mp4` |
+
+All paper figures are derived from frozen result data, deterministic solver replay,
+or clearly identified explanatory schematics. The Stanford Bunny is a visualization
+carrier only; it is **not** the benchmark geometry. Display deformation is typically
+magnified **400× for presentation**, while reported numerical quantities remain
+unscaled.
+
+### The visual result in numbers
+
+```text
+Fresh OFC proposals                     36
+Deceptive / beneficial                  12 / 24
+Hero ordinary improvement               +14.93%
+Hero untouched-target worsening         +9.03%
+DCS median |z|                           0.04877
+Force/compliance median |z|              0.55863
+Median force/DCS signal gain            11.46×
+Best force |z|                           1.31911
+Frozen decision threshold               |z| ≥ 2
+Resolved fresh proposals                 0 / 36
+Final evidential state                   unresolved → refuse certification
+```
+
+### Final mathematical explainer
+
+The committed `visualization/explainer/` package is the canonical paper-video
+source. It is a deterministic vector film rather than a cinematic camera sequence.
+It uses the frozen 4×4×4 MPM replay, diagnostic grids, response columns, residual
+fields, the real 36-proposal deception map and the fixed evidence threshold.
+
+Key chapters:
+
+| Time | Chapter |
+|---:|---|
+| 0–20 s | A repair that lies |
+| 20–31 s | The 36-proposal deception map |
+| 31–49 s | Ask the world a physical question |
+| 49–64 s | Build the directional response fingerprint |
+| 64–77 s | Isolate the mechanism darkfield |
+| 77–96 s | Mechanism-selective / standardized evidence |
+| 96–109 s | Reveal the information limit and frozen threshold |
+| 109–116 s | Appearance agreement does not imply physical verification |
+
+Reproduce the complete visual package:
+
+```bash
+./visualization/render_intuition_suite.sh
+./visualization/render_paper_suite.sh
+bash visualization/explainer/render_explainer.sh final
+```
+
+The mathematical explainer also exports editable SVG stills, PNG stills, a
+`storyboard.png`, source-data copies, SHA-256 provenance, chapter metadata and
+`narration.srt`. See [`visualization/explainer/README.md`](visualization/explainer/README.md).
+
+> Generated videos/renders live under ignored `build/` directories by design; the
+> repository tracks the deterministic source, frozen inputs and reproduction code
+> rather than committing large derived binaries. Publish final binaries as release
+> or workflow artifacts when distribution is needed.
 
 ---
 
@@ -939,6 +1042,7 @@ The completed research program **does not support the following positive claims*
 | Current research state | [research/README.md](research/README.md) |
 | Final numbers | [research/results/README.md](research/results/README.md) |
 | Paper data | [research/paper_data/README.md](research/paper_data/README.md) |
+| Paper-facing visuals | [visualization/explainer/README.md](visualization/explainer/README.md) |
 | Reproduction | [docs/PAPER_EVIDENCE_REPRODUCTION.md](docs/PAPER_EVIDENCE_REPRODUCTION.md) |
 | DCS program | [research/status/DCS_RESEARCH_PROGRAM.md](research/status/DCS_RESEARCH_PROGRAM.md) |
 | Limitations | [research/status/DCS_LIMITATIONS_AND_KILL_CRITERIA.md](research/status/DCS_LIMITATIONS_AND_KILL_CRITERIA.md) |

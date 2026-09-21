@@ -55,6 +55,8 @@ jobs:
           python3 -m py_compile visualization/scripts/compose_deception_map_svg.py
           python3 -m py_compile visualization/scripts/embed_svg_assets.py
           python3 -m py_compile visualization/scripts/verify_illustrator_svg.py
+          python3 -m py_compile visualization/explainer/render.py
+          python3 -m py_compile visualization/explainer/test_explainer.py
 
       - name: Verify frozen evidence and render SVGs
         run: ./visualization/render_all.sh
@@ -103,6 +105,16 @@ jobs:
           grep -q 'data:image/png;base64' build/vector-smoke/hero_standalone.svg
           python3 visualization/scripts/verify_illustrator_svg.py build/vector-smoke/hero.svg build/vector-smoke/xray.svg build/vector-smoke/explainer.svg build/vector-smoke/darkfield.svg build/vector-smoke/fingerprints.svg
 
+
+      - name: Validate Reality Probe explainer
+        run: |
+          python3 -m pip install --quiet numpy pillow
+          cmake -S . -B build-explainer-ci -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+          cmake --build build-explainer-ci --target vulkax_visualization_trajectory_probe --parallel 2
+          mkdir -p build/reality-probe-explainer/replay
+          ./build-explainer-ci/vulkax_visualization_trajectory_probe build/reality-probe-explainer/replay
+          python3 visualization/explainer/test_explainer.py
+          python3 visualization/explainer/render.py --mode check
       - name: Upload deterministic SVG package
         uses: actions/upload-artifact@v4
         with:
