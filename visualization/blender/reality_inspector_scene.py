@@ -134,7 +134,12 @@ def setup_world():
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    # Blender 5.2 exposes BLENDER_EEVEE; Blender 4.x may expose
+    # BLENDER_EEVEE_NEXT. Prefer the current stable enum and fall back.
+    try:
+        scene.render.engine = "BLENDER_EEVEE"
+    except TypeError:
+        scene.render.engine = "BLENDER_EEVEE_NEXT"
     scene.render.resolution_x = 1920
     scene.render.resolution_y = 1080
     scene.render.resolution_percentage = 100
