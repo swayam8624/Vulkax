@@ -2,11 +2,14 @@
 from __future__ import annotations
 import argparse
 from pathlib import Path
-from vector_composition_common import defs, metrics, png_data_uri, write_svg
+from vector_composition_common import defs, metrics, package_png, write_svg
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument("--repo-root",type=Path,required=True); p.add_argument("--observe",type=Path,required=True); p.add_argument("--repair",type=Path,required=True); p.add_argument("--xray",type=Path,required=True); p.add_argument("--out",type=Path,required=True)
-    a=p.parse_args(); m=metrics(a.repo_root); obs,rep,xr=map(png_data_uri,(a.observe,a.repair,a.xray))
+    a=p.parse_args(); m=metrics(a.repo_root)
+    obs=package_png(a.observe,a.out,"explainer_observe.png")
+    rep=package_png(a.repair,a.out,"explainer_repair.png")
+    xr=package_png(a.xray,a.out,"explainer_xray.png")
     cards=[(110,"01","CAPTURE","Executable world from observation","#76ddff",obs),(965,"02","REPAIR","Optimize what ordinary evidence sees","#8cefc7",rep),(1820,"03","PERTURB","Ask a mechanism-selective counterfactual","#ffba6e",xr)]
     cm=[]
     for x,num,title,sub,color,img in cards:
@@ -14,10 +17,10 @@ def main():
         foot="appearance-compatible state" if num=="01" else ("candidate looks better" if num=="02" else "observe hidden physical response")
         cm.append(f"""<g transform="translate({x},0)"><rect x="0" y="440" width="760" height="1110" rx="28" fill="#071521" stroke="{color}" stroke-opacity=".28"/>
         <text x="42" y="515" fill="{color}" font-size="30" font-weight="800">{num}</text><text x="110" y="515" fill="#edf6ff" font-size="34" font-weight="800">{title}</text>
-        <text x="42" y="565" fill="#9eb2c5" font-size="18">{sub}</text><image x="40" y="610" width="680" height="680" preserveAspectRatio="xMidYMid meet" href="{img}"/>
+        <text x="42" y="565" fill="#9eb2c5" font-size="18">{sub}</text><image x="40" y="610" width="680" height="680" preserveAspectRatio="xMidYMid meet" href="{img}" xlink:href="{img}"/>
         <rect x="42" y="1330" width="676" height="140" rx="16" fill="#081b29"/><text x="68" y="1380" fill="{color}" font-size="19" font-weight="700">{metric}</text>
         <text x="68" y="1420" fill="#b7c6d5" font-size="17">{foot}</text></g>""")
-    svg=f"""<svg xmlns="http://www.w3.org/2000/svg" width="3600" height="1800" viewBox="0 0 3600 1800">{defs()}<rect width="3600" height="1800" fill="url(#bg)"/>
+    svg=f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3600" height="1800" viewBox="0 0 3600 1800">{defs()}<rect width="3600" height="1800" fill="url(#bg)"/>
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif"><text x="110" y="160" fill="#eef7ff" font-size="70" font-weight="760">HOW VULKAX INTERROGATES A REPAIR</text>
     <text x="110" y="225" fill="#80dfff" font-size="24" font-weight="600" letter-spacing="2">APPEARANCE IS AN OBSERVATION CHANNEL — NOT A CERTIFICATE OF PHYSICAL MECHANISM</text>
     {''.join(cm)}<path d="M890 985 L940 985" stroke="#7ae1ff" stroke-width="8" stroke-linecap="round"/><path d="M1745 985 L1795 985" stroke="#ffb36c" stroke-width="8" stroke-linecap="round"/>
