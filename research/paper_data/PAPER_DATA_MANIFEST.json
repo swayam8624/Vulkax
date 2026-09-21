@@ -1,12 +1,14 @@
 {
   "schema": "vulkax.paper_data_map",
   "version": 1,
-  "as_of": "2026-09-20",
+  "as_of": "2026-09-21",
   "manuscript_prose_included": false,
   "canonical_results": {
     "summary": "research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md",
-    "table": "research/results/DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv",
-    "json": "research/results/DCS_FINAL_RESULTS_2026-09-20.json",
+    "dcs_table": "research/results/DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv",
+    "dcs_json": "research/results/DCS_FINAL_RESULTS_2026-09-20.json",
+    "final_json": "research/results/VULKAX_FINAL_RESULTS_2026-09-21.json",
+    "orthogonal_force": "research/results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.json",
     "information_frontier": "research/results/DCS_INFORMATION_FRONTIER_2026-09-20.json",
     "gauge_paired_diagnostics": "research/results/GAUGE_PAIRED_DIAGNOSTICS_2026-09-20.csv"
   },
@@ -45,6 +47,11 @@
       "id": "information_frontier",
       "source": "research/results/DCS_INFORMATION_FRONTIER_2026-09-20.json",
       "status": "post_hoc_diagnostic"
+    },
+    {
+      "id": "orthogonal_force_gain",
+      "source": "research/results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.json",
+      "status": "fresh_synthetic_follow_on"
     }
   ],
   "fresh_run_artifacts": [
@@ -59,18 +66,25 @@
     "build/gauge-dcs-retrospective/per_trial.csv",
     "build/paper-captured-world-run/certificate.json",
     "build/paper-performance/captured_world_performance_summary.json",
-    "build/paper-reproduction-validation.json"
+    "build/paper-reproduction-validation.json",
+    "build/orthogonal-force-compliance/analysis.json",
+    "build/orthogonal-force-compliance/proposals.csv",
+    "build/orthogonal-force-compliance/summary.json"
   ],
-  "scientific_disposition": "implementation_complete_no_positive_flagship_claim",
+  "scientific_disposition": "research_program_frozen_information_limit_result",
   "d5_fresh_measured_confirmation": "not_executed",
-  "warning": "Paper data are complete for the executed DCS research sequence, but no fresh positive D5 confirmation may be inferred.",
+  "warning": "Paper data support deceptive-repair and information-limit conclusions. The fresh force-compliance channel increases observability but remains unresolved; no measured prospective repair-verification claim is authorized.",
   "source_maps": {
     "readme": "research/paper_data/README.md",
     "figure_table_map": "research/paper_data/FIGURE_TABLE_SOURCE_MAP.md",
     "experiment_matrix": "research/paper_data/EXPERIMENT_MATRIX.csv",
     "ablation_matrix": "research/paper_data/ABLATION_MATRIX.md",
     "reproducibility_checklist": "research/paper_data/REPRODUCIBILITY_CHECKLIST.md",
-    "reproduction_guide": "docs/PAPER_EVIDENCE_REPRODUCTION.md"
+    "reproduction_guide": "docs/PAPER_EVIDENCE_REPRODUCTION.md",
+    "math_code_audit": "research/status/DCS_MATH_IMPLEMENTATION_AUDIT_2026-09-21.md",
+    "paper_freeze": "research/status/PAPER_FREEZE_2026-09-21.md",
+    "orthogonal_force_protocol": "research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md",
+    "publication_asset_lock": "research/paper_data/PUBLICATION_ASSET_LOCK.md"
   },
   "generated_assets_root": "build/paper-figures",
   "portable_archive_pattern": "build/vulkax-paper-evidence-<commit>.tar.gz"
