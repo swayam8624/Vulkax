@@ -34,10 +34,13 @@ jobs:
       - name: Replay frozen hero case and export solver states
         run: ./build-vis/vulkax_visualization_trajectory_probe build/visualization-trajectory
 
-      - name: Render raw solver-state figure
+      - name: Render solver-state surfaces
         run: |
           python3 -m py_compile visualization/scripts/render_solver_trajectory.py
-          python3 visualization/scripts/render_solver_trajectory.py             --trajectory-dir build/visualization-trajectory             --out build/visualization
+          python3 -m py_compile visualization/scripts/render_solver_residual_xray.py
+          python3 -m py_compile visualization/blender/solver_trajectory_scene.py
+          python3 visualization/scripts/render_solver_trajectory.py --trajectory-dir build/visualization-trajectory --out build/visualization
+          python3 visualization/scripts/render_solver_residual_xray.py --trajectory-dir build/visualization-trajectory --out build/visualization
 
       - name: Validate replay package
         run: |
@@ -47,7 +50,8 @@ jobs:
           test -s build/visualization/fig_solver_state_force_trajectories.svg
           test -s build/visualization/fig_solver_state_residual_xray.svg
           grep -q "matched_frozen_hero_row" build/visualization-trajectory/trajectory_manifest.json
-          grep -q "raw solver-state" build/visualization/fig_solver_state_force_trajectories.svg
+          grep -q "VULKAX raw solver-state force trajectories" build/visualization/fig_solver_state_force_trajectories.svg
+          grep -q "DISPLAY MAGNIFICATION" build/visualization/fig_solver_state_residual_xray.svg
 
       - name: Upload solver-state visualization package
         uses: actions/upload-artifact@v4
