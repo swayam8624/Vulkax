@@ -653,47 +653,49 @@ build/paper-figures/
 
 # Repository / branch hygiene
 
-No, all repository branches are **not** needed.
+The repository cleanup is complete.
 
-Current audit:
+| Branch class | Count | State |
+|---|---:|---|
+| `main` | **1** | canonical stable + research implementation |
+| historical release branch | **1** | `release/1.0.0` |
+| historical legacy snapshot | **1** | `legacy/studio-v1-2026-08-10` |
+| **Total working branches** | **3** | clean |
 
-| Branch class | Count |
-|---|---:|
-| Canonical / intentionally retained | **4** |
-| Fully contained and safe to delete | **25** |
-| Divergent with unique commits requiring audit/archive | **28** |
-| **Total** | **57** |
+Open pull requests: **0**.  
+Open issues: **0**.
 
-Open pull requests: **0**.
-
-The intended long-term topology is:
+The final topology is:
 
 ```text
-main
-release/1.0.0
-legacy/studio-v1-2026-08-10
-research/integration-20260920
+main                           ← canonical implementation
+release/1.0.0                  ← historical release lineage
+legacy/studio-v1-2026-08-10   ← historical snapshot
 ```
 
-with temporary feature/research branches only while work is active.
+The previous 26 fully-contained working branches were deleted after proving they
+contained zero unique commits relative to `main`.
 
-Current branch audit:
-[`research/status/BRANCH_AUDIT_2026-09-21.md`](research/status/BRANCH_AUDIT_2026-09-21.md). After promotion, `main` is the canonical stable implementation; the dated integration branch is historical.
+The remaining 28 divergent historical branches were **not discarded**. Each endpoint
+was preserved as an annotated tag under:
 
-Dry-run cleanup:
+```text
+archive/2026-09-21/<old-branch-name>
+```
+
+and only then was the working branch ref removed.
+
+That keeps the normal branch list small without losing experimental or renderer
+history.
+
+Current audit:
+[`research/status/BRANCH_AUDIT_2026-09-21.md`](research/status/BRANCH_AUDIT_2026-09-21.md).
+
+For future temporary branches, use the audited helper before deletion:
 
 ```bash
-bash research/scripts/audit_branch_cleanup.sh
+./research/scripts/audit_branch_cleanup.sh
 ```
-
-Delete only branches that are **still proven fully contained at execution time**:
-
-```bash
-bash research/scripts/audit_branch_cleanup.sh --delete
-```
-
-The cleanup helper refuses protected branches and refuses any branch that still has
-one or more unique commits relative to the canonical integration line.
 
 ---
 
