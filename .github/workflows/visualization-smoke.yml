@@ -21,6 +21,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate visualization shell entrypoints
+        run: |
+          bash -n visualization/render_all.sh
+          bash -n visualization/run_full_visualization.sh
+
       - name: Compile presentation Python
         run: |
           python3 -m py_compile visualization/scripts/verify_frozen_evidence.py

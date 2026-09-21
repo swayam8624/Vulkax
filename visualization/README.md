@@ -139,3 +139,31 @@ blender -b -P visualization/blender/solver_trajectory_scene.py -- \
 
 Add `--render` after the Blender-script separator arguments to render H.264. The in-scene title permanently states the display motion magnification so a presentation render cannot be mistaken for natural-scale deformation.
 
+## One-command full local visual build
+
+On macOS, Blender does **not** need to be on shell `PATH`. Both visualization entrypoints automatically detect the standard app bundle:
+
+```text
+/Applications/Blender.app/Contents/MacOS/Blender
+```
+
+To generate every current visual surface and all four solver-driven Blender scenes:
+
+```bash
+./visualization/run_full_visualization.sh
+```
+
+To additionally render the four solver-driven H.264 videos:
+
+```bash
+./visualization/run_full_visualization.sh --render-videos
+```
+
+Optional overrides:
+
+```bash
+export BLENDER_BIN="/Applications/Blender.app/Contents/MacOS/Blender"
+export VULKAX_MOTION_SCALE=400
+./visualization/run_full_visualization.sh
+```
+
