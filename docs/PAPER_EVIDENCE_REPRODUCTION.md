@@ -3,15 +3,14 @@
 This guide reproduces the complete currently executed Vulkax research evidence
 without writing manuscript prose.
 
-Canonical branch:
+Canonical stable branch:
 
-`research/integration-20260920`
+`main`
 
 ## Fresh clone
 
 ```bash
-git clone --branch research/integration-20260920 --single-branch \
-  https://github.com/swayam8624/Vulkax.git
+git clone https://github.com/swayam8624/Vulkax.git
 cd Vulkax
 ```
 
