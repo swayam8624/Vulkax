@@ -1,10 +1,10 @@
-<h1 align="center">REALITY PROBE</h1>
+<h1 align="center">Reality Probe</h1>
 
 <h3 align="center">Counterfactual Physical Verification of Captured Worlds</h3>
 
 <p align="center">
-  <strong>Looks right ≠ physically verified.</strong><br/>
-  Paper-facing research identity of the <code>VULKAX</code> verified-rewritable-reality repository.
+  Paper-facing research identity of the <code>VULKAX</code> repository.<br/>
+  A captured world can fit what was observed and still be wrong about how the world behaves.
 </p>
 
 <p align="center">
@@ -16,7 +16,24 @@
   <img src="https://img.shields.io/badge/Linux-Vulkan-A41E22?logo=vulkan" alt="Vulkan"/>
 </p>
 
----
+## Project status
+
+The research program implemented in this repository is complete and frozen for manuscript preparation.
+
+The scientific snapshot is:
+
+```text
+tag:    paper-freeze-2026-09-21
+commit: a9da8c0aa8689ebeea0d84baf95a74907659a837
+```
+
+The `main` branch contains later documentation and visualization work, but the scientific claims, thresholds, experiment labels, result ledgers, and evidence packages remain tied to the frozen snapshot.
+
+The final research outcome is not that every candidate repair can be certified. The project instead establishes a more specific result:
+
+> A repair can improve ordinary observational agreement while making an untouched physical target worse. Mechanism-selective counterfactual probes can reveal much stronger evidence about that mismatch, but the tested regime remains information-limited and does not justify a prospective certification claim.
+
+The remaining work is manuscript preparation and venue-specific submission packaging.
 
 ## Explainer video
 
@@ -27,12 +44,10 @@
 </p>
 
 <p align="center">
-  <strong>▶ Reality Probe — 116-second mathematical explainer</strong><br/>
-  Deceptive repair → controlled physical probes → mechanism fingerprints → residual field → standardized evidence → refusal.<br/>
-  <sub>Click the preview for the full-resolution explainer artifact.</sub>
+  <strong>Reality Probe, 116-second mathematical explainer</strong><br/>
+  The film follows the research path from deceptive repair to controlled probing, mechanism fingerprints, residual fields, standardized evidence, and the final refusal decision.<br/>
+  <sub>Click the preview to open the full-resolution explainer workflow and artifact.</sub>
 </p>
-
----
 
 ## Visual explanation
 
@@ -40,268 +55,133 @@
 <tr>
 <td align="center" width="33%">
   <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/02_deceptive_repair.png" width="285" alt="Deceptive repair"/><br/>
-  <sub><strong>Deceptive repair</strong><br/>ordinary fit improves while the untouched target worsens</sub>
+  <sub><strong>Deceptive repair</strong><br/>ordinary held-out fit improves while an untouched physical target worsens</sub>
 </td>
 <td align="center" width="33%">
   <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/03_deception_map.png" width="285" alt="Deception map"/><br/>
-  <sub><strong>36-proposal map</strong><br/>locates looks-better / physics-worse repairs</sub>
+  <sub><strong>Proposal landscape</strong><br/>36 fresh proposals show where observational and physical outcomes disagree</sub>
 </td>
 <td align="center" width="33%">
   <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/04_same_probe.png" width="285" alt="Same physical probe"/><br/>
-  <sub><strong>Same physical question</strong><br/>truth and repair receive the same intervention</sub>
+  <sub><strong>Controlled intervention</strong><br/>truth and repair are asked the same physical question</sub>
 </td>
 </tr>
 <tr>
 <td align="center" width="33%">
   <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/06_fingerprint.png" width="285" alt="Mechanism fingerprint"/><br/>
-  <sub><strong>Mechanism fingerprint</strong><br/>directional response signatures expose structure</sub>
+  <sub><strong>Mechanism fingerprint</strong><br/>directional responses summarize how the world reacts</sub>
 </td>
 <td align="center" width="33%">
-  <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/07_residual_field.png" width="285" alt="Mechanism darkfield"/><br/>
-  <sub><strong>Mechanism darkfield</strong><br/>surface disagreement isolates hidden response mismatch</sub>
+  <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/07_residual_field.png" width="285" alt="Mechanism residual field"/><br/>
+  <sub><strong>Mechanism residual</strong><br/>the response difference exposes disagreement hidden by ordinary fit</sub>
 </td>
 <td align="center" width="33%">
   <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/11_information_limit.png" width="285" alt="Information limit"/><br/>
-  <sub><strong>Information limit</strong><br/>11.46× stronger median signal still stays below |z| = 2</sub>
+  <sub><strong>Information limit</strong><br/>the force channel improves the signal by 11.46x but still remains below the frozen decision threshold</sub>
 </td>
 </tr>
 </table>
 
-<p align="center">
-  <strong>ordinary agreement → physical probe → response disagreement → standardized evidence → unresolved → refuse certification</strong>
-</p>
-
 <details>
-<summary><strong>Open the complete 12-frame visual atlas</strong></summary>
+<summary><strong>Complete 12-frame visual atlas</strong></summary>
 
 <br/>
 
 <table>
 <tr>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/01_question.png" width="260"/><br/><sub>01 · Question</sub></td>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/02_deceptive_repair.png" width="260"/><br/><sub>02 · Deceptive repair</sub></td>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/03_deception_map.png" width="260"/><br/><sub>03 · Deception map</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/01_question.png" width="260"/><br/><sub>01. Research question</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/02_deceptive_repair.png" width="260"/><br/><sub>02. Deceptive repair</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/03_deception_map.png" width="260"/><br/><sub>03. Proposal landscape</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/04_same_probe.png" width="260"/><br/><sub>04 · Same probe</sub></td>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/05_response_overlay.png" width="260"/><br/><sub>05 · Response overlay</sub></td>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/06_fingerprint.png" width="260"/><br/><sub>06 · Fingerprint</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/04_same_probe.png" width="260"/><br/><sub>04. Controlled probe</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/05_response_overlay.png" width="260"/><br/><sub>05. Response comparison</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/06_fingerprint.png" width="260"/><br/><sub>06. Mechanism fingerprint</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/07_residual_field.png" width="260"/><br/><sub>07 · Residual field</sub></td>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/08_dcs_intuition.png" width="260"/><br/><sub>08 · DCS intuition</sub></td>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/09_standardization.png" width="260"/><br/><sub>09 · Standardization</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/07_residual_field.png" width="260"/><br/><sub>07. Residual field</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/08_dcs_intuition.png" width="260"/><br/><sub>08. DCS intuition</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/09_standardization.png" width="260"/><br/><sub>09. Standardized evidence</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/10_signal_gain.png" width="260"/><br/><sub>10 · Signal gain</sub></td>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/11_information_limit.png" width="260"/><br/><sub>11 · Information limit</sub></td>
-<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/12_conclusion.png" width="260"/><br/><sub>12 · Conclusion</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/10_signal_gain.png" width="260"/><br/><sub>10. Signal gain</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/11_information_limit.png" width="260"/><br/><sub>11. Information limit</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/12_conclusion.png" width="260"/><br/><sub>12. Final conclusion</sub></td>
 </tr>
 </table>
 
 <p align="center"><img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/storyboard.png" width="820" alt="Reality Probe storyboard"/></p>
 
-Each still also has an editable SVG in <code>docs/readme_assets/</code>.
+Each still also has an editable SVG in `docs/readme_assets/`.
 </details>
 
----
+## What the project set out to build
 
-## Frozen paper snapshot
+VULKAX began as a systems project for turning captured scenes into persistent, editable, physically executable worlds.
 
-The executed research story is frozen for manuscript preparation.
+A useful captured world needs more than a renderer. It needs a stable relationship between appearance and physical state, a way to replay and calibrate the physics, a way to propose local edits, and an independent way to decide whether an edit deserves to be committed.
 
-- immutable tag: `paper-freeze-2026-09-21`
-- reproduced commit: `a9da8c0aa8689ebeea0d84baf95a74907659a837`
-- exact-head full paper-evidence workflow: **passed**
-- working branches: **3**
-- open PRs: **0**
-- open issues: **0**
+That led to five engineering requirements:
 
-Start with:
-[`research/results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md`](research/results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md).
+1. preserve stable identity between appearance and physical representations;
+2. replay captured behavior in a deterministic physical model;
+3. separate fitting data from held-out evaluation data;
+4. keep proposal generation separate from verification;
+5. commit a rewrite only when the evidence supports it, otherwise roll it back.
 
-The `main` branch may receive documentation/presentation corrections after the
-freeze; scientific claims and frozen result ledgers must continue to trace back to
-the immutable tag.
+The result is a C++20 system with versioned capture bundles, persistent Gaussian identity, APIC/MPM replay, fit-only material calibration, held-out replay, local influence estimation, adaptive rewrite proposals, atomic commit or rollback, native Metal and Vulkan rendering, measured-data ingestion, and machine-readable evidence records.
 
----
+The stable engineering baseline is documented in [Vulkax 1.0](docs/RELEASE_1_0.md).
 
-## Paper-facing visualization package
+## Engineering journey
 
-> **Naming:** `VULKAX` remains the repository/system codename. **Reality Probe** is
-> the paper-facing research identity. The scientific freeze remains
-> `paper-freeze-2026-09-21` at commit
-> `a9da8c0aa8689ebeea0d84baf95a74907659a837`; presentation work on `main` may
-> change how the result is explained, but not the frozen experiment, thresholds,
-> force protocol, proposal labels or claims.
+The implementation developed in stages. Each stage closed a specific gap in the end-to-end captured-world pipeline.
 
-The visual story is intentionally mechanism-first rather than cinematic:
+| Stage | Main result |
+|---|---|
+| 0.39 | Observation-robustness tests for calibration drift, influence stability, and adaptive-region overlap |
+| 0.40 | Versioned capture evidence contract with SHA-256 payload identity, units, frame metadata, provenance, and uncertainty sidecars |
+| 0.45 | Public DOT C2 measured-source benchmark with fit and held-out splits, calibrated replay, local proposal generation, and rollback |
+| 0.50 | Native Vulkan and Metal Gaussian projection and raster/compositing with CPU-oracle regression |
+| 0.60 | Unified verified rewrite transaction with typed edits, provenance, locality checks, and atomic rollback |
+| 0.70 | Scale-safe Gaussian identity and reorder-safe selection, correspondence, filtering, and hierarchy queries |
+| 0.80 | One-command captured-world execution with schema-versioned certificates and reproducible showcase output |
+| 0.90 | Release hardening, CLI failure tests, schema validation, performance evidence, documentation audits, and cross-platform gates |
+| 1.0 | Stable verified-rewritable-reality baseline |
 
-```text
-ordinary observation → plausible repair
-                     ↓
-            controlled physical probe
-                 ↙          ↘
-       truth response     repair response
-                 ↘          ↙
-               mechanism residual
-                       ↓
-             standardized evidence
-                       ↓
-              threshold: abs(z) >= 2
-                       ↓
-             unresolved → refuse
-```
+The DOT C2 benchmark is important because it established the measured-data boundary of the system. It uses real measured trajectory geometry, while rest state, mass, rest volume, neutral Gaussian photometry, and some uncertainty terms remain explicit model proxies. The fitted material parameters are therefore model-conditioned effective values, not claimed material measurements.
 
-### Visual suite
+The selected local rewrite in the DOT benchmark was rejected and rolled back. That rejection is part of the system result, not a failed demo.
 
-| Visualization | What it explains | Source / generator | Generated output |
-|---|---|---|---|
-| **Deceptive-repair hero** | Observe → plausible repair → physical interrogation | `visualization/blender/paper_plate_scene.py`, `visualization/scripts/compose_hero_svg.py` | `build/paper-visuals/vector/reality_probe_hero.svg` |
-| **Brightfield → diagnostic texture → darkfield** | Same-looking surface, different response under the same physical question | `compose_darkfield_intuition_svg.py` + solver-driven plates | `reality_probe_darkfield_intuition.svg` |
-| **Mechanism fingerprints** | +X, -X, +Y and +Z response signatures on one common residual scale | `compose_fingerprints_svg.py` | `reality_probe_mechanism_fingerprints.svg` |
-| **Deception map** | All 36 fresh OFC proposals; the `looks better / physics worse` region | `compose_deception_map_svg.py` + frozen proposal CSV | `reality_probe_deception_map.svg` |
-| **Mechanism darkfield / X-ray** | Surface field `|u_repair - u_truth|` and sparse solver-derived residual vectors | `compose_xray_svg.py` | `reality_probe_mechanism_darkfield.svg` |
-| **Method explainer** | Capture → repair → perturb → decide | `compose_explainer_svg.py` | `reality_probe_method_explainer.svg` |
-| **Raw paper plates** | Observe, repair, interrogate, brightfield, truth/repair textures, darkfield, four X-rays, wireframe | `paper_plate_scene.py` | `build/paper-visuals/plates/`, `build/paper-visuals/intuition/` |
-| **Deterministic evidence story** | Hero case, information frontier, evidence story, solver trajectories and residual views | `visualization/render_all.sh` | `build/visualization/*.svg` |
-| **Paper-data figures** | Ranking agreement, standardized separation, numerical floor, D4V, GAUGE contradiction, information frontier | `research/analysis/generate_paper_assets.py` | `build/paper-figures/*.svg` |
-| **Reality Probe mathematical explainer film** | 116 s vector explanation of deceptive repair, probes, fingerprints, darkfield, standardized evidence and refusal | `visualization/explainer/render.py` | `build/reality-probe-explainer/reality_probe_explainer.mp4` |
+## The research question that emerged
 
-All paper figures are derived from frozen result data, deterministic solver replay,
-or clearly identified explanatory schematics. The Stanford Bunny is a visualization
-carrier only; it is **not** the benchmark geometry. Display deformation is typically
-magnified **400× for presentation**, while reported numerical quantities remain
-unscaled.
+Once the end-to-end system was working, the harder question became clear.
 
-### The visual result in numbers
-
-```text
-Fresh OFC proposals                     36
-Deceptive / beneficial                  12 / 24
-Hero ordinary improvement               +14.93%
-Hero untouched-target worsening         +9.03%
-DCS median |z|                           0.04877
-Force/compliance median |z|              0.55863
-Median force/DCS signal gain            11.46×
-Best force |z|                           1.31911
-Frozen decision threshold               |z| ≥ 2
-Resolved fresh proposals                 0 / 36
-Final evidential state                   unresolved → refuse certification
-```
-
-### Final mathematical explainer
-
-The committed `visualization/explainer/` package is the canonical paper-video
-source. A tracked animated preview GIF plus all README stills are published under
-`docs/readme_assets/`; the full MP4 is distributed through the dedicated GitHub Actions artifact workflow. It is a deterministic vector film rather than a cinematic camera sequence.
-It uses the frozen 4×4×4 MPM replay, diagnostic grids, response columns, residual
-fields, the real 36-proposal deception map and the fixed evidence threshold.
-
-Key chapters:
-
-| Time | Chapter |
-|---:|---|
-| 0–20 s | A repair that lies |
-| 20–31 s | The 36-proposal deception map |
-| 31–49 s | Ask the world a physical question |
-| 49–64 s | Build the directional response fingerprint |
-| 64–77 s | Isolate the mechanism darkfield |
-| 77–96 s | Mechanism-selective / standardized evidence |
-| 96–109 s | Reveal the information limit and frozen threshold |
-| 109–116 s | Appearance agreement does not imply physical verification |
-
-Reproduce the complete visual package:
-
-```bash
-./visualization/render_intuition_suite.sh
-./visualization/render_paper_suite.sh
-bash visualization/explainer/render_explainer.sh final
-```
-
-The mathematical explainer also exports editable SVG stills, PNG stills, a
-`storyboard.png`, source-data copies, SHA-256 provenance, chapter metadata and
-`narration.srt`. See [`visualization/explainer/README.md`](visualization/explainer/README.md).
-
-> Generated videos/renders live under ignored `build/` directories by design; the
-> repository tracks the deterministic source, frozen inputs and reproduction code
-> rather than committing large derived binaries. Use the manual
-> **Reality Probe explainer artifact** workflow (`.github/workflows/reality-probe-explainer.yml`)
-> to generate and retain preview/final/stills packages on GitHub without polluting
-> source history with derived media.
-
----
-
-## Why Vulkax exists
-
-A captured 3D scene can look convincing while being **physically wrong**.
-
-A reconstructed object may reproduce the trajectory that was observed, yet fail as
-soon as we ask a counterfactual question:
-
-- What if the material becomes stiffer?
-- What if the fixture moves?
-- What if the load direction changes?
-- What if two interventions are applied together?
-- What if we edit one local region and leave the rest unchanged?
-
-That is the research problem behind Vulkax:
-
-> **How do we turn a captured scene into a persistent, editable, physically
-> executable world—and how do we know when an apparently successful physical repair
-> is actually deceptive?**
-
-Vulkax treats **verification, falsification, uncertainty, provenance and refusal**
-as first-class parts of the world model.
-
-It is not merely a renderer with physics attached.
-
----
-
-## Research thesis
-
-The project starts from a failure mode that ordinary fitting metrics cannot rule out:
+Suppose a candidate physical repair lowers the ordinary held-out error:
 
 ```math
-L_{\text{observation}}(M_{\text{repair}})
+L_{\mathrm{obs}}(M_{\mathrm{repair}})
 <
-L_{\text{observation}}(M_{\text{baseline}})
+L_{\mathrm{obs}}(M_{\mathrm{baseline}})
 ```
 
-does **not** imply
+That does not imply that the repair is physically more correct.
 
-```math
-M_{\text{repair}}
-\text{ is physically more correct.}
-```
+A model can match the observations better while becoming worse on a physical behavior that was not part of the fitting objective.
 
-A model can become observationally better while becoming mechanistically worse.
+This project calls that failure mode a **deceptive physical repair**.
 
-Vulkax calls this a **deceptive physical repair**.
+The research phase therefore shifted from building an editable executable world to asking a stricter question:
 
-The current research line investigates whether we can expose such repairs by
-constructing counterfactual experiments that deliberately cancel model-common
-response and reveal weaker mechanism-specific interaction structure.
+> What physical evidence is required before a repaired captured world can be trusted?
 
----
+## Dark-Field Counterfactual Spectroscopy
 
-# Dark-Field Counterfactual Spectroscopy
+The first research direction was Dark-Field Counterfactual Spectroscopy, or DCS.
 
-The central research instrument in the current branch is **Dark-Field
-Counterfactual Spectroscopy (DCS)**.
+For a physical world (M), let (F_M(u)) denote an observable response to an intervention (u). Instead of reading the raw response directly, DCS forms signed intervention contrasts designed to cancel response components shared by competing models.
 
-The analogy is dark-field imaging: suppress the dominant signal so weak structure
-becomes visible.
-
-For a physical world **M**, let
-
-```math
-F_M(u)
-```
-
-be an observable response under intervention vector **u**.
-
-Instead of looking only at raw motion, construct a signed intervention stencil
+A generic contrast has the form:
 
 ```math
 \mathcal D_{\mu}[F]
@@ -309,7 +189,7 @@ Instead of looking only at raw motion, construct a signed intervention stencil
 \sum_i w_i F(u_i)
 ```
 
-with moment-annihilation constraints such as
+with cancellation constraints such as:
 
 ```math
 \sum_i w_i = 0,
@@ -317,498 +197,241 @@ with moment-annihilation constraints such as
 \sum_i w_i u_i = 0.
 ```
 
-Constant and first-order/common response are cancelled, leaving higher-order
-interaction structure.
-
-A simple symmetric second-order witness is
+A simple symmetric second-order witness is:
 
 ```math
 F(+a)+F(-a)-2F(0)
 ```
 
-A mixed two-intervention witness is
+and a mixed finite-amplitude witness is:
 
 ```math
-F(A,B)-F(A,0)-F(0,B)+F(0,0)
+F(A,B)-F(A,0)-F(0,B)+F(0,0).
 ```
 
-which isolates finite-amplitude response that cannot be explained by either
-intervention independently.
+The mathematical operators themselves are not presented as new. The research question is whether these mechanism-selective contrasts can be made useful for falsifying deceptive repairs in captured executable worlds.
 
-For finite intervention sets, Vulkax also uses the Möbius-style interaction contrast
+## Experimental journey
 
-```math
-\kappa(S)
-=
-\sum_{T\subseteq S}
-(-1)^{|S|-|T|}F(T)
-```
+The research program deliberately kept positive controls, discovery experiments, retrospective evidence, and fresh evaluation separate.
 
-The mathematical primitives themselves are not claimed as new. The research
-question is whether they can be turned into a **mechanism-selective falsification
-system for captured executable worlds**.
+### D1: constructed positive control
 
----
-
-## The deeper object: mechanism order of contact
-
-Two candidate worlds may agree in ordinary state space and still disagree in how
-they respond to perturbation.
-
-Vulkax treats model equivalence as graded:
-
-```math
-j^k F_{M_1}(0)
-\approx
-j^k F_{M_2}(0)
-```
-
-means the worlds agree through mechanism order **k**, within the available
-measurement and numerical resolution.
-
-The first order at which they separate is a candidate **mechanism order of contact**.
-
-But higher order is useful only while the signal remains observable.
-
-Define a maximum observable mechanism order through a signal-to-uncertainty rule:
-
-```math
-k_{\max}
-=
-\max
-\left\{
-k :
-\frac{\|\mathcal D^{(k)}\|}
-{\sigma_{\text{measurement}}
-+\sigma_{\text{numerical}}
-+\sigma_{\text{repeat}}}
->
-\tau
-\right\}
-```
-
-If two models differ only beyond the apparatus' mechanism resolution, Vulkax should
-**refuse to pretend it knows**.
-
----
-
-## Active experiment selection
-
-The active-selection problem is not simply:
-
-> find an input that makes two models disagree.
-
-Instead, Vulkax searches for a **physically realizable contrast whose null space
-contains the behavior the surviving models already share**.
-
-For candidate worlds $M_1,\ldots,M_K$,
-
-```math
-\Gamma_{\mu}(M_i,M_j)
-=
-\frac{
-\|\mathcal D_{\mu}[M_i]-\mathcal D_{\mu}[M_j]\|
-}{
-\sqrt{
-\sigma^2_{\text{measurement},\mu}
-+
-\sigma^2_{\text{numerical},\mu}
-}
-}
-```
-
-One natural experiment-design target is
-
-```math
-\mu^\*
-=
-\arg\max_{\mu}
-\min_{i\ne j}
-\Gamma_{\mu}(M_i,M_j)
-```
-
-subject to moment annihilation, experiment cost and physical safety constraints.
-
----
-
-# System architecture
-
-```text
-captured appearance + observations
-                ↓
-stable appearance / physics identity
-                ↓
-      executable physical world
-                ↓
-         fit-only calibration
-                ↓
-           held-out replay
-                ↓
-      candidate physical rewrite
-                ↓
- counterfactual witness synthesis
-                ↓
-measurement + numerical uncertainty
-                ↓
-        evidence sufficient?
-          ↙             ↘
-        yes              no
-         ↓                ↓
- commit rewrite      refuse / rollback
-          \              /
-           certificate + provenance
-                     ↓
-          native Metal / Vulkan render
-```
-
-The renderer and physical solver are intentionally not treated as one monolithic
-state. Appearance, semantics, physical discretization, correspondence and evidence
-remain explicit.
-
----
-
-# Research directives
-
-These are the rules that govern Vulkax research. They are stronger than ordinary
-engineering conventions because the project is explicitly trying to avoid producing
-convincing but false physical conclusions.
-
-### 1. Falsify before promoting
-
-Every promising mechanism must survive explicit attempts to kill it.
-
-Positive controls show that an implementation can work. They do **not** establish
-scientific validity.
-
-### 2. Proposal and verification are separate
-
-The mechanism that proposes a repair may not certify its own success.
-
-### 3. Fit and evaluation data remain disjoint
-
-No threshold may be tuned on the partition later described as frozen validation.
-
-### 4. Negative results remain visible
-
-Failed D2/D3/D4V gates are part of the research record and may not be rewritten into
-a success story.
-
-### 5. Numerical artifacts are physical-claim blockers
-
-A witness that changes sign, explodes or fails refinement checks cannot be promoted
-as mechanistic evidence.
-
-### 6. Measurement provenance is explicit
-
-Measured, derived, fitted, literature-proxy and unavailable quantities are kept
-separate.
-
-### 7. Refusal is a valid system result
-
-When evidence is insufficient, the correct outcome is often:
-
-```text
-unresolved → refuse edit
-```
-
-rather than a low-confidence physical claim.
-
-### 8. Research claims must survive matched baselines
-
-DCS is compared against raw response, same-cost raw bundles, Fisher/Jacobian probes,
-maximum-motion probes and random controls.
-
-### 9. Retrospective evidence stays retrospective
-
-The GAUGE mechanism contradiction is scientifically useful but is not re-labelled
-as prospective confirmation.
-
-### 10. Reproducibility is part of the result
-
-A paper-facing number is not accepted into the canonical ledger unless its source,
-configuration and reproduction path are preserved.
-
----
-
-# Current research dashboard
-
-> **Project completion and scientific outcome are different things.**
->
-> Vulkax engineering, benchmarking, documentation, reproducibility and paper-data
-> packaging are complete for the executed research program. Some experiments
-> completed with a **negative** or **contradictory** scientific result. That is an
-> outcome, not unfinished work.
-
-| Stage | Execution status | Scientific outcome | Meaning |
-|---|---|---|---|
-| **D0** | ✅ **complete** | positive control passed | core annihilation/math contracts are correct |
-| **D1** | ✅ **complete** | 64/64 constructed cases behaved as designed | implementation can expose deliberately constructed deceptive repairs |
-| **D2 frozen** | ✅ **complete** | **negative validation** — 0/16 worlds resolved | fixed DCS did not achieve sufficient mechanism resolution |
-| **D3** | ✅ **complete** | **negative discovery result** — 0/6 worlds resolved | lower numerical error did not create enough physical observability |
-| **D4V** | ✅ **complete** | **negative repair-verification result** — 0% resolved coverage | 14/36 repairs were deceptive, but none of the tested verification channels reached the frozen credibility threshold |
-| **GAUGE** | ✅ **complete** | **retrospective channel contradiction** | aggregate/marker metrics favor overlap while longitudinal mechanism evidence favors endpoint |
-| **D5** | ✅ **stop-rule completed** | **not advanced by design** | preregistered progression stopped because D2/D3/D4V did not justify consuming a fresh confirmatory dataset |
-| **OFC** | ✅ **complete** | **fresh negative advancement result with 11.46× signal gain** | known-force compliance materially increased observability but still produced 0% resolved coverage |
-| **D6** | ✅ **complete** | systems capability implemented | spatial witness localization/export is available |
-
-### Completion state
-
-| Area | Status |
-|---|---|
-| Core implementation | ✅ complete |
-| Unit/regression tests | ✅ complete |
-| D1–D4V experiment execution | ✅ complete |
-| GAUGE retrospective execution | ✅ complete |
-| D5 confirmatory runner/infrastructure | ✅ complete |
-| D5 fresh positive measured experiment | ⛔ intentionally not consumed after failed advancement gates |
-| D6 spatial localization | ✅ complete |
-| Orthogonal force-compliance follow-on | ✅ complete; frozen advancement gate failed |
-| Benchmark/result ledgers | ✅ complete |
-| Paper-data figures/tables | ✅ complete |
-| One-command reproduction | ✅ complete |
-| Documentation / claim guard | ✅ complete |
-
-The current **scientific conclusion** is therefore not “unfinished DCS.” It is:
-
-> **The tested DCS formulations were fully implemented and rejected as a prospective
-> verifier. A separately preregistered known-force channel increased median
-> standardized signal by 11.46× on fresh truth worlds, but still failed the frozen
-> resolved-decision threshold. The limiting issue is experimental information,
-> not unfinished implementation.**
-
-That conclusion is itself a completed research outcome.
-
-### What “resolved”, “negative”, and “contradictory” mean
-
-- **Resolved** is a statistical/evidential state: the signal cleared the frozen
-  credibility threshold. “0 resolved” does **not** mean the code or experiment was
-  incomplete.
-- **Negative validation/discovery** means the experiment finished and falsified the
-  tested hypothesis.
-- **Contradictory channels** means two valid observables prefer different physical
-  explanations. That disagreement is the measured result.
-- **Not advanced by design** means a preregistered stop rule prevented spending a
-  fresh confirmatory dataset on a method that had already failed its prerequisite
-  gates.
-
-### Key frozen numbers
-
-```text
-D1 constructed positive control      64 cases
-D2 frozen truth worlds               16
-D2 resolved worlds                    0
-D2 median standardized separation     0.041578   (reference = 2)
-
-D3 truth worlds                       6
-D3 resolved worlds                    0
-D3 median k=2 numerical RMS            8.435e-7 m
-D3 median k=3 numerical RMS            2.153e-7 m
-
-D4V repair proposals                  36
-D4V deceptive                         14
-D4V beneficial                        22
-D4V resolved coverage                  0%
-
-GAUGE ordinary overlap wins           10 / 10
-GAUGE marker dark-field endpoint wins  0 / 10
-GAUGE longitudinal endpoint wins       9 / 10
-
-OFC fresh repair proposals              36
-OFC deceptive                           12
-OFC beneficial                          24
-OFC fresh DCS median |z|                 0.04877
-OFC force median |z|                     0.55863
-OFC force best |z|                       1.31911
-OFC force/DCS median signal gain        11.455x
-OFC resolved coverage                    0%
-```
-
----
-
-## Information frontier
-
-The D4V result is not merely a near miss.
-
-At the inherited **|z| ≥ 2** credibility reference:
-
-| Method | Median |z| | Maximum |z| | Median signal amplification needed to reach 2 |
-|---|---:|---:|---:|
-| DCS | 0.05024 | 0.17654 | **39.83×** |
-| raw bundle | 0.04991 | 0.40615 | 40.10× |
-| raw point | 0.14707 | 0.63142 | **13.60×** |
-| Fisher | 0.06637 | 0.63142 | 30.15× |
-| max motion | 0.05773 | 0.57505 | 34.64× |
-
-This is a post-hoc diagnostic, not a new gate.
-
-It strengthens the current engineering conclusion:
-
-> **The tested regime is information-limited. The next breakthrough needs a more
-> informative physical channel, not a slightly looser threshold.**
-
-See
-[`research/results/DCS_INFORMATION_FRONTIER_2026-09-20.md`](research/results/DCS_INFORMATION_FRONTIER_2026-09-20.md).
-
----
-
-# Orthogonal physical-information test
-
-D4V left an important ambiguity: was the failure specific to DCS algebra, or was the
-experiment simply not informative enough?
-
-To test that without retuning DCS, Vulkax froze a fresh experiment before execution:
-
-- six new off-grid truth worlds;
-- ordinary kinematic fitting/proposal generation unchanged;
-- a new **known-force compliance channel** not used for fitting;
-- fixed 40 N per top-layer particle;
-- four force directions;
-- the same frozen |z| ≥ 2 support/veto reference.
+The first task was to verify that the machinery could reject deliberately deceptive cases under a controlled construction.
 
 Result:
 
-| Quantity | Fresh kinematic DCS | Force compliance |
+```text
+deceptive repairs tested:       64
+correctly rejected:             64
+median observation improvement: 60.88%
+median witness degradation:     9.375x
+```
+
+This established implementation correctness under the positive-control construction. It did not establish prospective generalization.
+
+### D2: frozen truth-world validation
+
+D2 moved to 16 frozen truth worlds.
+
+Result:
+
+```text
+truth worlds:                   16
+resolved worlds:                 0
+median standardized separation:  0.041578
+reference decision magnitude:     2
+```
+
+The witness existed, but its standardized separation was far below the evidential scale required for a decision.
+
+### D3: witness-space and adaptive-order study
+
+D3 tested whether adaptive witness order and numerical treatment could recover useful separation.
+
+Result:
+
+```text
+truth worlds:                         6
+resolved worlds:                      0
+adaptive DCS median separation:       0.0588583
+median k=2 numerical RMS:             8.435e-7 m
+median k=3 numerical RMS:             2.153e-7 m
+```
+
+The numerical floor was characterized, but the evidential separation remained too small.
+
+### D4V: repair-veto discovery
+
+D4V examined actual repair proposals.
+
+Result:
+
+```text
+repair proposals:       36
+deceptive:              14
+beneficial:             22
+resolved coverage:       0%
+```
+
+This was the point where the central limitation became difficult to dismiss. The method could describe mechanism-sensitive differences, but the available evidence did not support a reliable support or veto decision at the frozen threshold.
+
+### GAUGE: retrospective measured contradiction
+
+The public GAUGE foam-shearing benchmark supplied a measured retrospective case where different evidence channels disagreed.
+
+```text
+ordinary face + marker preference:  overlap 10/10
+marker dark-field preference:       overlap 10/10
+longitudinal dark-field preference: endpoint 9/10
+```
+
+The exploratory retrospective exact sign-test for the longitudinal channel gave (p=0.02148).
+
+This result is kept explicitly retrospective because the metric conflict was already known before DCS was designed. It is evidence of a real channel contradiction, not fresh prospective confirmation.
+
+## Orthogonal physical information
+
+The D4V result left an important ambiguity. The failure could have been specific to the DCS construction, or it could have reflected a broader shortage of informative physical evidence.
+
+To separate those possibilities, the project froze a new experiment before execution. The fitting and repair proposal pipeline was left unchanged, while a known-force compliance channel was added as an orthogonal source of information.
+
+The protocol used:
+
+- six new off-grid truth worlds;
+- the same ordinary fitting and proposal-generation path;
+- a known 40 N force applied to each top-layer particle;
+- four force directions: +X, -X, +Y, and +Z;
+- the same frozen support and veto reference of (|z| >= 2).
+
+The fresh result was:
+
+| Quantity | Kinematic DCS | Force compliance |
 |---|---:|---:|
-| median |z| | 0.04877 | **0.55863** |
-| maximum |z| | 0.17279 | **1.31911** |
-| resolved coverage | 0% | 0% |
-| median additional signal needed to reach 2 | 41.01× | **3.58×** |
+| Median absolute z | 0.04877 | 0.55863 |
+| Maximum absolute z | 0.17279 | 1.31911 |
+| Resolved coverage | 0% | 0% |
+| Median additional signal needed to reach 2 | 41.01x | 3.58x |
 
-So the new physical channel produced an **11.46× median information gain**, but still
-did not provide enough credible evidence for support/veto decisions.
+The force channel increased the median standardized signal by **11.46x**.
 
-This is a completed negative advancement result, not an unfinished experiment.
+That is a substantial gain in observability, but it still did not cross the frozen decision threshold. All 36 fresh proposals remained unresolved.
 
-See:
+This changed the interpretation of the project. The main limitation was no longer best described as an unfinished implementation problem. It was an information problem.
 
-- [frozen force-compliance protocol](research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md)
-- [force-compliance result](research/results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md)
-- [mathematics-to-code audit](research/status/DCS_MATH_IMPLEMENTATION_AUDIT_2026-09-21.md)
+## Final scientific result
 
----
+The completed research program supports the following conclusions.
 
-# GAUGE: the motivating measured contradiction
+First, deceptive physical repair is a real failure mode in the tested captured-world setting. Ordinary held-out improvement can disagree with an untouched physical target.
 
-The public GAUGE foam-shearing benchmark produced the clearest mechanism-level
-contradiction in the current research line.
+Second, mechanism-sensitive counterfactual evidence can expose structure that ordinary observation does not reveal.
 
-A finite fixture-overlap repair improved ordinary held-out metrics in every tested
-repeat:
+Third, the tested DCS formulations do not provide a validated prospective repair verifier. Their standardized separation remains too small in the frozen discovery and validation regimes.
+
+Fourth, a genuinely orthogonal known-force channel provides much stronger evidence than the tested kinematic DCS channel, with an 11.46x median gain on the fresh experiment.
+
+Finally, stronger evidence is not the same as sufficient evidence. The best force result reached an absolute z of 1.31911 against the frozen decision magnitude of 2, so the correct system outcome remained unresolved.
+
+The research therefore ends with an information-limit result:
+
+> Physical verification is constrained by the information available in the experiment. A verifier should refuse to certify a repair when the evidence does not support the claim.
+
+## Frozen result summary
+
+| Experiment | Main outcome |
+|---|---|
+| D1 positive control | 64 of 64 constructed deceptive repairs rejected |
+| D2 validation | 16 truth worlds, 0 resolved, median standardized separation 0.041578 |
+| D3 adaptive-order study | 6 truth worlds, 0 resolved, median adaptive separation 0.0588583 |
+| D4V repair proposals | 36 proposals, 14 deceptive, 22 beneficial, 0% resolved coverage |
+| GAUGE retrospective | ordinary and marker channels favored overlap 10/10; longitudinal channel favored endpoint 9/10 |
+| Fresh force-compliance study | 36 proposals, 12 deceptive, 24 beneficial, 11.46x median signal gain, 0 resolved |
+
+For the fresh force-compliance study:
 
 ```text
-ordinary face + marker preference:
-overlap 10 / 10
+DCS median |z|:              0.048767
+force median |z|:            0.558629
+force maximum |z|:           1.319111
+frozen decision magnitude:   2
+resolved proposals:          0 / 36
 ```
 
-Marker dark-field response agreed with the aggregate metric:
+The selected visualization case improves ordinary held-out error by about 14.93% while worsening the untouched physical target by about 9.03%. It is used only as a post-hoc visualization example and does not affect the aggregate statistics or thresholds.
 
-```text
-marker dark-field:
-overlap 10 / 10
-```
+## What is implemented
 
-But the longitudinal mechanism channel reversed:
+The final repository includes:
 
-```text
-longitudinal dark-field:
-endpoint 9 / 10
-```
-
-Exploratory retrospective exact sign-test:
-
-```math
-p=0.02148
-```
-
-This result is intentionally labelled **retrospective** because the metric mirage was
-known before DCS was designed.
-
----
-
-# What Vulkax currently contributes
-
-### Systems contributions
-
-- persistent stable identity across appearance and physical representations;
 - versioned captured-world evidence bundles;
-- nonlinear APIC/MPM execution;
-- fit-only inverse calibration;
-- held-out replay and robustness evidence;
-- operator/material influence estimation;
+- persistent Gaussian and physical identity;
+- reorder-safe selection, correspondence, filtering, and rollback;
+- Gaussian appearance ingestion;
+- nonlinear APIC/MPM replay;
+- fit-only material calibration;
+- held-out replay;
+- observation robustness analysis;
+- finite-difference and controlled adjoint influence paths;
 - adaptive local rewrite proposals;
-- evidence-derived atomic commit / rollback semantics;
-- native Metal and Vulkan Gaussian rendering;
-- schema-versioned certificates and evidence registries;
-- reproducible measured-data pipelines.
+- evidence-derived atomic commit and rollback;
+- native Metal and Vulkan Gaussian paths;
+- measured DOT C2 benchmark support;
+- DCS intervention and witness infrastructure;
+- matched baseline experiments;
+- GAUGE retrospective analysis;
+- fresh orthogonal force-compliance evaluation;
+- deterministic paper figures and tables;
+- deterministic Reality Probe explainer assets;
+- SHA-256-indexed evidence packaging;
+- one-command research reproduction.
 
-### Research infrastructure
+## What the project does not claim
 
-- annihilating intervention contrasts;
-- finite-amplitude counterfactual interaction decomposition;
-- automatic stencil synthesis;
-- pair-aware uncertainty handling;
-- witness-space numerical uncertainty;
-- adaptive-order experiments;
-- deceptive-repair benchmarks;
-- matched raw/Fisher/max-motion baselines;
-- spatial dark-field localization;
-- frozen confirmatory replay infrastructure;
-- deterministic paper-data/figure generation.
+The completed project does not claim that:
 
-### Research finding
+- DCS is a universal physical correctness certificate;
+- DCS outperforms every matched raw or Fisher-style baseline;
+- the tested force-compliance channel provides useful prospective repair-veto coverage at the frozen threshold;
+- GAUGE is fresh confirmatory evidence;
+- fitted DOT parameters are true material measurements;
+- the Stanford Bunny used in visualization is the benchmark geometry;
+- display-magnified deformation is the physical displacement magnitude;
+- publication acceptance or novelty follows from implementation alone.
 
-The strongest current finding is not that DCS is already a deployable verifier.
+These boundaries are part of the final result, not unfinished work.
 
-It is that **ordinary observational improvement can be physically deceptive**, while
-the currently tested counterfactual verification channels can remain too
-information-poor to issue a credible support/veto decision.
+## Visualization and presentation
 
-That is a more useful result than hiding the failure behind a relaxed threshold.
+The paper-facing visualization layer is separate from the scientific freeze.
 
----
+Scientific pixels come from frozen result data, deterministic solver replay, or clearly identified explanatory graphics. The Stanford Bunny is used only as a visualization carrier. Surface deformation is driven by interpolation of the frozen solver displacement field, and display deformation is typically magnified 400x so the response can be seen. Reported numerical quantities remain unscaled.
 
-# Potential impact
+The main visual package includes:
 
-If the central research program succeeds, the same abstraction could matter wherever
-a captured or reconstructed scene is later used as an executable world rather than
-a static visualization:
+| Asset | Purpose |
+|---|---|
+| Deceptive-repair hero | Shows the observational improvement and physical contradiction |
+| Deception map | Places all 36 fresh force-compliance proposals in ordinary-improvement versus physical-target space |
+| Diagnostic textures | Makes truth and repair deformation readable under the same probe |
+| Mechanism fingerprints | Compares response signatures for +X, -X, +Y, and +Z |
+| Mechanism residual field | Visualizes the surface magnitude of repair-to-truth response disagreement |
+| Information-limit figure | Shows the force-channel gain relative to the frozen evidence threshold |
+| Mathematical explainer | Presents the complete research argument as a 116-second deterministic vector film |
 
-- physically editable digital twins;
-- inverse graphics + inverse mechanics;
-- robotics simulation from real captures;
-- XR environments whose objects are meant to behave, not merely render;
-- material and boundary-condition model criticism;
-- simulation credibility / verification workflows;
-- captured-world authoring tools that can **refuse unsupported edits**.
+The explainer source is in [visualization/explainer](visualization/explainer/README.md).
 
-The long-term goal is a world model that can answer not only
+## Reproduction
 
-> “does this reconstruction look right?”
-
-but
-
-> **“what physical claims are actually justified by the evidence we have?”**
-
----
-
-# One-command full research reproduction
-
-The canonical stable branch is:
-
-```text
-main
-```
+The canonical research branch is `main`.
 
 From a fresh clone:
 
 ```bash
 git clone https://github.com/swayam8624/Vulkax.git
 cd Vulkax
-
 ./run_everything.sh --clean
 ```
-
-The runner automatically selects Metal on macOS and Vulkan on Linux when available.
 
 Useful variants:
 
@@ -821,249 +444,33 @@ Useful variants:
 ./run_everything.sh --exhaustive
 ```
 
-The full run performs:
+The full run performs environment capture, build and tests, captured-world execution, D1 through D4V, the fresh force-compliance study, GAUGE retrospective analysis, information-frontier diagnostics, paper-asset generation, frozen-result validation, and evidence packaging.
 
-1. environment and hardware provenance capture;
-2. reusable Python-tool validation/self-tests;
-3. complete Release build;
-4. full CTest suite;
-5. evidence/release/CLI validation;
-6. native backend conformance;
-7. deterministic captured-world execution;
-8. timing evidence;
-9. D1;
-10. solver-native discovery;
-11. automatic active selection;
-12. D2;
-13. D3;
-14. D4V;
-15. fresh orthogonal force-compliance information test;
-16. GAUGE measured-data fetch and effective-span validation;
-17. 20 definitive GAUGE forward simulations;
-18. information-frontier diagnostics;
-19. frozen-result reproduction validation;
-20. deterministic paper figures/tables;
-21. SHA-256-indexed evidence packaging;
-22. portable archive creation.
-
-Detailed guide:
-[`docs/PAPER_EVIDENCE_REPRODUCTION.md`](docs/PAPER_EVIDENCE_REPRODUCTION.md).
-
----
-
-# Paper-data package
-
-The repository contains the complete non-manuscript source package for the research
-that has actually been executed.
-
-Start here:
-
-- [research paper-data map](research/paper_data/README.md)
-- [final benchmark summary](research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md)
-- [paper-level final ledger](research/results/VULKAX_FINAL_RESULTS_2026-09-21.json)
-- [frozen DCS ledger](research/results/DCS_FINAL_RESULTS_2026-09-20.json)
-- [mathematics-to-code audit](research/status/DCS_MATH_IMPLEMENTATION_AUDIT_2026-09-21.md)
-- [experiment matrix](research/paper_data/EXPERIMENT_MATRIX.csv)
-- [ablation matrix](research/paper_data/ABLATION_MATRIX.md)
-- [figure/table source map](research/paper_data/FIGURE_TABLE_SOURCE_MAP.md)
-- [reproducibility checklist](research/paper_data/REPRODUCIBILITY_CHECKLIST.md)
-- [claim guard](research/literature/CLAIM_GUARD.md)
-- [limitations / kill criteria](research/status/DCS_LIMITATIONS_AND_KILL_CRITERIA.md)
-
-A successful full run creates:
+The resulting evidence package is written to:
 
 ```text
 build/paper-evidence/
-├── README.md
-├── manifest.json
-├── artifact_index.csv
-├── SHA256SUMS
-├── canonical/
-├── generated/
-├── logs/
-└── system/
 ```
 
-plus:
+The portable archive is written as:
 
 ```text
 build/vulkax-paper-evidence-<commit>.tar.gz
-build/vulkax-paper-evidence-<commit>.tar.gz.sha256
 ```
 
----
-
-# Generated result widgets
-
-The paper-data generator produces deterministic SVG figures with a source CSV for
-each figure:
-
-<details>
-<summary><strong>Open generated-asset list</strong></summary>
-
-```text
-fig_ranking_agreement.svg
-fig_standardized_separation.svg
-fig_numerical_floor.svg
-fig_d4v_proposals.svg
-fig_gauge_channel_contradiction.svg
-fig_information_frontier.svg
-
-table_stage_outcomes.csv
-table_claim_boundaries.csv
-table_information_frontier.csv
-figure_manifest.json
-```
-
-Generated under:
+Paper figures are generated under:
 
 ```text
 build/paper-figures/
 ```
 
-</details>
+README and explainer media are generated from deterministic source code and published through the repository workflows.
 
----
+For detailed reproduction instructions, see [PAPER_EVIDENCE_REPRODUCTION.md](docs/PAPER_EVIDENCE_REPRODUCTION.md).
 
-# Repository / branch hygiene
+## Build and test
 
-The repository cleanup is complete.
-
-| Branch class | Count | State |
-|---|---:|---|
-| `main` | **1** | canonical stable + research implementation |
-| historical release branch | **1** | `release/1.0.0` |
-| historical legacy snapshot | **1** | `legacy/studio-v1-2026-08-10` |
-| **Total working branches** | **3** | clean |
-
-Open pull requests: **0**.  
-Open issues: **0**.
-
-The final topology is:
-
-```text
-main                           ← canonical implementation
-release/1.0.0                  ← historical release lineage
-legacy/studio-v1-2026-08-10   ← historical snapshot
-```
-
-The previous 26 fully-contained working branches were deleted after proving they
-contained zero unique commits relative to `main`.
-
-The remaining 28 divergent historical branches were **not discarded**. Each endpoint
-was preserved as an annotated tag under:
-
-```text
-archive/2026-09-21/<old-branch-name>
-```
-
-and only then was the working branch ref removed.
-
-That keeps the normal branch list small without losing experimental or renderer
-history.
-
-Current audit:
-[`research/status/BRANCH_AUDIT_2026-09-21.md`](research/status/BRANCH_AUDIT_2026-09-21.md).
-
-For future temporary branches, use the audited helper before deletion:
-
-```bash
-./research/scripts/audit_branch_cleanup.sh
-```
-
----
-
-## Current implementation — Vulkax 1.0
-
-**Vulkax 1.0 is the stable verified-rewritable-reality baseline.**
-
-The stable release freezes the implemented 0.39–0.90 engineering path without
-retroactively adding research claims.
-
-See [`docs/RELEASE_1_0.md`](docs/RELEASE_1_0.md).
-
-### Baseline capabilities
-
-- renderer-independent Gaussian appearance;
-- ASCII/binary 3DGS PLY ingestion;
-- persistent composite `GaussianId`;
-- reorder-safe selection/correspondence/rollback;
-- versioned captured-deformable evidence bundles;
-- affine MLS appearance↔physics coupling;
-- nonlinear APIC/MPM replay;
-- fit-only material calibration;
-- held-out replay;
-- finite-difference and controlled adjoint influence paths;
-- adaptive local rewrite proposals;
-- atomic verified rewrite transactions;
-- native Metal / Vulkan Gaussian paths;
-- schema-versioned certificates;
-- measured DOT C2 benchmark support;
-- deterministic presentation/showcase assets.
-
-The project remains **C++20**.
-
----
-
-## One-command captured-world research + showcase — 0.80
-
-The release-facing captured-world workflow remains available independently of the
-new paper-evidence runner:
-
-```bash
-./build/vulkax captured-world-run \
-  build/captured-example/capture.vkcap \
-  build/captured-world-run \
-  m4 0.003 1 1 1 \
-  Metal 0.08 0.01 0.02 12345 \
-  --showcase studio_pedestal \
-  --showcase-assets build/demo-assets \
-  --showcase-resolution 1280x720 \
-  --turntable 12
-```
-
-Use `Vulkan` on a Vulkan-capable Linux build or `none` when no native render
-dependency is desired.
-
-A completed run is not synonymous with a verified rewrite. The certificate records
-run completion separately from the rewrite decision.
-
-See
-[`docs/CAPTURED_WORLD_RUN_0_80.md`](docs/CAPTURED_WORLD_RUN_0_80.md).
-
----
-
-# Measured deformable benchmark — 0.45
-
-The stable release also includes the public CC0 DOT C2 measured deformable benchmark.
-
-Current controlled result:
-
-```text
-stable measured correspondences       225
-observations                           675
-fit / held-out rows                    585 / 90
-model-conditioned effective E          7500 Pa
-model-conditioned nu                   0.45
-fit dynamic RMS                        0.004390821778 m
-held-out dynamic RMS                   0.004417317099 m
-adaptive regions                       8
-adaptive particles                     182 / 225
-retained absolute-gradient mass        0.9480125633
-selected measured rewrite              rejected
-rollback                               performed
-```
-
-The rejected rewrite is intentionally preserved as evidence.
-
-See
-[`docs/MEASURED_BENCHMARK_0_45.md`](docs/MEASURED_BENCHMARK_0_45.md).
-
----
-
-# Build and test
-
-### macOS / Linux
+### macOS and Linux
 
 ```bash
 cmake -S . -B build \
@@ -1082,84 +489,43 @@ cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-Detailed platform setup:
-[`docs/INSTALL_0_90.md`](docs/INSTALL_0_90.md).
+Installation notes are in [INSTALL_0_90.md](docs/INSTALL_0_90.md). Performance methodology is in [PERFORMANCE_0_90.md](docs/PERFORMANCE_0_90.md).
 
-Performance methodology:
-[`docs/PERFORMANCE_0_90.md`](docs/PERFORMANCE_0_90.md).
+## Repository guide
 
----
+| Need | Document |
+|---|---|
+| Final research summary | [VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md](research/results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md) |
+| Final result ledger | [VULKAX_FINAL_RESULTS_2026-09-21.json](research/results/VULKAX_FINAL_RESULTS_2026-09-21.json) |
+| Research result index | [research/results/README.md](research/results/README.md) |
+| Paper-data map | [research/paper_data/README.md](research/paper_data/README.md) |
+| Force-compliance result | [ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md](research/results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md) |
+| DCS benchmark summary | [DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md](research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md) |
+| Information frontier | [DCS_INFORMATION_FRONTIER_2026-09-20.md](research/results/DCS_INFORMATION_FRONTIER_2026-09-20.md) |
+| Claim boundaries | [CLAIM_GUARD.md](research/literature/CLAIM_GUARD.md) |
+| Limitations and stop rules | [DCS_LIMITATIONS_AND_KILL_CRITERIA.md](research/status/DCS_LIMITATIONS_AND_KILL_CRITERIA.md) |
+| Mathematics-to-code audit | [DCS_MATH_IMPLEMENTATION_AUDIT_2026-09-21.md](research/status/DCS_MATH_IMPLEMENTATION_AUDIT_2026-09-21.md) |
+| Vulkax 1.0 baseline | [RELEASE_1_0.md](docs/RELEASE_1_0.md) |
+| Visual explainer | [visualization/explainer/README.md](visualization/explainer/README.md) |
 
-# Release validation
+## Final repository state
 
-```bash
-python3 scripts/validate_evidence_registry.py .
-python3 scripts/audit_release_claims.py . --expected-project-version 1.0.0
-python3 scripts/test_release_cli_failures.py --executable build/vulkax
-python3 scripts/benchmark_captured_world_run.py \
-  --executable build/vulkax \
-  --iterations 3 \
-  --backend none
+The normal working branch set is intentionally small:
+
+```text
+main
+release/1.0.0
+legacy/studio-v1-2026-08-10
 ```
 
----
+Historical experimental endpoints were preserved before branch cleanup. Open pull requests and issues were brought to zero during the final repository pass.
 
-# Research integrity / current non-claims
+The scientific freeze is immutable, the research evidence is reproducible, the negative results remain visible, and the visualization layer is derived from the frozen data rather than used to redefine it.
 
-The current repository **does support**:
+## Project completion
 
-- deterministic controlled captured-world execution;
-- stable capture / Gaussian identity contracts;
-- transactional rewrite rollback;
-- native Metal/Vulkan image regression;
-- real measured-data ingestion and held-out replay;
-- DCS implementation and matched-baseline experiments;
-- a fresh preregistered known-force compliance experiment showing an 11.46× median standardized-signal gain;
-- frozen negative D2/D3/D4V results;
-- retrospective GAUGE mechanism contradiction;
-- one-command evidence reproduction;
-- SHA-256-indexed paper-data packaging.
+VULKAX and the Reality Probe research program have reached their intended endpoint for this study.
 
-The completed research program **does not support the following positive claims**:
+The systems work is complete. The experiments are complete. The final negative and positive findings are frozen. The evidence package, figures, visual explainer, documentation, and reproduction path are in place.
 
-- DCS as a universal physical correctness certificate;
-- DCS superiority over matched raw/Fisher baselines;
-- useful prospective repair-veto coverage in the tested D4V or orthogonal-force regimes;
-- fresh measured prospective D5 confirmation (intentionally not consumed after the frozen stop rule);
-- true material-property recovery from GAUGE or DOT where the source data do not
-  provide the required ground truth;
-- publication acceptance;
-- publication novelty by implementation alone.
-
----
-
-# Research map
-
-| Need | Start here |
-|---|---|
-| What is Vulkax trying to solve? | this README |
-| Current research state | [research/README.md](research/README.md) |
-| Final numbers | [research/results/README.md](research/results/README.md) |
-| Paper data | [research/paper_data/README.md](research/paper_data/README.md) |
-| Paper-facing visuals | [visualization/explainer/README.md](visualization/explainer/README.md) |
-| Reproduction | [docs/PAPER_EVIDENCE_REPRODUCTION.md](docs/PAPER_EVIDENCE_REPRODUCTION.md) |
-| DCS program | [research/status/DCS_RESEARCH_PROGRAM.md](research/status/DCS_RESEARCH_PROGRAM.md) |
-| Limitations | [research/status/DCS_LIMITATIONS_AND_KILL_CRITERIA.md](research/status/DCS_LIMITATIONS_AND_KILL_CRITERIA.md) |
-| Novelty threats | [research/literature/DCS_NOVELTY_THREAT_MAP.md](research/literature/DCS_NOVELTY_THREAT_MAP.md) |
-| Claim boundaries | [research/literature/CLAIM_GUARD.md](research/literature/CLAIM_GUARD.md) |
-| Branch cleanup | [research/status/BRANCH_AUDIT_2026-09-21.md](research/status/BRANCH_AUDIT_2026-09-21.md) |
-| Release roadmap | [docs/ROADMAP_1_0.md](docs/ROADMAP_1_0.md) |
-
----
-
-## Development rules
-
-- Proposal and verification remain separate.
-- Synthetic evidence stays labelled synthetic.
-- Measured, derived and proxy quantities remain distinguishable.
-- Frozen validation partitions are never threshold-tuning datasets.
-- Numerical convergence is part of physical credibility.
-- Failed experiments remain visible.
-- A system may refuse to make a physical claim.
-- Reproduction artifacts are evidence, not decoration.
-
+The project now moves from research execution to manuscript preparation.
