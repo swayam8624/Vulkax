@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: readme-visual-publisher
+  cancel-in-progress: true
+
 jobs:
   publish:
     if: github.actor != 'github-actions[bot]'
@@ -36,29 +40,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Build frozen replay and final explainer
+      - name: Build frozen replay and README stills
         env:
           FILM_PY: python3
-        run: |
-          bash visualization/explainer/render_explainer.sh final
-          python3 visualization/explainer/render.py --mode stills
+        run: bash visualization/explainer/render_explainer.sh stills
 
       - name: Package tracked README assets
         run: |
+          rm -rf docs/readme_assets
           mkdir -p docs/readme_assets
-          cp build/reality-probe-explainer/reality_probe_explainer.mp4 docs/readme_assets/
           cp build/reality-probe-explainer/storyboard.png docs/readme_assets/
           cp build/reality-probe-explainer/figures/*.png docs/readme_assets/
           cp build/reality-probe-explainer/figures/*.svg docs/readme_assets/
+
+      - name: Build animated README preview
+        run: |
           ffmpeg -y \
-            -i docs/readme_assets/reality_probe_explainer.mp4 \
-            -vf "fps=10,scale=960:-1:flags=lanczos" \
-            -t 8 \
+            -loop 1 -t 1.2 -i docs/readme_assets/02_deceptive_repair.png \
+            -loop 1 -t 1.2 -i docs/readme_assets/04_same_probe.png \
+            -loop 1 -t 1.2 -i docs/readme_assets/06_fingerprint.png \
+            -loop 1 -t 1.2 -i docs/readme_assets/07_residual_field.png \
+            -loop 1 -t 1.2 -i docs/readme_assets/10_signal_gain.png \
+            -loop 1 -t 1.2 -i docs/readme_assets/11_information_limit.png \
+            -filter_complex "[0:v][1:v][2:v][3:v][4:v][5:v]concat=n=6:v=1:a=0,fps=10,scale=960:540:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3" \
             docs/readme_assets/reality_probe_explainer_preview.gif
 
       - name: Validate README asset package
         run: |
-          test -s docs/readme_assets/reality_probe_explainer.mp4
           test -s docs/readme_assets/reality_probe_explainer_preview.gif
           test -s docs/readme_assets/storyboard.png
           for n in 01_question 02_deceptive_repair 03_deception_map 04_same_probe 05_response_overlay 06_fingerprint 07_residual_field 08_dcs_intuition 09_standardization 10_signal_gain 11_information_limit 12_conclusion; do
@@ -76,4 +84,5 @@ jobs:
             exit 0
           fi
           git commit -m "docs: publish regenerated Reality Probe README visuals"
+          git pull --rebase origin main
           git push origin HEAD:main
