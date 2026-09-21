@@ -20,6 +20,10 @@ def main():
     def sx(x): return left+(x-xmin)/(xmax-xmin)*(right-left)
     def sy(y): return bottom-(y-ymin)/(ymax-ymin)*(bottom-top)
 
+    deceptive_count=sum(1 for r in rows if r["label"]=="deceptive")
+    beneficial_count=len(rows)-deceptive_count
+    hero_row=next(r for r in rows if r["truth_id"]=="5" and r["baseline"]=="apic" and r["repair"]=="pic")
+
     pts=[]
     for r in rows:
         x=float(r["ordinary_improvement_pct"])
@@ -48,11 +52,25 @@ def main():
         grid.append(f'<line x1="{left}" y1="{yy:.1f}" x2="{right}" y2="{yy:.1f}" stroke="#dfe4e7" stroke-width="1"/>')
         grid.append(f'<text x="{left-28}" y="{yy+7:.1f}" text-anchor="end" fill="#65717a" font-size="18">{yt}</text>')
 
+    hx=sx(float(hero_row["ordinary_improvement_pct"]))
+    hy=sy(float(hero_row["target_change_pct"]))
+    hero_callout=f"""<g>
+      <path d="M {hx+18:.1f} {hy-12:.1f} L {hx+95:.1f} {hy-92:.1f} L {hx+330:.1f} {hy-92:.1f}" fill="none" stroke="#d18a18" stroke-width="3"/>
+      <rect x="{hx+330:.1f}" y="{hy-144:.1f}" width="390" height="104" rx="12" fill="#fff8e9" stroke="#e6ad42" stroke-width="2"/>
+      <text x="{hx+350:.1f}" y="{hy-106:.1f}" fill="#8c5a05" font-size="18" font-weight="800">HERO CASE</text>
+      <text x="{hx+350:.1f}" y="{hy-76:.1f}" fill="#4d545a" font-size="17">+14.93% ordinary improvement</text>
+      <text x="{hx+350:.1f}" y="{hy-50:.1f}" fill="#b34f39" font-size="17">+9.03% hidden-target worsening</text>
+    </g>"""
+
     svg=f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">
     <rect width="{W}" height="{H}" fill="#f7f8f6"/>
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif">
     <text x="250" y="115" fill="#13202a" font-size="62" font-weight="780">WHEN “BETTER” BECOMES DECEPTIVE</text>
     <text x="250" y="178" fill="#5d6a74" font-size="24">All 36 frozen proposals: ordinary held-out improvement versus change on an untouched physical target.</text>
+    <g transform="translate(1810,112)">
+      <rect x="0" y="0" width="220" height="54" rx="27" fill="#f7e3dc"/><text x="110" y="36" text-anchor="middle" fill="#a64a35" font-size="20" font-weight="800">{deceptive_count} DECEPTIVE</text>
+      <rect x="240" y="0" width="220" height="54" rx="27" fill="#e2f0f3"/><text x="350" y="36" text-anchor="middle" fill="#267d94" font-size="20" font-weight="800">{beneficial_count} BENEFICIAL</text>
+    </g>
 
     <rect x="{left}" y="{top}" width="{right-left}" height="{y0-top:.1f}" fill="#fbebe6"/>
     <rect x="{left}" y="{y0:.1f}" width="{right-left}" height="{bottom-y0:.1f}" fill="#eaf4f6"/>
@@ -63,6 +81,7 @@ def main():
     <text x="{right-20}" y="{top+45}" text-anchor="end" fill="#b04e39" font-size="25" font-weight="750">LOOKS BETTER / PHYSICS WORSE</text>
     <text x="{right-20}" y="{bottom-28}" text-anchor="end" fill="#267d94" font-size="25" font-weight="750">LOOKS BETTER / PHYSICS BETTER</text>
     {''.join(pts)}
+    {hero_callout}
 
     <text x="{(left+right)/2:.1f}" y="1555" text-anchor="middle" fill="#27323b" font-size="25" font-weight="650">ordinary held-out error improvement (%) →</text>
     <text x="75" y="{(top+bottom)/2:.1f}" transform="rotate(-90 75 {(top+bottom)/2:.1f})" text-anchor="middle" fill="#27323b" font-size="25" font-weight="650">untouched physical target change (%) → worse</text>
