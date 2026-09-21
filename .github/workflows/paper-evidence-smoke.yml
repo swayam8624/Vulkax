@@ -2,7 +2,7 @@ name: Vulkax paper-evidence smoke
 
 on:
   push:
-    branches: ["research/integration-20260920"]
+    branches: ["main", "research/integration-20260920"]
     paths:
       - "run_everything.sh"
       - "README.md"
