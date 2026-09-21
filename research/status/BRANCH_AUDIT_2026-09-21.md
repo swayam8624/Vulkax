@@ -1,24 +1,23 @@
 # Branch Audit — 2026-09-21
 
-Canonical research branch:
-`research/integration-20260920`
+Canonical stable branch after promotion:
+`main`
 
 Audit method:
 
 ```text
-base = research/integration-20260920
+base = main
 safe-delete iff branch ahead_by == 0 relative to base
 ```
 
-The audit was rerun against the current integration branch after the paper-evidence
-packaging work.
+The audit was originally computed against the integration branch immediately before promotion. Because `main` is fast-forwarded to the same head, the containment relationships remain valid; after promotion the dated integration branch itself also becomes removable.
 
 ## Executive result
 
 | Class | Count | Action |
 |---|---:|---|
-| Canonical / intentionally retained | 4 | Keep |
-| Fully contained in integration | 25 | Safe to delete |
+| Canonical / intentionally retained | 3 | Keep |
+| Fully contained / redundant after promotion | 26 | Safe to delete |
 | Divergent with unique commits | 28 | Do not bulk-delete; archive/audit first |
 | **Total branches** | **57** | |
 
@@ -31,16 +30,13 @@ Keep:
 - `main` — production/default lineage
 - `release/1.0.0` — release lineage
 - `legacy/studio-v1-2026-08-10` — historical snapshot
-- `research/integration-20260920` — canonical current research line
+- `research/integration-20260920` — historical integration lineage; redundant once `main` is promoted
 
-For day-to-day development, only `main` and
-`research/integration-20260920` need to behave like active branches. The release and
-legacy refs are historical preservation.
+For day-to-day development, `main` is the canonical active branch. The release and legacy refs are historical preservation.
 
 ## Safe-delete branches
 
-All branches below currently have **zero unique commits ahead** of
-`research/integration-20260920`.
+The original 25 branches below had **zero unique commits ahead** of the pre-promotion integration head. After `main` is fast-forwarded to that head, they remain redundant, and `research/integration-20260920` becomes redundant as well.
 
 1. `develop/1.1`
 2. `feat/adaptive-material-influence-regions`
@@ -67,8 +63,9 @@ All branches below currently have **zero unique commits ahead** of
 23. `research/refusal-validation4`
 24. `research/refusal-validation5`
 25. `research/validation-truth-convergence`
+26. `research/integration-20260920` — safe after promotion because `main` contains the same history
 
-These branches add no commit that is absent from the canonical integration branch.
+These branches add no commit that is absent from canonical `main` after promotion.
 
 ## Divergent branches
 
@@ -137,10 +134,9 @@ archival tags rather than active branches after commit/file inspection.
 Target long-term topology:
 
 ```text
-main
+main                           canonical stable implementation
 release/1.0.0                  historical release
 legacy/studio-v1-2026-08-10   historical snapshot
-research/integration-20260920 canonical current research
 ```
 
 Plus temporary feature/research branches only while active.
@@ -164,5 +160,4 @@ To delete only branches that are still proven fully contained at execution time:
 bash research/scripts/audit_branch_cleanup.sh --delete
 ```
 
-The script refuses to delete canonical refs and refuses any branch with one or more
-unique commits relative to the canonical integration branch.
+The script refuses to delete protected refs and refuses any branch with one or more unique commits relative to canonical `main`.
