@@ -16,6 +16,26 @@
 
 ---
 
+## Frozen paper snapshot
+
+The executed research story is frozen for manuscript preparation.
+
+- immutable tag: `paper-freeze-2026-09-21`
+- reproduced commit: `a9da8c0aa8689ebeea0d84baf95a74907659a837`
+- exact-head full paper-evidence workflow: **passed**
+- working branches: **3**
+- open PRs: **0**
+- open issues: **0**
+
+Start with:
+[`research/results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md`](research/results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md).
+
+The `main` branch may receive documentation/presentation corrections after the
+freeze; scientific claims and frozen result ledgers must continue to trace back to
+the immutable tag.
+
+---
+
 ## Why Vulkax exists
 
 A captured 3D scene can look convincing while being **physically wrong**.
