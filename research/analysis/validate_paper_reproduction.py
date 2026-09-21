@@ -42,8 +42,9 @@ def check(result: dict, name: str, actual, expected, *, rel=None, abs_tol=1e-9) 
         result["passed"]=False
 
 def validate(repo: Path, build: Path, allow_missing_gauge: bool) -> dict:
-    canonical=load(repo/"research/results/DCS_FINAL_RESULTS_2026-09-20.json")
-    stages=canonical["stages"]
+    canonical=load(repo/"research/results/VULKAX_FINAL_RESULTS_2026-09-21.json")
+    stages=canonical["dcs"]["stages"]
+    ofc_ref=canonical["orthogonal_force_compliance"]
 
     result={
         "schema":"vulkax.paper_reproduction_validation",
@@ -154,6 +155,20 @@ def validate(repo: Path, build: Path, allow_missing_gauge: bool) -> dict:
             "name":"GAUGE result present","actual":False,"expected":True,"passed":False,
             "relative_tolerance":None,"absolute_tolerance":None,
         })
+
+    ofc=load(build/"orthogonal-force-compliance/analysis.json")
+    check(result,"OFC proposal count",ofc["proposal_count"],ofc_ref["proposal_count"])
+    check(result,"OFC deceptive count",ofc["deceptive_count"],ofc_ref["deceptive_count"])
+    check(result,"OFC beneficial count",ofc["beneficial_count"],ofc_ref["beneficial_count"])
+    check(result,"OFC DCS coverage",ofc["dcs"]["coverage"],ofc_ref["dcs"]["coverage"],rel=0.0,abs_tol=1e-12)
+    check(result,"OFC force coverage",ofc["force"]["coverage"],ofc_ref["force_compliance"]["coverage"],rel=0.0,abs_tol=1e-12)
+    check(result,"OFC force median abs z",ofc["force"]["median_abs_z"],
+          ofc_ref["force_compliance"]["median_abs_z"],rel=0.03,abs_tol=1e-4)
+    check(result,"OFC force max abs z",ofc["force"]["max_abs_z"],
+          ofc_ref["force_compliance"]["max_abs_z"],rel=0.03,abs_tol=1e-4)
+    check(result,"OFC force/DCS median-z ratio",ofc["force_to_dcs_median_abs_z_ratio"],
+          ofc_ref["force_to_dcs_median_abs_z_ratio"],rel=0.04,abs_tol=1e-3)
+    check(result,"OFC advancement gate",ofc["advancement_gate_pass"],ofc_ref["advancement_gate_pass"])
 
     cert=load(build/"paper-captured-world-run/certificate.json")
     check(result,"captured-world certificate schema",cert.get("schema"),"vulkax_captured_world_run")
