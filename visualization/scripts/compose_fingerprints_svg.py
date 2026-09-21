@@ -24,14 +24,14 @@ def main():
         q=float(r["repair_raw_rms_to_truth_m"])
         ratio=q/max(b,1e-18)
         x=120+i*910
-        blocks.append(f"""<g transform="translate({x},0)">
-        <text x="0" y="330" fill="#17212b" font-size="38" font-weight="800">{LABELS[d]} FORCE</text>
-        <rect x="0" y="390" width="840" height="840" rx="18" fill="#07131f"/>
-        <image x="25" y="415" width="790" height="790" preserveAspectRatio="xMidYMid meet" href="{imgs[d]}" xlink:href="{imgs[d]}"/>
-        <text x="0" y="1285" fill="#167aa2" font-size="20">baseline RMS {b:.2e} m</text>
-        <text x="0" y="1325" fill="#c95d28" font-size="20">repair RMS {q:.2e} m</text>
-        <text x="0" y="1375" fill="#17212b" font-size="28" font-weight="800">{ratio:.2f}× raw response error</text>
-        </g>""")
+        blocks.append(f"""<g>
+        <text x="{x}" y="330" fill="#17212b" font-size="38" font-weight="800">{LABELS[d]} FORCE</text>
+        <rect x="{x}" y="390" width="840" height="840" rx="18" fill="#07131f"/>
+        <text x="{x}" y="1285" fill="#167aa2" font-size="20">baseline RMS {b:.2e} m</text>
+        <text x="{x}" y="1325" fill="#c95d28" font-size="20">repair RMS {q:.2e} m</text>
+        <text x="{x}" y="1375" fill="#17212b" font-size="28" font-weight="800">{ratio:.2f}× raw response error</text>
+        </g>
+        <image x="{x+25}" y="415" width="790" height="790" href="{imgs[d]}"/>""")
     svg=f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3840" height="1615" viewBox="0 0 3840 1615">
     <defs>
       <linearGradient id="residualScale" x1="0" y1="0" x2="1" y2="0">
