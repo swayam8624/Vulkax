@@ -1267,3 +1267,283 @@ paper/
 
 Start with the full journal-style internal manuscript. Keep every numerical statement
 traceable to the frozen source hierarchy in Section 18 of this dossier.
+
+
+## 26. Code-to-paper map
+
+Use these source files when checking a manuscript statement against the actual
+implementation.
+
+### Core DCS mathematics
+
+- declarations: `include/vulkax/research/dark_field_counterfactual.hpp`
+- implementation: `src/research/dark_field_counterfactual.cpp`
+- regression tests: `tests/dark_field_counterfactual_tests.cpp`
+
+Relevant implemented objects include:
+- signed annihilating stencils;
+- arbitrary-order lower-moment validation;
+- counterfactual cumulants;
+- mechanism order of contact;
+- standardized dark-field discrepancy;
+- uncertainty propagation;
+- maximin and pair-aware synthesis;
+- witness-space separation;
+- spatial residual localization.
+
+### Physical solver
+
+- solver interface: `include/vulkax/solvers/mpm.hpp`
+- solver implementation: `src/solvers/mpm.cpp`
+- prescribed MPM research support:
+  `include/vulkax/research/prescribed_mpm.hpp`,
+  `src/research/prescribed_mpm.cpp`
+- APIC adjoint:
+  `include/vulkax/autodiff/mpm_adjoint.hpp`,
+  `src/autodiff/mpm_adjoint.cpp`
+
+### Captured-world fitting and rewrite path
+
+- captured-world research path:
+  `include/vulkax/research/captured_world_run.hpp`,
+  `src/research/captured_world_run.cpp`
+- operator influence:
+  `include/vulkax/research/captured_operator_influence.hpp`,
+  `src/research/captured_operator_influence.cpp`
+- verified rewrite:
+  `include/vulkax/research/captured_verified_rewrite.hpp`,
+  `src/research/captured_verified_rewrite.cpp`
+- transaction layer:
+  `include/vulkax/world/verified_rewrite.hpp`,
+  `src/world/verified_rewrite.cpp`
+
+### Experiment executables and analyses
+
+D1 / early controls:
+- `research/probes/dcs_darkfield_synthetic_probe.cpp`
+- `research/probes/dcs_solver_native_probe.cpp`
+- `research/probes/analyze_dcs_darkfield.py`
+- `research/probes/analyze_dcs_solver_native.py`
+
+Active selection:
+- `research/probes/dcs_active_selection_probe.cpp`
+- `research/probes/analyze_dcs_active_selection.py`
+
+D2:
+- `research/probes/dcs_d2_validation_probe.cpp`
+- `research/probes/analyze_dcs_d2_validation.py`
+- `.github/workflows/dcs-d2-validation.yml`
+
+D3:
+- `research/probes/dcs_d3_witness_space_probe.cpp`
+- `research/probes/analyze_dcs_d3_witness_space.py`
+- `research/probes/export_dcs_d3_tables.py`
+- `.github/workflows/dcs-d3-witness-space.yml`
+
+D4V:
+- `research/probes/dcs_d4v_repair_veto_probe.cpp`
+- `research/probes/analyze_dcs_d4v_repair_veto.py`
+- `.github/workflows/dcs-d4v-repair-veto.yml`
+
+Fresh force-compliance:
+- `research/probes/orthogonal_force_compliance_probe.cpp`
+- `research/probes/analyze_orthogonal_force_compliance.py`
+- `research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md`
+
+GAUGE:
+- `research/scripts/fetch_gauge_foam_subset.py`
+- `research/adapters/gauge_deformable_to_vulkax.py`
+- `research/analysis/gauge_dcs_retrospective.py`
+- `.github/workflows/dcs-gauge-retrospective.yml`
+
+Confirmatory replay:
+- `research/analysis/dcs_confirmatory_replay.py`
+
+Spatial export:
+- `research/analysis/export_dcs_spatial_map.py`
+
+### Paper asset generation
+
+- `research/analysis/generate_paper_assets.py`
+- `research/analysis/assemble_paper_evidence.py`
+- `research/analysis/validate_paper_reproduction.py`
+- `visualization/scripts/verify_frozen_evidence.py`
+- `visualization/explainer/render.py`
+
+## 27. Internal page budget
+
+This is a writing budget, not a venue rule.
+
+For a complete 9-10 page journal-style internal draft:
+
+| Section | Approximate budget |
+|---|---:|
+| Abstract + teaser | 0.5 page |
+| Introduction | 1.0 page |
+| Related work | 1.0-1.25 pages |
+| Problem formulation | 0.75 page |
+| Method | 1.75-2.0 pages |
+| Experimental protocol | 1.0-1.25 pages |
+| Results | 2.0 pages |
+| Discussion / limitations | 1.0 page |
+| Conclusion | 0.25 page |
+
+References are separate.
+
+For a 7-page dual-track cut, compress by:
+- moving detailed captured-world engineering to supplement;
+- combining problem formulation and method introduction;
+- turning D1/D2/D3 into one compact falsification panel;
+- keeping D4V, OFC, and GAUGE as the main result sequence;
+- moving detailed per-case tables and full uncertainty derivations to supplement;
+- keeping all central result numbers and discussion in the paper.
+
+## 28. Reviewer-risk register
+
+These are the questions the manuscript should answer before a reviewer has to ask.
+
+### Risk 1: "Is this just another Gaussian plus MPM paper?"
+
+Answer in the first page:
+no. Gaussian/MPM execution is infrastructure. The paper's scientific subject is
+whether a candidate physical rewrite is independently supported.
+
+Evidence:
+`research/literature/novelty_matrix.md`
+
+### Risk 2: "DCS fails, so where is the contribution?"
+
+Answer:
+the stronger result is deceptive repair plus quantified information-limited
+verification. DCS is the experimental instrument that is itself falsified as a
+general prospective verifier. The fresh orthogonal channel causally tests the
+information-content interpretation and raises median signal 11.46x.
+
+Do not hide DCS's negative result.
+
+### Risk 3: "Why should |z| = 2 be trusted?"
+
+The paper must explain:
+- it is the frozen operational decision reference used before the fresh evaluation;
+- it is not a universal physical constant;
+- it was not lowered after seeing results;
+- the information-frontier result is therefore about distance to a fixed operational
+  credibility rule, not discovery of a magic threshold.
+
+The supplement should trace the exact uncertainty denominator and threshold freeze.
+
+### Risk 4: "Why is the force channel genuinely different?"
+
+Explain:
+- repair fitting/proposal uses the kinematic calibration family;
+- the force channel is not used for fitting or proposal selection;
+- known external force is applied after proposal;
+- the hidden label is also not used for probe selection;
+- the partition and force amplitude were frozen before execution.
+
+Source:
+`research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md`
+
+### Risk 5: "Why not use raw point/Fisher if some baselines rank better?"
+
+Acknowledge it directly.
+D2b and D3 show that DCS does not dominate those baselines. D4V shows that none of
+the tested channels reaches resolved coverage. The contribution is not DCS
+superiority; it is the verification problem and information-limit diagnosis.
+
+### Risk 6: "Is 36 proposals enough?"
+
+Do not overstate statistical generality.
+The paper should frame the proposal populations as controlled experimental
+partitions and report exact counts, medians, maxima, and frozen gate outcomes.
+Avoid population-wide universal claims.
+
+### Risk 7: "Does the result generalize beyond APIC/PIC and this MPM regime?"
+
+Current answer:
+not established. The paper studies a controlled executable-world regime. Generalizing
+the information-limit result across solvers/material classes is future work.
+
+### Risk 8: "Is the measured evidence prospective?"
+
+No.
+GAUGE is retrospective and must remain labelled that way. The fresh prospective
+follow-on is synthetic force-compliance evidence.
+
+### Risk 9: "Is the hero figure cherry-picked?"
+
+The hero is selected post-hoc only for visualization by a documented deterministic
+rule. It is not used to compute aggregate statistics or choose thresholds. Put this
+in the caption.
+
+### Risk 10: "Is the residual field the DCS statistic?"
+
+No.
+The surface residual field is a solver-driven explanatory visualization of
+repair-to-truth response disagreement. State this explicitly.
+
+### Risk 11: "What is actually novel relative to V&V and digital-twin literature?"
+
+The paper must avoid claiming generic simulation credibility or generic
+counterfactual validation. The narrow claim is captured-world physical rewrite
+verification under deceptive observational improvement, with independent
+intervention evidence, explicit unresolved decisions, and an experimentally
+quantified information frontier.
+
+### Risk 12: "Can the work be reproduced?"
+
+The repository already has:
+- frozen commit/tag;
+- exact JSON ledgers;
+- one-command runner;
+- source CSVs;
+- system/compiler/GPU provenance;
+- SHA-256 artifact index;
+- deterministic figure generation;
+- CI.
+
+Put only the minimum reproducibility summary in the main paper and the full procedure
+in supplement.
+
+### Risk 13: "Was AI used to make evidence?"
+
+No AI-generated scientific pixels are used in the visualization pipeline.
+The explainer is deterministic code-driven vector graphics plus frozen solver data.
+If generative AI/LLMs are used to draft manuscript text, disclose that according to
+the target ACM policy and independently verify every sentence/citation.
+
+## 29. Paper-ready result table for drafting
+
+Use this table as the numerical source while drafting, but verify the exact JSON
+before final submission.
+
+| Stage | Population | Key result | Interpretation |
+|---|---:|---|---|
+| D1 | 64 deceptive repairs | 64/64 rejected in constructed control | implementation positive control |
+| D2 frozen | 16 truth worlds | 0 resolved; median sep 0.041578 | frozen negative validation |
+| D3 | 6 truth worlds | 0 resolved; adaptive median 0.0588583 | numerical floor improved, observability did not |
+| D4V | 36 proposals | 14 deceptive, 22 beneficial, 0% resolved | repair-veto information limit |
+| GAUGE | 10 held-out repeats | longitudinal endpoint preferred 9/10 | retrospective measured contradiction |
+| OFC | 36 proposals | 12 deceptive, 24 beneficial | fresh synthetic follow-on |
+| OFC DCS | 36 | median |z| 0.048767; max 0.172789 | weak comparator |
+| OFC force | 36 | median |z| 0.558629; max 1.319111 | 11.455x median gain, still unresolved |
+
+## 30. Manuscript build quality gates
+
+Before calling the manuscript submission-ready:
+
+1. every numerical claim has a source comment or manuscript-source map entry;
+2. every figure caption states its evidence class;
+3. D4V and OFC populations are never conflated;
+4. aggregate 11.46x and hero 11.70x are never conflated;
+5. prospective and retrospective evidence are never conflated;
+6. the main paper contains the central negative result, not only the supplement;
+7. all bibliography entries have been checked against source publications;
+8. no unsupported novelty claim survives the claim guard;
+9. all submitted files are anonymized and metadata-scrubbed;
+10. the companion video is under the target venue's limit;
+11. the anonymous supplement reproduces the frozen result without public Git history;
+12. third-party attributions are preserved without revealing author identity;
+13. the paper and video never imply the force channel crossed the decision threshold;
+14. the exact frozen tag and evidence hashes remain unchanged;
+15. the final PDF passes ACM formatting and font checks.
