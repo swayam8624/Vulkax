@@ -28,6 +28,8 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin --prune --tags
+          git config user.name "vulkax-archive-bot"
+          git config user.email "vulkax-archive-bot@users.noreply.github.com"
 
           canonical="origin/main"
           protected=(
