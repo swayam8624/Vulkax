@@ -38,15 +38,15 @@ The remaining work is manuscript preparation and venue-specific submission packa
 ## Explainer video
 
 <p align="center">
-  <a href="https://github.com/swayam8624/Vulkax/actions/workflows/reality-probe-explainer.yml">
-    <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/reality_probe_explainer_preview.gif" width="760" alt="Reality Probe mathematical explainer preview"/>
+  <a href="docs/readme_assets/reality_probe_explainer.mp4">
+    <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/reality_probe_explainer_full.gif" width="760" alt="Reality Probe full 116-second mathematical explainer"/>
   </a>
 </p>
 
 <p align="center">
-  <strong>Reality Probe, 116-second mathematical explainer</strong><br/>
-  The film follows the research path from deceptive repair to controlled probing, mechanism fingerprints, residual fields, standardized evidence, and the final refusal decision.<br/>
-  <sub>Click the preview to open the full-resolution explainer workflow and artifact.</sub>
+  <strong>Reality Probe, complete 116-second mathematical explainer</strong><br/>
+  The full animation plays inline from deceptive repair through controlled probing, mechanism fingerprints, residual fields, standardized evidence, the information limit, and the final refusal decision.<br/>
+  <sub>Click the animation for the full-resolution MP4.</sub>
 </p>
 
 ## Visual explanation
