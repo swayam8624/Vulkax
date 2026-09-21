@@ -45,12 +45,12 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create immutable Phase I paper-freeze tag
-        if: github.ref == 'refs/heads/main' && hashFiles('PHASE1_FREEZE_REQUEST.txt') != ''
+      - name: Create immutable paper-freeze tag
+        if: github.ref == 'refs/heads/main' && hashFiles('PAPER_FREEZE_REQUEST.txt') != ''
         shell: bash
         run: |
           set -euo pipefail
-          tag="phase1-paper-freeze-2026-09-21"
+          tag="paper-freeze-2026-09-21"
           git config user.name "vulkax-paper-freeze-bot"
           git config user.email "vulkax-paper-freeze-bot@users.noreply.github.com"
           git fetch origin --tags
@@ -61,6 +61,6 @@ jobs:
           fi
 
           git tag -a "$tag" "$GITHUB_SHA" \
-            -m "Vulkax Phase I paper freeze. Exact commit passed the full paper-evidence reproduction workflow on 2026-09-21."
+            -m "Vulkax paper freeze. Exact commit passed the full paper-evidence reproduction workflow on 2026-09-21."
           git push origin "refs/tags/$tag"
           echo "Created immutable paper-freeze tag: $tag -> $GITHUB_SHA"
