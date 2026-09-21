@@ -20,7 +20,9 @@ Human-readable:
 
 Machine-readable:
 - `../results/DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv`
-- `../results/DCS_FINAL_RESULTS_2026-09-20.json`
+- `../results/DCS_FINAL_RESULTS_2026-09-20.json` — frozen DCS ledger
+- `../results/VULKAX_FINAL_RESULTS_2026-09-21.json` — final paper-level ledger
+- `../results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.json` — fresh orthogonal-information result
 
 Frozen stage evidence:
 - `../status/DCS_D2_VALIDATION_RESULT.md`
@@ -32,6 +34,7 @@ Protocols:
 - `../benchmarks/DCS_D2_VALIDATION_PROTOCOL.md`
 - `../benchmarks/DCS_D3_DISCOVERY_PROTOCOL.md`
 - `../benchmarks/DCS_D4V_REPAIR_VETO_DISCOVERY_PROTOCOL.md`
+- `../benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md`
 
 Claim boundaries:
 - `../literature/CLAIM_GUARD.md`
@@ -43,6 +46,7 @@ Claim boundaries:
 - `EXPERIMENT_MATRIX.csv` — complete D0–D6 experiment/evidence matrix
 - `ABLATION_MATRIX.md` — executed method/ablation comparisons and frozen outcomes
 - `REPRODUCIBILITY_CHECKLIST.md` — repository/data/reproduction completeness checklist
+- `../status/DCS_MATH_IMPLEMENTATION_AUDIT_2026-09-21.md` — explicit mathematics-to-code audit
 - `FIGURE_TABLE_SOURCE_MAP.md` — exact source mapping for figures and tables
 - `PAPER_DATA_MANIFEST.json` — machine-readable package map
 - [full reproduction guide](../../docs/PAPER_EVIDENCE_REPRODUCTION.md)
@@ -61,10 +65,12 @@ with:
 4. `fig_d4v_proposals.svg` + CSV source
 5. `fig_gauge_channel_contradiction.svg` + CSV source
 6. `fig_information_frontier.svg` + CSV source
-7. `table_stage_outcomes.csv`
-8. `table_claim_boundaries.csv`
-9. `table_information_frontier.csv`
-10. `figure_manifest.json`
+7. `fig_orthogonal_force_gain.svg` + CSV source
+8. `table_stage_outcomes.csv`
+9. `table_claim_boundaries.csv`
+10. `table_information_frontier.csv`
+11. `table_orthogonal_force_compliance.csv`
+12. `figure_manifest.json`
 
 These are deterministic transforms of the committed result ledger; they do not alter
 the scientific decision.
@@ -79,6 +85,7 @@ The full runner reproduces and packages:
 - D2 frozen validation
 - D3 adaptive-order discovery
 - D4V repair-veto discovery
+- fresh orthogonal force-compliance experiment
 - captured-world certificate
 - controlled timing evidence
 - GAUGE effective-span validation
@@ -97,14 +104,13 @@ Supported:
 - the GAUGE retrospective shows a channel-specific contradiction: aggregate/marker
   evidence favors the overlap repair while the longitudinal mechanism channel
   favors the original endpoint model in 9/10 repeats;
-- Vulkax contains a complete reproducible implementation for counterfactual
-  annihilation, witness synthesis, uncertainty handling, spatial localization and
-  future frozen confirmatory replay.
+- a separately preregistered known-force channel increased median standardized signal by 11.46× on fresh synthetic worlds, while still producing 0% resolved coverage;
+- Vulkax contains a complete reproducible implementation for counterfactual annihilation, witness synthesis, uncertainty handling, spatial localization and frozen replay.
 
 Not supported:
 - DCS superiority over Fisher/raw baselines;
 - useful prospective DCS repair-veto deployment coverage;
-- fresh measured-domain prospective DCS confirmation;
+- fresh measured-domain prospective repair verification;
 - a universal physical correctness certificate.
 
 ## Remaining external-data boundary
