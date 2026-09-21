@@ -111,7 +111,6 @@ def main():
         t(105,588,"Both channels remain unresolved under the same frozen |z| = 2 decision rule.",22,fill=MUTED),
     ]
 
-    # Shared signed z-axis from -2.2 to +2.2.
     x0, x1, yy = 210, 1410, 685
     zmin, zmax = -2.2, 2.2
     zx = lambda z: x0 + (float(z)-zmin)/(zmax-zmin)*(x1-x0)
@@ -132,11 +131,11 @@ def main():
     zf = r["force_progress_z"]
     b += [
         circle(zx(zd),yy-18,11,BLUE),
-        t(zx(zd),yy-92,f"DCS  z={zd:.4f}",20,fill=BLUE,weight=750,anchor="middle"),
+        t(zx(zd),yy-52,f"DCS  z={zd:.4f}",19,fill=BLUE,weight=750,anchor="middle"),
         circle(zx(zf),yy+18,13,ORANGE),
-        t(zx(zf),yy+96,f"force/compliance  z={zf:.4f}",20,fill=ORANGE,weight=750,anchor="middle"),
-        t(800,780,f"For this exact deceptive proposal, the orthogonal channel is {ratio:.2f}× stronger in |z| — still not enough to veto.",
-          22,weight=750,anchor="middle"),
+        t(zx(zf),yy+62,f"force/compliance  z={zf:.4f}",19,fill=ORANGE,weight=750,anchor="middle"),
+        t(800,790,f"For this exact deceptive proposal, the orthogonal channel is {ratio:.2f}× stronger in |z| — still not enough to veto.",
+          21,weight=750,anchor="middle"),
         t(800,842,
           "Selection is explicitly post-hoc for visualization; the row did not set the threshold, force amplitude, or headline statistics.",
           18,fill=MUTED,anchor="middle"),
