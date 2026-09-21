@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import html
 import json
+import shutil
 from pathlib import Path
 
 
@@ -15,6 +16,18 @@ def png_data_uri(path: Path) -> str:
     if not path.is_file() or path.stat().st_size == 0:
         raise SystemExit(f"missing plate image: {path}")
     return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
+def package_png(path: Path, out_svg: Path, filename: str) -> str:
+    """Copy a raster plate beside an SVG and return an Illustrator-safe relative href."""
+    if not path.is_file() or path.stat().st_size == 0:
+        raise SystemExit(f"missing plate image: {path}")
+    assets_dir = out_svg.parent / "assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    destination = assets_dir / filename
+    if path.resolve() != destination.resolve():
+        shutil.copy2(path, destination)
+    return f"assets/{filename}"
 
 
 def metrics(repo_root: Path):
