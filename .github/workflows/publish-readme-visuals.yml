@@ -1,0 +1,79 @@
+name: Publish README visual assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "visualization/explainer/**"
+      - "visualization/data/**"
+      - "visualization/probes/**"
+      - "research/results/VULKAX_FINAL_RESULTS_2026-09-21.json"
+      - ".github/workflows/publish-readme-visuals.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install numpy pillow
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Build frozen replay and final explainer
+        env:
+          FILM_PY: python3
+        run: |
+          bash visualization/explainer/render_explainer.sh final
+          python3 visualization/explainer/render.py --mode stills
+
+      - name: Package tracked README assets
+        run: |
+          mkdir -p docs/readme_assets
+          cp build/reality-probe-explainer/reality_probe_explainer.mp4 docs/readme_assets/
+          cp build/reality-probe-explainer/storyboard.png docs/readme_assets/
+          cp build/reality-probe-explainer/figures/*.png docs/readme_assets/
+          cp build/reality-probe-explainer/figures/*.svg docs/readme_assets/
+          ffmpeg -y \
+            -i docs/readme_assets/reality_probe_explainer.mp4 \
+            -vf "fps=10,scale=960:-1:flags=lanczos" \
+            -t 8 \
+            docs/readme_assets/reality_probe_explainer_preview.gif
+
+      - name: Validate README asset package
+        run: |
+          test -s docs/readme_assets/reality_probe_explainer.mp4
+          test -s docs/readme_assets/reality_probe_explainer_preview.gif
+          test -s docs/readme_assets/storyboard.png
+          for n in 01_question 02_deceptive_repair 03_deception_map 04_same_probe 05_response_overlay 06_fingerprint 07_residual_field 08_dcs_intuition 09_standardization 10_signal_gain 11_information_limit 12_conclusion; do
+            test -s "docs/readme_assets/${n}.png"
+            test -s "docs/readme_assets/${n}.svg"
+          done
+
+      - name: Commit generated README assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f docs/readme_assets
+          if git diff --cached --quiet; then
+            echo "README visual assets already current"
+            exit 0
+          fi
+          git commit -m "docs: publish regenerated Reality Probe README visuals"
+          git push origin HEAD:main
