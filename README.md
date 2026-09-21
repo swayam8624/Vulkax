@@ -286,9 +286,23 @@ marker dark-field preference:       overlap 10/10
 longitudinal dark-field preference: endpoint 9/10
 ```
 
-The exploratory retrospective exact sign-test for the longitudinal channel gave (p=0.02148).
+The exploratory retrospective exact sign-test for the longitudinal channel gave `p = 0.02148`.
 
 This result is kept explicitly retrospective because the metric conflict was already known before DCS was designed. It is evidence of a real channel contradiction, not fresh prospective confirmation.
+
+### Confirmatory infrastructure and the stop rule
+
+The generic confirmatory replay path was also completed. It includes frozen-stencil enforcement, no-fit replay semantics, support, veto, and unresolved outcomes, together with direct nominal-versus-refined numerical witness uncertainty.
+
+A fresh measured prospective confirmation was intentionally not consumed for this paper after the prerequisite advancement gates failed. This was a research stop rule, not missing implementation. Spending a fresh confirmatory dataset after the method had already failed its frozen prerequisites would have weakened the experimental separation between discovery and confirmation.
+
+The final paper therefore keeps four evidence classes distinct: implemented confirmatory infrastructure, retrospective measured GAUGE evidence, fresh synthetic orthogonal-information evidence, and future measured prospective confirmation under a separately frozen protocol.
+
+### Spatial localization and export
+
+The spatial layer was completed alongside the verification experiments. It provides per-region dark-field residuals, standardized local residuals, resolved and unresolved region flags, mappings from physical particles to Gaussian or surface components, and PLY export for visualization.
+
+This layer does not add a new verification claim. It makes the evidence spatially inspectable and connects solver-native quantities to the final paper visualizations.
 
 ## Orthogonal physical information
 
@@ -381,6 +395,8 @@ The final repository includes:
 - matched baseline experiments;
 - GAUGE retrospective analysis;
 - fresh orthogonal force-compliance evaluation;
+- confirmatory replay infrastructure with frozen no-fit semantics;
+- spatial dark-field localization and PLY export;
 - deterministic paper figures and tables;
 - deterministic Reality Probe explainer assets;
 - SHA-256-indexed evidence packaging;
