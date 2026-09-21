@@ -172,13 +172,17 @@ Do not:
 A future real force-sensor or frequency/modal experiment is separate follow-on work
 and requires a separately frozen protocol and new data.
 
-## Remaining operation
+## Frozen repository snapshot
 
-Before declaring the repository snapshot immutable for manuscript production:
+The repository-side freeze is complete.
 
-1. latest main smoke CI must pass;
-2. exact-head `run_everything.sh` full reproduction must pass;
-3. evidence and publication artifacts must upload;
-4. annotated tag `paper-freeze-2026-09-21` must be created on that exact successful commit.
+- latest main CI: **green**
+- exact-head full `run_everything.sh` reproduction: **green**
+- evidence + publication artifacts: **uploaded by workflow**
+- annotated tag: `paper-freeze-2026-09-21`
+- frozen commit: `a9da8c0aa8689ebeea0d84baf95a74907659a837`
 
-After that, only manuscript and presentation work remain.
+The annotated tag resolves to the same commit that passed the full paper-evidence
+workflow.
+
+Remaining work: **manuscript writing and presentation only**.
