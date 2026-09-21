@@ -2,7 +2,7 @@
 from __future__ import annotations
 import argparse
 from pathlib import Path
-from vector_composition_common import defs, esc, metrics, png_data_uri, write_svg
+from vector_composition_common import defs, esc, metrics, package_png, write_svg
 
 def main():
     p=argparse.ArgumentParser()
@@ -13,7 +13,10 @@ def main():
     p.add_argument("--motion-scale",type=float,default=400.0)
     p.add_argument("--out",type=Path,required=True)
     a=p.parse_args(); m=metrics(a.repo_root)
-    images=[png_data_uri(a.observe),png_data_uri(a.repair),png_data_uri(a.interrogate)]
+    images=[
+      package_png(a.observe,a.out,"hero_observe.png"),
+      package_png(a.repair,a.out,"hero_repair.png"),
+      package_png(a.interrogate,a.out,"hero_interrogate.png")]
     panels=[
       (150,"01","OBSERVE","CAPTURED / FITTED STATE","#80e4ff",images[0]),
       (1340,"02","REPAIR",f"LOOKS BETTER  −{m['improve_pct']:.2f}% ORDINARY ERROR","#8ff0c9",images[1]),
@@ -26,8 +29,8 @@ def main():
         <text x="54" y="610" fill="{accent}" font-size="44" font-weight="700">{idx}</text>
         <text x="128" y="610" fill="#f1f7ff" font-size="44" font-weight="700">{esc(title)}</text>
         <text x="54" y="665" fill="{accent}" font-size="23" font-weight="600" letter-spacing="1">{esc(sub)}</text>
-        <image x="40" y="690" width="1080" height="1080" preserveAspectRatio="xMidYMid meet" href="{img}"/></g>""")
-    svg=f"""<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160">
+        <image x="40" y="690" width="1080" height="1080" preserveAspectRatio="xMidYMid meet" href="{img}" xlink:href="{img}"/></g>""")
+    svg=f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3840" height="2160" viewBox="0 0 3840 2160">
     {defs()}<rect width="3840" height="2160" fill="url(#bg)"/><rect x="120" y="120" width="3600" height="2" fill="url(#cyanLine)" opacity=".75"/>
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif">
     <text x="1920" y="285" text-anchor="middle" font-size="100" font-weight="620" fill="#eaf4ff"><tspan>LOOKS RIGHT. </tspan><tspan fill="#ffaf64">PHYSICS SAYS NO.</tspan></text>
