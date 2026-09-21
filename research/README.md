@@ -2,8 +2,8 @@
 
 Current canonical state: **2026-09-20**
 
-Canonical branch:
-`research/integration-20260920`
+Canonical stable branch:
+`main`
 
 ## One-command reproduction
 
