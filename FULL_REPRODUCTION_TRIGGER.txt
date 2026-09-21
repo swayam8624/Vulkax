@@ -1,12 +1,14 @@
-Trigger the final Vulkax Phase I paper-freeze reproduction.
+FINAL VULKAX PHASE I PAPER-FREEZE REPRODUCTION
 
-Purpose:
-- verify exact frozen main commit
-- execute full build/test/research reproduction
-- reproduce D1/D2/D3/D4V/GAUGE evidence
-- validate numbers against frozen ledgers
-- generate final SVG/CSV publication assets
-- assemble SHA-256 evidence bundle and archive
+This is the final repository mutation before the Phase I freeze.
 
-This trigger belongs to the Phase I manuscript freeze.
+The full workflow must:
+1. build/test the exact main commit;
+2. reproduce D1/D2/D3/D4V/GAUGE evidence;
+3. validate results against frozen canonical ledgers;
+4. generate the locked publication SVG/CSV assets;
+5. assemble and upload the SHA-256 paper-evidence bundle;
+6. upload paper assets;
+7. create the annotated tag phase1-paper-freeze-2026-09-21 on this exact commit.
+
 Date: 2026-09-21
