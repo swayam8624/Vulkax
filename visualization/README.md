@@ -79,3 +79,39 @@ Until then, use the vector figures as scientific evidence and the Reality Inspec
 The governing principle is simple:
 
 > make the presentation spectacular without allowing presentation code to manufacture evidence.
+
+## Solver-state-driven Reality Inspector
+
+The schematic layer now has a strict upgrade path to **actual solver motion**.
+
+Build and replay the exact frozen APIC → PIC hero case:
+
+```bash
+cmake -S . -B build-vis -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+cmake --build build-vis --target vulkax_visualization_trajectory_probe --parallel
+
+./build-vis/vulkax_visualization_trajectory_probe build/visualization-trajectory
+
+python3 visualization/scripts/render_solver_trajectory.py \
+  --trajectory-dir build/visualization-trajectory \
+  --out build/visualization
+```
+
+The exporter refits the two candidates with the original frozen calibration procedure and **fails closed** unless it reproduces the exact held-out and untouched-target errors stored for truth world 5. Only after that guard passes does it export synchronized particle trajectories for the four frozen 40 N force directions.
+
+The exported state is explicitly:
+
+```text
+raw_solver_state_before_synthetic_observation_noise
+```
+
+so the cinematic renderer can distinguish physical solver state from the noisy observation model used to compute experimental statistics.
+
+Generated evidence-facing surface:
+
+```text
+build/visualization/fig_solver_state_force_trajectories.svg
+```
+
+It overlays truth APIC, fitted baseline APIC and fitted repair PIC particle states and top-layer centroid trails for all four force directions. No deformation is hand-authored in this figure.
+

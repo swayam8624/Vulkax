@@ -1,0 +1,56 @@
+name: visualization-trajectory-smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "CMakeLists.txt"
+      - "visualization/probes/**"
+      - "visualization/scripts/render_solver_trajectory.py"
+      - "visualization/data/hero_case_ofc_2026-09-21.json"
+      - ".github/workflows/visualization-trajectory-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  replay-frozen-hero-trajectory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout including frozen paper tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure presentation replay target
+        run: cmake -S . -B build-vis -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=OFF
+
+      - name: Build trajectory exporter
+        run: cmake --build build-vis --target vulkax_visualization_trajectory_probe --parallel 2
+
+      - name: Replay frozen hero case and export solver states
+        run: ./build-vis/vulkax_visualization_trajectory_probe build/visualization-trajectory
+
+      - name: Render raw solver-state figure
+        run: |
+          python3 -m py_compile visualization/scripts/render_solver_trajectory.py
+          python3 visualization/scripts/render_solver_trajectory.py             --trajectory-dir build/visualization-trajectory             --out build/visualization
+
+      - name: Validate replay package
+        run: |
+          test -s build/visualization-trajectory/particle_trajectories.csv
+          test -s build/visualization-trajectory/direction_summary.csv
+          test -s build/visualization-trajectory/trajectory_manifest.json
+          test -s build/visualization/fig_solver_state_force_trajectories.svg
+          grep -q "matched_frozen_hero_row" build/visualization-trajectory/trajectory_manifest.json
+          grep -q "raw solver-state" build/visualization/fig_solver_state_force_trajectories.svg
+
+      - name: Upload solver-state visualization package
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkax-frozen-hero-trajectory
+          path: |
+            build/visualization-trajectory/
+            build/visualization/fig_solver_state_force_trajectories.svg
+          retention-days: 30

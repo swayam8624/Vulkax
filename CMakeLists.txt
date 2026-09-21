@@ -132,6 +132,11 @@ add_executable(vulkax_dcs_d4v_repair_veto_probe research/probes/dcs_d4v_repair_v
 target_link_libraries(vulkax_dcs_d4v_repair_veto_probe PRIVATE vulkax_core)
 add_executable(vulkax_orthogonal_force_compliance_probe research/probes/orthogonal_force_compliance_probe.cpp)
 target_link_libraries(vulkax_orthogonal_force_compliance_probe PRIVATE vulkax_core)
+# Presentation-only exporter for the frozen visual hero case. This target reads no
+# paper thresholds and cannot alter the frozen research result; it only replays the
+# already-defined solver configuration and writes raw particle trajectories.
+add_executable(vulkax_visualization_trajectory_probe visualization/probes/frozen_hero_trajectory_probe.cpp)
+target_link_libraries(vulkax_visualization_trajectory_probe PRIVATE vulkax_core)
 add_executable(vulkax_gauge_shearing_forward_probe research/probes/gauge_shearing_forward_probe.cpp)
 target_link_libraries(vulkax_gauge_shearing_forward_probe PRIVATE vulkax_core)
 if(VULKAX_BUILD_TESTS)
