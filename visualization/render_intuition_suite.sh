@@ -59,6 +59,11 @@ python3 "$ROOT/visualization/scripts/compose_fingerprints_svg.py" \
   --pz "$OUT/intuition/xray_pz.png" \
   --out "$OUT/vector/reality_probe_mechanism_fingerprints.svg"
 
+python3 "$ROOT/visualization/scripts/compose_deception_map_svg.py" \
+  --proposals "$ROOT/visualization/data/ofc_proposals_visualization_2026-09-21.csv" \
+  --out "$OUT/vector/reality_probe_deception_map.svg"
+
 echo "INTUITION SUITE PASS"
 echo "  $OUT/vector/reality_probe_darkfield_intuition.svg"
 echo "  $OUT/vector/reality_probe_mechanism_fingerprints.svg"
+echo "  $OUT/vector/reality_probe_deception_map.svg"

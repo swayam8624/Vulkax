@@ -46,6 +46,7 @@ jobs:
           python3 -m py_compile visualization/scripts/compose_explainer_svg.py
           python3 -m py_compile visualization/scripts/compose_darkfield_intuition_svg.py
           python3 -m py_compile visualization/scripts/compose_fingerprints_svg.py
+          python3 -m py_compile visualization/scripts/compose_deception_map_svg.py
 
       - name: Verify frozen evidence and render SVGs
         run: ./visualization/render_all.sh
@@ -86,6 +87,9 @@ jobs:
           test -s build/vector-smoke/fingerprints.svg
           grep -q 'HIDDEN PHYSICS' build/vector-smoke/darkfield.svg
           grep -q 'MECHANISM FINGERPRINTS' build/vector-smoke/fingerprints.svg
+          python3 visualization/scripts/compose_deception_map_svg.py --proposals visualization/data/ofc_proposals_visualization_2026-09-21.csv --out build/vector-smoke/deception.svg
+          test -s build/vector-smoke/deception.svg
+          grep -q 'BETTER' build/vector-smoke/deception.svg
 
       - name: Upload deterministic SVG package
         uses: actions/upload-artifact@v4
