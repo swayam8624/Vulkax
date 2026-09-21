@@ -4,15 +4,16 @@ Canonical research state date: **2026-09-21**
 
 ## Start here
 
-1. [Final paper-level JSON ledger](VULKAX_FINAL_RESULTS_2026-09-21.json)
-2. [Orthogonal force-compliance result](ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md)
-3. [DCS benchmark summary](DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md)
-4. [Machine-readable benchmark table](DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv)
-5. [Machine-readable DCS result ledger](DCS_FINAL_RESULTS_2026-09-20.json)
-6. [Post-hoc information frontier](DCS_INFORMATION_FRONTIER_2026-09-20.md)
-7. [Paper-data map](../paper_data/README.md)
-8. [Current research state](../status/CURRENT_RESEARCH_STATE_2026-09-20.md)
-9. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
+1. [Final research summary](VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md)
+2. [Final paper-level JSON ledger](VULKAX_FINAL_RESULTS_2026-09-21.json)
+3. [Orthogonal force-compliance result](ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md)
+4. [DCS benchmark summary](DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md)
+5. [Machine-readable benchmark table](DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv)
+6. [Machine-readable DCS result ledger](DCS_FINAL_RESULTS_2026-09-20.json)
+7. [Post-hoc information frontier](DCS_INFORMATION_FRONTIER_2026-09-20.md)
+8. [Paper-data map](../paper_data/README.md)
+9. [Current research state](../status/CURRENT_RESEARCH_STATE_2026-09-21.md)
+10. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
 
 ## Reproduce everything
 
