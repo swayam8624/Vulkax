@@ -26,13 +26,13 @@ def main():
     blocks=[]
     for i,(num,title,sub,img,accent) in enumerate(cards):
         x=120+i*910
-        blocks.append(f"""<g transform="translate({x},0)">
-        <text x="0" y="360" fill="{accent}" font-size="30" font-weight="800">{num}</text>
-        <text x="70" y="360" fill="#17212b" font-size="30" font-weight="800">{title}</text>
-        <text x="0" y="410" fill="#65717d" font-size="18">{sub}</text>
-        <rect x="0" y="455" width="840" height="840" rx="18" fill="#edf1f3" stroke="#d3d9dd"/>
-        <image x="30" y="485" width="780" height="780" preserveAspectRatio="xMidYMid meet" href="{img}" xlink:href="{img}"/>
-        </g>""")
+        blocks.append(f"""<g>
+        <text x="{x}" y="360" fill="{accent}" font-size="30" font-weight="800">{num}</text>
+        <text x="{x+70}" y="360" fill="#17212b" font-size="30" font-weight="800">{title}</text>
+        <text x="{x}" y="410" fill="#65717d" font-size="18">{sub}</text>
+        <rect x="{x}" y="455" width="840" height="840" rx="18" fill="#edf1f3" stroke="#d3d9dd"/>
+        </g>
+        <image x="{x+30}" y="485" width="780" height="780" href="{img}"/>""")
     svg=f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3840" height="1600" viewBox="0 0 3840 1600">
     <rect width="3840" height="1600" fill="#f7f8f6"/>
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif">
