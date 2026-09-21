@@ -1,4 +1,13 @@
-# Vulkax Paper Data Package
+# Paper data and manuscript handoff
+
+Start manuscript preparation with:
+
+- [SIGGRAPH manuscript dossier](MANUSCRIPT_DOSSIER_SIGGRAPH.md)
+- [manuscript asset index](MANUSCRIPT_ASSET_INDEX.csv)
+
+These files map the frozen research, section structure, claims, equations, figures,
+tables, video, supplementary material, anonymity requirements, and venue-facing
+submission constraints to exact repository paths.
 
 This directory is the committed map for everything needed to build a paper from the
 current Vulkax research state **without containing manuscript prose**.
