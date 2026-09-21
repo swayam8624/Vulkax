@@ -8,3 +8,5 @@ Policy:
 - final branch target: 3 refs
 
 Date: 2026-09-21
+
+Retry: configured annotated-tag committer identity.
