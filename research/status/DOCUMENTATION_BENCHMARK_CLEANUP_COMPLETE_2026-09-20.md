@@ -2,8 +2,10 @@
 
 Status: **COMPLETE**
 
-Canonical branch:
+Historical completion branch at the time of this record:
 `research/integration-20260920`
+
+Current canonical stable branch after promotion: `main`
 
 Completion head at time of this marker:
 `8f489e18ded373ebed98e6f22069cf1bce718a0b`
