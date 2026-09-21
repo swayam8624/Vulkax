@@ -1,8 +1,8 @@
-# Vulkax Phase I Publication Asset Lock
+# Vulkax Publication Asset Lock
 
 Status: **FROZEN ASSET SET**
 
-The following assets define the Phase I paper-data/visual package. They are
+The following assets define the frozen Vulkax paper-data/visual package. They are
 generated deterministically from the canonical result ledgers or from the frozen
 experiment outputs.
 
@@ -16,6 +16,7 @@ experiment outputs.
 | F4 | `fig_d4v_proposals.svg` | 36 proposed repairs: 14 deceptive, 22 beneficial, 0 resolved |
 | F5 | `fig_gauge_channel_contradiction.svg` | observation/marker versus longitudinal-mechanism disagreement |
 | F6 | `fig_information_frontier.svg` | post-hoc signal amplification required to reach the frozen credibility reference |
+| F7 | `fig_orthogonal_force_gain.svg` | fresh known-force channel increases median |z| 11.46× but remains below the frozen threshold |
 
 Each SVG has a source CSV generated beside it.
 
@@ -24,6 +25,7 @@ Each SVG has a source CSV generated beside it.
 - `table_stage_outcomes.csv`
 - `table_claim_boundaries.csv`
 - `table_information_frontier.csv`
+- `table_orthogonal_force_compliance.csv`
 - `research/paper_data/EXPERIMENT_MATRIX.csv`
 - `research/paper_data/ABLATION_MATRIX.md`
 - `research/results/DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv`
@@ -34,6 +36,7 @@ Each SVG has a source CSV generated beside it.
 - per-case D2 and D3 tables;
 - D3 stencil tables;
 - D4V proposal table;
+- orthogonal force-compliance proposal table and analysis;
 - GAUGE per-trial retrospective table;
 - captured-world certificate;
 - system/compiler/GPU provenance;
@@ -83,5 +86,4 @@ The complete one-command path generates and packages the same set:
 
 Do not replace a frozen figure because a later experiment looks more favorable.
 
-New evidence belongs to a new research phase unless it is purely a rendering or
-typographic correction of the same underlying frozen data.
+New evidence requires a separately frozen protocol and untouched data. It must not silently retune or overwrite the frozen D2/D3/D4V/OFC evidence.
