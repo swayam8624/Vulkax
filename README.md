@@ -131,7 +131,7 @@ That led to five engineering requirements:
 
 The result is a C++20 system with versioned capture bundles, persistent Gaussian identity, APIC/MPM replay, fit-only material calibration, held-out replay, local influence estimation, adaptive rewrite proposals, atomic commit or rollback, native Metal and Vulkan rendering, measured-data ingestion, and machine-readable evidence records.
 
-The stable engineering baseline is documented in [Vulkax 1.0](docs/RELEASE_1_0.md).
+Vulkax 1.0 is the stable verified-rewritable-reality baseline for this study. The release contract is documented in [Vulkax 1.0](docs/RELEASE_1_0.md). The measured-data path is documented in [MEASURED_BENCHMARK_0_45.md](docs/MEASURED_BENCHMARK_0_45.md), and the one-command captured-world path is documented in [CAPTURED_WORLD_RUN_0_80.md](docs/CAPTURED_WORLD_RUN_0_80.md).
 
 ## Engineering journey
 
