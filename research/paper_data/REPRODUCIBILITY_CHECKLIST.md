@@ -37,7 +37,7 @@ not imply acceptance, novelty, or a positive prospective result.
 - [x] per-trial GAUGE retrospective table
 - [x] aggregate GAUGE summary
 - [x] measured result explicitly marked retrospective
-- [ ] fresh positive D5 prospective measured confirmation — not executed; even the fresh orthogonal force-compliance channel remained below the frozen resolved-decision threshold
+- [x] D5 measured-confirmation stop rule completed — fresh positive measured confirmation was intentionally not consumed because the fresh orthogonal force-compliance channel still remained below the frozen resolved-decision threshold
 
 ## Paper-facing data
 
@@ -87,6 +87,8 @@ sequence** is indexed in this package.
 
 The current package is complete for the research that was actually executed.
 
-It does not contain a fresh positive D5 measured confirmation because the preceding
-prospective DCS gates were negative. That absence is a scientific result/boundary,
-not missing repository plumbing.
+It intentionally does not contain a fresh positive D5 measured confirmation. The
+frozen DCS gates were negative, and the separately preregistered force-compliance
+follow-on improved median standardized signal by 11.46× but still produced 0%
+resolved coverage. The stop decision is therefore complete; the absence of a D5
+measured run is a scientific boundary, not unfinished repository work.
