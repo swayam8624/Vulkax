@@ -134,8 +134,10 @@ The mathematical explainer also exports editable SVG stills, PNG stills, a
 
 > Generated videos/renders live under ignored `build/` directories by design; the
 > repository tracks the deterministic source, frozen inputs and reproduction code
-> rather than committing large derived binaries. Publish final binaries as release
-> or workflow artifacts when distribution is needed.
+> rather than committing large derived binaries. Use the manual
+> **Reality Probe explainer artifact** workflow (`.github/workflows/reality-probe-explainer.yml`)
+> to generate and retain preview/final/stills packages on GitHub without polluting
+> source history with derived media.
 
 ---
 
