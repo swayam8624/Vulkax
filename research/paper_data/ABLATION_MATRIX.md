@@ -92,3 +92,22 @@ Median dark-field errors:
 | longitudinal | 0.0031313 | 0.0055842 |
 
 Evidence class: **retrospective measured**.
+
+
+## Orthogonal force-compliance information test
+
+Fresh partition: 6 new truth worlds, 36 ordinary-heldout-improving repair proposals.
+
+| Quantity | Fresh kinematic DCS | Known-force compliance |
+|---|---:|---:|
+| resolved coverage | 0% | 0% |
+| median |z| | 0.04877 | **0.55863** |
+| maximum |z| | 0.17279 | **1.31911** |
+| sign accuracy | 50.00% | 55.56% |
+| median signal amplification still needed to reach |z|=2 | 41.01× | **3.58×** |
+
+Median standardized-signal gain from the orthogonal channel: **11.455×**.
+
+The preregistered advancement gate failed because no proposal crossed the frozen
+|z|=2 decision reference. The result therefore supports increased information
+content, not successful repair verification.
