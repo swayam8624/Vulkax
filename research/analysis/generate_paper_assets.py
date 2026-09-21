@@ -146,7 +146,9 @@ def write_csv(path: Path, header: list[str], rows: list[list[object]]) -> None:
         w=csv.writer(f); w.writerow(header); w.writerows(rows)
 
 def generate(result_path: Path, out: Path) -> dict:
-    data=json.loads(result_path.read_text())
+    root_data=json.loads(result_path.read_text())
+    data=root_data["dcs"] if root_data.get("schema")=="vulkax.final_results" else root_data
+    orthogonal=root_data.get("orthogonal_force_compliance") if root_data.get("schema")=="vulkax.final_results" else None
     out.mkdir(parents=True,exist_ok=True)
     figures=[]
 
@@ -242,6 +244,38 @@ def generate(result_path: Path, out: Path) -> dict:
             "claim":"The tested D4V verification channels were far below, not marginally below, the frozen |z|=2 reference."
         })
 
+    # Figure 7: fresh orthogonal physical-information gain.
+    if orthogonal:
+        vals=[
+            float(orthogonal["dcs"]["median_abs_z"]),
+            float(orthogonal["force_compliance"]["median_abs_z"]),
+            float(orthogonal["force_compliance"]["max_abs_z"]),
+        ]
+        p=out/"fig_orthogonal_force_gain.svg"
+        bar_chart(
+            p,
+            "Orthogonal physical information increases observability",
+            "Fresh synthetic follow-on; frozen credibility reference = |z| 2",
+            ["fresh DCS median","force median","force best"],vals,2.0,
+            "standardized progress |z|",threshold=2.0
+        )
+        write_csv(
+            out/"fig_orthogonal_force_gain.csv",
+            ["quantity","abs_z","reference","evidence_class"],
+            [
+                ["fresh DCS median",vals[0],2.0,"fresh_synthetic_follow_on"],
+                ["force median",vals[1],2.0,"fresh_synthetic_follow_on"],
+                ["force best",vals[2],2.0,"fresh_synthetic_follow_on"],
+            ]
+        )
+        figures.append({
+            "id":"orthogonal_force_gain",
+            "svg":p.name,
+            "data":"fig_orthogonal_force_gain.csv",
+            "status":"fresh_synthetic_follow_on",
+            "claim":"Known-force compliance increased median standardized signal by 11.46x but still did not cross the frozen resolved-decision threshold."
+        })
+
     # Paper-facing tables.
     write_csv(out/"table_stage_outcomes.csv",
               ["stage","status","population","resolved_coverage","paper_role"],
@@ -250,6 +284,7 @@ def generate(result_path: Path, out: Path) -> dict:
                 ["D2 frozen","negative","16 truth worlds","0","fresh frozen validation"],
                 ["D3","negative","6 truth worlds","0","discovery"],
                 ["D4V","negative","36 proposals","0","repair-veto discovery"],
+                ["OFC","negative with 11.46x signal gain","36 fresh proposals","0","orthogonal force-compliance follow-on"],
                 ["GAUGE","mixed","10 held-out repeats","n/a","retrospective measured evidence"],
                 ["D5","not executed","fresh measured data","n/a","future confirmation only"],
               ])
@@ -259,6 +294,8 @@ def generate(result_path: Path, out: Path) -> dict:
                 ["ordinary held-out improvement can be deceptive","yes"],
                 ["DCS universal ranking superiority","no"],
                 ["DCS useful prospective resolved repair-veto coverage","no"],
+                ["orthogonal known-force compliance increases standardized signal in the fresh synthetic test","yes"],
+                ["orthogonal force-compliance provides resolved repair-verification coverage","no"],
                 ["GAUGE longitudinal mechanism channel can contradict aggregate observation metrics","retrospective only"],
                 ["fresh measured prospective DCS confirmation","no"],
               ])
@@ -282,12 +319,30 @@ def generate(result_path: Path, out: Path) -> dict:
         write_csv(out/"table_information_frontier.csv",
                   ["method","median_abs_z","max_abs_z","median_required_signal_amplification_to_z2","analysis_class"],[])
 
+    if orthogonal:
+        write_csv(
+            out/"table_orthogonal_force_compliance.csv",
+            ["metric","fresh_dcs","force_compliance","frozen_reference"],
+            [
+                ["resolved_coverage",orthogonal["dcs"]["coverage"],orthogonal["force_compliance"]["coverage"],"n/a"],
+                ["median_abs_z",orthogonal["dcs"]["median_abs_z"],orthogonal["force_compliance"]["median_abs_z"],2.0],
+                ["max_abs_z",orthogonal["dcs"]["max_abs_z"],orthogonal["force_compliance"]["max_abs_z"],2.0],
+                ["median_required_signal_amplification_to_z2",
+                 orthogonal["dcs"]["median_required_signal_amplification_to_z2"],
+                 orthogonal["force_compliance"]["median_required_signal_amplification_to_z2"],1.0],
+                ["sign_accuracy",orthogonal["dcs"]["sign_accuracy"],orthogonal["force_compliance"]["sign_accuracy"],"n/a"],
+            ]
+        )
+    else:
+        write_csv(out/"table_orthogonal_force_compliance.csv",
+                  ["metric","fresh_dcs","force_compliance","frozen_reference"],[])
+
     manifest={
         "schema":"vulkax.paper_assets",
         "version":1,
         "source":str(result_path),
         "figures":figures,
-        "tables":["table_stage_outcomes.csv","table_claim_boundaries.csv","table_information_frontier.csv"],
+        "tables":["table_stage_outcomes.csv","table_claim_boundaries.csv","table_information_frontier.csv","table_orthogonal_force_compliance.csv"],
         "paper_prose_generated":False,
         "warning":"Assets visualize frozen results; they do not change claim status.",
     }
@@ -298,6 +353,8 @@ def self_test() -> None:
     with tempfile.TemporaryDirectory() as td:
         root=Path(td); source=root/"results.json"; out=root/"out"
         source.write_text(json.dumps({
+          "schema":"vulkax.final_results",
+          "dcs":{
           "stages":{
             "D2b":{"ranking_agreement":{"dcs_k2_maximin":.5,"raw_bundle":.6,"raw_maximin":.7,"fisher":.8,"max_motion":.55,"random":.4}},
             "D2_frozen":{"median_standardized_separation":.04,"median_numerical_rms_m":6e-6},
@@ -313,16 +370,23 @@ def self_test() -> None:
             "fisher":{"median_abs_z":.07,"max_abs_z":.63,"median_required_signal_amplification_to_z2":30.0},
             "max_motion":{"median_abs_z":.06,"max_abs_z":.58,"median_required_signal_amplification_to_z2":34.6}
           }}}
+          },
+          "orthogonal_force_compliance":{
+            "dcs":{"coverage":0.0,"median_abs_z":.05,"max_abs_z":.17,
+                   "median_required_signal_amplification_to_z2":40.0,"sign_accuracy":.5},
+            "force_compliance":{"coverage":0.0,"median_abs_z":.56,"max_abs_z":1.32,
+                   "median_required_signal_amplification_to_z2":3.57,"sign_accuracy":.56}
+          }
         }))
         m=generate(source,out)
-        assert len(m["figures"])==6
+        assert len(m["figures"])==7
         assert (out/"fig_ranking_agreement.svg").is_file()
         assert (out/"table_stage_outcomes.csv").is_file()
         print("VALID paper asset generator self-test")
 
 def main() -> int:
     ap=argparse.ArgumentParser()
-    ap.add_argument("--results",default="research/results/DCS_FINAL_RESULTS_2026-09-20.json")
+    ap.add_argument("--results",default="research/results/VULKAX_FINAL_RESULTS_2026-09-21.json")
     ap.add_argument("--out",default="build/paper-figures")
     ap.add_argument("--self-test",action="store_true")
     args=ap.parse_args()
