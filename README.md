@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-smoke.yml"><img src="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-smoke.yml/badge.svg?branch=research%2Fintegration-20260920" alt="Paper evidence smoke"/></a>
-  <a href="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-full.yml"><img src="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-full.yml/badge.svg?branch=research%2Fintegration-20260920" alt="Full reproduction"/></a>
+  <a href="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-smoke.yml"><img src="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-smoke.yml/badge.svg?branch=main" alt="Paper evidence smoke"/></a>
+  <a href="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-full.yml"><img src="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-full.yml/badge.svg?branch=main" alt="Full reproduction"/></a>
   <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus" alt="C++20"/>
   <img src="https://img.shields.io/badge/macOS-Metal-black?logo=apple" alt="Metal"/>
   <img src="https://img.shields.io/badge/Linux-Vulkan-A41E22?logo=vulkan" alt="Vulkan"/>
@@ -46,18 +46,18 @@ It is not merely a renderer with physics attached.
 
 The project starts from a failure mode that ordinary fitting metrics cannot rule out:
 
-[
-L_{	ext{observation}}(M_{	ext{repair}})
+$
+L_{\text{observation}}(M_{\text{repair}})
 <
-L_{	ext{observation}}(M_{	ext{baseline}})
-]
+L_{\text{observation}}(M_{\text{baseline}})
+$
 
 does **not** imply
 
-[
-M_{	ext{repair}}
-	ext{ is physically more correct.}
-]
+$
+M_{\text{repair}}
+\text{ is physically more correct.}
+$
 
 A model can become observationally better while becoming mechanistically worse.
 
@@ -79,54 +79,54 @@ becomes visible.
 
 For a physical world (M), let
 
-[
+$
 F_M(u)
-]
+$
 
 be an observable response under intervention vector (u).
 
 Instead of looking only at raw motion, construct a signed intervention stencil
 
-[
-mathcal D_{mu}[F]
+$
+\mathcal D_{\mu}[F]
 =
-sum_i w_i F(u_i)
-]
+\sum_i w_i F(u_i)
+$
 
 with moment-annihilation constraints such as
 
-[
-sum_i w_i = 0,
-qquad
-sum_i w_i u_i = 0.
-]
+$
+\sum_i w_i = 0,
+\qquad
+\sum_i w_i u_i = 0.
+$
 
 Constant and first-order/common response are cancelled, leaving higher-order
 interaction structure.
 
 A simple symmetric second-order witness is
 
-[
-F(+a)+F(-a)-2F(0).
-]
+$
+F(+a)+F(-a)-2F(0)
+$
 
 A mixed two-intervention witness is
 
-[
-F(A,B)-F(A,0)-F(0,B)+F(0,0),
-]
+$
+F(A,B)-F(A,0)-F(0,B)+F(0,0)
+$
 
 which isolates finite-amplitude response that cannot be explained by either
 intervention independently.
 
 For finite intervention sets, Vulkax also uses the Möbius-style interaction contrast
 
-[
-kappa(S)
+$
+\kappa(S)
 =
-sum_{Tsubseteq S}
-(-1)^{|S|-|T|}F(T).
-]
+\sum_{T\subseteq S}
+(-1)^{|S|-|T|}F(T)
+$
 
 The mathematical primitives themselves are not claimed as new. The research
 question is whether they can be turned into a **mechanism-selective falsification
@@ -141,11 +141,11 @@ they respond to perturbation.
 
 Vulkax treats model equivalence as graded:
 
-[
+$
 j^k F_{M_1}(0)
-approx
+\approx
 j^k F_{M_2}(0)
-]
+$
 
 means the worlds agree through mechanism order (k), within the available
 measurement and numerical resolution.
@@ -156,20 +156,20 @@ But higher order is useful only while the signal remains observable.
 
 Define a maximum observable mechanism order through a signal-to-uncertainty rule:
 
-[
-k_{max}
+$
+k_{\max}
 =
-max
-left{
+\max
+\left\{
 k :
-rac{|mathcal D^{(k)}|}
-{sigma_{	ext{measurement}}+
- sigma_{	ext{numerical}}+
- sigma_{	ext{repeat}}}
+\frac{\|\mathcal D^{(k)}\|}
+{\sigma_{\text{measurement}}
++\sigma_{\text{numerical}}
++\sigma_{\text{repeat}}}
 >
-	au
-ight}.
-]
+\tau
+\right\}
+$
 
 If two models differ only beyond the apparatus' mechanism resolution, Vulkax should
 **refuse to pretend it knows**.
@@ -185,32 +185,31 @@ The active-selection problem is not simply:
 Instead, Vulkax searches for a **physically realizable contrast whose null space
 contains the behavior the surviving models already share**.
 
-For candidate worlds (M_1,ldots,M_K),
+For candidate worlds $M_1,\ldots,M_K$,
 
-[
-Gamma_{mu}(M_i,M_j)
+$
+\Gamma_{\mu}(M_i,M_j)
 =
-rac{
-|mathcal D_{mu}[M_i]-mathcal D_{mu}[M_j]|
+\frac{
+\|\mathcal D_{\mu}[M_i]-\mathcal D_{\mu}[M_j]\|
 }{
-sqrt{
-sigma^2_{	ext{measurement},mu}
+\sqrt{
+\sigma^2_{\text{measurement},\mu}
 +
-sigma^2_{	ext{numerical},mu}
+\sigma^2_{\text{numerical},\mu}
 }
-}.
-]
+}
+$
 
 One natural experiment-design target is
 
-[
-mu^*
+$
+\mu^\*
 =
-argmax_mu
-min_{i
-e j}
-Gamma_mu(M_i,M_j)
-]
+\arg\max_{\mu}
+\min_{i\ne j}
+\Gamma_{\mu}(M_i,M_j)
+$
 
 subject to moment annihilation, experiment cost and physical safety constraints.
 
@@ -402,9 +401,9 @@ endpoint 9 / 10
 
 Exploratory retrospective exact sign-test:
 
-[
-p=0.02148.
-]
+$
+p=0.02148
+$
 
 This result is intentionally labelled **retrospective** because the metric mirage was
 known before DCS was designed.
