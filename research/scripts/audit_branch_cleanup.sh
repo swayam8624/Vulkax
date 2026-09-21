@@ -22,7 +22,6 @@ protected=(
   "main"
   "release/1.0.0"
   "legacy/studio-v1-2026-08-10"
-  "research/integration-20260920"
 )
 
 is_protected() {
