@@ -1,0 +1,31 @@
+name: Export manuscript figures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/export-manuscript-figures.yml"
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect paper figures
+        run: |
+          mkdir -p manuscript_figures
+          cp docs/readme_assets/02_deceptive_repair.png manuscript_figures/
+          cp docs/readme_assets/03_deception_map.png manuscript_figures/
+          cp docs/readme_assets/04_same_probe.png manuscript_figures/
+          cp docs/readme_assets/05_response_overlay.png manuscript_figures/
+          cp docs/readme_assets/06_fingerprint.png manuscript_figures/
+          cp docs/readme_assets/07_residual_field.png manuscript_figures/
+          cp docs/readme_assets/10_signal_gain.png manuscript_figures/
+          cp docs/readme_assets/11_information_limit.png manuscript_figures/
+      - name: Upload manuscript figures
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-probe-manuscript-figures
+          path: manuscript_figures
+          retention-days: 7
