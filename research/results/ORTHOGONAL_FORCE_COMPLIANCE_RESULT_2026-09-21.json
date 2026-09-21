@@ -1,0 +1,61 @@
+{
+  "schema": "vulkax.orthogonal_force_compliance_result",
+  "version": 1,
+  "date": "2026-09-21",
+  "evidence_class": "fresh_synthetic_follow_on",
+  "protocol": "research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md",
+  "workflow_run": 35555415551,
+  "workflow_artifact": "orthogonal-force-compliance-b21513038021a22a1aa9f601fbe535fcc0a4c7fc",
+  "proposal_count": 36,
+  "deceptive_count": 12,
+  "beneficial_count": 24,
+  "dcs": {
+    "coverage": 0,
+    "veto_count": 0,
+    "support_count": 0,
+    "unresolved_count": 36,
+    "sign_accuracy": 0.5,
+    "median_abs_z": 0.04876703024660442,
+    "max_abs_z": 0.17278867919331833,
+    "median_required_signal_amplification_to_z2": 41.011314199089604,
+    "best_case_required_signal_amplification_to_z2": 11.574832386804536
+  },
+  "force_compliance": {
+    "coverage": 0,
+    "veto_count": 0,
+    "support_count": 0,
+    "unresolved_count": 36,
+    "sign_accuracy": 0.5555555555555556,
+    "deceptive_negative_fraction": 0.75,
+    "beneficial_positive_fraction": 0.4583333333333333,
+    "median_abs_z": 0.558629185632829,
+    "max_abs_z": 1.3191113184383891,
+    "median_required_signal_amplification_to_z2": 3.580192462974075,
+    "best_case_required_signal_amplification_to_z2": 1.5161722684387782
+  },
+  "force_to_dcs_median_abs_z_ratio": 11.455058526384752,
+  "resolved_only_by_force": 0,
+  "resolved_only_by_dcs": 0,
+  "resolved_by_both": 0,
+  "advancement_gate_pass": false,
+  "advancement_gate": {
+    "at_least_4_deceptive": true,
+    "force_coverage_at_least_30pct": false,
+    "force_deceptive_veto_recall_at_least_50pct": false,
+    "force_beneficial_false_veto_at_most_25pct": true,
+    "force_coverage_exceeds_dcs": false,
+    "force_median_abs_z_exceeds_dcs": true,
+    "finite_numerical_comparison": true
+  },
+  "exploratory_post_hoc": {
+    "deceptive_classification_score": "-progress_z",
+    "dcs_auroc": 0.4444444444444444,
+    "dcs_average_precision": 0.3109424669734392,
+    "force_auroc": 0.7604166666666666,
+    "force_average_precision": 0.5784352221852221,
+    "warning": "Exploratory post-hoc only; AUROC/AUPRC were not preregistered advancement gates."
+  },
+  "decision": "orthogonal_information_gate_failed",
+  "interpretation": "A known-force compliance channel increased median standardized signal by 11.46x relative to fresh kinematic DCS, but still produced zero resolved proposals at the frozen |z|>=2 reference. The new channel materially improves observability without yet reaching credible repair-verification coverage.",
+  "warning": "Do not retune the frozen force amplitude, truth worlds, candidate grid, or decision threshold on this partition. This is synthetic follow-on evidence, not measured-world confirmation."
+}
