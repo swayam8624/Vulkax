@@ -24,6 +24,9 @@ not imply acceptance, novelty, or a positive prospective result.
 - [x] D4V pair-specific repair-veto study
 - [x] fair raw/Fisher/max-motion/random baselines
 - [x] negative outcomes preserved rather than threshold-tuned
+- [x] orthogonal force-compliance follow-on preregistered before execution
+- [x] fresh force-compliance experiment executed on untouched truth worlds
+- [x] 11.46x median signal gain preserved without retuning the failed advancement gate
 
 ## Measured evidence
 
@@ -34,8 +37,7 @@ not imply acceptance, novelty, or a positive prospective result.
 - [x] per-trial GAUGE retrospective table
 - [x] aggregate GAUGE summary
 - [x] measured result explicitly marked retrospective
-- [ ] fresh positive D5 prospective measured confirmation — not executed because no
-      synthetic DCS formulation cleared the advancement gates
+- [ ] fresh positive D5 prospective measured confirmation — not executed; even the fresh orthogonal force-compliance channel remained below the frozen resolved-decision threshold
 
 ## Paper-facing data
 
@@ -46,6 +48,8 @@ not imply acceptance, novelty, or a positive prospective result.
 - [x] executed ablation matrix
 - [x] deterministic figure generator
 - [x] source CSV for every generated figure
+- [x] orthogonal-force publication figure/table
+- [x] mathematics-to-code audit
 - [x] stage-outcome table
 - [x] claim-boundary table
 - [x] figure/table source map
