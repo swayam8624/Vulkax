@@ -1,19 +1,129 @@
-# Reality Probe
+<h1 align="center">REALITY PROBE</h1>
+
+<h3 align="center">Counterfactual Physical Verification of Captured Worlds</h3>
 
 <p align="center">
-  <strong>Counterfactual Physical Verification of Captured Worlds</strong><br/>
-  Paper-facing research identity of the <code>VULKAX</code> verified-rewritable-reality repository.<br/>
-  <strong>Looks right ≠ physically verified.</strong>
+  <strong>Looks right ≠ physically verified.</strong><br/>
+  Paper-facing research identity of the <code>VULKAX</code> verified-rewritable-reality repository.
 </p>
 
 <p align="center">
   <a href="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-smoke.yml"><img src="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-smoke.yml/badge.svg?branch=main" alt="Paper evidence smoke"/></a>
   <a href="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-full.yml"><img src="https://github.com/swayam8624/Vulkax/actions/workflows/paper-evidence-full.yml/badge.svg?branch=main" alt="Full reproduction"/></a>
+  <a href="https://github.com/swayam8624/Vulkax/actions/workflows/visualization-smoke.yml"><img src="https://github.com/swayam8624/Vulkax/actions/workflows/visualization-smoke.yml/badge.svg?branch=main" alt="Visualization smoke"/></a>
   <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus" alt="C++20"/>
   <img src="https://img.shields.io/badge/macOS-Metal-black?logo=apple" alt="Metal"/>
   <img src="https://img.shields.io/badge/Linux-Vulkan-A41E22?logo=vulkan" alt="Vulkan"/>
-  <img src="https://img.shields.io/badge/research-evidence--first-informational" alt="Evidence first"/>
 </p>
+
+---
+
+<p align="center">
+  <a href="docs/readme_assets/reality_probe_explainer.mp4">
+    <img src="docs/readme_assets/reality_probe_explainer_preview.gif" width="960" alt="Reality Probe explainer preview"/>
+  </a>
+</p>
+
+<p align="center">
+  <strong>▶ Click the animation to open the full 116-second mathematical explainer.</strong><br/>
+  No cinematic camera language: the film is built from the actual frozen proposal data, solver replay,
+  diagnostic grids, response fields, mechanism fingerprints and evidence threshold.
+</p>
+
+<p align="center">
+  <img src="docs/readme_assets/02_deceptive_repair.png" width="960" alt="Deceptive repair: looks better while the untouched physical target becomes worse"/>
+</p>
+
+<p align="center">
+  <em>A repair can improve ordinary held-out agreement while worsening an untouched physical target.</em>
+</p>
+
+## Visual explanation
+
+<p align="center">
+  <img src="docs/readme_assets/03_deception_map.png" width="475" alt="36-proposal deception map"/>
+  <img src="docs/readme_assets/04_same_probe.png" width="475" alt="Same physical probe applied to truth and repair"/>
+</p>
+
+<p align="center">
+  <img src="docs/readme_assets/06_fingerprint.png" width="475" alt="Mechanism fingerprint"/>
+  <img src="docs/readme_assets/07_residual_field.png" width="475" alt="Mechanism darkfield residual"/>
+</p>
+
+<p align="center">
+  <img src="docs/readme_assets/10_signal_gain.png" width="475" alt="11.46x standardized signal gain"/>
+  <img src="docs/readme_assets/11_information_limit.png" width="475" alt="Information limit and frozen evidence threshold"/>
+</p>
+
+The visual story is:
+
+```text
+ordinary observation
+      ↓
+plausible repair
+      ↓
+same controlled physical probe
+      ↓
+truth response  vs  repair response
+      ↓
+mechanism fingerprint / residual field
+      ↓
+standardized evidence
+      ↓
+11.46× stronger median signal
+      ↓
+still below |z| = 2
+      ↓
+UNRESOLVED → REFUSE CERTIFICATION
+```
+
+<details>
+<summary><strong>Open the complete 12-frame Reality Probe visual atlas</strong></summary>
+
+<br/>
+
+### 01 — The question
+<img src="docs/readme_assets/01_question.png" width="100%" alt="Reality Probe research question"/>
+
+### 02 — A deceptive repair
+<img src="docs/readme_assets/02_deceptive_repair.png" width="100%" alt="Deceptive repair"/>
+
+### 03 — The 36-proposal deception map
+<img src="docs/readme_assets/03_deception_map.png" width="100%" alt="Deception map"/>
+
+### 04 — Ask the same physical question
+<img src="docs/readme_assets/04_same_probe.png" width="100%" alt="Same probe"/>
+
+### 05 — Overlay the two responses
+<img src="docs/readme_assets/05_response_overlay.png" width="100%" alt="Truth repair response overlay"/>
+
+### 06 — Mechanism fingerprint
+<img src="docs/readme_assets/06_fingerprint.png" width="100%" alt="Mechanism fingerprint"/>
+
+### 07 — Mechanism darkfield
+<img src="docs/readme_assets/07_residual_field.png" width="100%" alt="Residual field"/>
+
+### 08 — DCS intuition
+<img src="docs/readme_assets/08_dcs_intuition.png" width="100%" alt="DCS intuition"/>
+
+### 09 — Standardized evidence
+<img src="docs/readme_assets/09_standardization.png" width="100%" alt="Standardized evidence"/>
+
+### 10 — Orthogonal physical information
+<img src="docs/readme_assets/10_signal_gain.png" width="100%" alt="Signal gain"/>
+
+### 11 — Information limit
+<img src="docs/readme_assets/11_information_limit.png" width="100%" alt="Information limit"/>
+
+### 12 — Conclusion
+<img src="docs/readme_assets/12_conclusion.png" width="100%" alt="Reality Probe conclusion"/>
+
+### Storyboard
+<img src="docs/readme_assets/storyboard.png" width="100%" alt="Reality Probe full storyboard"/>
+
+Every still also has a matching editable SVG under `docs/readme_assets/`.
+
+</details>
 
 ---
 
@@ -37,7 +147,7 @@ the immutable tag.
 
 ---
 
-## Reality Probe — paper-facing visual atlas
+## Paper-facing visualization package
 
 > **Naming:** `VULKAX` remains the repository/system codename. **Reality Probe** is
 > the paper-facing research identity. The scientific freeze remains
@@ -103,7 +213,8 @@ Final evidential state                   unresolved → refuse certification
 ### Final mathematical explainer
 
 The committed `visualization/explainer/` package is the canonical paper-video
-source. It is a deterministic vector film rather than a cinematic camera sequence.
+source. A tracked README copy of the final MP4 and preview GIF is published under
+`docs/readme_assets/`. It is a deterministic vector film rather than a cinematic camera sequence.
 It uses the frozen 4×4×4 MPM replay, diagnostic grids, response columns, residual
 fields, the real 36-proposal deception map and the fixed evidence threshold.
 
