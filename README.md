@@ -46,18 +46,18 @@ It is not merely a renderer with physics attached.
 
 The project starts from a failure mode that ordinary fitting metrics cannot rule out:
 
-$
+```math
 L_{\text{observation}}(M_{\text{repair}})
 <
 L_{\text{observation}}(M_{\text{baseline}})
-$
+```
 
 does **not** imply
 
-$
+```math
 M_{\text{repair}}
 \text{ is physically more correct.}
-$
+```
 
 A model can become observationally better while becoming mechanistically worse.
 
@@ -77,56 +77,56 @@ Counterfactual Spectroscopy (DCS)**.
 The analogy is dark-field imaging: suppress the dominant signal so weak structure
 becomes visible.
 
-For a physical world (M), let
+For a physical world **M**, let
 
-$
+```math
 F_M(u)
-$
+```
 
-be an observable response under intervention vector (u).
+be an observable response under intervention vector **u**.
 
 Instead of looking only at raw motion, construct a signed intervention stencil
 
-$
+```math
 \mathcal D_{\mu}[F]
 =
 \sum_i w_i F(u_i)
-$
+```
 
 with moment-annihilation constraints such as
 
-$
+```math
 \sum_i w_i = 0,
 \qquad
 \sum_i w_i u_i = 0.
-$
+```
 
 Constant and first-order/common response are cancelled, leaving higher-order
 interaction structure.
 
 A simple symmetric second-order witness is
 
-$
+```math
 F(+a)+F(-a)-2F(0)
-$
+```
 
 A mixed two-intervention witness is
 
-$
+```math
 F(A,B)-F(A,0)-F(0,B)+F(0,0)
-$
+```
 
 which isolates finite-amplitude response that cannot be explained by either
 intervention independently.
 
 For finite intervention sets, Vulkax also uses the Möbius-style interaction contrast
 
-$
+```math
 \kappa(S)
 =
 \sum_{T\subseteq S}
 (-1)^{|S|-|T|}F(T)
-$
+```
 
 The mathematical primitives themselves are not claimed as new. The research
 question is whether they can be turned into a **mechanism-selective falsification
@@ -141,13 +141,13 @@ they respond to perturbation.
 
 Vulkax treats model equivalence as graded:
 
-$
+```math
 j^k F_{M_1}(0)
 \approx
 j^k F_{M_2}(0)
-$
+```
 
-means the worlds agree through mechanism order (k), within the available
+means the worlds agree through mechanism order **k**, within the available
 measurement and numerical resolution.
 
 The first order at which they separate is a candidate **mechanism order of contact**.
@@ -156,7 +156,7 @@ But higher order is useful only while the signal remains observable.
 
 Define a maximum observable mechanism order through a signal-to-uncertainty rule:
 
-$
+```math
 k_{\max}
 =
 \max
@@ -169,7 +169,7 @@ k :
 >
 \tau
 \right\}
-$
+```
 
 If two models differ only beyond the apparatus' mechanism resolution, Vulkax should
 **refuse to pretend it knows**.
@@ -187,7 +187,7 @@ contains the behavior the surviving models already share**.
 
 For candidate worlds $M_1,\ldots,M_K$,
 
-$
+```math
 \Gamma_{\mu}(M_i,M_j)
 =
 \frac{
@@ -199,17 +199,17 @@ $
 \sigma^2_{\text{numerical},\mu}
 }
 }
-$
+```
 
 One natural experiment-design target is
 
-$
+```math
 \mu^\*
 =
 \arg\max_{\mu}
 \min_{i\ne j}
 \Gamma_{\mu}(M_i,M_j)
-$
+```
 
 subject to moment annihilation, experiment cost and physical safety constraints.
 
@@ -310,16 +310,60 @@ configuration and reproduction path are preserved.
 
 # Current research dashboard
 
-| Stage | Evidence class | Current result | Scientific meaning |
+> **Project completion and scientific outcome are different things.**
+>
+> Vulkax engineering, benchmarking, documentation, reproducibility and paper-data
+> packaging are complete for the executed research program. Some experiments
+> completed with a **negative** or **contradictory** scientific result. That is an
+> outcome, not unfinished work.
+
+| Stage | Execution status | Scientific outcome | Meaning |
 |---|---|---|---|
-| **D0** | implementation | ✅ pass | core annihilation/math contracts work |
-| **D1** | constructed positive control | ✅ 64-case pass | implementation can expose designed deceptive repairs |
-| **D2 frozen** | prospective synthetic validation | ❌ 0/16 resolved | fixed DCS did not achieve useful mechanism resolution |
-| **D3** | synthetic discovery | ❌ 0/6 resolved | lower numerical floor did not create observability |
-| **D4V** | repair-veto discovery | ❌ 0% resolved coverage | 14/36 repairs were deceptive, but no tested verifier resolved them |
-| **GAUGE** | measured retrospective | ⚠️ mixed | aggregate metrics and longitudinal mechanism evidence disagree |
-| **D5** | fresh measured confirmation | ⏸ not executed | intentionally blocked because prior gates did not justify it |
-| **D6** | systems capability | ✅ implemented | spatial witness localization/export exists |
+| **D0** | ✅ **complete** | positive control passed | core annihilation/math contracts are correct |
+| **D1** | ✅ **complete** | 64/64 constructed cases behaved as designed | implementation can expose deliberately constructed deceptive repairs |
+| **D2 frozen** | ✅ **complete** | **negative validation** — 0/16 worlds resolved | fixed DCS did not achieve sufficient mechanism resolution |
+| **D3** | ✅ **complete** | **negative discovery result** — 0/6 worlds resolved | lower numerical error did not create enough physical observability |
+| **D4V** | ✅ **complete** | **negative repair-verification result** — 0% resolved coverage | 14/36 repairs were deceptive, but none of the tested verification channels reached the frozen credibility threshold |
+| **GAUGE** | ✅ **complete** | **retrospective channel contradiction** | aggregate/marker metrics favor overlap while longitudinal mechanism evidence favors endpoint |
+| **D5** | ✅ **stop-rule completed** | **not advanced by design** | preregistered progression stopped because D2/D3/D4V did not justify consuming a fresh confirmatory dataset |
+| **D6** | ✅ **complete** | systems capability implemented | spatial witness localization/export is available |
+
+### Completion state
+
+| Area | Status |
+|---|---|
+| Core implementation | ✅ complete |
+| Unit/regression tests | ✅ complete |
+| D1–D4V experiment execution | ✅ complete |
+| GAUGE retrospective execution | ✅ complete |
+| D5 confirmatory runner/infrastructure | ✅ complete |
+| D5 fresh positive measured experiment | ⛔ intentionally not consumed after failed advancement gates |
+| D6 spatial localization | ✅ complete |
+| Benchmark/result ledgers | ✅ complete |
+| Paper-data figures/tables | ✅ complete |
+| One-command reproduction | ✅ complete |
+| Documentation / claim guard | ✅ complete |
+
+The current **scientific conclusion** is therefore not “unfinished DCS.” It is:
+
+> **The tested DCS formulations were fully implemented and tested, then rejected as
+> a prospective flagship verifier because the available physical information was
+> insufficient.**
+
+That conclusion is itself a completed research outcome.
+
+### What “resolved”, “negative”, and “contradictory” mean
+
+- **Resolved** is a statistical/evidential state: the signal cleared the frozen
+  credibility threshold. “0 resolved” does **not** mean the code or experiment was
+  incomplete.
+- **Negative validation/discovery** means the experiment finished and falsified the
+  tested hypothesis.
+- **Contradictory channels** means two valid observables prefer different physical
+  explanations. That disagreement is the measured result.
+- **Not advanced by design** means a preregistered stop rule prevented spending a
+  fresh confirmatory dataset on a method that had already failed its prerequisite
+  gates.
 
 ### Key frozen numbers
 
@@ -350,9 +394,9 @@ GAUGE longitudinal endpoint wins       9 / 10
 
 The D4V result is not merely a near miss.
 
-At the inherited (|z|ge2) credibility reference:
+At the inherited **|z| ≥ 2** credibility reference:
 
-| Method | Median (|z|) | Maximum (|z|) | Median signal amplification needed to reach 2 |
+| Method | Median |z| | Maximum |z| | Median signal amplification needed to reach 2 |
 |---|---:|---:|---:|
 | DCS | 0.05024 | 0.17654 | **39.83×** |
 | raw bundle | 0.04991 | 0.40615 | 40.10× |
@@ -401,9 +445,9 @@ endpoint 9 / 10
 
 Exploratory retrospective exact sign-test:
 
-$
+```math
 p=0.02148
-$
+```
 
 This result is intentionally labelled **retrospective** because the metric mirage was
 known before DCS was designed.
@@ -799,12 +843,12 @@ The current repository **does support**:
 - one-command evidence reproduction;
 - SHA-256-indexed paper-data packaging.
 
-The current repository **does not establish**:
+The completed research program **does not support the following positive claims**:
 
 - DCS as a universal physical correctness certificate;
 - DCS superiority over matched raw/Fisher baselines;
 - useful prospective repair-veto coverage in the tested D4V regime;
-- fresh measured prospective D5 confirmation;
+- fresh measured prospective D5 confirmation (intentionally not consumed after the frozen stop rule);
 - true material-property recovery from GAUGE or DOT where the source data do not
   provide the required ground truth;
 - publication acceptance;
