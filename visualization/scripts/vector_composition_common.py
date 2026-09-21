@@ -37,8 +37,8 @@ def metrics(repo_root: Path):
         "force_median_abs_z": ofc["force_compliance"]["median_abs_z"],
         "force_max_abs_z": ofc["force_compliance"]["max_abs_z"],
         "dcs_median_abs_z": ofc["dcs"]["median_abs_z"],
-        "resolved": ofc["resolved"],
-        "proposals": ofc["proposals"],
+        "resolved": ofc["force_compliance"]["unresolved_count"] == 0,
+        "proposals": ofc["proposal_count"],
     }
 
 

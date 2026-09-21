@@ -27,6 +27,7 @@ jobs:
           bash -n visualization/run_full_visualization.sh
           bash -n visualization/assets/fetch_stanford_bunny.sh
           bash -n visualization/render_paper_hero.sh
+          bash -n visualization/render_paper_suite.sh
 
       - name: Compile presentation Python
         run: |
@@ -36,6 +37,12 @@ jobs:
           python3 -m py_compile visualization/blender/reality_inspector_scene.py
           python3 -m py_compile visualization/blender/solver_trajectory_scene.py
           python3 -m py_compile visualization/scripts/render_hero_case.py
+          python3 -m py_compile visualization/blender/paper_plate_scene.py
+          python3 -m py_compile visualization/blender/verification_animation_scene.py
+          python3 -m py_compile visualization/scripts/vector_composition_common.py
+          python3 -m py_compile visualization/scripts/compose_hero_svg.py
+          python3 -m py_compile visualization/scripts/compose_xray_svg.py
+          python3 -m py_compile visualization/scripts/compose_explainer_svg.py
 
       - name: Verify frozen evidence and render SVGs
         run: ./visualization/render_all.sh
@@ -49,6 +56,20 @@ jobs:
           grep -q "14.93" build/visualization/fig_deceptive_repair_hero.svg
           grep -q "11.46" build/visualization/fig_information_frontier.svg
           grep -q "SCHEMATIC\|schematic" build/visualization/fig_reality_inspector_storyboard.svg
+
+      - name: Validate Illustrator-ready vector assembly
+        run: |
+          mkdir -p build/vector-smoke
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > build/vector-smoke/p.png
+          python3 visualization/scripts/compose_hero_svg.py --repo-root . --observe build/vector-smoke/p.png --repair build/vector-smoke/p.png --interrogate build/vector-smoke/p.png --out build/vector-smoke/hero.svg
+          python3 visualization/scripts/compose_xray_svg.py --repo-root . --xray build/vector-smoke/p.png --out build/vector-smoke/xray.svg
+          python3 visualization/scripts/compose_explainer_svg.py --repo-root . --observe build/vector-smoke/p.png --repair build/vector-smoke/p.png --xray build/vector-smoke/p.png --out build/vector-smoke/explainer.svg
+          test -s build/vector-smoke/hero.svg
+          test -s build/vector-smoke/xray.svg
+          test -s build/vector-smoke/explainer.svg
+          grep -q 'LOOKS RIGHT' build/vector-smoke/hero.svg
+          grep -q 'MECHANISM X-RAY' build/vector-smoke/xray.svg
+          grep -q 'HOW VULKAX' build/vector-smoke/explainer.svg
 
       - name: Upload deterministic SVG package
         uses: actions/upload-artifact@v4
