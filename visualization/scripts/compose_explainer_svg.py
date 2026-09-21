@@ -15,11 +15,12 @@ def main():
     for x,num,title,sub,color,img in cards:
         metric="FIT / RECONSTRUCT" if num=="01" else (f"ORDINARY ERROR −{m['improve_pct']:.2f}%" if num=="02" else "KNOWN FORCE / COMPLIANCE")
         foot="appearance-compatible state" if num=="01" else ("candidate looks better" if num=="02" else "observe hidden physical response")
-        cm.append(f"""<g transform="translate({x},0)"><rect x="0" y="440" width="760" height="1110" rx="28" fill="#071521" stroke="{color}" stroke-opacity=".28"/>
-        <text x="42" y="515" fill="{color}" font-size="30" font-weight="800">{num}</text><text x="110" y="515" fill="#edf6ff" font-size="34" font-weight="800">{title}</text>
-        <text x="42" y="565" fill="#9eb2c5" font-size="18">{sub}</text><image x="40" y="610" width="680" height="680" preserveAspectRatio="xMidYMid meet" href="{img}" xlink:href="{img}"/>
-        <rect x="42" y="1330" width="676" height="140" rx="16" fill="#081b29"/><text x="68" y="1380" fill="{color}" font-size="19" font-weight="700">{metric}</text>
-        <text x="68" y="1420" fill="#b7c6d5" font-size="17">{foot}</text></g>""")
+        cm.append(f"""<g><rect x="{x}" y="440" width="760" height="1110" rx="28" fill="#071521" stroke="{color}" stroke-opacity=".28"/>
+        <text x="{x+42}" y="515" fill="{color}" font-size="30" font-weight="800">{num}</text><text x="{x+110}" y="515" fill="#edf6ff" font-size="34" font-weight="800">{title}</text>
+        <text x="{x+42}" y="565" fill="#9eb2c5" font-size="18">{sub}</text>
+        <rect x="{x+42}" y="1330" width="676" height="140" rx="16" fill="#081b29"/><text x="{x+68}" y="1380" fill="{color}" font-size="19" font-weight="700">{metric}</text>
+        <text x="{x+68}" y="1420" fill="#b7c6d5" font-size="17">{foot}</text></g>
+        <image x="{x+40}" y="610" width="680" height="680" href="{img}"/>""")
     svg=f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3600" height="1800" viewBox="0 0 3600 1800">{defs()}<rect width="3600" height="1800" fill="url(#bg)"/>
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif"><text x="110" y="160" fill="#eef7ff" font-size="70" font-weight="760">HOW REALITY PROBE INTERROGATES A REPAIR</text>
     <text x="110" y="225" fill="#80dfff" font-size="24" font-weight="600" letter-spacing="2">APPEARANCE IS AN OBSERVATION CHANNEL — NOT A CERTIFICATE OF PHYSICAL MECHANISM</text>
