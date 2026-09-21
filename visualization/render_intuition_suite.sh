@@ -63,7 +63,17 @@ python3 "$ROOT/visualization/scripts/compose_deception_map_svg.py" \
   --proposals "$ROOT/visualization/data/ofc_proposals_visualization_2026-09-21.csv" \
   --out "$OUT/vector/reality_probe_deception_map.svg"
 
+for svg in reality_probe_darkfield_intuition reality_probe_mechanism_fingerprints reality_probe_deception_map; do
+  python3 "$ROOT/visualization/scripts/embed_svg_assets.py" \
+    --svg "$OUT/vector/$svg.svg" \
+    --out "$OUT/vector/${svg}_standalone.svg"
+done
+
 echo "INTUITION SUITE PASS"
 echo "  $OUT/vector/reality_probe_darkfield_intuition.svg"
 echo "  $OUT/vector/reality_probe_mechanism_fingerprints.svg"
 echo "  $OUT/vector/reality_probe_deception_map.svg"
+echo "Standalone/shareable copies:"
+echo "  $OUT/vector/reality_probe_darkfield_intuition_standalone.svg"
+echo "  $OUT/vector/reality_probe_mechanism_fingerprints_standalone.svg"
+echo "  $OUT/vector/reality_probe_deception_map_standalone.svg"
