@@ -1,7 +1,7 @@
 # DCS Benchmark Plan and Result Ledger
 
 Date: 2026-09-20
-Status: **execution complete for D0-D4V and GAUGE retrospective; D5 fresh confirmation not executed.** Historical preregistration text is retained below.
+Status: **execution complete for D0-D4V, fresh orthogonal force-compliance follow-on, and GAUGE retrospective; measured D5 confirmation not executed.** Historical preregistration text is retained below.
 
 ## A. Benchmark ladder
 
@@ -170,6 +170,7 @@ Frozen resolved-coverage results:
 | D2 fresh validation | 16 worlds | **0%** | fail / freeze |
 | D3 adaptive-order discovery | 6 worlds | **0%** | do not validate |
 | D4V repair-veto discovery | 36 proposals | **0%** | do not validate |
+| Orthogonal force-compliance | 36 proposals | **0%** | large signal gain, advancement gate fail |
 
 D4V proposal labels:
 - deceptive: **14**
@@ -209,6 +210,7 @@ cause-stratified false-accept table is claimed.
 8. **Risk-coverage:** DCS vs RMSE/UQ/selective baselines.
 9. **Ablation:** k=2, adaptive-k, no numerical guard, no active selection.
 10. **Failure case:** a world DCS cannot separate, documented explicitly.
+11. **Orthogonal information gain:** fresh DCS vs known-force median/max |z| against the fixed |z|=2 line.
 
 ## J. Results ledger
 
@@ -389,6 +391,49 @@ Status: **COMPLETE — NEGATIVE DISCOVERY**.
 - moment contract: PASS
 - decision: `d4v_not_strong_enough`
 
+### Orthogonal force-compliance follow-on
+Status: **COMPLETE — LARGE INFORMATION GAIN, FROZEN ADVANCEMENT FAILURE**.
+
+Protocol:
+`research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md`
+
+Result:
+`research/results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md`
+
+A new physical control channel was frozen before execution rather than retuning DCS.
+
+Fresh truth worlds:
+- 6 worlds;
+- 36 ordinary-heldout-improving repair proposals;
+- 12 deceptive;
+- 24 beneficial.
+
+Fresh kinematic DCS:
+- median `|z|`: **0.04877**;
+- maximum `|z|`: **0.17279**;
+- resolved coverage: **0%**.
+
+Known-force compliance:
+- median `|z|`: **0.55863**;
+- maximum `|z|`: **1.31911**;
+- resolved coverage: **0%**;
+- force/DCS median standardized-signal gain: **11.455×**.
+
+The known-force channel therefore closes most of the median information gap but
+does not cross the frozen `|z| >= 2` credibility reference.
+
+Frozen advancement decision:
+`orthogonal_information_gate_failed`.
+
+Interpretation:
+- the physical information channel matters strongly;
+- the D4V information-limit interpretation survives a direct intervention test;
+- a large information gain is not equivalent to credible verification coverage;
+- the 40 N amplitude and fresh partition may not be retuned after this result.
+
+Exploratory post-hoc AUROC/AUPRC diagnostics are retained only as secondary
+diagnostics and are not preregistered advancement metrics.
+
 ### GAUGE retrospective DCS analysis
 Status: **COMPLETE — RETROSPECTIVE ONLY**.
 
@@ -410,8 +455,7 @@ confirmation.
 
 ### D5 / D6 implementation disposition
 
-D5 fresh measured confirmation was **not executed** because no positive prospective
-DCS configuration survived synthetic gates.
+D5 fresh measured confirmation was **not executed**. After the DCS gates failed, a separately frozen synthetic known-force channel was tested and improved median standardized signal by 11.455×, but it also remained at 0% resolved coverage; this still did not justify a positive measured confirmation claim.
 
 The generic D5 frozen confirmatory replay runner is implemented and self-tested.
 
