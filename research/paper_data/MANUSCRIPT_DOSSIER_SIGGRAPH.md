@@ -941,6 +941,8 @@ Current baseline:
   `\documentclass[acmtog,anonymous,review]{acmart}`
 - Add `\acmSubmissionID{paper ID}`.
 - SIGGRAPH uses author-year citations.
+- Use a current `acmart` release accepted by SIGGRAPH; the 2026 call explicitly
+  requires version 2.16 or newer.
 - Review is double-blind.
 - The submission PDF, images, video, supplement, code/data, and PDF metadata must not
   identify authors or institutions.
@@ -959,6 +961,32 @@ Current baseline:
   publication permission.
 - Supplemental packages above 500 MB are not guaranteed to be downloaded/reviewed.
 - Conflict information is mandatory in the submission system.
+- The 2026 SIGGRAPH policy requires disclosure when generative AI is used to create
+  manuscript content beyond grammar correction. Because this project uses LLM
+  assistance during drafting and software work, maintain a factual use log and
+  prepare the required disclosure rather than trying to conceal the assistance.
+  Human authors remain responsible for every claim, citation, equation, and result.
+
+### Recommended venue strategy
+
+Primary fit: SIGGRAPH / SIGGRAPH Asia Technical Papers, especially if the manuscript
+is framed around executable captured worlds, counterfactual physical verification,
+deceptive repair, and visually interpretable mechanism evidence.
+
+A full journal-style draft is the safest internal source version because the method,
+negative-gate sequence, measured retrospective study, and orthogonal-information
+follow-on require careful qualification. If the target-year call retains the 2026
+track structure, decide later whether to submit journal-only or compress to the
+7-page dual-track format.
+
+Do not simultaneously submit substantially the same manuscript elsewhere during a
+SIGGRAPH review period. The current SIGGRAPH submission policy forbids simultaneous
+peer-reviewed submission of substantially similar work.
+
+Strong adjacent graphics options after a completed review cycle include SIGGRAPH
+Asia, ACM Transactions on Graphics, Eurographics / Computer Graphics Forum, ACM
+Symposium on Computer Animation, and Pacific Graphics. Venue adaptation may change
+emphasis and length, but must not change frozen results or evidence classes.
 
 ### Recommended writing strategy
 
