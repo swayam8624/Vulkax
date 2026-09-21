@@ -87,7 +87,9 @@
     "publication_asset_lock": "research/paper_data/PUBLICATION_ASSET_LOCK.md",
     "paper_positioning": "research/paper_data/PAPER_POSITIONING.md",
     "final_research_summary": "research/results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md",
-    "current_state": "research/status/CURRENT_RESEARCH_STATE_2026-09-21.md"
+    "current_state": "research/status/CURRENT_RESEARCH_STATE_2026-09-21.md",
+    "manuscript_dossier": "research/paper_data/MANUSCRIPT_DOSSIER_SIGGRAPH.md",
+    "manuscript_asset_index": "research/paper_data/MANUSCRIPT_ASSET_INDEX.csv"
   },
   "generated_assets_root": "build/paper-figures",
   "portable_archive_pattern": "build/vulkax-paper-evidence-<commit>.tar.gz"
