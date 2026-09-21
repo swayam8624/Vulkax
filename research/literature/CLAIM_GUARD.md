@@ -1,6 +1,6 @@
 # Vulkax research claim guard
 
-Updated: 2026-09-20
+Updated: 2026-09-21
 
 This file exists to prevent accidental novelty inflation.
 
@@ -106,3 +106,51 @@ A future positive claim requires:
 2. a fresh discovery partition;
 3. a newly frozen untouched validation partition;
 4. then a fresh measured D5 confirmation.
+
+
+## Orthogonal force-compliance claim guard — 2026-09-21
+
+A separately frozen follow-on experiment tested whether a known-force compliance
+channel improves observability without retuning DCS.
+
+Fresh synthetic facts:
+
+- 6 new off-grid truth worlds;
+- 36 ordinary-metric repair proposals;
+- 12 deceptive, 24 beneficial;
+- fresh kinematic DCS median |z|: **0.04877**;
+- force-compliance median |z|: **0.55863**;
+- force/DCS median standardized-signal gain: **11.455×**;
+- best force-compliance |z|: **1.31911**;
+- frozen support/veto reference: **|z| >= 2**;
+- force-compliance resolved coverage: **0%**;
+- advancement gate: **FAIL**.
+
+Therefore the force experiment may support:
+
+> A genuinely different known-force physical channel materially increased
+> uncertainty-normalized model-discrimination signal on fresh synthetic worlds.
+
+It may **not** support:
+
+- that the force channel provides reliable repair verification;
+- that 40 N is an optimal excitation amplitude;
+- that the synthetic force result generalizes to real sensors;
+- that the force result authorizes lowering the |z|=2 decision threshold;
+- that the fresh force partition may be reused to tune a stronger force protocol.
+
+The allowed paper-level statement is now:
+
+> Vulkax exposes deceptive physical repairs and evaluates multiple
+> mechanism-sensitive verification channels under explicit uncertainty. Frozen
+> DCS variants produced zero resolved prospective coverage; a separately
+> preregistered known-force channel increased median standardized signal by 11.46×
+> on fresh synthetic truth worlds but still remained below the frozen credibility
+> threshold, while a retrospective measured GAUGE study showed a channel-specific
+> contradiction between aggregate observation metrics and longitudinal mechanism
+> response.
+
+A stronger prospective verification claim now requires a new untouched experiment
+with materially greater information content and, for a measured-world claim, real
+independent sensing rather than another retuning of the current synthetic
+force-compliance partition.
