@@ -101,33 +101,16 @@ for svg in reality_probe_hero reality_probe_mechanism_darkfield reality_probe_me
     --out "$OUT/vector/${svg}_standalone.svg"
 done
 
-echo "[video] build verification animation scene"
-video_args=(
-  -b
-  -P "$ROOT/visualization/blender/verification_animation_scene.py"
-  --
-  --trajectory-dir "$TRAJ"
-  --bunny "$BUNNY"
-  --direction "$DIRECTION"
-  --motion-scale "$MOTION_SCALE"
-  --output "$OUT/video/reality_probe_verification_animation"
-)
 if [ "$VIDEO" -eq 1 ]; then
-  video_args+=(--render)
+  echo "[video] render canonical Reality Probe mathematical explainer"
+  bash "$ROOT/visualization/explainer/render_explainer.sh" final
 fi
-"$BLENDER" "${video_args[@]}"
-test -s "$OUT/video/reality_probe_verification_animation.blend" || { echo "error: missing animation blend" >&2; exit 1; }
-if [ "$VIDEO" -eq 1 ]; then
-  test -s "$OUT/video/reality_probe_verification_animation.mp4" || { echo "error: missing animation mp4" >&2; exit 1; }
-fi
-
 echo
 echo "PAPER VISUAL SUITE PASS"
 echo "Plates:      $OUT/plates/"
 echo "Illustrator: $OUT/vector/reality_probe_hero.svg"
 echo "             $OUT/vector/reality_probe_mechanism_darkfield.svg"
 echo "             $OUT/vector/reality_probe_method_explainer.svg"
-echo "Animation:   $OUT/video/reality_probe_verification_animation.blend"
 if [ "$VIDEO" -eq 1 ]; then
-  echo "             $OUT/video/reality_probe_verification_animation.mp4"
+  echo "Explainer:   $ROOT/build/reality-probe-explainer/reality_probe_explainer.mp4"
 fi
