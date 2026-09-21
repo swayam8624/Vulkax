@@ -1,0 +1,53 @@
+name: Reality Probe explainer artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Render mode
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - final
+          - stills
+          - check
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout frozen-capable history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install explainer dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install numpy pillow
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Render Reality Probe explainer
+        env:
+          FILM_PY: python3
+        run: bash visualization/explainer/render_explainer.sh "${{ inputs.mode }}"
+
+      - name: Upload explainer package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-probe-explainer-${{ inputs.mode }}-${{ github.sha }}
+          path: build/reality-probe-explainer/
+          if-no-files-found: error
+          retention-days: 30
