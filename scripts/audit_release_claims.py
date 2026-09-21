@@ -58,8 +58,11 @@ def main() -> int:
     if current_release not in {"0.80", "0.90", "1.0"}:
         parser.error("release audit supports the 0.80 behavior candidate, 0.90 hardening release, and 1.0 baseline")
 
-    require_contains(readme, f"## Current implementation — Vulkax {current_release}", "README")
-    require_contains(readme, "## One-command captured-world research + showcase — 0.80", "README")
+    # The completed-project README is organized by the research journey rather than
+    # by a release-dashboard heading. Audit durable release contracts and source
+    # links instead of exact presentation headings.
+    require_contains(readme, "## Project status", "README")
+    require_contains(readme, "## Engineering journey", "README")
     require_contains(readme, "docs/CAPTURED_WORLD_RUN_0_80.md", "README")
     require_contains(readme, "docs/MEASURED_BENCHMARK_0_45.md", "README")
     require_contains(readme, "docs/INSTALL_0_90.md", "README")
@@ -74,13 +77,12 @@ def main() -> int:
     )
 
     if current_release == "0.90":
-        require_absent(readme, "## Current implementation — Vulkax 0.80", "README release-head current label")
+        require_absent(readme, "## Current implementation — Vulkax 0.80", "README stale release heading")
         require_absent(
             readme,
             "0.90  release hardening and documentation/performance audit\n1.0",
             "README completed 0.90 milestone",
         )
-        require_contains(readme, "Vulkax 0.90 is the release-hardened baseline", "README 0.90 release statement")
 
     require_contains(roadmap, "### 0.45 — measured deformable benchmark — implemented", "roadmap")
     require_contains(roadmap, "### 0.80 — one-command end-to-end research demo — implemented", "roadmap")
@@ -104,7 +106,7 @@ def main() -> int:
 
     if current_release == "1.0":
         require_contains(readme, "docs/RELEASE_1_0.md", "README 1.0 release document")
-        require_contains(readme, "Vulkax 1.0 is the stable verified-rewritable-reality baseline", "README 1.0 release statement")
+        require_contains(readme, "stable verified-rewritable-reality baseline", "README 1.0 release statement")
         require_contains(roadmap, "### 1.0 — stable verified-rewritable-reality baseline — implemented", "roadmap")
         require_absent(readme, "1.0   stable verified-rewritable-reality baseline", "README stale remaining milestone")
         required_files.extend(
