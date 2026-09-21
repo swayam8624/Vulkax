@@ -204,6 +204,97 @@ def add_compact_probe(direction, stage_mat, glow_mat):
     hero.add_arrow("compact_force", tip - force * 0.02, tip + force * 0.72, 0.016, glow_mat)
 
 
+def residual_field_material(name):
+    """Render a smooth per-vertex candidate-minus-truth response magnitude field."""
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    try:
+        attr = nt.nodes.new("ShaderNodeVertexColor")
+        attr.layer_name = "ResidualColor"
+        color_out = attr.outputs["Color"]
+    except Exception:
+        attr = nt.nodes.new("ShaderNodeAttribute")
+        attr.attribute_name = "ResidualColor"
+        color_out = attr.outputs["Color"]
+    nt.links.new(color_out, bsdf.inputs["Base Color"])
+    if "Emission Color" in bsdf.inputs:
+        nt.links.new(color_out, bsdf.inputs["Emission Color"])
+    elif "Emission" in bsdf.inputs:
+        nt.links.new(color_out, bsdf.inputs["Emission"])
+    if "Emission Strength" in bsdf.inputs:
+        bsdf.inputs["Emission Strength"].default_value = 0.12
+    bsdf.inputs["Metallic"].default_value = 0.08
+    bsdf.inputs["Roughness"].default_value = 0.28
+    if "Coat Weight" in bsdf.inputs:
+        bsdf.inputs["Coat Weight"].default_value = 0.20
+        bsdf.inputs["Coat Roughness"].default_value = 0.18
+    nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+    return mat
+
+
+def four_direction_residual_scale(csv_path):
+    """Common raw-metre scale across +X/-X/+Y/+Z for directly comparable fields."""
+    max_mag = 1e-12
+    for direction in ("px", "nx", "py", "pz"):
+        dg, last = hero.load_states(csv_path, direction)
+        truth = dg[("truth", last)]
+        repair = dg[("repair_pic", last)]
+        for pid in truth:
+            td = truth[pid]["pos"] - truth[pid]["rest"]
+            rd = repair[pid]["pos"] - repair[pid]["rest"]
+            delta = rd - td
+            mapped = Vector((delta.x, delta.z, delta.y))
+            max_mag = max(max_mag, mapped.length)
+    return max_mag
+
+
+def residual_color(t):
+    """Perceptually ordered cool->light->warm response color."""
+    t = min(max(float(t), 0.0), 1.0)
+    if t < 0.5:
+        a = t / 0.5
+        lo = Vector((0.035, 0.28, 0.46))
+        hi = Vector((0.80, 0.90, 0.94))
+        rgb = lo.lerp(hi, a)
+    else:
+        a = (t - 0.5) / 0.5
+        lo = Vector((0.80, 0.90, 0.94))
+        hi = Vector((1.00, 0.30, 0.055))
+        rgb = lo.lerp(hi, a)
+    return (rgb.x, rgb.y, rgb.z, 1.0)
+
+
+def apply_residual_vertex_colors(obj, params, groups, frame, common_scale):
+    truth = groups[("truth", frame)]
+    repair = groups[("repair_pic", frame)]
+    attr = obj.data.color_attributes.get("ResidualColor")
+    if attr is None:
+        attr = obj.data.color_attributes.new(name="ResidualColor", type="FLOAT_COLOR", domain="POINT")
+    mags = []
+    for i, uvw in enumerate(params):
+        td = hero.field_displacement(truth, uvw)
+        rd = hero.field_displacement(repair, uvw)
+        mag = (rd - td).length
+        mags.append(mag)
+        attr.data[i].color = residual_color(mag / common_scale)
+    return max(mags) if mags else 0.0
+
+
+def create_residual_field_bunny(source, params, rest_display, groups, frame, motion_scale, mat, common_scale, name):
+    obj = hero.create_deformed_bunny(
+        source, name, params, rest_display, groups,
+        "repair_pic", frame, 0.0, motion_scale, mat,
+        animate=False,
+    )
+    max_surface = apply_residual_vertex_colors(obj, params, groups, frame, common_scale)
+    print(f"RESIDUAL_FIELD {name} max_surface_raw_m={max_surface:.9g} common_scale_raw_m={common_scale:.9g}")
+    return obj
+
+
 def add_surface_residual_vectors(params, rest_display, groups, frame, motion_scale, truth_mat, residual_mat):
     """Show candidate-minus-truth response at deterministic bunny-surface samples."""
     truth_group = groups[("truth", frame)]
@@ -247,11 +338,11 @@ def add_force_glyph(direction, glow_mat):
     elif direction == "nx":
         hero.add_arrow("force_nx", Vector((1.95, -0.24, 1.52)), Vector((1.18, -0.24, 1.52)), 0.012, glow_mat)
     elif direction == "py":
-        hero.add_arrow("force_py", Vector((0.0, -0.24, 0.18)), Vector((0.0, -0.24, 0.88)), 0.012, glow_mat)
+        hero.add_arrow("force_py", Vector((-1.62, -0.24, 0.52)), Vector((-1.62, -0.24, 1.20)), 0.012, glow_mat)
     else:
         # +solver-Z maps into screen depth from this camera: use the standard
         # circled-cross symbol for a vector pointing away from the viewer.
-        center = Vector((1.45, -0.70, 1.55))
+        center = Vector((1.58, -0.70, 1.52))
         hero.add_torus("force_pz_ring", center, 0.16, 0.010, glow_mat, rotation=(math.radians(90), 0.0, 0.0))
         hero.cylinder_between("force_pz_x1", center + Vector((-0.09, 0.0, -0.09)), center + Vector((0.09, 0.0, 0.09)), 0.010, glow_mat, 12)
         hero.cylinder_between("force_pz_x2", center + Vector((-0.09, 0.0, 0.09)), center + Vector((0.09, 0.0, -0.09)), 0.010, glow_mat, 12)
@@ -283,6 +374,8 @@ def main():
     mats = make_materials()
     diag_truth = diagnostic_grid_material("diag_truth_smooth", (0.82, 0.88, 0.92, 1.0), (0.015, 0.30, 0.48, 1.0))
     diag_repair = diagnostic_grid_material("diag_repair_smooth", (0.88, 0.84, 0.79, 1.0), (0.74, 0.24, 0.055, 1.0))
+    residual_field = residual_field_material("residual_field")
+    common_residual_scale = four_direction_residual_scale(args.trajectory_dir / "particle_trajectories.csv")
 
     source = hero.import_ply(args.bunny)
     source.name = "Stanford_Bunny_Source_Hidden"
@@ -291,7 +384,7 @@ def main():
     source.hide_viewport = True
 
     panel = args.panel
-    accent = mats["orange_glow"] if panel in {"interrogate", "xray"} else mats["cyan_glow"]
+    accent = mats["orange_glow"] if panel in {"interrogate", "xray", "darkfield"} else mats["cyan_glow"]
     if panel == "repair":
         accent = mats["green"]
 
@@ -350,22 +443,18 @@ def main():
         attach_rest_uv(obj, params)
 
     elif panel == "darkfield":
-        hero.create_deformed_bunny(source, "Darkfield_Repair", params, rest_display, groups,
-                                   "repair_pic", last, 0.0, args.motion_scale, mats["repair_trans"],
-                                   animate=False)
-        hero.create_deformed_bunny(source, "Darkfield_Truth", params, rest_display, groups,
-                                   "truth", last, 0.0, args.motion_scale, mats["truth_wire"],
-                                   animate=False, wireframe=True, ghost=True)
+        create_residual_field_bunny(
+            source, params, rest_display, groups, last, args.motion_scale,
+            residual_field, common_residual_scale, "Darkfield_Response"
+        )
         add_surface_residual_vectors(params, rest_display, groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
         add_force_glyph(args.direction, mats["orange_glow"])
 
     elif panel == "xray":
-        hero.create_deformed_bunny(source, "XRay_Repair", params, rest_display, groups,
-                                   "repair_pic", last, 0.0, args.motion_scale, mats["repair_trans"],
-                                   animate=False)
-        hero.create_deformed_bunny(source, "XRay_Truth", params, rest_display, groups,
-                                   "truth", last, 0.0, args.motion_scale, mats["truth_wire"],
-                                   animate=False, wireframe=True, ghost=True)
+        create_residual_field_bunny(
+            source, params, rest_display, groups, last, args.motion_scale,
+            residual_field, common_residual_scale, "XRay_Response"
+        )
         add_surface_residual_vectors(params, rest_display, groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
         add_force_glyph(args.direction, mats["orange_glow"])
 
