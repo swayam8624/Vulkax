@@ -62,7 +62,7 @@ insufficient to decide.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig0_reality_probe_overview.png}
+\includegraphics[width=\textwidth]{../docs/readme_assets/storyboard.png}
 \caption{Reality Probe at a glance, composed from frozen result panels. A candidate repair can improve ordinary held-out fit while worsening an untouched physical target. The repair is then asked a different physical question, its motion response is compared against the truth response, mechanism-level residuals are exposed, and the evidence is standardized. The selected case is post hoc for visualization; the 11.46$\times$ signal gain and 0/36 resolved coverage are aggregate fresh force-compliance results.}
 \label{fig:overview}
 \end{figure*}
@@ -79,7 +79,7 @@ independent of this selection.
 
 \begin{figure}
 \centering
-\includegraphics[width=\linewidth]{figures/02_deceptive_repair.png}
+\includegraphics[width=\linewidth]{../docs/readme_assets/02_deceptive_repair.png}
 \caption{Selected deceptive repair from the frozen fresh
 force-compliance population. The ordinary held-out error improves by
 14.93\% while the untouched physical-target error worsens by 9.03\%.
@@ -282,14 +282,11 @@ rewrite; if it produces veto, the rewrite is rejected; if evidence is
 unresolved, the system refuses certification rather than forcing a
 binary answer.
 
-\begin{figure}
-\centering
-\includegraphics[width=\linewidth]{figures/system_architecture.png}
-\caption{Reality Probe verification transaction. Proposal generation is
-separated from an independent physical probe. The orthogonal connectors
-emphasize transaction order and the explicit support, veto, or
-unresolved outcome.}
-\end{figure}
+The verification transaction is deliberately sequential: proposal
+generation is completed before the independent physical probe is
+evaluated, and the resulting evidence may support, veto, or leave the
+rewrite unresolved. This ordering prevents the confirmatory channel from
+silently becoming part of the proposal objective.
 
 The research implementation is in C++20 and uses nonlinear MPM replay,
 APIC/PIC transfer variants, finite-difference and adjoint influence
@@ -385,7 +382,7 @@ after observing the results.
 
 \begin{figure}
 \centering
-\includegraphics[width=\linewidth]{figures/04_same_probe.png}
+\includegraphics[width=\linewidth]{../docs/readme_assets/04_same_probe.png}
 \caption{Same controlled +X force probe applied to truth and repaired
 worlds. The displayed deformation is magnified 400x only for legibility;
 reported numbers remain unscaled.}
@@ -393,7 +390,7 @@ reported numbers remain unscaled.}
 
 \begin{figure}
 \centering
-\includegraphics[width=\linewidth]{figures/06_fingerprint.png}
+\includegraphics[width=\linewidth]{../docs/readme_assets/06_fingerprint.png}
 \caption{Four-direction force-response fingerprint for the selected
 frozen case. The six-component response bundle records top-layer and
 interior displacement under +X, -X, +Y, and +Z probes; truth and repair
@@ -402,7 +399,7 @@ are plotted on a shared component scale.}
 
 \begin{figure}
 \centering
-\includegraphics[width=\linewidth]{figures/07_residual_field.png}
+\includegraphics[width=\linewidth]{../docs/readme_assets/07_residual_field.png}
 \caption{Solver-driven residual field for the same frozen visualization
 case. All four force directions share one residual scale; the field is
 explanatory and is not itself the DCS decision statistic.}
@@ -508,7 +505,7 @@ Fresh OFC & 12 & 24 & 0/36 \\
 
 \begin{figure}
 \centering
-\includegraphics[width=\linewidth]{figures/03_deception_map.png}
+\includegraphics[width=\linewidth]{../docs/readme_assets/03_deception_map.png}
 \caption{Fresh orthogonal force-compliance proposal landscape. The
 figure shows where ordinary held-out improvement and the untouched
 physical target disagree across the fresh population.}
@@ -681,7 +678,7 @@ scale}\label{orthogonal-physical-information-changes-the-evidence-scale}
 
 \begin{figure}
 \centering
-\includegraphics[width=\linewidth]{figures/10_signal_gain.png}
+\includegraphics[width=\linewidth]{../docs/readme_assets/10_signal_gain.png}
 \caption{Fresh known-force compliance raises the median standardized
 signal by 11.46x relative to fresh DCS without changing the frozen
 decision rule.}
@@ -698,7 +695,7 @@ is the unique limiting cause.
 
 \begin{figure}
 \centering
-\includegraphics[width=\linewidth]{figures/11_information_limit.png}
+\includegraphics[width=\linewidth]{../docs/readme_assets/11_information_limit.png}
 \caption{Information-limit summary from the frozen fresh
 orthogonal-information experiment. Known-force compliance increases
 standardized evidence substantially, but the strongest case remains
