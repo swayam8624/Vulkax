@@ -17,6 +17,7 @@ done
 
 python3 "$ROOT/visualization/scripts/verify_frozen_evidence.py"
 python3 "$ROOT/visualization/scripts/render_paper_visuals.py" --out "$OUT"
+python3 "$ROOT/visualization/scripts/render_hero_case.py" --out "$OUT"
 
 if command -v magick >/dev/null 2>&1; then
   for svg in "$OUT"/*.svg; do

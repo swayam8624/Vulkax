@@ -1,0 +1,33 @@
+{
+  "schema": "vulkax.visual_hero_case",
+  "version": 1,
+  "date": "2026-09-21",
+  "evidence_class": "fresh_synthetic_follow_on",
+  "selection_class": "post_hoc_visualization_only",
+  "selection_rule": "Among deceptive proposals in the frozen orthogonal-force artifact, choose the proposal with the most negative force_progress_z. This selects a clear illustrative case only; it does not alter any scientific statistic, threshold, gate, or conclusion.",
+  "source": {
+    "workflow_run": 35555415551,
+    "artifact_id": 10620460094,
+    "artifact_name": "orthogonal-force-compliance-b21513038021a22a1aa9f601fbe535fcc0a4c7fc",
+    "artifact_sha256": "dcfc8de472dadd6da5fc16e2afa3194a142c10b2e73944e606c958e497b72728",
+    "proposals_csv_sha256": "489b4f154f33e60023b62fbd2599ed16e35ddd294b3d58950d207a7b659c0cea"
+  },
+  "row": {
+    "truth_id": 5,
+    "baseline": "apic",
+    "repair": "pic",
+    "baseline_holdout_m": 0.000010517712035032275,
+    "repair_holdout_m": 0.000008947388417773706,
+    "baseline_target_m": 0.000010987448733584696,
+    "repair_target_m": 0.000011979910421188088,
+    "label": "deceptive",
+    "dcs_progress_z": -0.1126167976660551,
+    "dcs_decision": "unresolved",
+    "dcs_separation": 0.1423161763625886,
+    "force_progress_z": -1.318106327559275,
+    "force_decision": "unresolved",
+    "force_num_baseline_m": 0.00000249163715629302,
+    "force_num_repair_m": 0.00002419866452217093,
+    "provenance": "synthetic-orthogonal-force-compliance"
+  }
+}

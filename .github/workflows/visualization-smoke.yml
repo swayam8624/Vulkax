@@ -25,15 +25,18 @@ jobs:
         run: |
           python3 -m py_compile visualization/scripts/verify_frozen_evidence.py
           python3 -m py_compile visualization/scripts/render_paper_visuals.py
+          python3 -m py_compile visualization/scripts/render_hero_case.py
 
       - name: Verify frozen evidence and render SVGs
         run: ./visualization/render_all.sh
 
       - name: Confirm expected visual surfaces
         run: |
+          test -s build/visualization/fig_deceptive_repair_hero.svg
           test -s build/visualization/fig_information_frontier.svg
           test -s build/visualization/fig_evidence_story.svg
           test -s build/visualization/fig_reality_inspector_storyboard.svg
+          grep -q "14.93" build/visualization/fig_deceptive_repair_hero.svg
           grep -q "11.46" build/visualization/fig_information_frontier.svg
           grep -q "SCHEMATIC\|schematic" build/visualization/fig_reality_inspector_storyboard.svg
 

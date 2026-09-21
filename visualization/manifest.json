@@ -1,11 +1,12 @@
 {
   "schema": "vulkax.visualization_manifest",
-  "version": 1,
+  "version": 2,
   "purpose": "presentation_only",
   "ai_generated_submission_imagery": false,
   "ledger": "research/results/VULKAX_FINAL_RESULTS_2026-09-21.json",
   "frozen_tag": "paper-freeze-2026-09-21",
   "frozen_commit": "a9da8c0aa8689ebeea0d84baf95a74907659a837",
+  "hero_case": "visualization/data/hero_case_ofc_2026-09-21.json",
   "frozen_values": {
     "dcs.stages.D1.cases": 64,
     "dcs.stages.D1.dcs_accept_deceptive": 0,
@@ -29,6 +30,11 @@
     "orthogonal_force_compliance.advancement_gate_pass": false
   },
   "render_surfaces": [
+    {
+      "file": "fig_deceptive_repair_hero.svg",
+      "class": "paper_evidence",
+      "claim": "one exact frozen fresh-synthetic deceptive proposal showing ordinary held-out improvement, untouched-target worsening, and unresolved DCS/force evidence"
+    },
     {
       "file": "fig_information_frontier.svg",
       "class": "paper_evidence",
