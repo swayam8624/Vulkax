@@ -1,16 +1,18 @@
 # Vulkax Research Results Index
 
-Canonical research state date: **2026-09-20**
+Canonical research state date: **2026-09-21**
 
 ## Start here
 
-1. [Final benchmark summary](DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md)
-2. [Machine-readable benchmark table](DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv)
-3. [Machine-readable result ledger](DCS_FINAL_RESULTS_2026-09-20.json)
-4. [Post-hoc information frontier](DCS_INFORMATION_FRONTIER_2026-09-20.md)
-4. [Paper-data map](../paper_data/README.md)
-5. [Current research state](../status/CURRENT_RESEARCH_STATE_2026-09-20.md)
-6. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
+1. [Final paper-level JSON ledger](VULKAX_FINAL_RESULTS_2026-09-21.json)
+2. [Orthogonal force-compliance result](ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md)
+3. [DCS benchmark summary](DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md)
+4. [Machine-readable benchmark table](DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv)
+5. [Machine-readable DCS result ledger](DCS_FINAL_RESULTS_2026-09-20.json)
+6. [Post-hoc information frontier](DCS_INFORMATION_FRONTIER_2026-09-20.md)
+7. [Paper-data map](../paper_data/README.md)
+8. [Current research state](../status/CURRENT_RESEARCH_STATE_2026-09-20.md)
+9. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
 
 ## Reproduce everything
 
@@ -49,6 +51,7 @@ Generated paper assets:
 - [D2 validation protocol](../benchmarks/DCS_D2_VALIDATION_PROTOCOL.md)
 - [D3 discovery protocol](../benchmarks/DCS_D3_DISCOVERY_PROTOCOL.md)
 - [D4V repair-veto protocol](../benchmarks/DCS_D4V_REPAIR_VETO_DISCOVERY_PROTOCOL.md)
+- [Orthogonal force-compliance protocol](../benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md)
 - [Full benchmark ledger](../benchmarks/DCS_BENCHMARK_PLAN.md)
 
 ## Deterministic figure/table outputs
@@ -61,6 +64,7 @@ Generated paper assets:
 - D4V repair-proposal figure;
 - GAUGE channel-contradiction figure;
 - post-hoc information-frontier figure;
+- orthogonal known-force information-gain figure;
 - stage-outcome table;
 - claim-boundary table.
 
@@ -82,10 +86,7 @@ for fresh prospective confirmation.
 
 DCS is fully implemented but is **not** a validated flagship verifier.
 
-The strongest current prospective observation is that the bottleneck is
-experimental information content: D4V contains 14 genuinely deceptive
-held-out-improving repairs, yet DCS and all matched verification baselines remain
-unresolved at the frozen credibility standard.
+The strongest current synthetic result is an information-gradient rather than a successful verifier: D4V contains 14 deceptive repairs with 0% resolved coverage, and a separately preregistered known-force compliance channel raises median |z| by 11.46× on fresh truth worlds but still reaches only 1.319 at best against the frozen |z|=2 decision reference.
 
 The strongest measured retrospective observation is the GAUGE channel conflict:
 ordinary/marker evidence favors the finite-overlap repair while the longitudinal
