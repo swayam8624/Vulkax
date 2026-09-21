@@ -11,7 +11,7 @@ def main():
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif"><text x="150" y="175" fill="#f0f7ff" font-size="76" font-weight="700">REALITY PROBE  /  MECHANISM DARKFIELD</text>
     <text x="150" y="245" fill="#82e2ff" font-size="25" font-weight="600" letter-spacing="2">CANDIDATE − TRUTH RESPONSE UNDER A KNOWN PHYSICAL PROBE</text>
     <rect x="120" y="330" width="1940" height="1320" rx="34" fill="#07131f" stroke="#6ee2ff" stroke-opacity=".22" stroke-width="2"/>
-    <image x="210" y="390" width="1760" height="1160" preserveAspectRatio="xMidYMid meet" href="{image}" xlink:href="{image}"/>
+    <image x="510" y="390" width="1160" height="1160" href="{image}"/>
     <text x="170" y="1600" fill="#ffae65" font-size="20" font-weight="600">DISPLAY ×{a.motion_scale:g} / RESIDUAL DIRECTIONS FROM RAW SOLVER STATE</text>
     <g transform="translate(2160,350)"><text x="0" y="0" fill="#f0f7ff" font-size="36" font-weight="700">THIS DECEPTIVE REPAIR</text>
     <text x="0" y="56" fill="#91a7bb" font-size="21">truth world {m['truth_id']} / frozen APIC → PIC proposal</text>
