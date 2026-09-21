@@ -5,7 +5,7 @@ Repository: VULKAX
 Paper-facing name: Reality Probe  
 Scientific freeze: `paper-freeze-2026-09-21`  
 Frozen commit: `a9da8c0aa8689ebeea0d84baf95a74907659a837`  
-Current repository status: research execution complete; manuscript preparation next
+Current repository status: research execution complete; review-hardened manuscript source committed under `paper/main.tex`
 
 This document is the handoff from completed research execution to paper writing. It
 collects the paper claim, section plan, exact evidence, equations, literature
@@ -19,7 +19,7 @@ changing the frozen science.
 
 ### Working title
 
-**Reality Probe: Counterfactual Physical Verification of Captured Worlds**
+**Reality Probe: Information-Limited Physical Verification of Captured Worlds**
 
 A more result-specific alternative is:
 
@@ -1250,23 +1250,21 @@ clearly separated from the existing paper freeze.
 
 ## 25. Immediate next step
 
-The research package is ready for manuscript construction.
+The full internal manuscript source now lives at `paper/main.tex` and has undergone a
+review-hardening pass. The next phase is submission engineering rather than manuscript
+construction:
 
-The next repository phase should create:
+1. compile and inspect the ACM/TOG PDF end to end;
+2. verify every bibliography entry against the source publication and, if desired,
+   migrate the inline reference list to a checked `references.bib`;
+3. inspect figure typography at printed two-column scale and regenerate any panel
+   whose internal labels are too small;
+4. build the anonymous supplementary export without public Git history or identity
+   metadata;
+5. preserve the scientific tag and frozen machine-readable results unchanged.
 
-```text
-paper/
-  main.tex
-  references.bib
-  sections/
-  figures/
-  tables/
-  supplement/
-  Makefile
-```
-
-Start with the full journal-style internal manuscript. Keep every numerical statement
-traceable to the frozen source hierarchy in Section 18 of this dossier.
+Any genuinely new measured-force experiment must be separately frozen and reported as
+new evidence rather than folded into the 2026-09-21 freeze.
 
 
 ## 26. Code-to-paper map
