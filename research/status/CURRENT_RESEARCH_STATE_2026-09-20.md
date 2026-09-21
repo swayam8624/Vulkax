@@ -1,7 +1,7 @@
 # Vulkax Current Research State — 2026-09-20
 
-Canonical branch:
-`research/integration-20260920`
+Canonical stable branch:
+`main`
 
 Canonical integration head at DCS merge:
 `e2fa8cadbfa765367971030ca9614d9d7a063aae`
@@ -97,4 +97,4 @@ Any successful discovery must be followed by:
 - open PRs: **0**
 - safe-delete fully-contained branches: **25**
 - divergent branches with unique commits: retained pending audit
-- production `main`: intentionally untouched by this research integration
+- production `main`: promoted to the canonical stable implementation on 2026-09-21
