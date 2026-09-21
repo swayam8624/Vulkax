@@ -88,7 +88,14 @@ hero_args=(
   --render-still
 )
 if [ "$RENDER_VIDEOS" -eq 1 ]; then hero_args+=(--render-animation); fi
+hero_base="$OUT/vulkax_bunny_hero_${AESTHETIC_DIRECTION}"
+rm -f "${hero_base}.blend" "${hero_base}.png" "${hero_base}.mp4"
 "$BLENDER" "${hero_args[@]}"
+test -s "${hero_base}.blend" || { echo "error: aesthetic hero .blend was not produced" >&2; exit 1; }
+test -s "${hero_base}.png" || { echo "error: aesthetic hero .png was not produced" >&2; exit 1; }
+if [ "$RENDER_VIDEOS" -eq 1 ]; then
+  test -s "${hero_base}.mp4" || { echo "error: aesthetic hero .mp4 was not produced" >&2; exit 1; }
+fi
 
 echo
 echo "[8/8] Build compact raw-solver Blender scenes"
@@ -104,7 +111,12 @@ for direction in px nx py pz; do
     --output "$output"
   )
   if [ "$RENDER_VIDEOS" -eq 1 ]; then args+=(--render); fi
+  rm -f "${output}.blend" "${output}.mp4"
   "$BLENDER" "${args[@]}"
+  test -s "${output}.blend" || { echo "error: missing solver scene ${output}.blend" >&2; exit 1; }
+  if [ "$RENDER_VIDEOS" -eq 1 ]; then
+    test -s "${output}.mp4" || { echo "error: missing solver video ${output}.mp4" >&2; exit 1; }
+  fi
 done
 
 echo

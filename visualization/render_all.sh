@@ -71,9 +71,14 @@ if [ "$WITH_BLENDER" -eq 1 ]; then
   fi
 
   echo "Using Blender: $BLENDER"
+  rm -f "$OUT/reality_inspector.blend"
   "$BLENDER" -b -P "$ROOT/visualization/blender/reality_inspector_scene.py" -- \
     --repo-root "$ROOT" \
     --output "$OUT/reality_inspector"
+  if [ ! -s "$OUT/reality_inspector.blend" ]; then
+    echo "error: Blender returned without producing reality_inspector.blend" >&2
+    exit 1
+  fi
 fi
 
 echo

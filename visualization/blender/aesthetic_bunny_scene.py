@@ -21,6 +21,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import bpy
+from bpy_extras import anim_utils
 from mathutils import Vector
 
 BG = (0.004, 0.010, 0.025, 1.0)
@@ -362,9 +363,13 @@ def create_deformed_bunny(
             key.value = 0.0
             key.keyframe_insert(data_path="value", frame=min(1 + last * frame_stride, t + frame_stride))
         if obj.data.shape_keys and obj.data.shape_keys.animation_data:
-            for fc in obj.data.shape_keys.animation_data.action.fcurves:
-                for kp in fc.keyframe_points:
-                    kp.interpolation = "LINEAR"
+            channelbag = anim_utils.animdata_get_channelbag_for_assigned_slot(
+                obj.data.shape_keys.animation_data
+            )
+            if channelbag is not None:
+                for fc in channelbag.fcurves:
+                    for kp in fc.keyframe_points:
+                        kp.interpolation = "LINEAR"
     else:
         keys[0][1].value = 1.0
 

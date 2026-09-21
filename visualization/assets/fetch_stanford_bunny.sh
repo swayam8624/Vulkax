@@ -12,7 +12,7 @@ URL_HTTP="http://graphics.stanford.edu/pub/3Dscanrep/bunny.tar.gz"
 mkdir -p "$ASSET_ROOT"
 
 if [ ! -s "$PLY" ]; then
-  echo "Fetching Stanford Bunny from the Stanford 3D Scanning Repository..."
+  echo "Fetching Stanford Bunny from the Stanford 3D Scanning Repository..." >&2
   if [ ! -s "$ARCHIVE" ]; then
     if ! curl -L --fail --retry 3 --retry-delay 2 "$URL_HTTPS" -o "$ARCHIVE"; then
       echo "HTTPS fetch failed; retrying Stanford's HTTP endpoint..." >&2

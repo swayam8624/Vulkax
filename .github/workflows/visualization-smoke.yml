@@ -26,6 +26,7 @@ jobs:
           bash -n visualization/render_all.sh
           bash -n visualization/run_full_visualization.sh
           bash -n visualization/assets/fetch_stanford_bunny.sh
+          bash -n visualization/render_paper_hero.sh
 
       - name: Compile presentation Python
         run: |
