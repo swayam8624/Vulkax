@@ -1,6 +1,6 @@
 {
   "schema": "vulkax.visualization_manifest",
-  "version": 2,
+  "version": 3,
   "purpose": "presentation_only",
   "ai_generated_submission_imagery": false,
   "ledger": "research/results/VULKAX_FINAL_RESULTS_2026-09-21.json",
@@ -49,6 +49,16 @@
       "file": "fig_reality_inspector_storyboard.svg",
       "class": "schematic_storyboard",
       "claim": "visual explanation only; mechanism drawing is explicitly schematic and numeric annotations come from the frozen ledger"
+    },
+    {
+      "file": "fig_solver_state_force_trajectories.svg",
+      "class": "solver_replay_evidence",
+      "claim": "natural-scale synchronized raw MPM states for the exact frozen truth-world-5 APIC to PIC hero replay"
+    },
+    {
+      "file": "fig_solver_state_residual_xray.svg",
+      "class": "solver_replay_evidence",
+      "claim": "candidate-minus-truth solver residual vectors with explicit display magnification only"
     }
   ]
 }

@@ -115,3 +115,27 @@ build/visualization/fig_solver_state_force_trajectories.svg
 
 It overlays truth APIC, fitted baseline APIC and fitted repair PIC particle states and top-layer centroid trails for all four force directions. No deformation is hand-authored in this figure.
 
+### Mechanism X-ray and Blender animation
+
+Natural-scale particle motion is intentionally tiny, so an additional X-ray surface renders **candidate-minus-truth residual vectors with an explicit display magnification**:
+
+```bash
+python3 visualization/scripts/render_solver_residual_xray.py \
+  --trajectory-dir build/visualization-trajectory \
+  --out build/visualization
+```
+
+Default display magnification is `700×`. The raw numerical values printed beside it remain unscaled.
+
+The same raw trajectory package can drive a procedural Blender scene:
+
+```bash
+blender -b -P visualization/blender/solver_trajectory_scene.py -- \
+  --trajectory-dir build/visualization-trajectory \
+  --direction px \
+  --motion-scale 400 \
+  --output build/visualization/vulkax_solver_reality_inspector
+```
+
+Add `--render` after the Blender-script separator arguments to render H.264. The in-scene title permanently states the display motion magnification so a presentation render cannot be mistaken for natural-scale deformation.
+

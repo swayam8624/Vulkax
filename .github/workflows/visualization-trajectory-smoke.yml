@@ -8,6 +8,8 @@ on:
       - "CMakeLists.txt"
       - "visualization/probes/**"
       - "visualization/scripts/render_solver_trajectory.py"
+      - "visualization/scripts/render_solver_residual_xray.py"
+      - "visualization/blender/solver_trajectory_scene.py"
       - "visualization/data/hero_case_ofc_2026-09-21.json"
       - ".github/workflows/visualization-trajectory-smoke.yml"
 
@@ -43,6 +45,7 @@ jobs:
           test -s build/visualization-trajectory/direction_summary.csv
           test -s build/visualization-trajectory/trajectory_manifest.json
           test -s build/visualization/fig_solver_state_force_trajectories.svg
+          test -s build/visualization/fig_solver_state_residual_xray.svg
           grep -q "matched_frozen_hero_row" build/visualization-trajectory/trajectory_manifest.json
           grep -q "raw solver-state" build/visualization/fig_solver_state_force_trajectories.svg
 
@@ -53,4 +56,5 @@ jobs:
           path: |
             build/visualization-trajectory/
             build/visualization/fig_solver_state_force_trajectories.svg
+            build/visualization/fig_solver_state_residual_xray.svg
           retention-days: 30
