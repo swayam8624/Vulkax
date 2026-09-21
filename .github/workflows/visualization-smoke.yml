@@ -34,6 +34,7 @@ jobs:
             exit 1
           fi
           bash -n visualization/render_intuition_suite.sh
+          bash -n visualization/render_verification_video.sh
 
       - name: Compile presentation Python
         run: |
@@ -53,6 +54,7 @@ jobs:
           python3 -m py_compile visualization/scripts/compose_fingerprints_svg.py
           python3 -m py_compile visualization/scripts/compose_deception_map_svg.py
           python3 -m py_compile visualization/scripts/embed_svg_assets.py
+          python3 -m py_compile visualization/scripts/verify_illustrator_svg.py
 
       - name: Verify frozen evidence and render SVGs
         run: ./visualization/render_all.sh
@@ -99,6 +101,7 @@ jobs:
           python3 visualization/scripts/embed_svg_assets.py --svg build/vector-smoke/hero.svg --out build/vector-smoke/hero_standalone.svg
           test -s build/vector-smoke/hero_standalone.svg
           grep -q 'data:image/png;base64' build/vector-smoke/hero_standalone.svg
+          python3 visualization/scripts/verify_illustrator_svg.py build/vector-smoke/hero.svg build/vector-smoke/xray.svg build/vector-smoke/explainer.svg build/vector-smoke/darkfield.svg build/vector-smoke/fingerprints.svg
 
       - name: Upload deterministic SVG package
         uses: actions/upload-artifact@v4
