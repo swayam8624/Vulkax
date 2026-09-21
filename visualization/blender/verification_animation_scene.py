@@ -1,4 +1,7 @@
-# LEGACY PRESENTATION EXPERIMENT — NOT THE CANONICAL REALITY PROBE PAPER VIDEO.\n# Kept only for provenance. Use visualization/explainer/render.py via\n# visualization/explainer/render_explainer.sh for the canonical explainer.\n#!/usr/bin/env python3
+# LEGACY PRESENTATION EXPERIMENT — NOT THE CANONICAL REALITY PROBE PAPER VIDEO.
+# Kept only for provenance. Use visualization/explainer/render.py via
+# visualization/explainer/render_explainer.sh for the canonical explainer.
+#!/usr/bin/env python3
 """Build the restrained Reality Probe paper/supplement video.
 
 Four shots, no ornamental scanner choreography:
