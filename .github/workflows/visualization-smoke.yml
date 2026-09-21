@@ -25,11 +25,15 @@ jobs:
         run: |
           bash -n visualization/render_all.sh
           bash -n visualization/run_full_visualization.sh
+          bash -n visualization/assets/fetch_stanford_bunny.sh
 
       - name: Compile presentation Python
         run: |
           python3 -m py_compile visualization/scripts/verify_frozen_evidence.py
           python3 -m py_compile visualization/scripts/render_paper_visuals.py
+          python3 -m py_compile visualization/blender/aesthetic_bunny_scene.py
+          python3 -m py_compile visualization/blender/reality_inspector_scene.py
+          python3 -m py_compile visualization/blender/solver_trajectory_scene.py
           python3 -m py_compile visualization/scripts/render_hero_case.py
 
       - name: Verify frozen evidence and render SVGs

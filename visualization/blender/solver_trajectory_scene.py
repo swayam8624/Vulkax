@@ -199,9 +199,17 @@ def main():
     bpy.ops.wm.save_as_mainfile(filepath=str(args.output.with_suffix(".blend")))
 
     if args.render:
-        scene.render.image_settings.file_format="FFMPEG"
+        settings=scene.render.image_settings
+        if hasattr(settings,"media_type"):
+            settings.media_type="VIDEO"
+        else:
+            settings.file_format="FFMPEG"
         scene.render.ffmpeg.format="MPEG4"
         scene.render.ffmpeg.codec="H264"
+        try:
+            scene.render.ffmpeg.constant_rate_factor="HIGH"
+        except Exception:
+            pass
         scene.render.fps=30
         scene.render.filepath=str(args.output.with_suffix(".mp4"))
         bpy.ops.render.render(animation=True)

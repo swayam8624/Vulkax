@@ -167,3 +167,42 @@ export VULKAX_MOTION_SCALE=400
 ./visualization/run_full_visualization.sh
 ```
 
+## Aesthetic paper hero — Stanford Bunny + real VULKAX field
+
+The primary paper-facing 3D scene now uses the Stanford Bunny as a **visualization carrier**. It is not claimed to be the frozen benchmark object. The surface is warped by trilinear interpolation of the exported 4x4x4 VULKAX MPM displacement field for truth APIC, baseline APIC and repair PIC.
+
+The asset is downloaded from the Stanford 3D Scanning Repository by:
+
+```bash
+./visualization/assets/fetch_stanford_bunny.sh
+```
+
+The download is cached under `build/assets/stanford-bunny/`; an attribution file and SHA-256 are written beside it. Publication images must credit the Stanford Computer Graphics Laboratory.
+
+The default full build renders a 2560x1440 hero still:
+
+```text
+build/visualization/vulkax_bunny_hero_px.png
+build/visualization/vulkax_bunny_hero_px.blend
+```
+
+The composition is:
+
+```text
+01 OBSERVE      baseline APIC as scanned/wireframe state + solver lattice
+02 REPAIR       polished PIC candidate that improves ordinary held-out error
+03 INTERROGATE  PIC repair + truth ghost + residual field + physical probe
+```
+
+All displayed deformation is solver-driven. `VULKAX_MOTION_SCALE` is only a declared display magnification.
+
+For highest-quality stills on Apple Silicon, after the Eevee preview succeeds:
+
+```bash
+VULKAX_AESTHETIC_ENGINE=cycles \
+VULKAX_MOTION_SCALE=400 \
+./visualization/run_full_visualization.sh
+```
+
+The Blender script requests Metal for Cycles when available.
+
