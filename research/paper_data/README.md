@@ -113,14 +113,17 @@ Not supported:
 - fresh measured-domain prospective repair verification;
 - a universal physical correctness certificate.
 
-## Remaining external-data boundary
+## External-data boundary after the frozen paper
 
-A future positive flagship result still requires a genuinely higher-information
-physical channel, a new untouched validation partition, and then fresh D5 measured
-confirmation.
+The paper's research program is complete.
 
-The infrastructure to replay and package that future confirmation is already in the
-repository.
+A stronger future claim — reliable prospective repair verification in the measured
+world — would require a **new** untouched experiment with materially more physical
+information and real independent sensing. The executed 40 N synthetic
+force-compliance partition is frozen and may not be retuned.
+
+The existing D5 replay infrastructure can package such future evidence, but that is
+follow-on research rather than missing work for this paper.
 
 ## Post-hoc information frontier
 
