@@ -28,6 +28,11 @@ jobs:
           bash -n visualization/assets/fetch_stanford_bunny.sh
           bash -n visualization/render_paper_hero.sh
           bash -n visualization/render_paper_suite.sh
+          if grep -Fq '\${' visualization/render_paper_suite.sh; then
+            echo "error: render_paper_suite.sh contains accidentally escaped parameter expansion" >&2
+            grep -nF '\${' visualization/render_paper_suite.sh >&2
+            exit 1
+          fi
           bash -n visualization/render_intuition_suite.sh
 
       - name: Compile presentation Python
