@@ -96,7 +96,7 @@ def configure_scene(engine, samples):
     scene.render.resolution_y = 1440
     scene.render.resolution_percentage = 100
     scene.render.fps = 30
-    scene.world.color = BG
+    scene.world.color = BG[:3]
     scene.frame_start = 1
     scene.frame_end = 181
     scene.render.image_settings.media_type = "IMAGE"
