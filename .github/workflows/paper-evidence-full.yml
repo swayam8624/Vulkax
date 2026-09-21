@@ -3,7 +3,7 @@ name: Vulkax full paper-evidence reproduction
 on:
   workflow_dispatch:
   push:
-    branches: ["research/integration-20260920"]
+    branches: ["main", "research/integration-20260920"]
     paths:
       - "FULL_REPRODUCTION_TRIGGER.txt"
 
