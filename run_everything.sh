@@ -169,13 +169,27 @@ fi
   if command -v lscpu >/dev/null 2>&1; then lscpu; else sysctl -a 2>/dev/null | grep -E 'machdep.cpu|hw.(model|memsize|ncpu|physicalcpu|logicalcpu)' || true; fi
   echo
   echo "=== GPU ==="
-  nvidia-smi || true
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi
+  else
+    echo "nvidia-smi unavailable (expected on non-NVIDIA hosts)"
+  fi
   echo
   echo "=== Vulkan ==="
-  vulkaninfo --summary || true
+  if command -v vulkaninfo >/dev/null 2>&1; then
+    if ! vulkaninfo --summary 2>/dev/null; then
+      echo "vulkaninfo present but no usable Vulkan loader/device was available"
+    fi
+  else
+    echo "vulkaninfo unavailable"
+  fi
   echo
   echo "=== Metal ==="
-  system_profiler SPDisplaysDataType 2>/dev/null || true
+  if command -v system_profiler >/dev/null 2>&1; then
+    system_profiler SPDisplaysDataType 2>/dev/null || true
+  else
+    echo "Metal system profiler unavailable on this platform"
+  fi
 } > "$PAPER_DIR/system/system-info.txt"
 
 stage "Validate Python research/release tooling"
