@@ -84,11 +84,11 @@ def load_metrics():
 
 
 def setup_camera(scene):
-    bpy.ops.object.camera_add(location=(0.0, -8.85, 3.25))
+    bpy.ops.object.camera_add(location=(0.0, -9.15, 3.18))
     cam = bpy.context.object
-    cam.data.lens = 58
+    cam.data.lens = 50
     cam.data.sensor_width = 36
-    target = Vector((0.0, 0.0, 1.28))
+    target = Vector((0.0, 0.0, 1.22))
     cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
     scene.camera = cam
     return cam
@@ -116,9 +116,9 @@ def setup_lighting():
 
 def add_header(step, title, subtitle, accent, white, muted):
     objs = []
-    objs.append(add_screen_text(step, -3.38, 2.88, 0.20, accent))
-    objs.append(add_screen_text(title, -2.88, 2.88, 0.20, white))
-    objs.append(add_screen_text(subtitle, -3.38, 2.55, 0.095, muted))
+    objs.append(add_screen_text(step, -2.92, 2.58, 0.15, accent))
+    objs.append(add_screen_text(title, -2.52, 2.58, 0.15, white))
+    objs.append(add_screen_text(subtitle, -2.92, 2.30, 0.072, muted))
     return objs
 
 
@@ -184,7 +184,7 @@ def main():
     shot1 = created_since(before) + add_header(
         "01", "APPEARANCE", "ordinary evidence prefers this repair", cyan, white, muted
     )
-    metric = add_screen_text("ordinary held-out error  -14.93%", -3.38, -0.55, 0.090, cyan)
+    metric = add_screen_text("ordinary held-out error  -14.93%", -2.92, -0.55, 0.078, cyan)
     shot1.append(metric)
     shot_visibility(shot1, 1, 75)
 
@@ -210,8 +210,8 @@ def main():
         "02", "SAME PROBE, DIFFERENT RESPONSE", "rest-space diagnostic grid under the frozen +X force", cyan, white, muted
     )
     shot2 += [
-        add_screen_text("TRUTH", -2.45, -0.10, 0.105, cyan),
-        add_screen_text("REPAIR", 0.72, -0.10, 0.105, orange),
+        add_screen_text("TRUTH", -2.30, -0.10, 0.090, cyan),
+        add_screen_text("REPAIR", 0.72, -0.10, 0.090, orange),
     ]
     hero.add_arrow("video_force_arrow", Vector((-0.42, -1.50, 0.20)), Vector((0.42, -1.50, 0.20)), 0.012, orange)
     shot2 += [o for o in bpy.data.objects if o.name.startswith("video_force_arrow")]
@@ -236,19 +236,19 @@ def main():
     # Shot 4: quantitative decision.
     improve, worsen, force_z, threshold, median_ratio = load_metrics()
     before = set(bpy.data.objects)
-    card = add_screen_box("decision_card", 0.0, 1.15, 5.65, 3.35, panel, bevel=0.10)
-    title = add_screen_text("04  DECISION", -2.45, 2.52, 0.20, white)
-    sub = add_screen_text("the physical channel is stronger, but still below the frozen certification bar", -2.45, 2.18, 0.085, muted)
-    l1 = add_screen_text("ordinary fit", -2.30, 1.48, 0.105, muted)
-    v1 = add_screen_text(f"-{improve:.2f}%", 0.65, 1.48, 0.145, cyan)
-    l2 = add_screen_text("hidden physical target", -2.30, 0.92, 0.105, muted)
-    v2 = add_screen_text(f"+{worsen:.2f}%", 0.65, 0.92, 0.145, orange)
-    l3 = add_screen_text("force/compliance |z|", -2.30, 0.36, 0.105, muted)
-    v3 = add_screen_text(f"{force_z:.3f}  <  {threshold:.0f}", 0.65, 0.36, 0.145, orange)
-    gain = add_screen_text(f"median signal gain  {median_ratio:.2f}x", -2.30, -0.20, 0.090, muted)
-    refuse_box = add_screen_box("refuse_box", 0.0, -0.95, 4.55, 0.72, hero.material("refuse_bg", (0.12, 0.018, 0.025, 1.0), metallic=0.0, roughness=0.35), bevel=0.08)
-    refuse = add_screen_text("REFUSE CERTIFICATION", 0.0, -0.98, 0.22, red, align="CENTER")
-    foot = add_screen_text("insufficient information is itself a result", 0.0, -1.55, 0.075, muted, align="CENTER")
+    card = add_screen_box("decision_card", 0.0, 1.05, 5.10, 3.00, panel, bevel=0.10)
+    title = add_screen_text("04  DECISION", -2.10, 2.25, 0.165, white)
+    sub = add_screen_text("stronger physical evidence, still below the frozen certification bar", -2.10, 1.98, 0.068, muted)
+    l1 = add_screen_text("ordinary fit", -2.00, 1.38, 0.090, muted)
+    v1 = add_screen_text(f"-{improve:.2f}%", 0.70, 1.38, 0.125, cyan)
+    l2 = add_screen_text("hidden physical target", -2.00, 0.88, 0.090, muted)
+    v2 = add_screen_text(f"+{worsen:.2f}%", 0.70, 0.88, 0.125, orange)
+    l3 = add_screen_text("force/compliance |z|", -2.00, 0.38, 0.090, muted)
+    v3 = add_screen_text(f"{force_z:.3f}  <  {threshold:.0f}", 0.70, 0.38, 0.125, orange)
+    gain = add_screen_text(f"median signal gain  {median_ratio:.2f}x", -2.00, -0.10, 0.078, muted)
+    refuse_box = add_screen_box("refuse_box", 0.0, -0.76, 4.25, 0.60, hero.material("refuse_bg", (0.12, 0.018, 0.025, 1.0), metallic=0.0, roughness=0.35), bevel=0.08)
+    refuse = add_screen_text("REFUSE CERTIFICATION", 0.0, -0.79, 0.175, red, align="CENTER")
+    foot = add_screen_text("insufficient information is itself a result", 0.0, -1.26, 0.064, muted, align="CENTER")
     shot4 = created_since(before)
     shot_visibility(shot4, 301, 390)
 
