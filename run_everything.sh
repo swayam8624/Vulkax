@@ -18,7 +18,7 @@ set -euo pipefail
 #
 # The default run reproduces the current paper-facing evidence stack:
 # build + full ctest + release validation + backend conformance + captured-world
-# controlled run + DCS D1/D2/D3/D4V + GAUGE retrospective + evidence packaging.
+# controlled run + DCS D1/D2/D3/D4V + orthogonal force-compliance + GAUGE retrospective + evidence packaging.
 #
 # --exhaustive additionally runs selected historical falsification probes that are
 # preserved for provenance but are not part of the final canonical result claim.
@@ -182,7 +182,8 @@ stage "Validate Python research/release tooling"
 python3 -m py_compile   scripts/validate_evidence_registry.py   scripts/audit_release_claims.py   scripts/test_release_cli_failures.py   scripts/benchmark_captured_world_run.py   research/analysis/dcs_confirmatory_replay.py   research/analysis/export_dcs_spatial_map.py   research/analysis/export_dcs_evidence_pack.py   research/analysis/gauge_dcs_retrospective.py   research/analysis/gauge_shearing_effective_span.py   research/analysis/validate_gauge_effective_span.py   research/probes/analyze_dcs_darkfield.py   research/probes/analyze_dcs_solver_native.py   research/probes/analyze_dcs_active_selection.py   research/probes/analyze_dcs_d2_validation.py   research/probes/analyze_dcs_d3_witness_space.py   research/probes/analyze_dcs_d4v_repair_veto.py   research/probes/export_dcs_d3_tables.py   research/analysis/assemble_paper_evidence.py \
   research/analysis/generate_paper_assets.py \
   research/analysis/validate_paper_reproduction.py \
-  research/analysis/analyze_information_frontier.py
+  research/analysis/analyze_information_frontier.py \
+  research/probes/analyze_orthogonal_force_compliance.py
 
 python3 research/analysis/dcs_confirmatory_replay.py --self-test
 python3 research/analysis/export_dcs_spatial_map.py --self-test
@@ -255,6 +256,13 @@ rm -rf "$BUILD_DIR/dcs-d4v-discovery"
 run_logged dcs-d4v-run   "$BUILD_DIR/vulkax_dcs_d4v_repair_veto_probe" "$BUILD_DIR/dcs-d4v-discovery"
 run_logged dcs-d4v-analyze   python3 research/probes/analyze_dcs_d4v_repair_veto.py "$BUILD_DIR/dcs-d4v-discovery"
 
+stage "Fresh orthogonal force-compliance information test"
+rm -rf "$BUILD_DIR/orthogonal-force-compliance"
+run_logged orthogonal-force-run \
+  "$BUILD_DIR/vulkax_orthogonal_force_compliance_probe" "$BUILD_DIR/orthogonal-force-compliance"
+run_logged orthogonal-force-analyze \
+  python3 research/probes/analyze_orthogonal_force_compliance.py "$BUILD_DIR/orthogonal-force-compliance"
+
 if [[ "$SKIP_GAUGE" == "0" ]]; then
   stage "GAUGE public measured-data fetch"
   run_logged gauge-fetch     python3 research/scripts/fetch_gauge_foam_subset.py "$BUILD_DIR/gauge-download"
@@ -316,7 +324,7 @@ python3 research/analysis/validate_paper_reproduction.py "${VALIDATION_ARGS[@]}"
 stage "Generate deterministic paper figures and tables"
 rm -rf "$BUILD_DIR/paper-figures"
 python3 research/analysis/generate_paper_assets.py \
-  --results research/results/DCS_FINAL_RESULTS_2026-09-20.json \
+  --results research/results/VULKAX_FINAL_RESULTS_2026-09-21.json \
   --out "$BUILD_DIR/paper-figures"
 
 stage "Generate flat DCS evidence index"
@@ -327,6 +335,7 @@ EVIDENCE_INPUTS=(
   "$BUILD_DIR/dcs-d2-validation/analysis.json"
   "$BUILD_DIR/dcs-d3-discovery/analysis.json"
   "$BUILD_DIR/dcs-d4v-discovery/analysis.json"
+  "$BUILD_DIR/orthogonal-force-compliance/analysis.json"
 )
 if [[ "$SKIP_GAUGE" == "0" ]]; then
   EVIDENCE_INPUTS+=("$BUILD_DIR/gauge-dcs-retrospective/summary.json")
@@ -394,6 +403,8 @@ Portable archive:
 
 Important scientific status:
   D2/D3/D4V remain negative/frozen.
+  The fresh force-compliance channel increases median standardized signal but
+  remains below the frozen resolved-decision threshold.
   GAUGE is retrospective.
   This run reproduces evidence; it does not convert negative results into a
   prospective positive flagship claim.
