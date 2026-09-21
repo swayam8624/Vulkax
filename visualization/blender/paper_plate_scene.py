@@ -22,7 +22,7 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--trajectory-dir", type=Path, required=True)
     p.add_argument("--bunny", type=Path, required=True)
-    p.add_argument("--panel", choices=["observe", "repair", "interrogate", "xray", "wireframe"], required=True)
+    p.add_argument("--panel", choices=["observe", "repair", "interrogate", "xray", "wireframe", "brightfield", "texture_truth", "texture_repair", "darkfield"], required=True)
     p.add_argument("--direction", choices=["px", "nx", "py", "pz"], default="px")
     p.add_argument("--motion-scale", type=float, default=400.0)
     p.add_argument("--engine", choices=["eevee", "cycles"], default="eevee")
@@ -46,6 +46,10 @@ def make_materials():
         "truth_wire": hero.material("plate_truth_wire", (0.18, 0.78, 1.0, 1.0), metallic=0.0, roughness=0.12, emission=0.9, alpha=0.62),
         "repair_trans": hero.material("plate_repair_trans", (1.0, 0.23, 0.05, 1.0), metallic=0.0, roughness=0.18, emission=0.24, alpha=0.22),
         "residual": hero.material("plate_residual", (1.0, 0.54, 0.12, 1.0), metallic=0.0, roughness=0.12, emission=3.2),
+        "diag_truth_base": hero.material("diag_truth_base", (0.80, 0.88, 0.93, 1.0), metallic=0.12, roughness=0.22),
+        "diag_truth_line": hero.material("diag_truth_line", (0.02, 0.34, 0.48, 1.0), metallic=0.0, roughness=0.26, emission=0.18),
+        "diag_repair_base": hero.material("diag_repair_base", (0.91, 0.84, 0.76, 1.0), metallic=0.10, roughness=0.22),
+        "diag_repair_line": hero.material("diag_repair_line", (0.66, 0.20, 0.05, 1.0), metallic=0.0, roughness=0.26, emission=0.14),
     }
 
 
@@ -135,6 +139,19 @@ def add_compact_probe(direction, stage_mat, glow_mat):
     hero.add_arrow("compact_force", tip - force * 0.02, tip + force * 0.72, 0.016, glow_mat)
 
 
+def apply_diagnostic_grid(obj, params, line_mat, bands=11, width=0.085):
+    """Assign a rest-space grid texture that deforms with the bunny surface."""
+    obj.data.materials.append(line_mat)
+    for poly in obj.data.polygons:
+        us = [params[i][0] for i in poly.vertices]
+        ws = [params[i][2] for i in poly.vertices]
+        u = sum(us) / len(us)
+        w = sum(ws) / len(ws)
+        pu = (u * bands) % 1.0
+        pw = (w * bands) % 1.0
+        line = pu < width or pu > 1.0 - width or pw < width or pw > 1.0 - width
+        poly.material_index = 1 if line else 0
+
 def setup_scene(args):
     scene = hero.configure_scene(args.engine, args.cycles_samples)
     scene.render.resolution_x = 1800
@@ -207,6 +224,37 @@ def main():
                                    animate=False, wireframe=True, ghost=True)
         add_forensic_residuals(groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
         add_compact_probe(args.direction, mats["stage"], mats["orange_glow"])
+
+    elif panel == "brightfield":
+        hero.create_deformed_bunny(source, "Brightfield_Repair", params, rest_display, groups,
+                                   "repair_pic", last, 0.0, args.motion_scale, mats["pearl"],
+                                   animate=False)
+
+    elif panel == "texture_truth":
+        obj = hero.create_deformed_bunny(source, "Diagnostic_Truth", params, rest_display, groups,
+                                         "truth", last, 0.0, args.motion_scale, mats["diag_truth_base"],
+                                         animate=False)
+        apply_diagnostic_grid(obj, params, mats["diag_truth_line"])
+
+    elif panel == "texture_repair":
+        obj = hero.create_deformed_bunny(source, "Diagnostic_Repair", params, rest_display, groups,
+                                         "repair_pic", last, 0.0, args.motion_scale, mats["diag_repair_base"],
+                                         animate=False)
+        apply_diagnostic_grid(obj, params, mats["diag_repair_line"])
+
+    elif panel == "darkfield":
+        hero.create_deformed_bunny(source, "Darkfield_Repair", params, rest_display, groups,
+                                   "repair_pic", last, 0.0, args.motion_scale, mats["repair_trans"],
+                                   animate=False)
+        hero.create_deformed_bunny(source, "Darkfield_Truth", params, rest_display, groups,
+                                   "truth", last, 0.0, args.motion_scale, mats["truth_wire"],
+                                   animate=False, wireframe=True, ghost=True)
+        add_forensic_residuals(groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
+        force = {"px": Vector((1, 0, 0)), "nx": Vector((-1, 0, 0)),
+                 "py": Vector((0, 0, 1)), "pz": Vector((0, 1, 0))}[args.direction]
+        origin = Vector((0, -0.18, 1.55))
+        hero.add_arrow("darkfield_force", origin - force * 1.55, origin + force * 0.15,
+                       0.022, mats["orange_glow"])
 
     elif panel == "xray":
         hero.create_deformed_bunny(source, "XRay_Repair", params, rest_display, groups,

@@ -34,7 +34,7 @@ def main():
     {defs()}<rect width="3840" height="2160" fill="url(#bg)"/><rect x="120" y="120" width="3600" height="2" fill="url(#cyanLine)" opacity=".75"/>
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif">
     <text x="1920" y="285" text-anchor="middle" font-size="100" font-weight="620" fill="#eaf4ff"><tspan>LOOKS RIGHT. </tspan><tspan fill="#ffaf64">PHYSICS SAYS NO.</tspan></text>
-    <text x="1920" y="365" text-anchor="middle" font-size="28" font-weight="600" fill="#7fdfff" letter-spacing="3">VULKAX  /  MECHANISM-SELECTIVE PHYSICAL VERIFICATION</text>
+    <text x="1920" y="365" text-anchor="middle" font-size="28" font-weight="600" fill="#7fdfff" letter-spacing="3">REALITY PROBE  /  COUNTERFACTUAL PHYSICAL VERIFICATION</text>
     {''.join(pm)}
     <path d="M1280 1160 L1320 1160" stroke="#7fdfff" stroke-width="8" stroke-linecap="round"/><path d="M2470 1160 L2510 1160" stroke="#ffb36c" stroke-width="8" stroke-linecap="round"/>
     <g transform="translate(2790,1828)" filter="url(#shadow)"><rect width="690" height="150" rx="22" fill="#180d12" stroke="#ff5a62" stroke-width="2"/>

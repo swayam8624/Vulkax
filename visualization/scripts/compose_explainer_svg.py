@@ -21,7 +21,7 @@ def main():
         <rect x="42" y="1330" width="676" height="140" rx="16" fill="#081b29"/><text x="68" y="1380" fill="{color}" font-size="19" font-weight="700">{metric}</text>
         <text x="68" y="1420" fill="#b7c6d5" font-size="17">{foot}</text></g>""")
     svg=f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3600" height="1800" viewBox="0 0 3600 1800">{defs()}<rect width="3600" height="1800" fill="url(#bg)"/>
-    <g font-family="Inter,Helvetica Neue,Arial,sans-serif"><text x="110" y="160" fill="#eef7ff" font-size="70" font-weight="760">HOW VULKAX INTERROGATES A REPAIR</text>
+    <g font-family="Inter,Helvetica Neue,Arial,sans-serif"><text x="110" y="160" fill="#eef7ff" font-size="70" font-weight="760">HOW REALITY PROBE INTERROGATES A REPAIR</text>
     <text x="110" y="225" fill="#80dfff" font-size="24" font-weight="600" letter-spacing="2">APPEARANCE IS AN OBSERVATION CHANNEL — NOT A CERTIFICATE OF PHYSICAL MECHANISM</text>
     {''.join(cm)}<path d="M890 985 L940 985" stroke="#7ae1ff" stroke-width="8" stroke-linecap="round"/><path d="M1745 985 L1795 985" stroke="#ffb36c" stroke-width="8" stroke-linecap="round"/>
     <g transform="translate(2675,440)"><rect width="815" height="1110" rx="28" fill="#100d13" stroke="#ff676e" stroke-opacity=".55"/><text x="44" y="75" fill="#ff757a" font-size="30" font-weight="800">04</text>
