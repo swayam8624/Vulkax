@@ -3,9 +3,12 @@ name: Vulkax full paper-evidence reproduction
 on:
   workflow_dispatch:
   push:
-    branches: ["main", "research/integration-20260920"]
+    branches: ["main"]
     paths:
       - "FULL_REPRODUCTION_TRIGGER.txt"
+
+permissions:
+  contents: write
 
 concurrency:
   group: vulkax-full-paper-evidence
@@ -41,3 +44,23 @@ jobs:
           path: build/paper-figures
           if-no-files-found: error
           retention-days: 30
+
+      - name: Create immutable Phase I paper-freeze tag
+        if: github.ref == 'refs/heads/main' && hashFiles('PHASE1_FREEZE_REQUEST.txt') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="phase1-paper-freeze-2026-09-21"
+          git config user.name "vulkax-paper-freeze-bot"
+          git config user.email "vulkax-paper-freeze-bot@users.noreply.github.com"
+          git fetch origin --tags
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "Freeze tag already exists; refusing to move it."
+            exit 1
+          fi
+
+          git tag -a "$tag" "$GITHUB_SHA" \
+            -m "Vulkax Phase I paper freeze. Exact commit passed the full paper-evidence reproduction workflow on 2026-09-21."
+          git push origin "refs/tags/$tag"
+          echo "Created immutable paper-freeze tag: $tag -> $GITHUB_SHA"
