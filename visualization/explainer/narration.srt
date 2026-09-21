@@ -1,0 +1,64 @@
+1
+00:00:00,000 --> 00:00:07,000
+A captured world can reproduce what we observed.
+But did the observations constrain how it works?
+
+2
+00:00:07,000 --> 00:00:20,000
+In this selected APIC-to-PIC repair, ordinary held-out error improves by 14.93%.
+An untouched physical-target error worsens by 9.03%. This is a deceptive repair.
+
+3
+00:00:20,000 --> 00:00:31,000
+The fresh synthetic experiment contains 36 proposals: 12 deceptive and 24 beneficial.
+The ordinary criterion proposes the repairs; an untouched target supplies the labels.
+
+4
+00:00:31,000 --> 00:00:42,000
+Now apply a known force: 40 newtons per top particle, with the bottom layer fixed.
+The actual solver responses are shown with displacement magnified 400 times.
+
+5
+00:00:42,000 --> 00:00:49,000
+Overlay truth and repair under the same probe.
+Their material grids reveal a response mismatch.
+
+6
+00:00:49,000 --> 00:01:04,000
+Probe positive X, negative X, positive Y and positive Z.
+Top and interior displacement components assemble into a response fingerprint.
+
+7
+00:01:04,000 --> 00:01:17,000
+Subtract the repair and truth displacements to expose the residual field.
+Every direction uses the same color scale; numerical values remain unscaled.
+
+8
+00:01:17,000 --> 00:01:25,000
+DCS selects mechanism-sensitive contrasts that cancel lower-order trends.
+This second-difference schematic illustrates the idea, not a measured response.
+
+9
+00:01:25,000 --> 00:01:30,000
+Credible progress is error improvement divided by combined uncertainty:
+measurement, repeat variation and numerical refinement.
+
+10
+00:01:30,000 --> 00:01:36,000
+The force channel increases median absolute standardized progress from 0.0488 to 0.5586.
+That is 11.46 times stronger median signal on the same 36 proposals.
+
+11
+00:01:36,000 --> 00:01:44,000
+Reveal the frozen threshold: absolute z must reach 2 for a support or veto decision.
+Even the maximum force magnitude, 1.3191, remains below it.
+
+12
+00:01:44,000 --> 00:01:49,000
+All 36 remain unresolved. Zero support. Zero veto.
+Refuse certification: stronger evidence is not necessarily sufficient evidence.
+
+13
+00:01:49,000 --> 00:01:56,000
+Looks right does not mean physically verified.
+Reality Probe asks the repaired world physical questions.

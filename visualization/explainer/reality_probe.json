@@ -1,0 +1,13 @@
+{
+  "title": "REALITY PROBE",
+  "subtitle": "Counterfactual Physical Verification of Captured Worlds",
+  "duration_s": 116,
+  "display_magnification": 400,
+  "background": "#f5f3ed",
+  "ink": "#24343b",
+  "muted": "#63747a",
+  "rule": "#cdd4d1",
+  "truth": "#147f96",
+  "repair": "#cf6635",
+  "refusal": "#ae3c3b"
+}
