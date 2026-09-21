@@ -1,0 +1,226 @@
+{
+  "schema": "vulkax.final_results",
+  "version": 1,
+  "as_of": "2026-09-21",
+  "research_program_status": "frozen_for_manuscript_preparation",
+  "central_problem": "observationally improving physical repairs can be mechanistically worse, and verification can be limited by experimental information content",
+  "dcs": {
+    "schema": "vulkax.dcs.final_results",
+    "version": 1,
+    "date": "2026-09-20",
+    "scientific_disposition": "implementation_complete_no_positive_flagship_claim",
+    "stages": {
+      "D1": {
+        "status": "pass_constructed_only",
+        "cases": 64,
+        "ordinary_accept": 64,
+        "deceptive": 64,
+        "dcs_accept_deceptive": 0,
+        "median_observation_improvement": 0.6088,
+        "median_witness_degradation_ratio": 9.375
+      },
+      "D2a": {
+        "status": "mixed_negative",
+        "ranking_agreement": {
+          "heldout_rmse": 0.625,
+          "dcs_fixed_k2": 0.625
+        },
+        "ordinary_mirage_pairs": 9,
+        "dcs_corrected_mirages": 9
+      },
+      "D2b": {
+        "status": "negative",
+        "ranking_agreement": {
+          "dcs_k2_maximin": 0.625,
+          "raw_bundle": 0.75,
+          "raw_maximin": 0.9583,
+          "fisher": 0.875,
+          "max_motion": 0.6667,
+          "random": 0.4583
+        }
+      },
+      "D2_frozen": {
+        "status": "fail_frozen",
+        "truth_worlds": 16,
+        "resolved_worlds": 0,
+        "coverage": 0,
+        "median_standardized_separation": 0.041578,
+        "median_numerical_rms_m": 0.000006469,
+        "maximum_moment_residual": 3.886e-16
+      },
+      "D3": {
+        "status": "negative",
+        "truth_worlds": 6,
+        "resolved_worlds": 0,
+        "adaptive_order_counts": {
+          "2": 6,
+          "3": 0
+        },
+        "median_separation": {
+          "adaptive": 0.0588583,
+          "k2": 0.0588583,
+          "k3": 0.0157173
+        },
+        "median_numerical_rms_m": {
+          "k2": 8.435e-7,
+          "k3": 2.153e-7
+        },
+        "ranking_agreement": {
+          "adaptive_dcs": 0.5278,
+          "k2_dcs": 0.5278,
+          "k3_dcs": 0.4722,
+          "raw_bundle": 0.5833,
+          "raw_pair_aware": 0.5556,
+          "fisher": 0.6111,
+          "max_motion": 0.5833,
+          "random": 0.5278
+        }
+      },
+      "D4V": {
+        "status": "negative",
+        "proposals": 36,
+        "deceptive": 14,
+        "beneficial": 22,
+        "resolved_coverage": {
+          "dcs": 0,
+          "raw_bundle": 0,
+          "raw_pair": 0,
+          "fisher": 0,
+          "max_motion": 0
+        }
+      },
+      "GAUGE": {
+        "status": "retrospective_only",
+        "trials": 10,
+        "ordinary_overlap_wins": 10,
+        "marker_darkfield_endpoint_wins": 0,
+        "longitudinal_darkfield_endpoint_wins": 9,
+        "median_marker_error_m": {
+          "endpoint": 0.0024280231467879694,
+          "overlap": 0.0017091958992332462
+        },
+        "median_longitudinal_error": {
+          "endpoint": 0.003131335884307733,
+          "overlap": 0.0055841823898999735
+        }
+      },
+      "D5": {
+        "status": "runner_implemented_fresh_confirmation_not_executed"
+      },
+      "D6": {
+        "status": "spatial_localization_implemented_not_scientific_validation"
+      }
+    },
+    "post_hoc_information_frontier": {
+      "analysis_class": "post_hoc_diagnostic",
+      "source_json": "research/results/DCS_INFORMATION_FRONTIER_2026-09-20.json",
+      "d4v": {
+        "threshold_abs_z": 2,
+        "methods": {
+          "dcs": {
+            "median_abs_z": 0.0502368362695058,
+            "max_abs_z": 0.1765438680006307,
+            "median_required_signal_amplification_to_z2": 39.832159447383674
+          },
+          "raw_bundle": {
+            "median_abs_z": 0.0499095477459188,
+            "max_abs_z": 0.4061535567688481,
+            "median_required_signal_amplification_to_z2": 40.098676097440816
+          },
+          "raw_point": {
+            "median_abs_z": 0.14707093736228743,
+            "max_abs_z": 0.6314213171695398,
+            "median_required_signal_amplification_to_z2": 13.59990735800135
+          },
+          "fisher": {
+            "median_abs_z": 0.0663679631040366,
+            "max_abs_z": 0.6314213171695398,
+            "median_required_signal_amplification_to_z2": 30.150174372377187
+          },
+          "max_motion": {
+            "median_abs_z": 0.05773474089993585,
+            "max_abs_z": 0.5750533076545649,
+            "median_required_signal_amplification_to_z2": 34.64145387363821
+          }
+        }
+      },
+      "gauge": {
+        "longitudinal_endpoint_better_count": 9,
+        "longitudinal_overlap_better_count": 1,
+        "longitudinal_median_endpoint_minus_overlap": -0.00266595776944405,
+        "longitudinal_exact_two_sided_sign_test_p": 0.021484375
+      },
+      "warning": "Post-hoc/retrospective diagnostic only; does not alter frozen D2/D3/D4V gates or establish prospective confirmation."
+    }
+  },
+  "orthogonal_force_compliance": {
+    "schema": "vulkax.orthogonal_force_compliance_result",
+    "version": 1,
+    "date": "2026-09-21",
+    "evidence_class": "fresh_synthetic_follow_on",
+    "protocol": "research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md",
+    "workflow_run": 35555415551,
+    "workflow_artifact": "orthogonal-force-compliance-b21513038021a22a1aa9f601fbe535fcc0a4c7fc",
+    "proposal_count": 36,
+    "deceptive_count": 12,
+    "beneficial_count": 24,
+    "dcs": {
+      "coverage": 0,
+      "veto_count": 0,
+      "support_count": 0,
+      "unresolved_count": 36,
+      "sign_accuracy": 0.5,
+      "median_abs_z": 0.04876703024660442,
+      "max_abs_z": 0.17278867919331833,
+      "median_required_signal_amplification_to_z2": 41.011314199089604,
+      "best_case_required_signal_amplification_to_z2": 11.574832386804536
+    },
+    "force_compliance": {
+      "coverage": 0,
+      "veto_count": 0,
+      "support_count": 0,
+      "unresolved_count": 36,
+      "sign_accuracy": 0.5555555555555556,
+      "deceptive_negative_fraction": 0.75,
+      "beneficial_positive_fraction": 0.4583333333333333,
+      "median_abs_z": 0.558629185632829,
+      "max_abs_z": 1.3191113184383891,
+      "median_required_signal_amplification_to_z2": 3.580192462974075,
+      "best_case_required_signal_amplification_to_z2": 1.5161722684387782
+    },
+    "force_to_dcs_median_abs_z_ratio": 11.455058526384752,
+    "resolved_only_by_force": 0,
+    "resolved_only_by_dcs": 0,
+    "resolved_by_both": 0,
+    "advancement_gate_pass": false,
+    "advancement_gate": {
+      "at_least_4_deceptive": true,
+      "force_coverage_at_least_30pct": false,
+      "force_deceptive_veto_recall_at_least_50pct": false,
+      "force_beneficial_false_veto_at_most_25pct": true,
+      "force_coverage_exceeds_dcs": false,
+      "force_median_abs_z_exceeds_dcs": true,
+      "finite_numerical_comparison": true
+    },
+    "exploratory_post_hoc": {
+      "deceptive_classification_score": "-progress_z",
+      "dcs_auroc": 0.4444444444444444,
+      "dcs_average_precision": 0.3109424669734392,
+      "force_auroc": 0.7604166666666666,
+      "force_average_precision": 0.5784352221852221,
+      "warning": "Exploratory post-hoc only; AUROC/AUPRC were not preregistered advancement gates."
+    },
+    "decision": "orthogonal_information_gate_failed",
+    "interpretation": "A known-force compliance channel increased median standardized signal by 11.46x relative to fresh kinematic DCS, but still produced zero resolved proposals at the frozen |z|>=2 reference. The new channel materially improves observability without yet reaching credible repair-verification coverage.",
+    "warning": "Do not retune the frozen force amplitude, truth worlds, candidate grid, or decision threshold on this partition. This is synthetic follow-on evidence, not measured-world confirmation."
+  },
+  "final_evidence_summary": {
+    "deceptive_repair_demonstrated": true,
+    "d2_d3_d4v_prospective_dcs_positive_claim": false,
+    "gauge_retrospective_channel_contradiction": true,
+    "orthogonal_force_channel_median_signal_gain_vs_fresh_dcs": 11.455058526384752,
+    "orthogonal_force_resolved_coverage": 0,
+    "measured_prospective_confirmation": false
+  },
+  "final_disposition": "The executed program supports deceptive-repair and information-limit claims, not a claim that DCS or the tested force-compliance channel is a validated prospective repair verifier."
+}
