@@ -86,7 +86,8 @@
     "orthogonal_force_protocol": "research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md",
     "publication_asset_lock": "research/paper_data/PUBLICATION_ASSET_LOCK.md",
     "paper_positioning": "research/paper_data/PAPER_POSITIONING.md",
-    "final_research_summary": "research/results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md"
+    "final_research_summary": "research/results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md",
+    "current_state": "research/status/CURRENT_RESEARCH_STATE_2026-09-21.md"
   },
   "generated_assets_root": "build/paper-figures",
   "portable_archive_pattern": "build/vulkax-paper-evidence-<commit>.tar.gz"
