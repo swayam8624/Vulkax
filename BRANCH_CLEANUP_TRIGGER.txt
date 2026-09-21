@@ -1,0 +1,9 @@
+Trigger audited branch cleanup after promotion of the stable implementation to main.
+
+Policy:
+- compare every remote branch against origin/main
+- never delete main, release/1.0.0, or legacy/studio-v1-2026-08-10
+- delete only branches with zero unique commits ahead of main
+- preserve every divergent branch with unique work
+
+Date: 2026-09-21
