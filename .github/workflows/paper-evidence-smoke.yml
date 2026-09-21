@@ -54,6 +54,11 @@ jobs:
               print("VALID JSON",p)
           PY
 
+      - name: Audit release-facing README claims
+        run: |
+          python3 scripts/validate_evidence_registry.py .
+          python3 scripts/audit_release_claims.py . --expected-project-version 1.0.0
+
       - name: Generate deterministic paper assets
         run: |
           python3 research/analysis/generate_paper_assets.py             --results research/results/DCS_FINAL_RESULTS_2026-09-20.json             --out build/paper-figures
