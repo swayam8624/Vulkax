@@ -78,14 +78,14 @@ python3 "$ROOT/visualization/scripts/compose_hero_svg.py" \
   --repair "$OUT/plates/repair.png" \
   --interrogate "$OUT/plates/interrogate.png" \
   --motion-scale "$MOTION_SCALE" \
-  --out "$OUT/vector/vulkax_hero_composite.svg"
+  --out "$OUT/vector/reality_probe_hero.svg"
 
 echo "[vector] mechanism X-ray"
 python3 "$ROOT/visualization/scripts/compose_xray_svg.py" \
   --repo-root "$ROOT" \
   --xray "$OUT/plates/xray.png" \
   --motion-scale "$MOTION_SCALE" \
-  --out "$OUT/vector/vulkax_mechanism_xray.svg"
+  --out "$OUT/vector/reality_probe_mechanism_darkfield.svg"
 
 echo "[vector] 2D/3D method explainer"
 python3 "$ROOT/visualization/scripts/compose_explainer_svg.py" \
@@ -93,7 +93,13 @@ python3 "$ROOT/visualization/scripts/compose_explainer_svg.py" \
   --observe "$OUT/plates/wireframe.png" \
   --repair "$OUT/plates/repair.png" \
   --xray "$OUT/plates/xray.png" \
-  --out "$OUT/vector/vulkax_method_explainer.svg"
+  --out "$OUT/vector/reality_probe_method_explainer.svg"
+
+for svg in reality_probe_hero reality_probe_mechanism_darkfield reality_probe_method_explainer; do
+  python3 "$ROOT/visualization/scripts/embed_svg_assets.py" \
+    --svg "$OUT/vector/$svg.svg" \
+    --out "$OUT/vector/${svg}_standalone.svg"
+done
 
 echo "[video] build verification animation scene"
 video_args=(
@@ -104,7 +110,7 @@ video_args=(
   --bunny "$BUNNY"
   --direction "$DIRECTION"
   --motion-scale "$MOTION_SCALE"
-  --output "$OUT/video/vulkax_verification_animation"
+  --output "$OUT/video/reality_probe_verification_animation"
 )
 if [ "$VIDEO" -eq 1 ]; then
   video_args+=(--render)
