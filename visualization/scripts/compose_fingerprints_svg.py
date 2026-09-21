@@ -4,7 +4,7 @@ import argparse,csv
 from pathlib import Path
 from vector_composition_common import package_png, write_svg
 
-LABELS={"px":"+X","nx":"−X","py":"+Y","pz":"+Z"}
+LABELS={"px":"+X","nx":"-X","py":"+Y","pz":"+Z"}
 
 def main():
     p=argparse.ArgumentParser()
@@ -44,7 +44,7 @@ def main():
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif">
     <text x="120" y="125" fill="#13202a" font-size="62" font-weight="780">MECHANISM FINGERPRINTS</text>
     <text x="120" y="190" fill="#5d6a74" font-size="24">The same repaired world is interrogated along four orthogonal force directions.</text>
-    <text x="120" y="240" fill="#7a858d" font-size="19">Surface color = |u_repair − u_truth|, normalized by one common four-direction scale.</text>
+    <text x="120" y="240" fill="#7a858d" font-size="19">Surface color = |u_repair - u_truth|, normalized by one common four-direction scale.</text>
     {''.join(blocks)}
     <g transform="translate(120,1460)">
       <rect x="0" y="0" width="620" height="18" rx="9" fill="url(#residualScale)"/>
