@@ -1,6 +1,14 @@
 name: Reality Probe explainer artifact
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "visualization/explainer/**"
+      - "visualization/data/**"
+      - "visualization/probes/**"
+      - "research/results/VULKAX_FINAL_RESULTS_2026-09-21.json"
+      - ".github/workflows/reality-probe-explainer.yml"
   workflow_dispatch:
     inputs:
       mode:
@@ -19,6 +27,7 @@ permissions:
 
 jobs:
   render:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout frozen-capable history
