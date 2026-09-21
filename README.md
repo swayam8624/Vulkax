@@ -326,6 +326,7 @@ configuration and reproduction path are preserved.
 | **D4V** | ✅ **complete** | **negative repair-verification result** — 0% resolved coverage | 14/36 repairs were deceptive, but none of the tested verification channels reached the frozen credibility threshold |
 | **GAUGE** | ✅ **complete** | **retrospective channel contradiction** | aggregate/marker metrics favor overlap while longitudinal mechanism evidence favors endpoint |
 | **D5** | ✅ **stop-rule completed** | **not advanced by design** | preregistered progression stopped because D2/D3/D4V did not justify consuming a fresh confirmatory dataset |
+| **OFC** | ✅ **complete** | **fresh negative advancement result with 11.46× signal gain** | known-force compliance materially increased observability but still produced 0% resolved coverage |
 | **D6** | ✅ **complete** | systems capability implemented | spatial witness localization/export is available |
 
 ### Completion state
@@ -339,6 +340,7 @@ configuration and reproduction path are preserved.
 | D5 confirmatory runner/infrastructure | ✅ complete |
 | D5 fresh positive measured experiment | ⛔ intentionally not consumed after failed advancement gates |
 | D6 spatial localization | ✅ complete |
+| Orthogonal force-compliance follow-on | ✅ complete; frozen advancement gate failed |
 | Benchmark/result ledgers | ✅ complete |
 | Paper-data figures/tables | ✅ complete |
 | One-command reproduction | ✅ complete |
@@ -346,9 +348,11 @@ configuration and reproduction path are preserved.
 
 The current **scientific conclusion** is therefore not “unfinished DCS.” It is:
 
-> **The tested DCS formulations were fully implemented and tested, then rejected as
-> a prospective flagship verifier because the available physical information was
-> insufficient.**
+> **The tested DCS formulations were fully implemented and rejected as a prospective
+> verifier. A separately preregistered known-force channel increased median
+> standardized signal by 11.46× on fresh truth worlds, but still failed the frozen
+> resolved-decision threshold. The limiting issue is experimental information,
+> not unfinished implementation.**
 
 That conclusion is itself a completed research outcome.
 
@@ -386,6 +390,15 @@ D4V resolved coverage                  0%
 GAUGE ordinary overlap wins           10 / 10
 GAUGE marker dark-field endpoint wins  0 / 10
 GAUGE longitudinal endpoint wins       9 / 10
+
+OFC fresh repair proposals              36
+OFC deceptive                           12
+OFC beneficial                          24
+OFC fresh DCS median |z|                 0.04877
+OFC force median |z|                     0.55863
+OFC force best |z|                       1.31911
+OFC force/DCS median signal gain        11.455x
+OFC resolved coverage                    0%
 ```
 
 ---
@@ -413,6 +426,42 @@ It strengthens the current engineering conclusion:
 
 See
 [`research/results/DCS_INFORMATION_FRONTIER_2026-09-20.md`](research/results/DCS_INFORMATION_FRONTIER_2026-09-20.md).
+
+---
+
+# Orthogonal physical-information test
+
+D4V left an important ambiguity: was the failure specific to DCS algebra, or was the
+experiment simply not informative enough?
+
+To test that without retuning DCS, Vulkax froze a fresh experiment before execution:
+
+- six new off-grid truth worlds;
+- ordinary kinematic fitting/proposal generation unchanged;
+- a new **known-force compliance channel** not used for fitting;
+- fixed 40 N per top-layer particle;
+- four force directions;
+- the same frozen |z| ≥ 2 support/veto reference.
+
+Result:
+
+| Quantity | Fresh kinematic DCS | Force compliance |
+|---|---:|---:|
+| median |z| | 0.04877 | **0.55863** |
+| maximum |z| | 0.17279 | **1.31911** |
+| resolved coverage | 0% | 0% |
+| median additional signal needed to reach 2 | 41.01× | **3.58×** |
+
+So the new physical channel produced an **11.46× median information gain**, but still
+did not provide enough credible evidence for support/veto decisions.
+
+This is a completed negative advancement result, not an unfinished experiment.
+
+See:
+
+- [frozen force-compliance protocol](research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md)
+- [force-compliance result](research/results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md)
+- [mathematics-to-code audit](research/status/DCS_MATH_IMPLEMENTATION_AUDIT_2026-09-21.md)
 
 ---
 
@@ -566,13 +615,14 @@ The full run performs:
 12. D2;
 13. D3;
 14. D4V;
-15. GAUGE measured-data fetch and effective-span validation;
-16. 20 definitive GAUGE forward simulations;
-17. information-frontier diagnostics;
-18. frozen-result reproduction validation;
-19. deterministic paper figures/tables;
-20. SHA-256-indexed evidence packaging;
-21. portable archive creation.
+15. fresh orthogonal force-compliance information test;
+16. GAUGE measured-data fetch and effective-span validation;
+17. 20 definitive GAUGE forward simulations;
+18. information-frontier diagnostics;
+19. frozen-result reproduction validation;
+20. deterministic paper figures/tables;
+21. SHA-256-indexed evidence packaging;
+22. portable archive creation.
 
 Detailed guide:
 [`docs/PAPER_EVIDENCE_REPRODUCTION.md`](docs/PAPER_EVIDENCE_REPRODUCTION.md).
@@ -588,7 +638,9 @@ Start here:
 
 - [research paper-data map](research/paper_data/README.md)
 - [final benchmark summary](research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md)
-- [machine-readable final ledger](research/results/DCS_FINAL_RESULTS_2026-09-20.json)
+- [paper-level final ledger](research/results/VULKAX_FINAL_RESULTS_2026-09-21.json)
+- [frozen DCS ledger](research/results/DCS_FINAL_RESULTS_2026-09-20.json)
+- [mathematics-to-code audit](research/status/DCS_MATH_IMPLEMENTATION_AUDIT_2026-09-21.md)
 - [experiment matrix](research/paper_data/EXPERIMENT_MATRIX.csv)
 - [ablation matrix](research/paper_data/ABLATION_MATRIX.md)
 - [figure/table source map](research/paper_data/FIGURE_TABLE_SOURCE_MAP.md)
@@ -840,6 +892,7 @@ The current repository **does support**:
 - native Metal/Vulkan image regression;
 - real measured-data ingestion and held-out replay;
 - DCS implementation and matched-baseline experiments;
+- a fresh preregistered known-force compliance experiment showing an 11.46× median standardized-signal gain;
 - frozen negative D2/D3/D4V results;
 - retrospective GAUGE mechanism contradiction;
 - one-command evidence reproduction;
@@ -849,7 +902,7 @@ The completed research program **does not support the following positive claims*
 
 - DCS as a universal physical correctness certificate;
 - DCS superiority over matched raw/Fisher baselines;
-- useful prospective repair-veto coverage in the tested D4V regime;
+- useful prospective repair-veto coverage in the tested D4V or orthogonal-force regimes;
 - fresh measured prospective D5 confirmation (intentionally not consumed after the frozen stop rule);
 - true material-property recovery from GAUGE or DOT where the source data do not
   provide the required ground truth;
