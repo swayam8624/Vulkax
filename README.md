@@ -545,3 +545,18 @@ VULKAX and the Reality Probe research program have reached their intended endpoi
 The systems work is complete. The experiments are complete. The final negative and positive findings are frozen. The evidence package, figures, visual explainer, documentation, and reproduction path are in place.
 
 The project now moves from research execution to manuscript preparation.
+
+
+## License and third-party material
+
+Original Reality Probe / VULKAX code, documentation, and project-authored source
+assets are licensed under the Apache License 2.0. See [LICENSE](LICENSE) and
+[NOTICE](NOTICE).
+
+Datasets, public meshes, downloaded media, and other external assets retain their
+own terms. The current attribution and redistribution boundaries are recorded in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+For paper writing, start with the
+[SIGGRAPH manuscript dossier](research/paper_data/MANUSCRIPT_DOSSIER_SIGGRAPH.md)
+and the [manuscript asset index](research/paper_data/MANUSCRIPT_ASSET_INDEX.csv).
