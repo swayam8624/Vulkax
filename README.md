@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="https://github.com/swayam8624/Vulkax/actions/workflows/reality-probe-explainer.yml">
-    <img src="./docs/readme_assets/reality_probe_explainer_preview.gif" width="960" alt="Reality Probe animated explainer preview"/>
+    <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/reality_probe_explainer_preview.gif" width="960" alt="Reality Probe animated explainer preview"/>
   </a>
 </p>
 
@@ -31,7 +31,7 @@
 </p>
 
 <p align="center">
-  <img src="./docs/readme_assets/02_deceptive_repair.png" width="960" alt="Deceptive repair: looks better while the untouched physical target becomes worse"/>
+  <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/02_deceptive_repair.png" width="960" alt="Deceptive repair: looks better while the untouched physical target becomes worse"/>
 </p>
 
 <p align="center">
@@ -41,18 +41,18 @@
 ## Visual explanation
 
 <p align="center">
-  <img src="./docs/readme_assets/03_deception_map.png" width="475" alt="36-proposal deception map"/>
-  <img src="./docs/readme_assets/04_same_probe.png" width="475" alt="Same physical probe applied to truth and repair"/>
+  <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/03_deception_map.png" width="475" alt="36-proposal deception map"/>
+  <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/04_same_probe.png" width="475" alt="Same physical probe applied to truth and repair"/>
 </p>
 
 <p align="center">
-  <img src="./docs/readme_assets/06_fingerprint.png" width="475" alt="Mechanism fingerprint"/>
-  <img src="./docs/readme_assets/07_residual_field.png" width="475" alt="Mechanism darkfield residual"/>
+  <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/06_fingerprint.png" width="475" alt="Mechanism fingerprint"/>
+  <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/07_residual_field.png" width="475" alt="Mechanism darkfield residual"/>
 </p>
 
 <p align="center">
-  <img src="./docs/readme_assets/10_signal_gain.png" width="475" alt="11.46x standardized signal gain"/>
-  <img src="./docs/readme_assets/11_information_limit.png" width="475" alt="Information limit and frozen evidence threshold"/>
+  <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/10_signal_gain.png" width="475" alt="11.46x standardized signal gain"/>
+  <img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/11_information_limit.png" width="475" alt="Information limit and frozen evidence threshold"/>
 </p>
 
 The visual story is:
@@ -83,43 +83,43 @@ UNRESOLVED → REFUSE CERTIFICATION
 <br/>
 
 ### 01 — The question
-<img src="./docs/readme_assets/01_question.png" width="100%" alt="Reality Probe research question"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/01_question.png" width="100%" alt="Reality Probe research question"/>
 
 ### 02 — A deceptive repair
-<img src="./docs/readme_assets/02_deceptive_repair.png" width="100%" alt="Deceptive repair"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/02_deceptive_repair.png" width="100%" alt="Deceptive repair"/>
 
 ### 03 — The 36-proposal deception map
-<img src="./docs/readme_assets/03_deception_map.png" width="100%" alt="Deception map"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/03_deception_map.png" width="100%" alt="Deception map"/>
 
 ### 04 — Ask the same physical question
-<img src="./docs/readme_assets/04_same_probe.png" width="100%" alt="Same probe"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/04_same_probe.png" width="100%" alt="Same probe"/>
 
 ### 05 — Overlay the two responses
-<img src="./docs/readme_assets/05_response_overlay.png" width="100%" alt="Truth repair response overlay"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/05_response_overlay.png" width="100%" alt="Truth repair response overlay"/>
 
 ### 06 — Mechanism fingerprint
-<img src="./docs/readme_assets/06_fingerprint.png" width="100%" alt="Mechanism fingerprint"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/06_fingerprint.png" width="100%" alt="Mechanism fingerprint"/>
 
 ### 07 — Mechanism darkfield
-<img src="./docs/readme_assets/07_residual_field.png" width="100%" alt="Residual field"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/07_residual_field.png" width="100%" alt="Residual field"/>
 
 ### 08 — DCS intuition
-<img src="./docs/readme_assets/08_dcs_intuition.png" width="100%" alt="DCS intuition"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/08_dcs_intuition.png" width="100%" alt="DCS intuition"/>
 
 ### 09 — Standardized evidence
-<img src="./docs/readme_assets/09_standardization.png" width="100%" alt="Standardized evidence"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/09_standardization.png" width="100%" alt="Standardized evidence"/>
 
 ### 10 — Orthogonal physical information
-<img src="./docs/readme_assets/10_signal_gain.png" width="100%" alt="Signal gain"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/10_signal_gain.png" width="100%" alt="Signal gain"/>
 
 ### 11 — Information limit
-<img src="./docs/readme_assets/11_information_limit.png" width="100%" alt="Information limit"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/11_information_limit.png" width="100%" alt="Information limit"/>
 
 ### 12 — Conclusion
-<img src="./docs/readme_assets/12_conclusion.png" width="100%" alt="Reality Probe conclusion"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/12_conclusion.png" width="100%" alt="Reality Probe conclusion"/>
 
 ### Storyboard
-<img src="./docs/readme_assets/storyboard.png" width="100%" alt="Reality Probe full storyboard"/>
+<img src="https://raw.githubusercontent.com/swayam8624/Vulkax/main/docs/readme_assets/storyboard.png" width="100%" alt="Reality Probe full storyboard"/>
 
 Every still also has a matching editable SVG under `docs/readme_assets/`.
 
