@@ -53,6 +53,71 @@ def make_materials():
     }
 
 
+def diagnostic_grid_material(name, base_color, line_color, bands=10.0, width=0.055):
+    """Smooth UV-space diagnostic grid that deforms with the solver-driven mesh."""
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    tex = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+
+    nt.links.new(tex.outputs["UV"], sep.inputs["Vector"])
+
+    masks = []
+    threshold = math.sin(math.pi * width)
+    for axis_name in ("X", "Y"):
+        mul = nt.nodes.new("ShaderNodeMath")
+        mul.operation = "MULTIPLY"
+        mul.inputs[1].default_value = bands * math.pi
+        sine = nt.nodes.new("ShaderNodeMath")
+        sine.operation = "SINE"
+        absv = nt.nodes.new("ShaderNodeMath")
+        absv.operation = "ABSOLUTE"
+        less = nt.nodes.new("ShaderNodeMath")
+        less.operation = "LESS_THAN"
+        less.inputs[1].default_value = threshold
+        nt.links.new(sep.outputs[axis_name], mul.inputs[0])
+        nt.links.new(mul.outputs[0], sine.inputs[0])
+        nt.links.new(sine.outputs[0], absv.inputs[0])
+        nt.links.new(absv.outputs[0], less.inputs[0])
+        masks.append(less)
+
+    grid = nt.nodes.new("ShaderNodeMath")
+    grid.operation = "MAXIMUM"
+    nt.links.new(masks[0].outputs[0], grid.inputs[0])
+    nt.links.new(masks[1].outputs[0], grid.inputs[1])
+
+    mix = nt.nodes.new("ShaderNodeMixRGB")
+    mix.blend_type = "MIX"
+    mix.inputs[1].default_value = (*base_color[:3], 1.0)
+    mix.inputs[2].default_value = (*line_color[:3], 1.0)
+    nt.links.new(grid.outputs[0], mix.inputs[0])
+    nt.links.new(mix.outputs[0], bsdf.inputs["Base Color"])
+    bsdf.inputs["Metallic"].default_value = 0.08
+    bsdf.inputs["Roughness"].default_value = 0.24
+    if "Coat Weight" in bsdf.inputs:
+        bsdf.inputs["Coat Weight"].default_value = 0.28
+        bsdf.inputs["Coat Roughness"].default_value = 0.16
+    nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+    return mat
+
+
+def attach_rest_uv(obj, params):
+    """Store normalized rest-space (u,w) on the copied bunny topology."""
+    uv = obj.data.uv_layers.new(name="DiagnosticUV")
+    for poly in obj.data.polygons:
+        for loop_index in poly.loop_indices:
+            vid = obj.data.loops[loop_index].vertex_index
+            u, _v, w = params[vid]
+            uv.data[loop_index].uv = (u, w)
+    obj.data.uv_layers.active = uv
+    obj.data.uv_layers.active_render = uv
+
+
 def plate_camera(scene, panel):
     # Keep all hero plates on the same optical scale so Illustrator assembly
     # does not have to hide framing differences.
@@ -139,18 +204,58 @@ def add_compact_probe(direction, stage_mat, glow_mat):
     hero.add_arrow("compact_force", tip - force * 0.02, tip + force * 0.72, 0.016, glow_mat)
 
 
-def apply_diagnostic_grid(obj, params, line_mat, bands=11, width=0.085):
-    """Assign a rest-space grid texture that deforms with the bunny surface."""
-    obj.data.materials.append(line_mat)
-    for poly in obj.data.polygons:
-        us = [params[i][0] for i in poly.vertices]
-        ws = [params[i][2] for i in poly.vertices]
-        u = sum(us) / len(us)
-        w = sum(ws) / len(ws)
-        pu = (u * bands) % 1.0
-        pw = (w * bands) % 1.0
-        line = pu < width or pu > 1.0 - width or pw < width or pw > 1.0 - width
-        poly.material_index = 1 if line else 0
+def add_surface_residual_vectors(params, rest_display, groups, frame, motion_scale, truth_mat, residual_mat):
+    """Show candidate-minus-truth response at deterministic bunny-surface samples."""
+    truth_group = groups[("truth", frame)]
+    repair_group = groups[("repair_pic", frame)]
+    targets = [
+        (0.24, 0.42, 0.40), (0.40, 0.48, 0.34), (0.58, 0.48, 0.38),
+        (0.74, 0.52, 0.43), (0.30, 0.50, 0.62), (0.50, 0.50, 0.67),
+        (0.68, 0.50, 0.64), (0.42, 0.36, 0.82), (0.62, 0.42, 0.82),
+    ]
+    used = set()
+    for target in targets:
+        idx = min(
+            (i for i in range(len(params)) if i not in used),
+            key=lambda i: sum((params[i][k] - target[k]) ** 2 for k in range(3)),
+        )
+        used.add(idx)
+        uvw = params[idx]
+        a = rest_display[idx] + hero.field_displacement(truth_group, uvw) * motion_scale
+        b = rest_display[idx] + hero.field_displacement(repair_group, uvw) * motion_scale
+        delta = b - a
+        if delta.length <= 1e-7:
+            continue
+        hero.cylinder_between(f"surface_residual_{idx}", a, b, 0.008, residual_mat, 16)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.014, location=a)
+        bpy.context.object.data.materials.append(truth_mat)
+        unit = delta.normalized()
+        bpy.ops.mesh.primitive_cone_add(
+            vertices=16, radius1=0.026, radius2=0.0, depth=0.065,
+            location=b - unit * 0.022,
+        )
+        cone = bpy.context.object
+        cone.rotation_mode = "QUATERNION"
+        cone.rotation_quaternion = delta.to_track_quat("Z", "Y")
+        cone.data.materials.append(residual_mat)
+
+
+def add_force_glyph(direction, glow_mat):
+    """Compact direction glyph kept outside the central response field."""
+    if direction == "px":
+        hero.add_arrow("force_px", Vector((-1.95, -0.24, 1.52)), Vector((-1.18, -0.24, 1.52)), 0.012, glow_mat)
+    elif direction == "nx":
+        hero.add_arrow("force_nx", Vector((1.95, -0.24, 1.52)), Vector((1.18, -0.24, 1.52)), 0.012, glow_mat)
+    elif direction == "py":
+        hero.add_arrow("force_py", Vector((0.0, -0.24, 0.18)), Vector((0.0, -0.24, 0.88)), 0.012, glow_mat)
+    else:
+        # +solver-Z maps into screen depth from this camera: use the standard
+        # circled-cross symbol for a vector pointing away from the viewer.
+        center = Vector((1.45, -0.70, 1.55))
+        hero.add_torus("force_pz_ring", center, 0.16, 0.010, glow_mat, rotation=(math.radians(90), 0.0, 0.0))
+        hero.cylinder_between("force_pz_x1", center + Vector((-0.09, 0.0, -0.09)), center + Vector((0.09, 0.0, 0.09)), 0.010, glow_mat, 12)
+        hero.cylinder_between("force_pz_x2", center + Vector((-0.09, 0.0, 0.09)), center + Vector((0.09, 0.0, -0.09)), 0.010, glow_mat, 12)
+
 
 def setup_scene(args):
     scene = hero.configure_scene(args.engine, args.cycles_samples)
@@ -176,6 +281,8 @@ def main():
     groups, last = hero.load_states(args.trajectory_dir / "particle_trajectories.csv", args.direction)
     scene = setup_scene(args)
     mats = make_materials()
+    diag_truth = diagnostic_grid_material("diag_truth_smooth", (0.82, 0.88, 0.92, 1.0), (0.015, 0.30, 0.48, 1.0))
+    diag_repair = diagnostic_grid_material("diag_repair_smooth", (0.88, 0.84, 0.79, 1.0), (0.74, 0.24, 0.055, 1.0))
 
     source = hero.import_ply(args.bunny)
     source.name = "Stanford_Bunny_Source_Hidden"
@@ -222,7 +329,7 @@ def main():
         hero.create_deformed_bunny(source, "Interrogate_Truth", params, rest_display, groups,
                                    "truth", last, 0.0, args.motion_scale, mats["truth_wire"],
                                    animate=False, wireframe=True, ghost=True)
-        add_forensic_residuals(groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
+        add_surface_residual_vectors(params, rest_display, groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
         add_compact_probe(args.direction, mats["stage"], mats["orange_glow"])
 
     elif panel == "brightfield":
@@ -232,15 +339,15 @@ def main():
 
     elif panel == "texture_truth":
         obj = hero.create_deformed_bunny(source, "Diagnostic_Truth", params, rest_display, groups,
-                                         "truth", last, 0.0, args.motion_scale, mats["diag_truth_base"],
+                                         "truth", last, 0.0, args.motion_scale, diag_truth,
                                          animate=False)
-        apply_diagnostic_grid(obj, params, mats["diag_truth_line"])
+        attach_rest_uv(obj, params)
 
     elif panel == "texture_repair":
         obj = hero.create_deformed_bunny(source, "Diagnostic_Repair", params, rest_display, groups,
-                                         "repair_pic", last, 0.0, args.motion_scale, mats["diag_repair_base"],
+                                         "repair_pic", last, 0.0, args.motion_scale, diag_repair,
                                          animate=False)
-        apply_diagnostic_grid(obj, params, mats["diag_repair_line"])
+        attach_rest_uv(obj, params)
 
     elif panel == "darkfield":
         hero.create_deformed_bunny(source, "Darkfield_Repair", params, rest_display, groups,
@@ -249,12 +356,8 @@ def main():
         hero.create_deformed_bunny(source, "Darkfield_Truth", params, rest_display, groups,
                                    "truth", last, 0.0, args.motion_scale, mats["truth_wire"],
                                    animate=False, wireframe=True, ghost=True)
-        add_forensic_residuals(groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
-        force = {"px": Vector((1, 0, 0)), "nx": Vector((-1, 0, 0)),
-                 "py": Vector((0, 0, 1)), "pz": Vector((0, 1, 0))}[args.direction]
-        origin = Vector((0, -0.18, 1.55))
-        hero.add_arrow("darkfield_force", origin - force * 1.55, origin + force * 0.15,
-                       0.022, mats["orange_glow"])
+        add_surface_residual_vectors(params, rest_display, groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
+        add_force_glyph(args.direction, mats["orange_glow"])
 
     elif panel == "xray":
         hero.create_deformed_bunny(source, "XRay_Repair", params, rest_display, groups,
@@ -263,12 +366,8 @@ def main():
         hero.create_deformed_bunny(source, "XRay_Truth", params, rest_display, groups,
                                    "truth", last, 0.0, args.motion_scale, mats["truth_wire"],
                                    animate=False, wireframe=True, ghost=True)
-        add_forensic_residuals(groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
-        force = {"px": Vector((1, 0, 0)), "nx": Vector((-1, 0, 0)),
-                 "py": Vector((0, 0, 1)), "pz": Vector((0, 1, 0))}[args.direction]
-        origin = Vector((0, -0.18, 1.55))
-        hero.add_arrow("xray_force", origin - force * 1.8, origin + force * 0.2,
-                       0.025, mats["orange_glow"])
+        add_surface_residual_vectors(params, rest_display, groups, last, args.motion_scale, mats["cyan_glow"], mats["residual"])
+        add_force_glyph(args.direction, mats["orange_glow"])
 
     plate_lighting(panel)
     plate_camera(scene, panel)
