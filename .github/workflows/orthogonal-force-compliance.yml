@@ -1,0 +1,40 @@
+name: Orthogonal force-compliance information test
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "research/probes/orthogonal_force_compliance_probe.cpp"
+      - "research/probes/analyze_orthogonal_force_compliance.py"
+      - "research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/orthogonal-force-compliance.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vulkax-orthogonal-force-compliance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
+      - name: Build probe
+        run: cmake --build build --target vulkax_orthogonal_force_compliance_probe --parallel 2
+      - name: Execute frozen fresh experiment
+        run: build/vulkax_orthogonal_force_compliance_probe build/orthogonal-force-compliance
+      - name: Analyze frozen outputs
+        run: |
+          python3 research/probes/analyze_orthogonal_force_compliance.py build/orthogonal-force-compliance | tee build/orthogonal-force-compliance/analysis.txt
+          cat build/orthogonal-force-compliance/analysis.json
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: orthogonal-force-compliance-${{ github.sha }}
+          path: build/orthogonal-force-compliance
+          if-no-files-found: error
+          retention-days: 30
