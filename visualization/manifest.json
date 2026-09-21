@@ -1,0 +1,48 @@
+{
+  "schema": "vulkax.visualization_manifest",
+  "version": 1,
+  "purpose": "presentation_only",
+  "ai_generated_submission_imagery": false,
+  "ledger": "research/results/VULKAX_FINAL_RESULTS_2026-09-21.json",
+  "frozen_tag": "paper-freeze-2026-09-21",
+  "frozen_commit": "a9da8c0aa8689ebeea0d84baf95a74907659a837",
+  "frozen_values": {
+    "dcs.stages.D1.cases": 64,
+    "dcs.stages.D1.dcs_accept_deceptive": 0,
+    "dcs.stages.D1.median_observation_improvement": 0.6088,
+    "dcs.stages.D1.median_witness_degradation_ratio": 9.375,
+    "dcs.stages.D2_frozen.truth_worlds": 16,
+    "dcs.stages.D2_frozen.resolved_worlds": 0,
+    "dcs.stages.D3.truth_worlds": 6,
+    "dcs.stages.D3.resolved_worlds": 0,
+    "dcs.stages.D4V.proposals": 36,
+    "dcs.stages.D4V.deceptive": 14,
+    "dcs.stages.D4V.beneficial": 22,
+    "dcs.stages.GAUGE.trials": 10,
+    "dcs.stages.GAUGE.ordinary_overlap_wins": 10,
+    "dcs.stages.GAUGE.longitudinal_darkfield_endpoint_wins": 9,
+    "orthogonal_force_compliance.proposal_count": 36,
+    "orthogonal_force_compliance.dcs.median_abs_z": 0.04876703024660442,
+    "orthogonal_force_compliance.force_compliance.median_abs_z": 0.558629185632829,
+    "orthogonal_force_compliance.force_compliance.max_abs_z": 1.3191113184383891,
+    "orthogonal_force_compliance.force_to_dcs_median_abs_z_ratio": 11.455058526384752,
+    "orthogonal_force_compliance.advancement_gate_pass": false
+  },
+  "render_surfaces": [
+    {
+      "file": "fig_information_frontier.svg",
+      "class": "paper_evidence",
+      "claim": "orthogonal force/compliance greatly increases standardized signal while remaining below the frozen decision reference"
+    },
+    {
+      "file": "fig_evidence_story.svg",
+      "class": "paper_summary",
+      "claim": "completed evidence-stage summary"
+    },
+    {
+      "file": "fig_reality_inspector_storyboard.svg",
+      "class": "schematic_storyboard",
+      "claim": "visual explanation only; mechanism drawing is explicitly schematic and numeric annotations come from the frozen ledger"
+    }
+  ]
+}
