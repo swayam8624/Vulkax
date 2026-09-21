@@ -74,13 +74,13 @@ jobs:
           grep -q 'REALITY PROBE' build/vector-smoke/xray.svg
           grep -q 'HOW REALITY PROBE' build/vector-smoke/explainer.svg
           python3 visualization/scripts/compose_darkfield_intuition_svg.py --repo-root . --brightfield build/vector-smoke/p.png --truth build/vector-smoke/p.png --repair build/vector-smoke/p.png --darkfield build/vector-smoke/p.png --out build/vector-smoke/darkfield.svg
-          cat > build/vector-smoke/direction_summary.csv <<'EOF'
-direction,baseline_raw_rms_to_truth_m,repair_raw_rms_to_truth_m
-px,4.62e-6,5.58e-5
-nx,4.62e-6,5.58e-5
-py,4.67e-6,5.54e-5
-pz,4.62e-6,5.58e-5
-EOF
+          printf '%s\n' \
+            'direction,baseline_raw_rms_to_truth_m,repair_raw_rms_to_truth_m' \
+            'px,4.62e-6,5.58e-5' \
+            'nx,4.62e-6,5.58e-5' \
+            'py,4.67e-6,5.54e-5' \
+            'pz,4.62e-6,5.58e-5' \
+            > build/vector-smoke/direction_summary.csv
           python3 visualization/scripts/compose_fingerprints_svg.py --summary build/vector-smoke/direction_summary.csv --px build/vector-smoke/p.png --nx build/vector-smoke/p.png --py build/vector-smoke/p.png --pz build/vector-smoke/p.png --out build/vector-smoke/fingerprints.svg
           test -s build/vector-smoke/darkfield.svg
           test -s build/vector-smoke/fingerprints.svg
