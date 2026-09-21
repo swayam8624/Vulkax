@@ -1,7 +1,9 @@
 # Branch and PR Cleanup Manifest — 2026-09-20
 
-Canonical integrated research branch:
+Historical integration branch at the time of this audit:
 `research/integration-20260920`
+
+Current canonical stable branch after promotion: `main`
 
 Merged DCS implementation:
 `e2fa8cadbfa765367971030ca9614d9d7a063aae`
@@ -79,7 +81,7 @@ Recommended deletion command, one branch at a time:
 - `main` — production/default branch
 - `release/1.0.0` — immutable release lineage
 - `legacy/studio-v1-2026-08-10` — historical snapshot
-- `research/integration-20260920` — canonical current research integration
+- `research/integration-20260920` — historical integration lineage; removable after confirming `main` is at the same/newer head
 
 ## Divergent branches with unique commits — retain pending audit
 
@@ -124,6 +126,6 @@ Do **not** bulk-delete these.
 - stale open PRs: **0**
 - fully contained branches audited for safe deletion: **25**
 - divergent unique-work branches: retained
-- canonical research line: one merged integration branch
+- canonical stable line after promotion: `main`
 
 This manifest supersedes the earlier cleanup file written before DCS integration.
