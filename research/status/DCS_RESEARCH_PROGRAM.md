@@ -497,3 +497,75 @@ Not included in the 100% implementation number:
 
 Therefore **100% implementation must never be interpreted as 100% evidence or paper
 readiness**. Negative results remain binding.
+
+
+## 11. Fresh orthogonal-information follow-on — 2026-09-21
+
+The D4V outcome localized the bottleneck to information content rather than another
+DCS algebraic variant. That interpretation was tested directly under a separately
+frozen protocol:
+
+`research/benchmarks/ORTHOGONAL_FORCE_COMPLIANCE_PROTOCOL_2026-09-21.md`
+
+The follow-on did **not** retune D2/D3/D4V.
+
+Fresh truth worlds:
+- E={14,125; 16,625; 18,125} Pa;
+- nu={0.22; 0.32};
+- 6 total worlds;
+- APIC truth at dt=2.5e-5 s.
+
+The repair proposal mechanism remained ordinary held-out kinematic error.
+
+The new channel used a known external-force compliance bundle:
+- bottom layer fixed;
+- 40 N per top particle;
+- +x, -x, +y and +z force directions;
+- measured top/interior mean displacement response;
+- nominal-vs-half-dt numerical uncertainty;
+- the same frozen `|z| >= 2` support/veto reference.
+
+Fresh result:
+- proposals: **36**;
+- deceptive: **12**;
+- beneficial: **24**;
+- fresh kinematic DCS median `|z|`: **0.04877**;
+- known-force median `|z|`: **0.55863**;
+- known-force maximum `|z|`: **1.31911**;
+- median force/DCS signal gain: **11.455×**;
+- DCS resolved coverage: **0%**;
+- force resolved coverage: **0%**;
+- frozen force advancement gate: **FAIL**.
+
+This experiment substantially strengthens the information-limit interpretation:
+changing the physical information channel increases observability by over an order
+of magnitude without yet crossing the credibility threshold.
+
+Do not retune:
+- the 40 N force amplitude;
+- the four force directions;
+- these truth worlds;
+- the candidate fitting grid;
+- the `|z|=2` decision reference.
+
+Canonical result:
+`research/results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md`
+
+## 12. Frozen research-program disposition — 2026-09-21
+
+The active DCS research program is now frozen for manuscript preparation.
+
+Final supportable thesis:
+
+> Observational improvement can be deceptive in captured executable worlds.
+> Mechanism-sensitive verification may remain unresolved because of insufficient
+> experimental information. A separately preregistered orthogonal force-compliance
+> channel materially increased uncertainty-normalized discriminating signal on
+> fresh synthetic worlds but still did not achieve resolved support/veto coverage.
+
+The phrase “Phase I” is not required. D0–D6 remain internal experiment-stage names,
+not a promise of mandatory future research phases.
+
+A future real force sensor, modal/frequency channel or other new apparatus is
+follow-on research requiring a new frozen protocol and new data; it is not necessary
+to keep tuning this paper's frozen experiment set.
