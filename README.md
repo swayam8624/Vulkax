@@ -479,17 +479,16 @@ but
 
 # One-command full research reproduction
 
-The canonical research branch is:
+The canonical stable branch is:
 
 ```text
-research/integration-20260920
+main
 ```
 
 From a fresh clone:
 
 ```bash
-git clone --branch research/integration-20260920 --single-branch \
-  https://github.com/swayam8624/Vulkax.git
+git clone https://github.com/swayam8624/Vulkax.git
 cd Vulkax
 
 ./run_everything.sh --clean
@@ -636,7 +635,7 @@ research/integration-20260920
 with temporary feature/research branches only while work is active.
 
 Current branch audit:
-[`research/status/BRANCH_AUDIT_2026-09-21.md`](research/status/BRANCH_AUDIT_2026-09-21.md).
+[`research/status/BRANCH_AUDIT_2026-09-21.md`](research/status/BRANCH_AUDIT_2026-09-21.md). After promotion, `main` is the canonical stable implementation; the dated integration branch is historical.
 
 Dry-run cleanup:
 
