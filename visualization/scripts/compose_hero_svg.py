@@ -23,13 +23,14 @@ def main():
       (2530,"03","INTERROGATE",f"PHYSICS WORSE  +{m['worsen_pct']:.2f}% HIDDEN TARGET","#ffb36c",images[2])]
     pm=[]
     for x,idx,title,sub,accent,img in panels:
-        pm.append(f"""<g id="panel-{title.lower()}" transform="translate({x},0)">
-        <rect x="0" y="510" width="1160" height="1300" rx="32" fill="#07131f" stroke="{accent}" stroke-opacity=".18" stroke-width="2"/>
-        <rect x="0" y="510" width="1160" height="5" rx="2.5" fill="{accent}" opacity=".85"/>
-        <text x="54" y="610" fill="{accent}" font-size="44" font-weight="700">{idx}</text>
-        <text x="128" y="610" fill="#f1f7ff" font-size="44" font-weight="700">{esc(title)}</text>
-        <text x="54" y="665" fill="{accent}" font-size="23" font-weight="600" letter-spacing="1">{esc(sub)}</text>
-        <image x="40" y="690" width="1080" height="1080" preserveAspectRatio="xMidYMid meet" href="{img}" xlink:href="{img}"/></g>""")
+        pm.append(f"""<g id="panel-{title.lower()}-vector">
+        <rect x="{x}" y="510" width="1160" height="1300" rx="32" fill="#07131f" stroke="{accent}" stroke-opacity=".18" stroke-width="2"/>
+        <rect x="{x}" y="510" width="1160" height="5" rx="2.5" fill="{accent}" opacity=".85"/>
+        <text x="{x+54}" y="610" fill="{accent}" font-size="44" font-weight="700">{idx}</text>
+        <text x="{x+128}" y="610" fill="#f1f7ff" font-size="44" font-weight="700">{esc(title)}</text>
+        <text x="{x+54}" y="665" fill="{accent}" font-size="23" font-weight="600" letter-spacing="1">{esc(sub)}</text>
+        </g>
+        <image id="panel-{title.lower()}-raster" x="{x+40}" y="690" width="1080" height="1080" href="{img}"/>""")
     svg=f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3840" height="2160" viewBox="0 0 3840 2160">
     {defs()}<rect width="3840" height="2160" fill="url(#bg)"/><rect x="120" y="120" width="3600" height="2" fill="url(#cyanLine)" opacity=".75"/>
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif">
