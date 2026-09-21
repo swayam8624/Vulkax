@@ -47,6 +47,7 @@ jobs:
           python3 -m py_compile visualization/scripts/compose_darkfield_intuition_svg.py
           python3 -m py_compile visualization/scripts/compose_fingerprints_svg.py
           python3 -m py_compile visualization/scripts/compose_deception_map_svg.py
+          python3 -m py_compile visualization/scripts/embed_svg_assets.py
 
       - name: Verify frozen evidence and render SVGs
         run: ./visualization/render_all.sh
@@ -90,6 +91,9 @@ jobs:
           python3 visualization/scripts/compose_deception_map_svg.py --proposals visualization/data/ofc_proposals_visualization_2026-09-21.csv --out build/vector-smoke/deception.svg
           test -s build/vector-smoke/deception.svg
           grep -q 'BETTER' build/vector-smoke/deception.svg
+          python3 visualization/scripts/embed_svg_assets.py --svg build/vector-smoke/hero.svg --out build/vector-smoke/hero_standalone.svg
+          test -s build/vector-smoke/hero_standalone.svg
+          grep -q 'data:image/png;base64' build/vector-smoke/hero_standalone.svg
 
       - name: Upload deterministic SVG package
         uses: actions/upload-artifact@v4
