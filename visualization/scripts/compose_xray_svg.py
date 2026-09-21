@@ -2,16 +2,16 @@
 from __future__ import annotations
 import argparse
 from pathlib import Path
-from vector_composition_common import defs, metrics, png_data_uri, write_svg
+from vector_composition_common import defs, metrics, package_png, write_svg
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument("--repo-root",type=Path,required=True); p.add_argument("--xray",type=Path,required=True); p.add_argument("--motion-scale",type=float,default=400.0); p.add_argument("--out",type=Path,required=True)
-    a=p.parse_args(); m=metrics(a.repo_root); image=png_data_uri(a.xray)
-    svg=f"""<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="1800" viewBox="0 0 3200 1800">{defs()}<rect width="3200" height="1800" fill="url(#bg)"/>
+    a=p.parse_args(); m=metrics(a.repo_root); image=package_png(a.xray,a.out,"xray_plate.png")
+    svg=f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3200" height="1800" viewBox="0 0 3200 1800">{defs()}<rect width="3200" height="1800" fill="url(#bg)"/>
     <g font-family="Inter,Helvetica Neue,Arial,sans-serif"><text x="150" y="175" fill="#f0f7ff" font-size="76" font-weight="700">MECHANISM X-RAY</text>
     <text x="150" y="245" fill="#82e2ff" font-size="25" font-weight="600" letter-spacing="2">CANDIDATE − TRUTH RESPONSE UNDER A KNOWN PHYSICAL PROBE</text>
     <rect x="120" y="330" width="1940" height="1320" rx="34" fill="#07131f" stroke="#6ee2ff" stroke-opacity=".22" stroke-width="2"/>
-    <image x="210" y="390" width="1760" height="1160" preserveAspectRatio="xMidYMid meet" href="{image}"/>
+    <image x="210" y="390" width="1760" height="1160" preserveAspectRatio="xMidYMid meet" href="{image}" xlink:href="{image}"/>
     <text x="170" y="1600" fill="#ffae65" font-size="20" font-weight="600">DISPLAY ×{a.motion_scale:g} / RESIDUAL DIRECTIONS FROM RAW VULKAX SOLVER STATE</text>
     <g transform="translate(2160,350)"><text x="0" y="0" fill="#f0f7ff" font-size="36" font-weight="700">THIS DECEPTIVE REPAIR</text>
     <text x="0" y="56" fill="#91a7bb" font-size="21">truth world {m['truth_id']} / frozen APIC → PIC proposal</text>
