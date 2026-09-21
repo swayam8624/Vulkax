@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-canonical="origin/research/integration-20260920"
+canonical="origin/main"
 delete=0
 
 if [[ "${1:-}" == "--delete" ]]; then
