@@ -32,6 +32,16 @@ REQUIRED_EVIDENCE = [
     "research/results/GAUGE_PAIRED_DIAGNOSTICS_2026-09-20.csv",
     "docs/MEASURED_BENCHMARK_0_45.md",
     "paper/main_humanized.tex",
+    ".github/workflows/measured-world-showcase.yml",
+]
+
+MEASURED_VISUAL_WORKFLOW_GUARDS = [
+    "DOT C2",
+    "contact_sheet.png",
+    "hero_baseline.png",
+    "hero_rollback.png",
+    "turntable/frame_000.png",
+    "render_backend: Vulkan",
 ]
 
 MANUSCRIPT_GUARDS = [
@@ -135,11 +145,21 @@ def run_audit(root: pathlib.Path) -> dict:
                 } and asset not in text:
                     errors.append(f"core visual not referenced by manuscript: {rel}")
 
+
+    measured_visual_contract = {}
+    measured_workflow = root / ".github/workflows/measured-world-showcase.yml"
+    if measured_workflow.is_file():
+        workflow_text = measured_workflow.read_text(encoding="utf-8")
+        for guard in MEASURED_VISUAL_WORKFLOW_GUARDS:
+            measured_visual_contract[guard] = guard in workflow_text
+            if guard not in workflow_text:
+                errors.append(f"measured visual workflow guard missing: {guard}")
+
     benchmark_matrix = [
         {
             "source": "DOT C2",
             "class": "public measured source",
-            "role": "end-to-end captured-world engineering check",
+            "role": "end-to-end captured-world engineering check plus deterministic Vulkan qualitative showcase",
             "claim_boundary": "measured trajectories; unobserved physical quantities remain explicit proxies",
         },
         {
@@ -171,6 +191,7 @@ def run_audit(root: pathlib.Path) -> dict:
         "visuals": visuals,
         "frozen_invariants": invariants,
         "manuscript_guards": manuscript_guards,
+        "measured_visual_contract": measured_visual_contract,
         "benchmark_matrix": benchmark_matrix,
     }
 

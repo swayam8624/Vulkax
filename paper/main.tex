@@ -560,6 +560,34 @@ satisfying the configured nonlinear linearization-error tolerance. This
 result validates the commit/refusal mechanism on measured-source data
 but is not used as evidence for the central deceptive-repair claim.
 
+
+
+\begin{table}[t]
+\centering
+\caption{Public DOT C2 measured-source engineering check. The material parameters are model-conditioned effective values, not material ground truth.}
+\label{tab:dot-c2}
+\begin{tabular}{lr}
+\toprule
+Quantity & Result \\
+\midrule
+Measured correspondence points & 225 \\
+Trajectory observations (fit / held-out) & 675 (585 / 90) \\
+Effective \(E,\nu\) & 7.5 kPa, 0.45 \\
+Dynamic RMS (fit / held-out) & 4.391 / 4.417 mm \\
+Adaptive candidate set & 182/225 particles; 94.80\% abs. gradient \\
+Rewrite verification & nonlinear pass; oracle fail; rollback \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The same pinned DOT C2 source is also exercised by the native Vulkan measured-world
+showcase, which emits baseline and rollback hero views, close-ups, a comparison
+plate, and an eight-view turntable. Because the candidate rewrite is rejected, the
+final displayed state intentionally returns to the baseline state. These images are
+qualitative implementation evidence for the measured captured-world path; they are
+not additional evidence that the fitted material parameters are physically unique or
+ground-truth accurate.
+
 \subsection{GAUGE: retrospective measured channel
 contradiction}\label{gauge-retrospective-measured-channel-contradiction}
 

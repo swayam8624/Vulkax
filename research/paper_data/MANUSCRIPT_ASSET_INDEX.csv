@@ -24,3 +24,4 @@ T1,stage outcomes,mixed,,build/paper-figures/table_stage_outcomes.csv,Table 1,"p
 T2,claim boundaries,integrity,,build/paper-figures/table_claim_boundaries.csv,Supplement,"supported vs unsupported claims"
 T3,information frontier,post-hoc diagnostic,,build/paper-figures/table_information_frontier.csv,Supplement,"post-hoc only"
 T4,orthogonal force compliance,fresh synthetic follow-on,,build/paper-figures/table_orthogonal_force_compliance.csv,Table 2,"same frozen threshold and proposal population"
+M1,DOT C2 measured-world showcase,public measured-source presentation,,build/dot-c2-world-run/render/showcase/contact_sheet.png,Supplement,"pinned DOT C2 measured trajectory geometry; Vulkan presentation derivative; rejected rewrite is rolled back; not material-ground-truth evidence"
