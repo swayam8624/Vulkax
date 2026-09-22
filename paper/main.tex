@@ -9,6 +9,7 @@
 \usepackage{amsmath}
 \usepackage{booktabs,array,tabularx,multirow}
 \usepackage{graphicx}
+\usepackage{tikz}
 \usepackage{xcolor}
 \usepackage{microtype}
 \usepackage{siunitx}
@@ -579,6 +580,13 @@ Rewrite verification & nonlinear pass; oracle fail; rollback \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\resizebox{0.92\linewidth}{!}{\input{dot_c2_measured_heldout.tikz}}
+\caption{Held-out DOT C2 measured-versus-predicted geometry at the later validation checkpoint ($t=0.167$ s), shown in the camera-frame $x/y$ projection. Circles are measured correspondences, crosses are Vulkax predictions, and connecting segments are true-scale residuals rather than magnified arrows. Across the 90 held-out samples from both nonzero checkpoints, the 3-D RMS is 4.417 mm. This evaluates the model-conditioned captured-world replay; DOT C2 does not provide material ground truth.}
+\label{fig:dot-c2-heldout}
+\end{figure}
 
 The same pinned DOT C2 source is also exercised by the native Vulkan measured-world
 showcase, which emits baseline and rollback hero views, close-ups, a comparison
