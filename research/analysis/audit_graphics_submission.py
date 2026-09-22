@@ -10,6 +10,7 @@ visualization-only evidence clearly separated.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import pathlib
 import struct
@@ -119,6 +120,71 @@ def run_audit(root: pathlib.Path) -> dict:
         except Exception as exc:
             errors.append(f"could not validate frozen result invariants: {exc}")
 
+    gauge_trial_summary = {}
+    gauge_path = root / "research/results/GAUGE_PAIRED_DIAGNOSTICS_2026-09-20.csv"
+    if gauge_path.is_file():
+        try:
+            with gauge_path.open("r", encoding="utf-8", newline="") as f:
+                gauge_rows = list(csv.DictReader(f))
+            expected_channels = {
+                "face_nrmse": (0, 10, 0),
+                "marker_rmse_m": (0, 10, 0),
+                "dcs_marker_error_m": (0, 10, 0),
+                "dcs_longitudinal_error": (9, 1, 0),
+            }
+            by_channel = {row["channel"]: row for row in gauge_rows}
+            for channel, expected in expected_channels.items():
+                row = by_channel.get(channel)
+                if row is None:
+                    errors.append(f"GAUGE diagnostic channel missing: {channel}")
+                    continue
+                counts = (
+                    int(row["endpoint_better_count"]),
+                    int(row["overlap_better_count"]),
+                    int(row["ties"]),
+                )
+                gauge_trial_summary[channel] = {
+                    "endpoint_better": counts[0],
+                    "overlap_better": counts[1],
+                    "ties": counts[2],
+                    "trials": sum(counts),
+                }
+                if sum(counts) != 10:
+                    errors.append(
+                        f"GAUGE {channel} no longer summarizes exactly 10 held-out repeats"
+                    )
+                if counts != expected:
+                    errors.append(
+                        f"GAUGE {channel} direction counts changed: {counts} != {expected}"
+                    )
+            long_row = by_channel.get("dcs_longitudinal_error")
+            if long_row is not None:
+                p = float(long_row["exact_two_sided_sign_test_p"])
+                if abs(p - 0.021484375) > 1e-12:
+                    errors.append(
+                        "GAUGE longitudinal exact sign-test p-value changed"
+                    )
+        except Exception as exc:
+            errors.append(f"could not validate GAUGE paired diagnostics: {exc}")
+
+    dot_benchmark_summary = {}
+    dot_path = root / "docs/MEASURED_BENCHMARK_0_45.md"
+    if dot_path.is_file():
+        dot_text = dot_path.read_text(encoding="utf-8")
+        dot_guards = {
+            "tracked_points": "imports 225 stable tracked points",
+            "observations": "675 marker observations",
+            "fit_rms": "fit dynamic RMS                                0.004390821778 m",
+            "heldout_rms": "held-out validation RMS                        0.004417317099 m",
+            "adaptive_particles": "adaptive proposed particles                  182 / 225",
+            "rollback": "rollback performed           yes",
+        }
+        for key, guard in dot_guards.items():
+            present = guard in dot_text
+            dot_benchmark_summary[key] = present
+            if not present:
+                errors.append(f"DOT C2 benchmark guard changed or missing: {key}")
+
     manuscript_path = root / "paper/main_humanized.tex"
     manuscript_guards = {}
     if manuscript_path.is_file():
@@ -192,6 +258,8 @@ def run_audit(root: pathlib.Path) -> dict:
         "frozen_invariants": invariants,
         "manuscript_guards": manuscript_guards,
         "measured_visual_contract": measured_visual_contract,
+        "gauge_trial_summary": gauge_trial_summary,
+        "dot_benchmark_summary": dot_benchmark_summary,
         "benchmark_matrix": benchmark_matrix,
     }
 
@@ -213,6 +281,18 @@ def write_report(report: dict, out_dir: pathlib.Path) -> None:
     for row in report["benchmark_matrix"]:
         lines.append(
             f"| {row['source']} | {row['class']} | {row['role']} | {row['claim_boundary']} |"
+        )
+    lines += ["", "## Benchmark integrity checks", ""]
+    if report["gauge_trial_summary"]:
+        for channel, row in report["gauge_trial_summary"].items():
+            lines.append(
+                f"- GAUGE `{channel}`: {row['trials']} repeats "
+                f"({row['endpoint_better']} endpoint / {row['overlap_better']} overlap / {row['ties']} ties)"
+            )
+    if report["dot_benchmark_summary"]:
+        lines.append(
+            "- DOT C2 benchmark guards: "
+            + ("PASS" if all(report["dot_benchmark_summary"].values()) else "FAIL")
         )
     lines += ["", "## Visual surfaces", ""]
     for v in report["visuals"]:
