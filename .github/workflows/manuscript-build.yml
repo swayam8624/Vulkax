@@ -6,6 +6,8 @@ on:
     paths:
       - 'paper/main.tex'
       - 'paper/build_word.py'
+      - 'paper/main_humanized.tex'
+      - 'paper/build_word_humanized.py'
       - '.github/workflows/manuscript-build.yml'
   workflow_dispatch:
 
@@ -37,16 +39,27 @@ jobs:
       - name: Build editable Word manuscript
         run: python3 paper/build_word.py
 
+      - name: Compile prose-edited ACM/TOG PDF
+        run: |
+          cd paper
+          latexmk -pdf -interaction=nonstopmode -halt-on-error main_humanized.tex
+          cp main_humanized.pdf Reality_Probe_Manuscript_Prose_Edited.pdf
+
+      - name: Build prose-edited Word manuscript
+        run: python3 paper/build_word_humanized.py
+
       - name: Record checksums
         run: |
           cd paper
           sha256sum Reality_Probe_Manuscript.pdf Reality_Probe_Manuscript.docx > MANUSCRIPT_SHA256.txt
+          sha256sum Reality_Probe_Manuscript_Prose_Edited.pdf Reality_Probe_Manuscript_Prose_Edited.docx > MANUSCRIPT_PROSE_EDITED_SHA256.txt
 
       - name: Commit generated artifacts
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add paper/Reality_Probe_Manuscript.pdf paper/Reality_Probe_Manuscript.docx paper/MANUSCRIPT_SHA256.txt
+          git add paper/Reality_Probe_Manuscript.pdf paper/Reality_Probe_Manuscript.docx paper/MANUSCRIPT_SHA256.txt \
+            paper/Reality_Probe_Manuscript_Prose_Edited.pdf paper/Reality_Probe_Manuscript_Prose_Edited.docx paper/MANUSCRIPT_PROSE_EDITED_SHA256.txt
           if git diff --cached --quiet; then
             echo "Generated manuscript artifacts are unchanged."
             exit 0
