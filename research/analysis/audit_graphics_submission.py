@@ -33,6 +33,7 @@ REQUIRED_EVIDENCE = [
     "research/results/GAUGE_PAIRED_DIAGNOSTICS_2026-09-20.csv",
     "docs/MEASURED_BENCHMARK_0_45.md",
     "paper/main_humanized.tex",
+    "paper/dot_c2_measured_heldout.tikz",
     ".github/workflows/measured-world-showcase.yml",
 ]
 
@@ -50,6 +51,7 @@ MANUSCRIPT_GUARDS = [
     "Fresh prospective force evidence is synthetic",
     "not benchmark geometry",
     "DOT C2",
+    "dot_c2_measured_heldout.tikz",
 ]
 
 def png_dimensions(path: pathlib.Path) -> tuple[int, int]:
@@ -184,6 +186,16 @@ def run_audit(root: pathlib.Path) -> dict:
             dot_benchmark_summary[key] = present
             if not present:
                 errors.append(f"DOT C2 benchmark guard changed or missing: {key}")
+
+    dot_tikz_path = root / "paper/dot_c2_measured_heldout.tikz"
+    if dot_tikz_path.is_file():
+        dot_tikz = dot_tikz_path.read_text(encoding="utf-8")
+        for guard in (
+            "validation split, t=0.166667 s",
+            "residual segments are not magnified",
+        ):
+            if guard not in dot_tikz:
+                errors.append(f"DOT C2 TikZ provenance guard missing: {guard}")
 
     manuscript_path = root / "paper/main_humanized.tex"
     manuscript_guards = {}
