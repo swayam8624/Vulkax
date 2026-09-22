@@ -77,7 +77,7 @@ We therefore do not present DCS, or force compliance, as a finished prospective 
   repeat, and numerical uncertainty, and preserves support, veto, or
   unresolved outcomes rather than forcing a binary verdict.
 \item
-  \textbf{Prospective falsification of DCS.} We show that
+  \textbf{Prospective falsification of the stronger DCS hypothesis.} We show that
   lower-order-annihilating intervention contrasts can succeed on a
   constructed control yet fail to provide useful prospective
   discrimination in frozen realistic regimes; this negative result is
@@ -362,12 +362,12 @@ Best-case factor to $|z|=2$ & 11.57$\times$ & 1.52$\times$ \\
 \end{table}
 
 \paragraph{Decision-threshold robustness.}
-The primary decision magnitude remains the prospectively frozen \(\tau=2\). We also inspect nearby thresholds after the fact to check whether the negative conclusion is hanging on that single number; the primary rule is not changed. Because the frozen per-proposal OFC ledger retains signed DCS and force progress scores, this sweep can be reported exactly. Fresh DCS has no support or veto crossing even at \(\tau=1\). Force compliance resolves 14/36 proposals at \(\tau=1\): 6 support and 8 veto. Five of the 12 deceptive repairs are vetoed (41.7\% recall), while 3 of 24 beneficial repairs are falsely vetoed (12.5\%). That still misses the preregistered advancement target. At \(\tau=1.5\) and above, force coverage returns to 0/36. The useful point is the shape of the transition: the evidence is stronger than DCS, but the frozen population is still uncertified at the primary \(\tau=2\) rule.
+The primary decision magnitude remains the prospectively frozen \(\tau=2\). We also inspect nearby thresholds after the fact to check whether the negative conclusion is hanging on that single number; the primary rule is not changed. Because the frozen per-proposal OFC ledger retains signed DCS and force progress scores, this sweep can be reported exactly. Fresh DCS has no support or veto crossing even at \(\tau=1\). Force compliance resolves 14/36 proposals at \(\tau=1\): 6 support and 8 veto. Five of the 12 deceptive repairs are vetoed (41.7\% recall), while 3 of 24 beneficial repairs are falsely vetoed (12.5\%). That still misses the prospectively frozen advancement target. At \(\tau=1.5\) and above, force coverage returns to 0/36. The useful point is the shape of the transition: the evidence is stronger than DCS, but the frozen population is still uncertified at the primary \(\tau=2\) rule.
 
 \begin{table}[t]
 \centering
 \caption{Threshold-robustness audit from the frozen per-proposal ledger.
-The $\tau=2$ row is the preregistered primary rule; other rows are
+The $\tau=2$ row is the prospectively frozen primary rule; other rows are
 post-hoc sensitivity checks and do not redefine the decision policy.}
 \label{tab:threshold-sensitivity}
 \begin{tabular}{lcc}
@@ -394,8 +394,8 @@ mode}\label{deceptive-repair-is-a-distinct-failure-mode}
 
 D4V and the fresh synthetic OFC population both show why ordinary held-out improvement is not enough. D4V contains 14 deceptive repairs among 36 ordinary-improving proposals; fresh synthetic OFC contains 12 among 36. Those fractions should not be read as a universal deception rate. They serve a more modest purpose: under controlled candidate-generation pipelines, the failure mode exists often enough that a verification rule based only on observation fit cannot ignore it.
 
-\subsection{The DCS hypothesis is falsified as a general prospective
-verifier}\label{the-dcs-hypothesis-is-falsified-as-a-general-prospective-verifier}
+\subsection{The stronger DCS hypothesis is not supported in the tested
+regime}\label{the-dcs-hypothesis-is-falsified-as-a-general-prospective-verifier}
 
 D1 shows that dark-field rejection can be strong when the experiment is deliberately constructed around that distinction. The strength does not survive the prospective stages. D2 and D3 stay far below the decision magnitude, DCS does not beat the matched ranking baselines, and D4V resolves none of the repair proposals. We treat that as a central result, not an embarrassing corner case. It rules out the stronger story that mechanism-selective cancellation by itself is enough for repair certification in the regime we tested.
 
@@ -515,8 +515,8 @@ OpenAI ChatGPT was used during research for code drafting and debugging,
 experiment-orchestration and analysis scripts, visualization/manuscript tooling,
 and manuscript revision. AI-generated material was not treated as empirical
 evidence. Experimental partitions, thresholds, executed outputs, numerical
-claims, and cited sources were checked against committed research artifacts
-before inclusion in the manuscript.
+claims were checked against committed research artifacts, and cited sources
+were checked against publication records before inclusion in the manuscript.
 
 Paper visualizations are generated deterministically. Solver-driven surfaces may use an explicit display magnification so that micrometer-scale motion is visible, but the reported numbers are never scaled. The Stanford Bunny appears only as a visualization carrier where noted and still requires its source attribution; it is not benchmark geometry. The mathematical explainer uses the actual solver body and does not depend on the bunny.
 
