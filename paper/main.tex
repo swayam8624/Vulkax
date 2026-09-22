@@ -802,10 +802,9 @@ The main limitations are substantive.
   \textbf{The decision magnitude is operational.} The value 2 is frozen
   before evaluation and prevents post-hoc threshold tuning, but it is
   not a universal law for all physical verification tasks. A post-hoc
-  robustness audit shows zero fresh crossings for both channels at every
-  $\tau\ge1.5$; the exact force crossing count at $\tau=1$ cannot be
-  recovered from the aggregate publication ledger alone and is
-  therefore not asserted.
+  robustness audit uses the frozen per-proposal ledger: force compliance
+  has 14/36 crossings at $\tau=1$ (6 support and 8 veto), while both
+  fresh channels have zero crossings for every $\tau\ge1.5$.
 \item
   \textbf{DCS synthesis is heuristic.} Lower-moment annihilation is
   exact up to tolerance, but the projected maximin search is not
