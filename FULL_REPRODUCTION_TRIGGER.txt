@@ -1,25 +1,4 @@
-FINAL VULKAX PAPER-FREEZE REPRODUCTION
-
-This trigger identifies the exact repository snapshot proposed for manuscript
-production.
-
-The full workflow must succeed on this exact commit before the immutable
-paper-freeze tag is created.
-
-Required reproduction:
-1. complete Release build and CTest suite;
-2. release/evidence/CLI validation;
-3. D1, solver-native discovery, D2, D3 and D4V;
-4. fresh preregistered orthogonal force-compliance experiment;
-5. GAUGE measured retrospective;
-6. information-frontier diagnostics;
-7. validation against the frozen 2026-09-21 final result ledger;
-8. generation of all locked SVG/CSV publication assets;
-9. SHA-256 evidence bundle and portable archive;
-10. evidence and paper-asset artifact upload;
-11. annotated tag paper-freeze-2026-09-21 on this exact successful commit.
-
-No research threshold, force amplitude, truth partition or result is to be retuned
-after this trigger.
-
-Date: 2026-09-21
+Graphics-submission hardening full reproduction trigger.
+Branch: submission/reality-probe-graphics-hardening
+Purpose: rerun build, tests, D1/D2/D3/D4V, orthogonal force compliance, GAUGE retrospective, diagnostics, and paper evidence packaging before manuscript integration.
+Nonce: graphics-hardening-2026-09-22
