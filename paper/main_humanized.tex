@@ -347,7 +347,7 @@ The full system is also run on measured DOT C2 trajectories \citep{li2025dot}. T
 \centering
 \caption{Public DOT C2 measured-source engineering check. The material parameters are model-conditioned effective values, not material ground truth.}
 \label{tab:dot-c2}
-\begin{tabular}{lr}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X >{\raggedleft\arraybackslash}p{0.47\linewidth}@{}}
 \toprule
 Quantity & Result \\
 \midrule
@@ -358,7 +358,7 @@ Dynamic RMS (fit / held-out) & 4.391 / 4.417 mm \\
 Adaptive candidate set & 182/225 particles; 94.80\% abs. gradient \\
 Rewrite verification & nonlinear pass; oracle fail; rollback \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \begin{figure}[t]
@@ -443,7 +443,7 @@ Decision magnitude $\tau$ & DCS crossings & Force crossings \\
 \end{tabular}
 \end{table}
 
-The aggregate median-magnitude ratio is 11.455$\times$. The complete post-hoc sweep is generated from the frozen per-proposal ledger by \texttt{research/analysis/threshold\_sensitivity\_ofc.py} and stored in \texttt{research/paper\_data/THRESHOLD\_SENSITIVITY\_OFC\_2026-09-21.csv}.
+The aggregate median-magnitude ratio is 11.455$\times$. The complete post-hoc sweep is generated from the frozen per-proposal ledger by \path{research/analysis/threshold_sensitivity_ofc.py} and stored in \path{research/paper_data/THRESHOLD_SENSITIVITY_OFC_2026-09-21.csv}.
 
 The advancement gate requires at least 30\% resolved coverage, at least 50\% veto recall over deceptive repairs, no more than 25\% false-veto rate over beneficial repairs, better coverage than DCS, higher median magnitude than DCS, and finite numerical refinement for every proposal. Force compliance passes the population-size, false-veto, median-signal, and numerical checks, but it fails coverage and recall. We keep that result as a failed gate with a strong standardized-evidence increase; we do not rename it a successful verifier.
 
