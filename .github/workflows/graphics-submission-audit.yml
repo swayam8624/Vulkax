@@ -1,0 +1,22 @@
+name: Reality Probe graphics submission audit
+
+on:
+  push:
+    branches: ["feat/**"]
+    paths:
+      - "paper/**"
+      - "research/**"
+      - "scripts/audit_graphics_submission_evidence.py"
+      - "docs/readme_assets/**"
+      - ".github/workflows/graphics-submission-audit.yml"
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit frozen benchmark and visual evidence
+        run: python3 scripts/audit_graphics_submission_evidence.py
