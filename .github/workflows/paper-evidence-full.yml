@@ -1,6 +1,8 @@
 name: Vulkax full paper-evidence reproduction
 
 on:
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
   push:
     branches: ["main", "submission/reality-probe-graphics-hardening"]
