@@ -439,6 +439,30 @@ OFC & 36 repairs & 0/36 & 12 deceptive and 24 beneficial; known-force compliance
 \end{tabularx}
 \end{table*}
 
+
+\subsection{Graphics-facing benchmark and visual evidence coverage}
+\label{graphics-facing-benchmark-and-visual-evidence-coverage}
+
+A graphics submission needs recognizable benchmark evidence and inspectable visual consequences, not only an internal systems ledger. We therefore make the evidence surface explicit rather than asking the reader to infer it from the implementation. Table~\ref{tab:graphics-evidence} separates public measured datasets, controlled synthetic evaluation, and visualization-only geometry. This classification does not change any experimental gate or elevate retrospective evidence into prospective confirmation.
+
+\begin{table*}[t]
+\centering
+\caption{Graphics-facing evidence coverage. Public measured benchmarks are kept distinct from controlled synthetic partitions and from visualization-only geometry.}
+\label{tab:graphics-evidence}
+\begin{tabularx}{\textwidth}{l l X X}
+\toprule
+Source & Evidence class & What it contributes & Claim boundary \\
+\midrule
+DOT C2 \citep{li2025dot} & Public measured trajectories & End-to-end captured-world ingestion, fit/held-out replay, local rewrite, and rollback on measured motion. & Stress-free state, loads, thickness, mass, and constitutive ground truth are not supplied; fitted material values remain model-conditioned. \\
+GAUGE foam shearing \citep{wang2026gauge} & Public measured benchmark & Ten held-out repeats for a measured channel-contradiction analysis. & Retrospective/post-hoc evidence only; it is not fresh prospective confirmation of DCS. \\
+D2/D3/D4V + OFC & Frozen controlled synthetic & Known-ground-truth falsification, pair-specific repair evaluation, and orthogonal force-compliance observability under a frozen decision rule. & Controlled evidence, not a measured-world benchmark. \\
+Stanford Bunny visual suite & Public geometry visualization carrier & Solver-driven deformation, force direction, mechanism fingerprints, and residual fields for qualitative inspection. & Visualization only; the bunny is not benchmark geometry and contributes no quantitative result. \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+The paper's deceptive-repair, same-probe, force-fingerprint, residual-field, signal-gain, and information-limit panels are generated from committed solver trajectories or frozen result ledgers. They are intended to show what the tested physical differences look like, while the numerical conclusions continue to come from the JSON/CSV evidence records. In other words, the visual layer exposes the consequence of the experiments without becoming a second, informal source of truth.
+
 \subsection{D1: constructed positive
 control}\label{d1-constructed-positive-control}
 
