@@ -36,7 +36,8 @@ with tempfile.NamedTemporaryFile("w", suffix=".tex", dir=ROOT, delete=False, enc
 
 try:
     subprocess.run(
-        ["pandoc", str(tmp), "--from=latex", "--to=docx",
+        ["pandoc", str(tmp), "--from=latex", "--to=docx", "--citeproc",
+         f"--bibliography={ROOT / 'references.bib'}",
          f"--resource-path={ROOT}", "-o", str(OUT)],
         check=True,
         cwd=ROOT,

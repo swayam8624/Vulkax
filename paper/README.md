@@ -1,3 +1,23 @@
+
+## Final author-visible manuscript
+
+The submission-facing, prose-edited, fully disclosed author-visible manuscript is:
+
+- \`Reality_Probe_Manuscript_Final.pdf\`
+- \`Reality_Probe_Manuscript_Final.docx\`
+- source: \`main_humanized.tex\`
+- bibliography: \`references.bib\`
+- checksum file: \`FINAL_MANUSCRIPT_SHA256.txt\`
+
+The final source narrows the information-limit claim to the tested captured-world
+regimes, explicitly labels the fresh force experiment as synthetic, distinguishes
+the three-way evidence decision from the binary commit/non-commit transaction, and
+uses ACM BibTeX citations with updated publication metadata.
+
+For a double-blind venue, do not submit the author-visible PDF unchanged. Apply the
+venue's current anonymity rules to authorship, acknowledgments, repository links,
+and metadata while retaining any AI/research-use disclosure required by that venue.
+
 # Reality Probe paper source
 
 This directory contains the paper-facing manuscript for the Vulkax research program.
