@@ -25,7 +25,7 @@ repls = {
         r"\[\kappa(S) = \sum_{T \subseteq S} (-1)^{|S|-|T|}F(T).\]",
     r"\(\sum_{i}^{}w_{i}^{2}\)": r"\(\sum_i w_i^2\)",
     r"\[z_{force} = \frac{e(B,Y) - e(R,Y)}{\sqrt{\sigma_{meas}^{2} + \sigma_{repeat}^{2} + \sigma_{num,B}^{2} + \sigma_{num,R}^{2}}}.\]":
-        r"\[z_{force} = \frac{e(B,Y)-e(R,Y)}{\sqrt{\sigma_{meas}^2+\sigma_{repeat}^2+\sigma_{num,B}^2+\sigma_{num,R}^2}}.\\]",
+        r"\[z_{force} = \frac{e(B,Y)-e(R,Y)}{\sqrt{\sigma_{meas}^2+\sigma_{repeat}^2+\sigma_{num,B}^2+\sigma_{num,R}^2}}.\]",
 }
 for old, new in repls.items():
     src = src.replace(old, new)
