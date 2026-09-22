@@ -439,6 +439,41 @@ OFC & 36 repairs & 0/36 & 12 deceptive and 24 beneficial; known-force compliance
 \end{tabularx}
 \end{table*}
 
+
+\subsection{Graphics-facing benchmark and visual evidence}
+\label{graphics-facing-benchmark-and-visual-evidence}
+
+For a graphics venue, we make the benchmark and visual-evidence layers explicit rather than treating them as presentation material. The evaluation uses two public measured-source families with different roles. DOT C2 exercises the complete captured-world path---measured trajectory import, model-conditioned calibration, held-out replay, local rewrite proposal, verification, and rollback. GAUGE supplies a separate measured foam-shearing case in which ordinary marker/face agreement and a longitudinal mechanism channel disagree. We do not pool these sources or describe GAUGE as fresh confirmation: DOT C2 is an engineering check on measured input, while GAUGE is retrospective physical evidence.
+
+The controlled D1--D4V and fresh orthogonal-force populations provide the quantitative benchmark layer. The visual layer is generated deterministically from the same frozen ledgers and solver fields. It is intended to answer a graphics-specific question that aggregate tables cannot: what spatial and visible consequence corresponds to an observationally improving but physically worse repair? Because this paper is not a camera-image reconstruction benchmark, photometric PSNR/SSIM would not measure the claimed contribution. Instead, visual quality is assessed by consistency of probe conditions, common response scales, explicit residual fields, and traceability of each image to frozen physical evidence.
+
+\begin{table*}[t]
+\centering
+\caption{Graphics-facing evidence matrix. Public measured sources, controlled benchmark populations, and deterministic visual outputs serve distinct roles and are not conflated.}
+\label{tab:graphics-evidence}
+\begin{tabularx}{\textwidth}{l l X X}
+\toprule
+Evidence & Class & Role & Submission-facing output \\
+\midrule
+DOT C2 & Public measured trajectories & End-to-end measured-source captured-world execution and refusal/rollback check & Measured replay, local rewrite outcome, provenance and verification records \\
+GAUGE & Public measured foam shearing & Retrospective real-data channel contradiction & Ordinary-vs-mechanism metric comparison over 10 held-out repeats \\
+D1--D4V & Frozen synthetic benchmark families & Positive control, frozen validation, numerical/witness studies, repair-veto population & Aggregate tables, matched baselines, proposal landscape \\
+OFC & Fresh synthetic follow-on & Orthogonal physical-information test under a frozen decision rule & Same-probe response views, fingerprints, residual fields, signal-gain and information-limit plots \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{../docs/readme_assets/05_response_overlay.png}
+\caption{Truth and repaired response fields overlaid under an identical controlled probe. The visualization is tied to the frozen selected case and uses a common scale so visible differences are not created by per-image normalization.}
+\label{fig:response-overlay}
+\end{figure}
+
+The complete submission-evidence mapping is maintained in
+\texttt{research/paper\_data/GRAPHICS\_SUBMISSION\_EVIDENCE.md}, and
+\texttt{scripts/audit\_graphics\_submission\_evidence.py} checks that the public-source records, frozen headline values, and manuscript-linked visual assets remain mutually consistent.
+
 \subsection{D1: constructed positive
 control}\label{d1-constructed-positive-control}
 
