@@ -163,8 +163,8 @@ joint geometry and physical-parameter estimation from multi-view video
 (MPM) dynamics directly with 3D Gaussian primitives \citep{xie2024physgaussian};
 subsequent work has extended physics-aware visual representations toward
 material initialization and refinement, interaction synthesis, and
-monocular or multi-material inverse physics (Zhang et al.~2024; Liu et
-al.~2025; Rho et al.~2026; Wada et al.~2026). These methods establish
+monocular or multi-material inverse physics
+\citep{zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs}. These methods establish
 that high-quality visual representations can support physical inference
 and simulation. Reality Probe does not claim novelty for
 Gaussian-plus-MPM simulation, parameter fitting, or differentiable
@@ -184,8 +184,8 @@ design}\label{identifiability-and-experimental-design}
 
 Physical inference can be limited by the information content of the
 observed trajectories. Recent work provides structural identifiability
-conditions directly from video for classes of dynamical systems (Y. Wang
-et al.~2026), while measurement-grounded benchmarks such as IRIS
+conditions directly from video for classes of dynamical systems
+\citep{wang2026identifiability}, while measurement-grounded benchmarks such as IRIS
 evaluate parameter accuracy, identifiability, extrapolation, and
 governing-equation recovery on controlled real videos \citep{khanbayov2026iris}. In mechanics, optimal experiment design uses sensitivity,
 Jacobian conditioning, and Fisher-information concepts to choose
@@ -219,8 +219,8 @@ tracking}\label{measured-deformable-tracking}
 
 For engineering validation of the captured-world pipeline, we also use
 sequence C2 from the DOT deformable tracking dataset, which provides
-measured 3D correspondences obtained using invisible markers (Xinyuan Li
-et al.~2024). DOT supplies geometry and motion measurements, but not the
+measured 3D correspondences obtained using invisible markers
+\citep{li2025dot}. DOT supplies geometry and motion measurements, but not the
 stress-free state, loads, thickness, mass, or constitutive ground truth
 required to identify the true cloth material. We therefore treat the
 inferred parameters in that benchmark as model-conditioned effective
