@@ -1,0 +1,57 @@
+name: Reality Probe graphics submission hardening
+
+on:
+  push:
+    branches:
+      - submission/reality-probe-graphics-hardening
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reality-probe-graphics-hardening-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-and-manuscript:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build and manuscript dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y             cmake ninja-build build-essential python3 python3-pip             latexmk pandoc texlive-latex-extra texlive-fonts-extra             texlive-science texlive-publishers
+          python3 -m pip install --break-system-packages python-docx
+
+      - name: Validate graphics-submission audit
+        run: |
+          python3 -m py_compile research/analysis/audit_graphics_submission.py
+          python3 research/analysis/audit_graphics_submission.py --self-test
+          python3 research/analysis/audit_graphics_submission.py             --repo-root . --out build/graphics-submission-audit
+
+      - name: Replay frozen paper evidence without external GAUGE download
+        run: |
+          bash run_everything.sh             --backend none             --skip-gauge             --skip-performance
+
+      - name: Compile final manuscript
+        run: |
+          cd paper
+          latexmk -pdf -interaction=nonstopmode -halt-on-error main_humanized.tex
+          cp main_humanized.pdf Reality_Probe_Manuscript_Graphics_Hardened.pdf
+
+      - name: Upload hardening evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-probe-graphics-hardening-${{ github.sha }}
+          path: |
+            build/graphics-submission-audit
+            build/paper-evidence
+            build/paper-figures
+            paper/Reality_Probe_Manuscript_Graphics_Hardened.pdf
+          if-no-files-found: error
+          retention-days: 30
