@@ -3,7 +3,7 @@ name: Vulkax full paper-evidence reproduction
 on:
   workflow_dispatch:
   push:
-    branches: ["main"]
+    branches: ["main", "submission/reality-probe-graphics-hardening"]
     paths:
       - "FULL_REPRODUCTION_TRIGGER.txt"
 
