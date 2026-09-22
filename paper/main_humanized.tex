@@ -9,6 +9,7 @@
 \usepackage{amsmath}
 \usepackage{booktabs,array,tabularx,multirow}
 \usepackage{graphicx}
+\usepackage{tikz}
 \usepackage{xcolor}
 \usepackage{microtype}
 \usepackage{siunitx}
@@ -264,6 +265,30 @@ OFC & 36 repairs & 0/36 & 12 deceptive and 24 beneficial; known-force compliance
 \end{tabularx}
 \end{table*}
 
+
+\subsection{Graphics-facing benchmark and visual evidence coverage}
+\label{graphics-facing-benchmark-and-visual-evidence-coverage}
+
+A graphics submission needs recognizable benchmark evidence and inspectable visual consequences, not only an internal systems ledger. We therefore make the evidence surface explicit rather than asking the reader to infer it from the implementation. Table~\ref{tab:graphics-evidence} separates public measured datasets, controlled synthetic evaluation, and visualization-only geometry. This classification does not change any experimental gate or elevate retrospective evidence into prospective confirmation.
+
+\begin{table*}[t]
+\centering
+\caption{Graphics-facing evidence coverage. Public measured benchmarks are kept distinct from controlled synthetic partitions and from visualization-only geometry.}
+\label{tab:graphics-evidence}
+\begin{tabularx}{\textwidth}{l l X X}
+\toprule
+Source & Evidence class & What it contributes & Claim boundary \\
+\midrule
+DOT C2 \citep{li2025dot} & Public measured trajectories & End-to-end captured-world ingestion, fit/held-out replay, local rewrite, and rollback on measured motion. & Stress-free state, loads, thickness, mass, and constitutive ground truth are not supplied; fitted material values remain model-conditioned. \\
+GAUGE foam shearing \citep{wang2026gauge} & Public measured benchmark & Ten held-out repeats for a measured channel-contradiction analysis. & Retrospective/post-hoc evidence only; it is not fresh prospective confirmation of DCS. \\
+D2/D3/D4V + OFC & Frozen controlled synthetic & Known-ground-truth falsification, pair-specific repair evaluation, and orthogonal force-compliance observability under a frozen decision rule. & Controlled evidence, not a measured-world benchmark. \\
+Stanford Bunny visual suite & Public geometry visualization carrier & Solver-driven deformation, force direction, mechanism fingerprints, and residual fields for qualitative inspection. & Visualization only; the bunny is not benchmark geometry and contributes no quantitative result. \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+The paper's deceptive-repair, same-probe, force-fingerprint, residual-field, signal-gain, and information-limit panels are generated from committed solver trajectories or frozen result ledgers. They are intended to show what the tested physical differences look like, while the numerical conclusions continue to come from the JSON/CSV evidence records. In other words, the visual layer exposes the consequence of the experiments without becoming a second, informal source of truth.
+
 \subsection{D1: constructed positive
 control}\label{d1-constructed-positive-control}
 
@@ -316,10 +341,45 @@ check}\label{measured-source-engineering-check}
 
 The full system is also run on measured DOT C2 trajectories \citep{li2025dot}. The importer keeps measured 3D correspondences separate from explicit proxies for rest state, density, thickness, mass, Gaussian photometry, and uncertainty. Fit-only calibration followed by held-out replay yields a model-conditioned effective material setting, not a claim about the true cloth properties. A proposed local material rewrite is rejected and rolled back because the complete independent derivative-verification contract is not satisfied, even though it passes the configured nonlinear linearization-error tolerance. This is useful evidence that the commit/refusal machinery behaves correctly on measured-source data, but it is not part of the central deceptive-repair result.
 
+
+
+\begin{table}[t]
+\centering
+\caption{Public DOT C2 measured-source engineering check. The material parameters are model-conditioned effective values, not material ground truth.}
+\label{tab:dot-c2}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X >{\raggedleft\arraybackslash}p{0.47\linewidth}@{}}
+\toprule
+Quantity & Result \\
+\midrule
+Measured correspondence points & 225 \\
+Trajectory observations (fit / held-out) & 675 (585 / 90) \\
+Effective \(E,\nu\) & 7.5 kPa, 0.45 \\
+Dynamic RMS (fit / held-out) & 4.391 / 4.417 mm \\
+Adaptive candidate set & 182/225 particles; 94.80\% abs. gradient \\
+Rewrite verification & nonlinear pass; oracle fail; rollback \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\resizebox{0.92\linewidth}{!}{\input{dot_c2_measured_heldout.tikz}}
+\caption{Held-out DOT C2 measured-versus-predicted geometry at the later validation checkpoint ($t=0.167$ s), shown in the camera-frame $x/y$ projection. Circles are measured correspondences, crosses are Vulkax predictions, and connecting segments are true-scale residuals rather than magnified arrows. Across the 90 held-out samples from both nonzero checkpoints, the 3-D RMS is 4.417 mm. This evaluates the model-conditioned captured-world replay; DOT C2 does not provide material ground truth.}
+\label{fig:dot-c2-heldout}
+\end{figure}
+
+The same pinned DOT C2 source is also exercised by the native Vulkan measured-world
+showcase, which emits baseline and rollback hero views, close-ups, a comparison
+plate, and an eight-view turntable. Because the candidate rewrite is rejected, the
+final displayed state intentionally returns to the baseline state. These images are
+qualitative implementation evidence for the measured captured-world path; they are
+not additional evidence that the fitted material parameters are physically unique or
+ground-truth accurate.
+
 \subsection{GAUGE: retrospective measured channel
 contradiction}\label{gauge-retrospective-measured-channel-contradiction}
 
-We examine ten held-out foam-shearing repeats from GAUGE \citep{wang2026gauge}. Ordinary face-plus-marker metrics prefer the finite-overlap candidate in all 10 repeats, and marker dark-field does the same. The longitudinal mechanism channel disagrees: it prefers the endpoint model in 9 of 10 repeats. Median marker error is 0.002428 m for endpoint and 0.001709 m for overlap, whereas median longitudinal error is 0.003131 for endpoint and 0.005584 for overlap. A post-hoc exact two-sided sign test on the longitudinal direction gives \(p=0.02148\).
+We examine ten held-out foam-shearing repeats from GAUGE \citep{wang2026gauge}. The committed paired-diagnostics CSV is channel-aggregated: each row reports win/loss/tie counts over these same ten repeats rather than representing a single trial. Ordinary face-plus-marker metrics prefer the finite-overlap candidate in all 10 repeats, and marker dark-field does the same. The longitudinal mechanism channel disagrees: it prefers the endpoint model in 9 of 10 repeats. Median marker error is 0.002428 m for endpoint and 0.001709 m for overlap, whereas median longitudinal error is 0.003131 for endpoint and 0.005584 for overlap. A post-hoc exact two-sided sign test on the longitudinal direction gives \(p=0.02148\).
 
 \begin{table}[t]
 \centering
@@ -383,7 +443,7 @@ Decision magnitude $\tau$ & DCS crossings & Force crossings \\
 \end{tabular}
 \end{table}
 
-The aggregate median-magnitude ratio is 11.455$\times$. The complete post-hoc sweep is generated from the frozen per-proposal ledger by \texttt{research/analysis/threshold\_sensitivity\_ofc.py} and stored in \texttt{research/paper\_data/THRESHOLD\_SENSITIVITY\_OFC\_2026-09-21.csv}.
+The aggregate median-magnitude ratio is 11.455$\times$. The complete post-hoc sweep is generated from the frozen per-proposal ledger by \path{research/analysis/threshold_sensitivity_ofc.py} and stored in \path{research/paper_data/THRESHOLD_SENSITIVITY_OFC_2026-09-21.csv}.
 
 The advancement gate requires at least 30\% resolved coverage, at least 50\% veto recall over deceptive repairs, no more than 25\% false-veto rate over beneficial repairs, better coverage than DCS, higher median magnitude than DCS, and finite numerical refinement for every proposal. Force compliance passes the population-size, false-veto, median-signal, and numerical checks, but it fails coverage and recall. We keep that result as a failed gate with a strong standardized-evidence increase; we do not rename it a successful verifier.
 
