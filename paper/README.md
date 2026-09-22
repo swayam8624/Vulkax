@@ -18,6 +18,25 @@ For a double-blind venue, do not submit the author-visible PDF unchanged. Apply 
 venue's current anonymity rules to authorship, acknowledgments, repository links,
 and metadata while retaining any AI/research-use disclosure required by that venue.
 
+## Graphics-submission hardening
+
+The graphics-facing evidence surface is audited separately from the scientific
+freeze so venue packaging cannot silently change the claims. Run:
+
+```bash
+python3 research/analysis/audit_graphics_submission.py --repo-root . \
+  --out build/graphics-submission-audit
+```
+
+The audit verifies the public measured benchmark/source boundary (DOT C2 and
+GAUGE), the controlled synthetic D2/D3/D4V/OFC boundary, paper-facing visual
+assets, manuscript evidence-class guards, and frozen numerical invariants.
+
+Branch CI also replays the frozen paper-evidence stack and compiles the
+submission-facing manuscript. The audit is a packaging/reproducibility check;
+it is not a new scientific result and does not alter the immutable
+`paper-freeze-2026-09-21` evidence claims.
+
 # Reality Probe paper source
 
 This directory contains the paper-facing manuscript for the Vulkax research program.
