@@ -1,0 +1,592 @@
+\documentclass[acmtog]{acmart}
+\setcopyright{none}
+\settopmatter{printacmref=false,printccs=false,printfolios=true}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{textcomp}
+\usepackage{amsmath}
+\usepackage{booktabs,array,tabularx,multirow}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{siunitx}
+\usepackage{enumitem}
+\usepackage{url}
+\usepackage{bookmark}
+\setlength{\emergencystretch}{3em}
+\setlength{\textfloatsep}{9pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\sisetup{round-mode=places,round-precision=3,detect-weight=true}
+\hypersetup{hidelinks,pdftitle={Reality Probe: Information-Limited Physical Verification of Captured Worlds},pdfauthor={Swayam Singal}}
+\title{Reality Probe: Information-Limited Physical Verification of Captured Worlds}
+\author{Swayam Singal}
+\email{swayam.singal@gmail.com}
+\keywords{captured worlds, inverse physics, physical verification, counterfactual simulation, material point method, uncertainty, experiment design, Gaussian splatting}
+\begin{document}
+\begin{abstract}
+Captured scenes are starting to behave less like static reconstructions and more like executable worlds: their physical parameters are fitted, edited, and replayed. That shift creates an awkward verification problem. A repair can lower ordinary held-out error and still make the world less correct under a physical test that was never used to choose the repair. We call this deceptive physical repair. Reality Probe is our framework for handling that case without forcing a verdict: proposal generation and physical evidence are kept separate, and the outcome can be support, veto, or unresolved. Dark-Field Counterfactual Spectroscopy (DCS) is one mechanism-selective probe inside that framework, not the framework itself. It uses signed intervention contrasts to suppress lower-order common response and evaluates what remains under measurement, repeat, and numerical uncertainty. The staged experiments are deliberately unforgiving. DCS passes a constructed control, but frozen prospective validation gives 0/16 resolved truth worlds in D2, 0/6 in D3, and 0/36 ordinary-improving repair proposals in D4V, including 14 deceptive repairs. We then freeze a different experiment: known-force compliance on fresh truth worlds. That channel raises median standardized evidence magnitude from 0.0488 to 0.5586, an 11.46$\times$ increase, but the strongest case reaches only 1.3191 against the frozen decision magnitude of 2, so all 36 proposals remain unresolved. A retrospective measured GAUGE analysis also shows that physical channels can disagree. The conclusion is therefore narrower, and more useful, than a universal verifier: verification is limited by the information supplied by the experiment, and when that information is not discriminating enough, the correct output is refusal to certify.
+\end{abstract}
+\maketitle
+\pagestyle{plain}
+\thispagestyle{plain}
+
+\section{Introduction}\label{introduction}
+
+A growing class of systems attaches physical state directly to visual scene representations, allowing captured objects to be simulated, edited, and tested under interactions that were never observed during capture. Physics-aware neural fields and Gaussian representations have made this practical for dynamic reconstruction, material inference, and interaction synthesis (Xuan Li et al.~2023; Xie et al.~2024; Zhang et al.~2024; Liu et al.~2025; Rho et al.~2026; Wada et al.~2026). Once a scene can be rewritten physically, however, fitting is no longer the whole problem. The harder question is what should count as evidence that a rewrite is actually better, rather than merely better at matching the observations on which it was judged.
+
+That question is difficult because inverse physical models are often underdetermined by the observations we can collect. Different parameters, transfer schemes, boundary assumptions, numerical settings, or constitutive approximations may explain nearly the same visible motion and then disagree elsewhere. Structural identifiability, optimal experimental design, model discrepancy, and simulation credibility all address parts of this ambiguity (Y. Wang et al.~2026; Asadi and Laksari 2025; Oberkampf, Pilch, and Trucano 2007; Laudy 2026). We use those ideas as context rather than claiming them as new. Our narrower concern is operational: a persistent captured world has been given a requested physical rewrite, and the system must decide whether an independent experiment supports it, contradicts it, or simply fails to say enough.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{../docs/readme_assets/storyboard.png}
+\caption{Reality Probe at a glance, composed from frozen result panels. A candidate repair can improve ordinary held-out fit while worsening an untouched physical target. The repair is then asked a different physical question, its motion response is compared against the truth response, mechanism-level residuals are exposed, and the evidence is standardized. The selected case is post hoc for visualization; the 11.46$\times$ signal gain and 0/36 resolved coverage are aggregate fresh force-compliance results.}
+\label{fig:overview}
+\end{figure*}
+
+We use the word \emph{deceptive} for a repair that improves an ordinary held-out observation metric while making an untouched physical target worse. The term describes the evidence pattern, not the intent of an optimizer. One frozen force-compliance case makes the issue concrete: ordinary held-out error drops by 14.93\%, yet untouched-target error rises by 9.03\%. We show that case because it is easy to inspect visually; it was chosen after the experiment and has no role in the aggregate statistics or decision thresholds.
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{../docs/readme_assets/02_deceptive_repair.png}
+\caption{Selected deceptive repair from the frozen fresh
+force-compliance population. The ordinary held-out error improves by
+14.93\% while the untouched physical-target error worsens by 9.03\%.
+This post-hoc visualization case does not affect aggregate statistics or
+thresholds.}
+\end{figure}
+
+Reality Probe is our attempt to make that approval step explicit. Repairs are proposed from the usual calibration and held-out observations, but verification is performed with controlled physical interventions that were not used to choose the repair. The verifier compares the reference and candidate responses, carries measurement, repeat, and numerical uncertainty, and is allowed to return support, veto, or unresolved. That last outcome matters. Reality Probe is the contribution-level framework because it defines the transaction between proposal and evidence, including refusal when the evidence is weak. DCS is one probe that we test inside it. DCS forms signed intervention contrasts that suppress lower-order common response so that mechanism-specific disagreement can stand out. The finite-difference and inclusion-exclusion operators themselves are classical; what we test here is whether they are useful for repair verification, and we keep the cases where they are not.
+
+The experimental sequence was designed as a falsification chain rather than a collection of only favorable benchmarks. DCS first has to pass a constructed control. It then faces frozen truth-world validation, witness-space refinement, and a pair-specific repair-veto population. Those stages do not yield resolved prospective evidence, and matched raw, Fisher-style, and maximum-motion comparators also remain unresolved in D4V. Instead of moving the threshold, we measure the \emph{information frontier}: the distance between the evidence we actually obtained and the decision reference fixed in advance. The final experiment changes the question asked of the world itself. We freeze a known-force compliance channel before execution; on fresh truth worlds its median standardized evidence is 11.46$\times$ larger than fresh DCS, but it still does not reach the decision boundary.
+
+We therefore do not present DCS, or force compliance, as a finished prospective verifier. The paper makes four more limited contributions:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{Deceptive physical repair.} We formalize and experimentally
+  instantiate the failure mode in which ordinary held-out fit improves
+  while an untouched physical target worsens.
+\item
+  \textbf{Reality Probe.} We develop an evidence-governed
+  rewrite-verification architecture that separates proposal generation
+  from confirmatory physical intervention, carries explicit measurement,
+  repeat, and numerical uncertainty, and preserves support, veto, or
+  unresolved outcomes rather than forcing a binary verdict.
+\item
+  \textbf{Prospective falsification of DCS.} We show that
+  lower-order-annihilating intervention contrasts can succeed on a
+  constructed control yet fail to provide useful prospective
+  discrimination in frozen realistic regimes; this negative result is
+  retained rather than retuned away.
+\item
+  \textbf{Orthogonal information-channel experiment.} On fresh truth
+  worlds, changing the physical interrogation from kinematic
+  counterfactuals to known-force compliance raises median standardized
+  evidence by 11.46$\times$ under the unchanged decision rule, while
+  still remaining insufficient for certification.
+\end{enumerate}
+
+The thread running through the paper is simple: a captured world can fit its observations better and still be physically worse. When the available experiment cannot distinguish those possibilities strongly enough, unresolved is not a failure of the pipeline; it is the scientifically honest result.
+
+\section{Related Work}\label{related-work}
+
+\subsection{Physics-aware scene representations and inverse
+physics}\label{physics-aware-scene-representations-and-inverse-physics}
+
+PAC-NeRF couples continuum simulation to a neural radiance field for joint geometry and physical-parameter estimation from multi-view video (Xuan Li et al.~2023). PhysGaussian brings Material Point Method (MPM) dynamics directly into 3D Gaussian primitives (Xie et al.~2024), and later work has pushed physics-aware visual representations toward material initialization and refinement, interaction synthesis, and monocular or multi-material inverse physics (Zhang et al.~2024; Liu et al.~2025; Rho et al.~2026; Wada et al.~2026). These systems establish that visual representations can carry enough structure for physical inference and simulation. We do not claim Gaussian-plus-MPM simulation, parameter fitting, or differentiable inverse physics as contributions. Our question begins one step later: once an optimizer has already produced an observationally better physical rewrite, what independent evidence justifies accepting it?
+
+Differentiable simulators such as ChainQueen and DiffTaichi provide much of the infrastructure needed for gradient-based physical optimization (Hu et al.~2019, 2020). Finite differences, adjoint sensitivity, APIC/MPM replay, and material calibration play the same supporting role in our implementation. They are machinery we rely on, not novelty claims.
+
+\subsection{Identifiability and experimental
+design}\label{identifiability-and-experimental-design}
+
+The amount of physical information in an observed trajectory can be the limiting factor in inference. Recent work derives structural identifiability conditions from video for classes of dynamical systems (Y. Wang et al.~2026), while measurement-grounded benchmarks such as IRIS evaluate parameter accuracy, identifiability, extrapolation, and governing-equation recovery on controlled real videos (Khanbayov et al.~2026). In mechanics, optimal experiment design uses sensitivity, Jacobian conditioning, and Fisher-information ideas to choose informative loading conditions (Asadi and Laksari 2025). Classical model-discrimination design asks the closely related question of which excitation best separates competing explanations. We do not claim either principle as new. What Reality Probe adds is a rewrite transaction built around evidence sufficiency: unresolved is an explicit outcome, and we can ask experimentally what changes when the physical evidence channel itself changes.
+
+\subsection{Simulation credibility and measured physical
+fidelity}\label{simulation-credibility-and-measured-physical-fidelity}
+
+Verification, validation, uncertainty quantification, and intended-use credibility have long been part of serious computational modeling (Oberkampf, Pilch, and Trucano 2007). Digital-twin work has also begun to make the validation of simulated counterfactuals explicit (Laudy 2026). Those frameworks give the broader credibility vocabulary. They do not, by themselves, answer the local question faced here: whether a particular physical edit to a captured world is supported by the experiment available to verify it.
+
+GAUGE is a recent measurement-grounded benchmark for physical fidelity across simulation engines and video world models, spanning rigid, cable, textile, and volumetric-deformation tasks (S. Wang et al.~2026). We use its public foam-shearing subset only for a retrospective channel-contradiction analysis. Because that conflict was already visible in the data, we do not treat it as fresh prospective confirmation.
+
+\subsection{Measured deformable
+tracking}\label{measured-deformable-tracking}
+
+We also exercise the captured-world pipeline on sequence C2 from the DOT deformable tracking dataset, which provides measured 3D correspondences through invisible markers (Xinyuan Li et al.~2024). DOT gives us measured geometry and motion, but it does not provide the stress-free state, loads, thickness, mass, or constitutive ground truth needed to identify a unique cloth material. We therefore report the fitted values only as model-conditioned effective parameters and keep this engineering check separate from the main verification claim.
+
+\section{Problem Formulation}\label{problem-formulation}
+
+Let \(M\) denote an executable captured world and \(R_{0}\), \(R_{1}\) the baseline and proposed repaired physical realizations. The experiments keep three evidence roles separate. Fitting evidence is used to calibrate or propose a rewrite. Ordinary held-out evidence checks generalization within the same observation family. An untouched target, or an independent physical intervention, is reserved until after the repair has been proposed.
+
+Let \(L_{obs}(R)\) be the ordinary held-out loss and \(L_{target}(R)\)
+be an independent physical target. We define a deceptive repair by
+
+\[L_{obs}\left( R_{1} \right) < L_{obs}\left( R_{0} \right)\quad\text{and}\quad L_{target}\left( R_{1} \right) > L_{target}\left( R_{0} \right).\]
+
+The definition intentionally says nothing about the cause of the mismatch. Model-form error, parameter compensation, transfer choice, boundary assumptions, and numerical artifacts can all produce worlds that look similarly plausible under the observations and diverge under another physical test.
+
+A verification channel produces an error \(e(R,Y)\) against independent
+evidence \(Y\) and an uncertainty scale \(\sigma\). We use the signed
+progress statistic
+
+\[z = \frac{e\left( R_{0},Y \right) - e\left( R_{1},Y \right)}{\sigma}.\]
+
+The frozen decision rule is
+
+\[z \geq 2 \Rightarrow \text{support},\quad\quad z \leq - 2 \Rightarrow \text{veto},\quad\quad|z| < 2 \Rightarrow \text{unresolved}.\]
+
+The magnitude 2 is a decision reference fixed before the fresh evaluation, not a physical constant. We keep that distinction explicit because none of the main unresolved results is reclassified after the data are inspected.
+
+\section{Reality Probe}\label{reality-probe}
+
+\subsection{Captured-world rewrite and verification
+pipeline}\label{captured-world-rewrite-and-verification-pipeline}
+
+Reality Probe keeps proposal generation and verification as separate stages. A captured bundle contains appearance-linked state, particle state, observations, uncertainty sidecars, and provenance. The fitting split is used to calibrate a candidate model; ordinary held-out error is measured; a local or model-level rewrite is proposed; only then is independent counterfactual evidence evaluated. Support can permit a commit, veto rejects the rewrite, and unresolved leaves the candidate unverified. The system does not convert weak evidence into a binary answer merely because a downstream transaction wants one.
+
+That ordering is more than bookkeeping. The proposal has to be complete before the confirmatory physical probe is evaluated. Otherwise the verification channel can quietly leak into the proposal objective and stop being independent evidence.
+
+The research implementation is C++20. It includes nonlinear MPM replay, APIC/PIC transfer variants, finite-difference and adjoint influence paths, deterministic experiment drivers, frozen JSON/CSV result ledgers, and SHA-256-indexed evidence packages. Metal and Vulkan render paths are useful for integration and presentation, but none of the quantitative paper claims depends on native rendering.
+
+\subsection{Dark-Field Counterfactual
+Spectroscopy}\label{dark-field-counterfactual-spectroscopy}
+
+For a model \(M\) and physical intervention \(u\), let \(F_{M}(u)\)
+denote an observable response vector. DCS applies a signed intervention
+measure \(\mu\) to form
+
+\[\mathcal{D}_{\mu}\left\lbrack F_{M} \right\rbrack = \sum_{i}^{}w_{i}F_{M}\left( u_{i} \right).\]
+
+For a declared mechanism order \(k\), the stencil weights are required
+to annihilate all lower-order multivariate monomials,
+
+\[r_{\alpha} = \sum_{i}^{}w_{i}u_{i}^{\alpha} \approx 0,\quad\quad|\alpha| < k.\]
+
+The implementation does not assume a single hand-written stencil. It enumerates the required lower-order monomials and checks the largest annihilation residual against a tolerance. A familiar one-dimensional order-2 example is
+
+\begin{equation}\label{eq:second}
+F(+a)+F(-a)-2F(0).
+\end{equation}
+
+which removes constant and linear response. In the actual experiments the order-2 comparator is synthesized over a \(3 \times 3\) intervention lattice, so Eq.~\ref{eq:second} is only an intuition-building example, not the stencil that generated the reported results.
+
+The system also implements finite-amplitude Boolean-lattice interactions
+through the Möbius contrast
+
+\[\kappa(S) = \sum_{T \subseteq S}^{}( - 1)^{|S| - |T|}F(T).\]
+
+We use this quantity as a finite-amplitude interaction statistic. We do not claim it as a new mixed-derivative theorem.
+
+\subsection{Uncertainty and standardized
+separation}\label{uncertainty-and-standardized-separation}
+
+The denominator of the standardized evidence keeps measurement, repeat, and numerical uncertainty separate. Measurement and repeat variance propagate through a signed stencil with the squared \(\ell_2\) weight gain \(\sum_i w_i^2\). Numerical error is handled more cautiously because discretization errors can be correlated across intervention points. D3 also estimates that contribution directly in witness space by evaluating the same signed witness at nominal and refined solver resolution.
+
+For each candidate pair, the verifier looks at the worst standardized separation in the retained response bundle. Active stencil synthesis projects candidate disagreement into the nullspace of the lower-moment constraints and then searches a deterministic set of projected directions. The underlying maximin problem is non-convex, so this procedure is deliberately described as a heuristic; we do not attach a global-optimality claim to it.
+
+\subsection{Known-force compliance as orthogonal
+information}\label{known-force-compliance-as-orthogonal-information}
+
+After D4V, we froze a separate experiment to answer a more basic question: was the weak evidence mainly a property of DCS, or were the available physical observations themselves not very discriminating? The fitting path and repair proposals were left unchanged. Only after a candidate had been selected did the new channel apply a known force and measure compliance.
+
+The fresh set contains six APIC truth worlds. Young's modulus takes values in \(\{14125,16625,18125\}\) Pa, Poisson ratio in \(\{0.22,0.32\}\), and the truth timestep is \(2.5\times10^{-5}\) s. Candidate families were fixed before execution. The bottom particle layer is kinematically fixed, gravity is disabled, and every top-layer particle receives 40 N in four separate experiments: \(+x\), \(-x\), \(+y\), and \(+z\). For each direction we record mean top-layer and interior-layer displacement in three axes, producing a six-component response.
+
+Numerical uncertainty is the RMS difference between nominal and
+half-timestep candidate response bundles. Measurement and repeat scales
+are each frozen at \(2 \times 10^{- 5}\) m per component. The force
+progress statistic is
+
+\[z_{force} = \frac{e(B,Y) - e(R,Y)}{\sqrt{\sigma_{meas}^{2} + \sigma_{repeat}^{2} + \sigma_{num,B}^{2} + \sigma_{num,R}^{2}}}.\]
+
+The DCS comparator and force channel use the same decision magnitude of 2. Force amplitude, directions, truth worlds, candidate grid, and threshold were all fixed before execution. None was changed after seeing the result.
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{../docs/readme_assets/04_same_probe.png}
+\caption{Same controlled +X force probe applied to truth and repaired
+worlds. The displayed deformation is magnified 400x only for legibility;
+reported numbers remain unscaled.}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{../docs/readme_assets/06_fingerprint.png}
+\caption{Four-direction force-response fingerprint for the selected
+frozen case. The six-component response bundle records top-layer and
+interior displacement under +X, -X, +Y, and +Z probes; truth and repair
+are plotted on a shared component scale.}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{../docs/readme_assets/07_residual_field.png}
+\caption{Solver-driven residual field for the same frozen visualization
+case. All four force directions share one residual scale; the field is
+explanatory and is not itself the DCS decision statistic.}
+\end{figure}
+
+\section{Experimental Program}\label{experimental-program}
+
+The experiments are grouped by what they are allowed to establish: implementation sanity, frozen validation, discovery analysis, retrospective measured evidence, and fresh follow-on evidence. Table~\ref{tab:stages} gives the central outcomes.
+
+Main experimental stages. ``Crosses frozen boundary'' means that the
+standardized evidence reaches the predeclared support/veto magnitude;
+zero crossings do not imply that an experiment produced no scientific
+information.
+
+\begin{table*}[t]
+\centering
+\caption{Main experimental stages. ``Resolved'' refers to the frozen support/veto decision rule, not whether the scientific question was informative.}
+\label{tab:stages}
+\begin{tabularx}{\textwidth}{l r r X}
+\toprule
+Stage & Population & Crosses frozen boundary & Main outcome \\
+\midrule
+D1 & 64 repairs & 64/64 & Constructed positive control; median ordinary improvement 60.88\%, median witness degradation ratio 9.375. \\
+D2 & 16 worlds & 0/16 & Median standardized separation 0.041578. \\
+D3 & 6 worlds & 0/6 & Median adaptive separation 0.0588583; lower numerical floor does not recover observability. \\
+D4V & 36 repairs & 0/36 & 14 deceptive and 22 beneficial; matched verification channels also have zero resolved coverage. \\
+GAUGE & 10 trials & -- & Retrospective measured channel contradiction; longitudinal endpoint preferred in 9/10 held-out repeats. \\
+OFC & 36 repairs & 0/36 & 12 deceptive and 24 beneficial; known-force compliance increases evidence scale but not coverage. \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+\subsection{D1: constructed positive
+control}\label{d1-constructed-positive-control}
+
+D1 is a deliberately constructed sanity check. All 64 proposed repairs improve the ordinary criterion and are deceptive by construction, and DCS rejects all 64. Median ordinary observation improvement is 60.88\%, while the median witness-degradation ratio is 9.375. This tells us that the execution path can express the intended rejection when the signal is built into the experiment. It does not tell us that the same behavior will generalize prospectively.
+
+\subsection{D2: active selection and frozen
+validation}\label{d2-active-selection-and-frozen-validation}
+
+The D2b discovery comparison asks a simpler ranking question before the frozen validation. Ranking agreement is 95.83\% for raw maximin, 87.50\% for Fisher/Jacobian selection, 75.00\% for the same-cost raw bundle, 66.67\% for maximum motion, 62.50\% for DCS order-2 maximin, and 45.83\% for random selection. DCS is therefore not the strongest matched ranking method in this comparison.
+
+Frozen D2 contains 16 truth worlds, and none reaches the decision magnitude. Median standardized separation is 0.041578, median numerical RMS is \(6.469\times10^{-6}\) m, and the maximum moment residual is \(3.886\times10^{-16}\). In other words, the stencil algebra is behaving numerically while the experiment is still not separating the physical alternatives strongly enough.
+
+\subsection{D3: witness-space refinement and adaptive
+order}\label{d3-witness-space-refinement-and-adaptive-order}
+
+D3 asks whether cleaner witness-space numerics or a higher mechanism order recovers useful separation. It does not. Six fresh truth worlds are evaluated; adaptive selection chooses order 2 in all six and never order 3. Median adaptive separation is 0.0588583. Refinement lowers median numerical RMS from \(8.435\times10^{-7}\) m for order 2 to \(2.153\times10^{-7}\) m for order 3, but no truth world is resolved. Ranking agreement remains modest: Fisher 61.11\%, raw bundle 58.33\%, maximum motion 58.33\%, pair-aware raw 55.56\%, adaptive DCS 52.78\%, and order-3 DCS 47.22\%.
+
+This stage is useful precisely because it separates two things that are easy to confuse. A witness can become numerically cleaner without the experiment becoming more informative about which physical world is correct.
+
+\subsection{D4V: pair-specific repair
+veto}\label{d4v-pair-specific-repair-veto}
+
+D4V starts from 36 repairs that already improve ordinary held-out error. Fourteen are deceptive on the untouched target and 22 are beneficial. Under the inherited \(|z|\ge2\) rule, DCS, the raw bundle, pair-specific raw, Fisher, and maximum-motion verification all have zero resolved coverage. The tables report these D4V counts alongside the fresh follow-on population.
+
+\begin{table}[t]
+\centering
+\caption{Ordinary-improving proposal populations. D4V and fresh OFC are independently generated partitions and their counts must not be mixed.}
+\label{tab:populations}
+\begin{tabular}{lrrr}
+\toprule
+Population & Deceptive & Beneficial & Resolved \\
+\midrule
+D4V & 14 & 22 & 0/36 \\
+Fresh OFC & 12 & 24 & 0/36 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{../docs/readme_assets/03_deception_map.png}
+\caption{Fresh orthogonal force-compliance proposal landscape. The
+figure shows where ordinary held-out improvement and the untouched
+physical target disagree across the fresh population.}
+\end{figure}
+A post-hoc information-frontier calculation makes the gap visible without changing the rule. D4V has median DCS magnitude 0.05024 against a frozen decision magnitude of 2, which corresponds to roughly 39.8$\times$ median signal amplification if uncertainty were otherwise unchanged. The matched channels are also far from resolved coverage. We use this only as a diagnostic of how much evidence is missing, not as a reason to alter a frozen gate.
+
+\subsection{Measured-source engineering
+check}\label{measured-source-engineering-check}
+
+The full system is also run on measured DOT C2 trajectories (Xinyuan Li et al.~2024). The importer keeps measured 3D correspondences separate from explicit proxies for rest state, density, thickness, mass, Gaussian photometry, and uncertainty. Fit-only calibration followed by held-out replay yields a model-conditioned effective material setting, not a claim about the true cloth properties. A proposed local material rewrite is rejected and rolled back because the complete independent derivative-verification contract is not satisfied, even though it passes the configured nonlinear linearization-error tolerance. This is useful evidence that the commit/refusal machinery behaves correctly on measured-source data, but it is not part of the central deceptive-repair result.
+
+\subsection{GAUGE: retrospective measured channel
+contradiction}\label{gauge-retrospective-measured-channel-contradiction}
+
+We examine ten held-out foam-shearing repeats from GAUGE (S. Wang et al.~2026). Ordinary face-plus-marker metrics prefer the finite-overlap candidate in all 10 repeats, and marker dark-field does the same. The longitudinal mechanism channel disagrees: it prefers the endpoint model in 9 of 10 repeats. Median marker error is 0.002428 m for endpoint and 0.001709 m for overlap, whereas median longitudinal error is 0.003131 for endpoint and 0.005584 for overlap. A post-hoc exact two-sided sign test on the longitudinal direction gives \(p=0.02148\).
+
+\begin{table}[t]
+\centering
+\caption{GAUGE retrospective channel comparison. Lower error is better. The sign test is post hoc.}
+\label{tab:gauge}
+\begin{tabular}{lcc}
+\toprule
+Metric & Endpoint & Overlap \\
+\midrule
+Median marker error (m) & 0.002428 & 0.001709 \\
+Median longitudinal error & 0.003131 & 0.005584 \\
+Longitudinal held-out wins & 9/10 & 1/10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The conflict was visible before DCS was formulated, so we label it retrospective throughout. It is evidence that channels can disagree, not prospective confirmation of the later method.
+
+\subsection{Fresh orthogonal force-compliance
+study}\label{fresh-orthogonal-force-compliance-study}
+
+The fresh force experiment produces 36 ordinary-heldout-improving proposals: 12 deceptive and 24 beneficial. Fresh DCS has median \(|z|=0.04877\) and maximum 0.17279. Force compliance moves the median to 0.55863 and the maximum to 1.31911, giving an aggregate-median ratio of 11.455. That is a large change in evidence scale, but not a boundary crossing: DCS resolves 0/36 and force compliance also resolves 0/36. The median extra amplification needed for the force channel to reach magnitude 2 is 3.58$\times$; even the best case still needs 1.52$\times$.
+
+
+\begin{table}[t]
+\centering
+\caption{Fresh orthogonal force-compliance results.}
+\label{tab:ofc}
+\begin{tabular}{lcc}
+\toprule
+Quantity & DCS & Force \\
+\midrule
+Median $|z|$ & 0.04877 & 0.55863 \\
+Maximum $|z|$ & 0.17279 & 1.31911 \\
+Resolved coverage & 0/36 & 0/36 \\
+Median factor to $|z|=2$ & 41.01$\times$ & 3.58$\times$ \\
+Best-case factor to $|z|=2$ & 11.57$\times$ & 1.52$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Decision-threshold robustness.}
+The primary decision magnitude remains the prospectively frozen \(\tau=2\). We also inspect nearby thresholds after the fact to check whether the negative conclusion is hanging on that single number; the primary rule is not changed. Because the frozen per-proposal OFC ledger retains signed DCS and force progress scores, this sweep can be reported exactly. Fresh DCS has no support or veto crossing even at \(\tau=1\). Force compliance resolves 14/36 proposals at \(\tau=1\): 6 support and 8 veto. Five of the 12 deceptive repairs are vetoed (41.7\% recall), while 3 of 24 beneficial repairs are falsely vetoed (12.5\%). That still misses the preregistered advancement target. At \(\tau=1.5\) and above, force coverage returns to 0/36. The useful point is the shape of the transition: the evidence is stronger than DCS, but the frozen population is still uncertified at the primary \(\tau=2\) rule.
+
+\begin{table}[t]
+\centering
+\caption{Threshold-robustness audit from the frozen aggregate ledger.
+The $\tau=2$ row is the preregistered primary rule; other rows are
+post-hoc sensitivity checks and do not redefine the decision policy.}
+\label{tab:threshold-sensitivity}
+\begin{tabular}{lcc}
+\toprule
+Decision magnitude $\tau$ & DCS crossings & Force crossings \\
+\midrule
+1.0 & 0/36 & 14/36 \\
+1.5 & 0/36 & 0/36 \\
+2.0 & 0/36 & 0/36 \\
+2.5 & 0/36 & 0/36 \\
+3.0 & 0/36 & 0/36 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The aggregate median-magnitude ratio is 11.455$\times$. The complete post-hoc sweep is generated from the frozen per-proposal ledger by \texttt{research/analysis/threshold\_sensitivity\_ofc.py} and stored in \texttt{research/paper\_data/THRESHOLD\_SENSITIVITY\_OFC\_2026-09-21.csv}.
+
+The advancement gate requires at least 30\% resolved coverage, at least 50\% veto recall over deceptive repairs, no more than 25\% false-veto rate over beneficial repairs, better coverage than DCS, higher median magnitude than DCS, and finite numerical refinement for every proposal. Force compliance passes the population-size, false-veto, median-signal, and numerical checks, but it fails coverage and recall. We keep that result as a failed gate with a strong information-gain observation; we do not rename it a successful verifier.
+
+\section{Results and Analysis}\label{results-and-analysis}
+
+\subsection{Deceptive repair is a distinct failure
+mode}\label{deceptive-repair-is-a-distinct-failure-mode}
+
+D4V and the fresh OFC population both show why ordinary held-out improvement is not enough. D4V contains 14 deceptive repairs among 36 ordinary-improving proposals; fresh OFC contains 12 among 36. Those fractions should not be read as a universal deception rate. They serve a more modest purpose: under controlled candidate-generation pipelines, the failure mode exists often enough that a verification rule based only on observation fit cannot ignore it.
+
+\subsection{The DCS hypothesis is falsified as a general prospective
+verifier}\label{the-dcs-hypothesis-is-falsified-as-a-general-prospective-verifier}
+
+D1 shows that dark-field rejection can be strong when the experiment is deliberately constructed around that distinction. The strength does not survive the prospective stages. D2 and D3 stay far below the decision magnitude, DCS does not beat the matched ranking baselines, and D4V resolves none of the repair proposals. We treat that as a central result, not an embarrassing corner case. It rules out the stronger story that mechanism-selective cancellation by itself is enough for repair certification in the regime we tested.
+
+The D3 refinement result sharpens this point. Lowering the numerical floor in witness space by several-fold barely changes standardized separation. Whatever is limiting the original witness, it is not simply coarse solver discretization.
+
+\subsection{Orthogonal physical information changes the evidence
+scale}\label{orthogonal-physical-information-changes-the-evidence-scale}
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{../docs/readme_assets/10_signal_gain.png}
+\caption{Fresh known-force compliance raises the median standardized
+signal by 11.46x relative to fresh DCS without changing the frozen
+decision rule.}
+\end{figure}
+
+The force-compliance experiment shifts the evidence scale in a way the earlier numerical refinements did not. Median standardized magnitude rises to 0.5586, roughly an order of magnitude above the fresh DCS median. Nothing about the decision rule or scoring definition changes; the difference comes from asking a physically different question. We take this as strong evidence that observability is experiment-dependent, while stopping short of claiming that information content is the only factor limiting verification.
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{../docs/readme_assets/11_information_limit.png}
+\caption{Information-limit summary from the frozen fresh
+orthogonal-information experiment. Known-force compliance increases
+standardized evidence substantially, but the strongest case remains
+below the frozen decision magnitude.}
+\end{figure}
+
+This is why the choice of physical question matters. Kinematic observations may be perfectly adequate for proposing a plausible repair and still be poor at distinguishing that repair from alternatives. A force-controlled test introduces a different constraint on the candidate worlds; in these experiments, that extra constraint is visibly more informative.
+
+\subsection{Stronger evidence is not sufficient
+evidence}\label{stronger-evidence-is-not-sufficient-evidence}
+
+The largest magnitude in the fresh force population is \(|z|=1.31911\), still below the frozen decision boundary. The visualized case has signed force progress \(z=-1.31811\): it moves strongly toward veto but does not reach it. Reality Probe therefore leaves the repair unresolved. We prefer that outcome to lowering the threshold after seeing the partition or pretending that an intermediate score is a definitive physical verdict.
+
+The information-frontier view also prevents a misleading all-or-nothing summary. DCS and force compliance both have 0\% resolved coverage at \(\tau=2\), but they are not equally informative. Their evidence magnitudes, and therefore their remaining distance to the decision boundary, are very different. That difference gives a quantitative direction for future intervention and sensor design even though the present experiment does not justify deployment-level certification.
+
+\section{Discussion}\label{discussion}
+
+\subsection{What is established}\label{what-is-established}
+
+Three conclusions survive the full sequence of experiments. First, a repair can improve ordinary observations while worsening an untouched physical target. Second, mechanism-sensitive verification can remain too weak for a reliable decision even after its numerical implementation is made cleaner. Third, changing the physical interrogation can increase observability substantially without making the evidence sufficient for certification.
+
+Those conclusions are intentionally narrower than a claim of universal physical correctness. They are still operationally meaningful. A persistent captured-world system can keep fitting, verification, and unresolved evidence separate, and it can decline a requested rewrite without treating that refusal as a software failure.
+
+\subsection{Relation to identifiability and experiment
+design}\label{relation-to-identifiability-and-experiment-design}
+
+The force result fits the broader experimental-design principle that model discrimination depends on what is excited and what is measured (Asadi and Laksari 2025; Y. Wang et al.~2026). We are not introducing that principle. What the experiments expose is its consequence inside a rewrite workflow: verification can fail even when every candidate looks plausible because the experiment does not separate them strongly enough. In that situation the system should not simply pick the highest score. It should collect more informative evidence or remain unresolved.
+
+\subsection{Relation to simulation verification and digital
+twins}\label{relation-to-simulation-verification-and-digital-twins}
+
+Simulation-credibility frameworks already distinguish code verification, solution verification, model validation, and uncertainty (Oberkampf, Pilch, and Trucano 2007). Digital-twin validation similarly asks which counterfactual claims are actually supported by observable validation data (Laudy 2026). Reality Probe sits underneath that broader view as an application-specific mechanism. Its scope is a captured world that can be physically edited, where a proposed rewrite is tested by an independent intervention before commit.
+
+\subsection{Limitations}\label{limitations}
+
+The limitations are not bookkeeping details; several of them define the boundary of the claim.
+
+\begin{itemize}
+\item
+  \textbf{Fresh prospective force evidence is synthetic.} The orthogonal
+  force-compliance experiment uses controlled MPM truth worlds rather
+  than a measured force-sensor setup. A real prospective force
+  experiment is required for a stronger measured-world claim.
+\item
+  \textbf{GAUGE is retrospective.} The measured channel contradiction
+  motivates the problem and demonstrates that different observables can
+  disagree, but it is not an untouched prospective test of DCS or force
+  compliance.
+\item
+  \textbf{The physical regime is limited.} The principal experiments use
+  a fixed deformable MPM setup and selected APIC/PIC candidate families.
+  Generalization across constitutive families, contact regimes, and
+  solvers is not established.
+\item
+  \textbf{The decision magnitude is operational.} The value 2 is frozen
+  before evaluation and prevents post-hoc threshold tuning, but it is
+  not a universal law for all physical verification tasks. A post-hoc
+  robustness audit shows zero fresh crossings for both channels at every
+  $\tau\ge1.5$; the exact force crossing count at $\tau=1$ cannot be
+  recovered from the aggregate publication ledger alone and is
+  therefore not asserted.
+\item
+  \textbf{DCS synthesis is heuristic.} Lower-moment annihilation is
+  exact up to tolerance, but the projected maximin search is not
+  globally optimal.
+\item
+  \textbf{The response-jet interpretation is operational.} The
+  implementation estimates order of contact from validated witnesses; it
+  does not reconstruct a complete symbolic Taylor tensor.
+\item
+  \textbf{The selected hero case is post hoc.} It is chosen
+  deterministically for explanation and does not influence thresholds,
+  aggregate statistics, or the information-gain result.
+\item
+  \textbf{Spatial residuals are explanatory.} Solver-driven residual
+  fields localize response disagreement but are not themselves the DCS
+  decision statistic.
+\item
+  \textbf{Measured DOT parameters are model-conditioned.} The DOT
+  benchmark lacks stress-free state, loads, thickness, mass, and
+  constitutive ground truth for C2; fitted material values are therefore
+  not presented as true cloth properties.
+\end{itemize}
+
+\subsection{Future work}\label{future-work}
+
+The next useful experiment is not another tuning pass on the frozen DCS or force partitions. It is a separately frozen measured study using an independent force sensor, or another calibrated excitation that genuinely changes the available physical information. Modal or frequency-domain excitation, broader constitutive families, and intervention-specific sensing are natural directions. Whatever comes next should keep proposal generation blind to the confirmatory channel and preserve a decision rule declared before the confirming measurements are examined.
+
+\section{Reproducibility and Implementation
+Notes}\label{reproducibility-and-implementation-notes}
+
+The repository records the 2026-09-21 scientific freeze at commit \texttt{a9da8c0aa868}. The one-command runner builds and tests the code, executes the staged experiments, regenerates deterministic figures and tables, validates frozen numerical values, records compiler/system/GPU provenance, and assembles a SHA-256-indexed evidence archive. Paper conclusions are read from machine-readable JSON ledgers rather than reverse-engineered from rounded labels in figures.
+
+The core DCS code is kept separate from the experiment drivers. It includes arbitrary-order lower-moment validation, signed-response application, finite-amplitude counterfactual cumulants, standardized discrepancies, uncertainty propagation, active stencil synthesis, witness-space numerical refinement, and spatial localization. The orthogonal force protocol and fresh truth worlds are versioned independently of D2/D3/D4V. That separation is there for a practical reason: a negative gate should not disappear because the same data were quietly retuned.
+
+Paper visualizations are generated deterministically. Solver-driven surfaces may use an explicit display magnification so that micrometer-scale motion is visible, but the reported numbers are never scaled. The Stanford Bunny appears only as a visualization carrier where noted and still requires its source attribution; it is not benchmark geometry. The mathematical explainer uses the actual solver body and does not depend on the bunny.
+
+\section{Conclusion}\label{conclusion}
+
+Better observation fit is not the same thing as better physics. Across the controlled repair populations, some ordinary-improving repairs make an untouched physical target worse. Reality Probe turns that mismatch into an explicit evidence transaction, with DCS as one tested mechanism-selective probe rather than the framework itself. Frozen D2, D3, and D4V do not support DCS as a general prospective verifier. A separately frozen known-force compliance channel raises median standardized evidence by 11.46$\times$ on fresh truth worlds, but every proposal still remains below the primary decision magnitude. The practical lesson is the one we would want the system to follow in deployment: verification is only as informative as the experiment behind it, and when the experiment cannot discriminate strongly enough, the system should say so and refuse certification.
+
+\section{References}\label{references}
+
+Asadi, Amirreza, and Kaveh Laksari. 2025. ``Optimal Experimental Design
+for Repeatable Hyperelastic Material Characterization.'' \emph{Journal
+of the Mechanical Behavior of Biomedical Materials} 170: 107104.
+https://doi.org/10.1016/j.jmbbm.2025.107104.
+
+Hu, Yuanming, Luke Anderson, Tzu-Mao Li, Qi Sun, Nathan Carr, Jonathan
+Ragan-Kelley, and Frédo Durand. 2020. ``DiffTaichi: Differentiable
+Programming for Physical Simulation.'' In \emph{International Conference
+on Learning Representations}.
+
+Hu, Yuanming, Jiancheng Liu, Andrew Spielberg, Joshua B. Tenenbaum,
+William T. Freeman, Jiajun Wu, Daniela Rus, and Wojciech Matusik. 2019.
+``ChainQueen: A Real-Time Differentiable Physical Simulator for Soft
+Robotics.'' In \emph{IEEE International Conference on Robotics and
+Automation}, 6265--71. https://doi.org/10.1109/ICRA.2019.8794333.
+
+Khanbayov, Rasul, Mohamed Rayan Barhdadi, Erchin Serpedin, and Hasan
+Kurban. 2026. ``IRIS: A Real-World Benchmark for Inverse Recovery and
+Identification of Physical Dynamic Systems from Monocular Video.''
+https://arxiv.org/abs/2603.16432.
+
+Laudy, Olav. 2026. ``The Digital Twin Counterfactual Framework: A
+Validation Architecture for Simulated Potential Outcomes.''
+https://arxiv.org/abs/2604.01325.
+
+Li, Xinyuan, Yu Guo, Yubei Tu, Yu Ji, Yanchen Liu, Jinwei Ye, and
+Changxi Zheng. 2024. ``Textureless Deformable Object Tracking with
+Invisible Markers.'' \emph{IEEE Transactions on Pattern Analysis and
+Machine Intelligence}. https://doi.org/10.1109/TPAMI.2024.3463422.
+
+Li, Xuan, Yi-Ling Qiao, Peter Yichen Chen, Krishna Murthy
+Jatavallabhula, Ming C. Lin, Chenfanfu Jiang, and Chuang Gan. 2023.
+``PAC-NeRF: Physics Augmented Continuum Neural Radiance Fields for
+Geometry-Agnostic System Identification.'' In \emph{International
+Conference on Learning Representations}.
+https://arxiv.org/abs/2303.05512.
+
+Liu, Zhuoman, Weicai Ye, Yan Luximon, Pengfei Wan, and Di Zhang. 2025.
+``Unleashing the Potential of Multi-Modal Foundation Models and Video
+Diffusion for 4D Dynamic Physical Scene Simulation.'' In
+\emph{Proceedings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition}, 11016--25.
+
+Oberkampf, William L., Martin Pilch, and Timothy G. Trucano. 2007.
+``Predictive Capability Maturity Model for Computational Modeling and
+Simulation.'' SAND2007-5948. Sandia National Laboratories.
+https://doi.org/10.2172/976951.
+
+Rho, Daniel, Jun Myeong Choi, Matthew Thornton, Biswadip Dey, and Roni
+Sengupta. 2026. ``MonoPhysics: Estimating Geometry, Appearance, and
+Physical Parameters from Monocular Videos.''
+https://arxiv.org/abs/2605.30320.
+
+Wada, Norika, Kohei Yamashita, Ryo Kawahara, and Ko Nishino. 2026.
+``M-PhyGs: Multi-Material Object Dynamics from Video.''
+https://arxiv.org/abs/2512.16885.
+
+Wang, Shuai, Yaxin Feng, Xuekun Jiang, Shihan Tian, Ningyu Yan, Xing
+Shen, Chaoyang Lyu, et al.~2026. ``GAUGE: A Measurement-Grounded
+Benchmark for Physical Fidelity in Simulation Engines and Video World
+Models.'' https://arxiv.org/abs/2608.05948.
+
+Wang, Yuanyuan, Wenjie Wang, Kun Zhang, and Mingming Gong. 2026.
+``Physics from Video: Identifiability of Time-Invariant Second-Order
+ODEs Under Minimal Trajectory Conditions.'' In \emph{International
+Conference on Machine Learning}. https://arxiv.org/abs/2606.00115.
+
+Xie, Tianyi, Zeshun Zong, Yuxing Qiu, Xuan Li, Yutao Feng, Yin Yang, and
+Chenfanfu Jiang. 2024. ``PhysGaussian: Physics-Integrated 3D Gaussians
+for Generative Dynamics.'' In \emph{Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition}, 4389--98.
+
+Zhang, Tianyuan, Hong-Xing Yu, Rundi Wu, Brandon Y. Feng, Changxi Zheng,
+Noah Snavely, Jiajun Wu, and William T. Freeman. 2024. ``PhysDreamer:
+Physics-Based Interaction with 3D Objects via Video Generation.'' In
+\emph{European Conference on Computer Vision}, 388--406.
+https://doi.org/10.1007/978-3-031-72627-9\_22.
+
+\end{document}
