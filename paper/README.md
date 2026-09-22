@@ -111,3 +111,4 @@ figure typography review, anonymous supplementary export, and venue-specific che
 A genuinely new prospective measured-force experiment would strengthen the paper, but
 it is new research. It must use a separately frozen protocol and must not be presented
 as part of the existing 2026-09-21 scientific freeze.
+\nThe manuscript now also contains `dot_c2_measured_heldout.tikz`, a vector quantitative visual generated from the successful DOT C2 benchmark artifact. It plots the later held-out checkpoint as measured correspondences versus model predictions with true-scale residual segments; the caption retains the 90-sample 3-D held-out RMS and the no-material-ground-truth boundary.\n\n
