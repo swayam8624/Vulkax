@@ -100,6 +100,40 @@ validation populations, the 20% acceleration gate, repair factors, and `|S|=2`
 remain unchanged.
 
 
+## V6.1 development failure and V6.2 correction
+
+`ball_identity_v6_1` was then executed on the same fresh development set
+`drop_50/06..10`. It still failed:
+
+- quality-pass videos: 3/5;
+- median acceleration relative error: 0.6082737827106389;
+- truth-control accuracy: 0.8333333333333334;
+- placebo false-assertion rate: 0.0;
+- directional sign rate: 0.9333333333333333.
+
+Fresh validation `drop_100/06..10` remained unopened.
+
+The bounded geometry descriptors were now sane, but the selector still optimized
+identity score before event structure. That can prefer a slow same-ball reset over
+the gravity-driven release.
+
+`ball_identity_v6_2` is frozen before fresh validation:
+
+1. ball identity remains a hard eligibility gate;
+2. a candidate must span at least 70% of the maximum eligible ball travel in that
+   video;
+3. among those near-full-span candidates, choose the shortest full-flight duration;
+4. timing/trajectory residuals, release-speed ratio, horizontal drift, detected
+   fraction, identity score and span are tie-breakers only;
+5. target gravity is absent from this ranking.
+
+A `candidate_audit.csv` is emitted with the top plausible events and descriptive
+development-only acceleration diagnostics. The audit never participates in
+selection.
+
+The next execution must use `--development-only`. Even if the gate passes, the
+runner stops before requesting `drop_100/06..10`.
+
 For each eligible object track:
 
 1. use the track's full observed vertical travel to define normalized progress
