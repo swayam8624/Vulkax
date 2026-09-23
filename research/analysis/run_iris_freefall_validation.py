@@ -454,19 +454,42 @@ def self_test_video():
             elif t<1.45:
                 frac=1.0
             else:
-                # Deliberately add a slow reset to the top. The v1 "longest run"
-                # selector can prefer this; revision 4 must still select free fall.
                 frac=max(0.0,1.0-(t-1.45)/.85)
             yy=60+span_px*frac
             cv2.circle(q,(320,int(round(yy))),10,(255,255,255),-1)
+
+            # Deliberate non-ball distractor: excellent quadratic motion but wrong
+            # duration/acceleration. V6 must reject it by object identity.
+            if .25<=t<=.95:
+                u=(t-.25)/.70
+                dfrac=min(1.0,max(0.0,u*u))
+                dy=45+230*dfrac
+                cv2.rectangle(q,(105,int(round(dy))-5),(145,int(round(dy))+5),(255,255,255),-1)
             writer.write(q)
         writer.release()
-        tr=extract(p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12)
-        rel=abs(tr["direct_acceleration_m_s2"]-G)/G
-        assert rel<=0.20,(tr["direct_acceleration_m_s2"],rel,tr)
-        assert tr["active_frames"]>=12
-        assert tr["monotone_fraction"]>=.78
-        print("VALID IRIS free-fall synthetic-video tracker",tr["direct_acceleration_m_s2"],rel)
+
+        base=extract(p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12)
+        rel=abs(base["direct_acceleration_m_s2"]-G)/G
+        assert rel<=0.20,(base["direct_acceleration_m_s2"],rel,base)
+        assert base["active_frames"]>=12
+
+        v6cfg={
+            "minimum_median_circularity":0.35,
+            "maximum_area_cv":0.65,
+            "maximum_aspect_log_mad":0.45,
+            "minimum_detected_fraction":0.50,
+        }
+        ident=extract(
+            p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12,
+            tracker_config=v6cfg
+        )
+        ident_rel=abs(ident["direct_acceleration_m_s2"]-G)/G
+        assert ident_rel<=0.20,(ident["direct_acceleration_m_s2"],ident_rel,ident)
+        assert ident["median_circularity"]>=v6cfg["minimum_median_circularity"]
+        assert ident["aspect_log_median"]<=v6cfg["maximum_aspect_log_mad"]
+        print("VALID IRIS free-fall synthetic-video tracker",
+              ident["direct_acceleration_m_s2"],ident_rel,
+              "circularity",ident["median_circularity"])
 
 FIELDS=["record_version","trial_id","paired_key","dataset","scene","split","evidence_class","confirmatory",
 "trial_family","ground_truth","method","score","decision","decision_threshold","confidence","physical_delta",
@@ -474,9 +497,8 @@ FIELDS=["record_version","trial_id","paired_key","dataset","scene","split","evid
 "negative_control","seed","source_artifact","notes"]
 
 def manifests(root,split,config):
-    desired={"development":("drop_50",set(config["dataset"]["development"]["takes"])),
-             "validation":("drop_100",set(config["dataset"]["validation"]["takes"])),
-             "final_test":("drop_150",set(config["dataset"]["final_test"]["takes"]))}[split]
+    spec=config["dataset"][split]
+    desired=(spec["setting"],set(spec["takes"]))
     out=[]
     for p in (root/"iris").glob("*/manifest.json"):
         m=json.loads(p.read_text());parts=m["scene"].split("/")
