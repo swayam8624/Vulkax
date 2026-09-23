@@ -1380,32 +1380,40 @@ def _fit_constant_acceleration_fragment_v65(
     if float(np.mean(deriv>=-1e-6))<.90:
         return _reject(diagnostics,"predicted_direction")
 
+    # Full release/impact roots are optional diagnostics in V6.5.  A partial
+    # flight fragment can identify constant acceleration without containing the
+    # release or impact itself.  Eligibility therefore depends on observed motion
+    # support, not successful extrapolation to p=0 and p=1.
     release_tau=_increasing_quadratic_root(a0,b0,c0,0.0)
     impact_tau=_increasing_quadratic_root(a0,b0,c0,1.0)
-    if release_tau is None or impact_tau is None or impact_tau<=release_tau:
-        return _reject(diagnostics,"event_roots")
-    T=float(impact_tau-release_tau)
-    full_frames=T*fps
-    if not math.isfinite(full_frames) or full_frames<minimum_interval_frames:
-        return _reject(diagnostics,"full_duration")
-    if T>1.25:
-        return _reject(diagnostics,"invalid_T")
+    roots_complete=(
+        release_tau is not None and impact_tau is not None
+        and impact_tau>release_tau
+    )
+    observed_span_s=float(t_abs[-1]-t_abs[0])
+    observed_span_frames=int(frames[-1]-frames[0]+1)
+    if observed_span_frames<minimum_interval_frames:
+        return _reject(diagnostics,"observed_duration")
 
-    # The inferred full event must overlap the observed fragment.  Some
-    # extrapolation is expected because detections can start after release or end
-    # before impact, but an event mostly outside the observed data is not usable.
-    obs_end=float(tr[-1])
-    pre=max(0.0,-release_tau)
-    post=max(0.0,impact_tau-obs_end)
-    extrap_frames=(pre+post)*fps
-    max_extrap=float(identity_cfg.get("maximum_event_extrapolation_frames",30.0))
-    if extrap_frames>max_extrap:
-        return _reject(diagnostics,"extrapolation")
-
-    release_speed=b0+c0*release_tau
-    release_ratio=abs(release_speed)/max(abs(c0*T),1e-9)
-    if release_ratio>float(identity_cfg.get("maximum_release_speed_ratio",.65)):
-        return _reject(diagnostics,"release_speed")
+    if roots_complete:
+        inferred_T=float(impact_tau-release_tau)
+        if not math.isfinite(inferred_T) or inferred_T<=0.0 or inferred_T>1.25:
+            roots_complete=False
+    if roots_complete:
+        T=inferred_T
+        pre=max(0.0,-float(release_tau))
+        post=max(0.0,float(impact_tau)-float(tr[-1]))
+        extrap_frames=(pre+post)*fps
+        release_speed=b0+c0*float(release_tau)
+        release_ratio=abs(release_speed)/max(abs(c0*T),1e-9)
+        event_t0_abs=float(t0obs+float(release_tau))
+    else:
+        # Backward-compatible duration fields describe the observed support when
+        # the full event is not inferable.  They are not used to estimate g.
+        T=max(observed_span_s,1.0/fps)
+        extrap_frames=0.0
+        release_ratio=abs(b0)/max(abs(c0*T),1e-9)
+        event_t0_abs=t0obs
 
     # Convert position residual into a temporal residual by analytically
     # inverting the fitted constant-acceleration model.  This keeps the existing
@@ -1478,7 +1486,7 @@ def _fit_constant_acceleration_fragment_v65(
         "dense_frames":all_frames,
         "abs_times":np.asarray(chunk["abs_times"],float),
         "window_indices":ids,
-        "t0_s":float(t0obs+release_tau),
+        "t0_s":float(event_t0_abs),
         "full_fall_time_s":T,
         "timing_fit_rms_s":timing/fps,
         "timing_fit_rms_frames":timing,
@@ -1497,9 +1505,12 @@ def _fit_constant_acceleration_fragment_v65(
         "radius_cv":float(chunk["radius_cv"]),
         "area_cv":float(chunk["area_cv"]),
         "aspect_log_median":float(chunk["aspect_log_median"]),
-        "interval_frames":int(round(full_frames)),
-        "observed_fragment_frames":int(len(ids)),
-        "inferred_full_fall_frames":float(full_frames),
+        "interval_frames":int(observed_span_frames),
+        "observed_fragment_frames":int(observed_span_frames),
+        "inferred_full_fall_frames":float(
+            (impact_tau-release_tau)*fps if roots_complete
+            else observed_span_frames
+        ),
         "detected_frames":int(detected),
         "global_progress_span":pspan,
         "global_progress_start":float(np.min(p)),
@@ -1508,9 +1519,13 @@ def _fit_constant_acceleration_fragment_v65(
         "normalized_fit_a":float(a0),
         "normalized_fit_b":float(b0),
         "duration_10_90_s":float(
-            _increasing_quadratic_root(a0,b0,c0,.90)
-            - _increasing_quadratic_root(a0,b0,c0,.10)
+            (_increasing_quadratic_root(a0,b0,c0,.90)
+             - _increasing_quadratic_root(a0,b0,c0,.10))
+            if (_increasing_quadratic_root(a0,b0,c0,.10) is not None
+                and _increasing_quadratic_root(a0,b0,c0,.90) is not None)
+            else observed_span_s
         ),
+        "roots_complete":1.0 if roots_complete else 0.0,
         "acceleration_stability":float(acc_stability),
         "event_extrapolation_frames":float(extrap_frames),
         "release_plateau_track":-1,
@@ -1606,6 +1621,7 @@ def choose_ballistic_track_v65(tracks,fps,minimum_interval_frames=12,identity_cf
             "normalized_fit_a":float(q["normalized_fit_a"]),
             "normalized_fit_b":float(q["normalized_fit_b"]),
             "duration_10_90_s":float(q["duration_10_90_s"]),
+            "roots_complete":float(q["roots_complete"]),
             "acceleration_stability":float(q["acceleration_stability"]),
             "event_extrapolation_frames":float(q["event_extrapolation_frames"]),
             "release_plateau_track":-1,
@@ -1691,9 +1707,16 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
     t0=float(chosen["t0_s"]);T=float(chosen["full_fall_time_s"])
     times=abs_times[ids]-t0
     position_m=np.clip(progress[ids],0.0,1.0)*drop_height
-    observed_fragment_frames=int(len(times))
-    inferred_full_fall_frames=float(T*fps)
-    if inferred_full_fall_frames+1e-9<minimum_interval_frames:
+    observed_fragment_frames=int(chosen.get("observed_fragment_frames",len(times)))
+    inferred_full_fall_frames=float(
+        chosen.get("inferred_full_fall_frames",T*fps)
+    )
+    if tracker_config and tracker_config.get("revision")=="ball_identity_v6_5":
+        if observed_fragment_frames<minimum_interval_frames:
+            raise ContractError(
+                "V6.5 selector returned insufficient observed motion support"
+            )
+    elif inferred_full_fall_frames+1e-9<minimum_interval_frames:
         raise ContractError(
             "selector returned event whose inferred full fall violates minimum duration"
         )
@@ -1752,6 +1775,8 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "aspect_log_median":float(chosen["aspect_log_median"]),
         "edge_trim_left":0,
         "edge_trim_right":0,
+        "acceleration_stability":float(chosen.get("acceleration_stability",0.0)),
+        "roots_complete":bool(chosen.get("roots_complete",0.0)),
         "candidate_audit":candidate_audit,
         "roi":[int(x0),int(yy0),int(x1-x0),int(y1-yy0)]
     }
@@ -2063,11 +2088,18 @@ def main():
                 qq["acceleration_relative_error"]=abs(qq["direct_acceleration_m_s2"]-G)/G
                 candidate_audit_rows.append(qq)
             checks={
-                "full_duration_frames":tr["inferred_full_fall_frames"]>=tg["minimum_active_frames"],
+                ("observed_motion_frames" if tg.get("revision")=="ball_identity_v6_5"
+                 else "full_duration_frames"):
+                    (tr["observed_fragment_frames"]>=tg["minimum_active_frames"]
+                     if tg.get("revision")=="ball_identity_v6_5"
+                     else tr["inferred_full_fall_frames"]>=tg["minimum_active_frames"]),
                 "monotone":tr["monotone_fraction"]>=tg.get("minimum_monotone_fraction",.78),
                 "timing_fit":tr["timing_fit_rms_frames"]<=tg.get("maximum_timing_fit_rms_frames",2.5),
                 "trajectory_shape":tr["trajectory_shape_rms_fraction"]<=tg.get("maximum_trajectory_shape_rms_fraction",.10),
-                "release_speed":tr["release_speed_ratio"]<=tg.get("maximum_release_speed_ratio",.65),
+                "release_speed":(
+                    True if tg.get("revision")=="ball_identity_v6_5"
+                    else tr["release_speed_ratio"]<=tg.get("maximum_release_speed_ratio",.65)
+                ),
                 "x_drift":tr["x_drift_fraction"]<=tg.get("maximum_x_drift_fraction",.45),
                 "gap_penalty":tr["gap_penalty"]<=tg.get("maximum_gap_penalty",.50),
                 "circularity":tr["median_circularity"]>=tg.get("minimum_median_circularity",0.0),
@@ -2095,6 +2127,8 @@ def main():
                           "timing_fit_rms_frames":tr["timing_fit_rms_frames"],
                           "trajectory_shape_rms_fraction":tr["trajectory_shape_rms_fraction"],
                           "release_speed_ratio":tr["release_speed_ratio"],
+                          "acceleration_stability":tr.get("acceleration_stability",0.0),
+                          "roots_complete":tr.get("roots_complete",False),
                           "x_drift_fraction":tr["x_drift_fraction"],
                           "gap_penalty":tr["gap_penalty"],
                           "candidate_track_count":tr["candidate_track_count"],
@@ -2165,7 +2199,7 @@ def main():
                 "aspect_log_median","envelope_track_count","envelope_source_track",
                 "envelope_source_chunk","normalized_acceleration_s2",
                 "normalized_fit_a","normalized_fit_b","duration_10_90_s",
-                "acceleration_stability","event_extrapolation_frames",
+                "roots_complete","acceleration_stability","event_extrapolation_frames",
                 "release_plateau_track","impact_plateau_track",
                 "direct_acceleration_m_s2","release_rest_acceleration_m_s2",
                 "acceleration_relative_error"]
