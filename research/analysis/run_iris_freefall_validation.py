@@ -1380,10 +1380,21 @@ def main():
         assert bad is None
         assert diag.get("progress_span",0)==1,diag
 
-        # Static source guard: no legacy closure-style reject(...) call may exist.
-        source=pathlib.Path(__file__).read_text()
-        assert "return reject(" not in source
-        assert "diagnostics=diagnostics if diagnostics is not None" not in source
+        # Static scope guard: reject(...) must never be called as a free/local
+        # name. Use AST rather than source-string matching so the test does not
+        # trigger on its own assertion text or comments.
+        import ast,inspect
+        tree=ast.parse(pathlib.Path(__file__).read_text())
+        bad=[
+            (getattr(node,"lineno",None),ast.unparse(node))
+            for node in ast.walk(tree)
+            if isinstance(node,ast.Call)
+            and isinstance(node.func,ast.Name)
+            and node.func.id=="reject"
+        ]
+        assert not bad,bad
+        sig=inspect.signature(_recalibrate_gravity_candidate)
+        assert "diagnostics" in sig.parameters,sig
 
         print("VALID IRIS free-fall analyzer self-test");return
     if a.self_test_video:
