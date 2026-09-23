@@ -27,6 +27,8 @@ on:
       - "research/scripts/fetch_iris_freefall_blind.py"
       - "research/scripts/fetch_iris_reference_baselines.py"
       - "research/scripts/run_postfinal_reviewer_hardening.sh"
+      - "research/scripts/build_iris_metal_preprocessor.sh"
+      - "src/tools/iris_metal_preprocess.mm"
       - "research/scripts/run_iris_freefall_blind_validation.sh"
       - "research/scripts/run_iris_freefall_final_test.sh"
       - "visualization/scripts/render_reviewer_hardening.py"
@@ -163,6 +165,7 @@ jobs:
           bash -n research/scripts/run_iris_pendulum_validation.sh
           bash -n research/scripts/run_iris_pendulum_final_test.sh
           bash -n research/scripts/run_postfinal_reviewer_hardening.sh
+          bash -n research/scripts/build_iris_metal_preprocessor.sh
           bash -n research/scripts/run_iris_freefall_blind_validation.sh
           bash -n research/scripts/run_iris_freefall_final_test.sh
 
