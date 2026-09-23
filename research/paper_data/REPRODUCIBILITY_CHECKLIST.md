@@ -189,6 +189,10 @@ execution and may not be claimed from old data.
 - [x] strong direct-period and damped-nonlinear baseline implementation
 - [x] GT-hidden proposal artifact with truth joined only after SHA closure
 - [x] corruption robustness battery implementation
+- [x] Metal-accelerated robustness preprocessing on macOS
+- [x] AVFoundation decode + Metal corruption/resize/grayscale path avoids MJPEG retranscode
+- [x] Metal clean-equivalence gate requires exact locked primary decision-vector reproduction
+- [x] macOS CI builds and instantiates the native Metal preprocessing pipelines
 - [x] proposal/probe overlap-dependence sweep implementation
 - [x] measured-truth uncertainty sensitivity implementation
 - [x] pinned official IRIS reference-baseline importer

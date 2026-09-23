@@ -177,6 +177,28 @@ baselines, a GT-hidden proposal→verification experiment, measured-truth uncert
 sensitivity, proposal/probe dependence, corruption robustness, pinned official IRIS
 reference imports, and deterministic evidence visuals.
 
+On macOS the corruption-robustness stage now defaults to a native Apple-Silicon
+fast path:
+
+```text
+AVFoundation / hardware video decode where available
+→ Metal 640px resize + grayscale
+→ Metal corruption in the exact analysis space
+→ raw grayscale frames
+→ unchanged centroid / FFT / evidence scoring
+```
+
+It does **not** transcode temporary full-resolution MJPEG videos. Before any Metal
+corruption result is accepted, the clean Metal path must reproduce every one of
+the locked primary decisions for all ten final videos and agree with the frozen
+observed period within 2%. A failed equivalence gate aborts the robustness run.
+
+Force the legacy implementation only for debugging with:
+
+```bash
+python3 research/analysis/run_iris_postfinal_robustness.py --profile full --backend cpu
+```
+
 To additionally open the **development/validation** portion of the second blind
 domain:
 

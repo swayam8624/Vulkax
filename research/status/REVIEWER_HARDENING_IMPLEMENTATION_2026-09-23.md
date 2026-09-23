@@ -12,10 +12,14 @@ outcomes that have not yet been executed on the local frozen data.
 - GT-hidden baseline->candidate repair proposal pipeline:
   - baseline from first 20% of video;
   - candidate from first 40%;
-  - ordinary held-out acceptance on 40-50%;
-  - Reality Probe verification on disjoint final 50%;
+  - ordinary held-out acceptance on 40-60%;
+  - Reality Probe verification on disjoint final 40%;
   - proposal artifact SHA-256 closed before truth join;
 - deterministic corruption robustness:
+  - Metal-accelerated corruption execution on macOS via AVFoundation + native Metal;
+  - no temporary full-resolution MJPEG transcode on the Metal path;
+  - clean CPU/frozen-vs-Metal decision-vector equivalence gate before corruption results;
+  - per-video/condition live progress;
   - pixel noise;
   - Gaussian blur;
   - frame loss;

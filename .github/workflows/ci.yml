@@ -198,6 +198,10 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Build and self-test IRIS Metal preprocessor
+        run: |
+          bash research/scripts/build_iris_metal_preprocessor.sh build/tools/vulkax_iris_metal_preprocess
+          ./build/tools/vulkax_iris_metal_preprocess --self-test
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVULKAX_BUILD_TESTS=ON
       - name: Build
