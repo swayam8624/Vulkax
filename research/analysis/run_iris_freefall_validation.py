@@ -1346,6 +1346,45 @@ def main():
         else:
             raise AssertionError("invalid global progress span was accepted")
 
+        # Rejection helper is total and records reasons without relying on closure
+        # scope. This is a direct regression for the V6.3 NameError incident.
+        diag={}
+        assert _reject(diag,"unit_test") is None
+        assert diag=={"unit_test":1}
+
+        # V6.3 fragment rejection must be controlled (None + reason), never an
+        # exception. Use a nearly stationary fragment to force progress_span.
+        selector_cfg={
+            "expected_sign":1.0,
+            "minimum_global_progress_span":0.15,
+            "maximum_global_timing_fit_rms_frames":2.5,
+        }
+        chunk={
+            "track_id":1,"chunk_id":0,
+            "frames":np.arange(12,dtype=int),
+            "abs_times":np.arange(12,dtype=float)/60.0,
+            "x":np.zeros(12,dtype=float),
+            "y":np.linspace(100.0,105.0,12),
+            "detected_frames_original":np.arange(12,dtype=int),
+            "detected_fraction_chunk":1.0,
+            "gap_penalty":0.0,"identity_score":0.9,
+            "median_circularity":0.9,"median_solidity":0.95,
+            "median_circle_fill":0.9,"median_axis_ratio":0.95,
+            "radius_cv":0.05,"area_cv":0.05,"aspect_log_median":0.02,
+        }
+        diag={}
+        bad=_fit_global_fragment(
+            chunk,0,12,0.0,220.0,220.0,60.0,selector_cfg,12,
+            diagnostics=diag
+        )
+        assert bad is None
+        assert diag.get("progress_span",0)==1,diag
+
+        # Static source guard: no legacy closure-style reject(...) call may exist.
+        source=pathlib.Path(__file__).read_text()
+        assert "return reject(" not in source
+        assert "diagnostics=diagnostics if diagnostics is not None" not in source
+
         print("VALID IRIS free-fall analyzer self-test");return
     if a.self_test_video:
         self_test_video();return
