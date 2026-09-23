@@ -43,7 +43,11 @@ echo "=== Reviewer hardening: proposal/probe dependence ==="
 "$VENV/bin/python" research/analysis/run_iris_channel_dependence.py   --campaign "$BUILD/publication-validation/iris-pendulum-final-test"   --out "$BUILD/publication-validation/iris-pendulum-postfinal-dependence"
 
 echo "=== Reviewer hardening: corruption robustness ($PROFILE) ==="
-"$VENV/bin/python" research/analysis/run_iris_postfinal_robustness.py   --campaign "$BUILD/publication-validation/iris-pendulum-final-test"   --out "$BUILD/publication-validation/iris-pendulum-postfinal-robustness"   --profile "$PROFILE"
+"$VENV/bin/python" research/analysis/run_iris_postfinal_robustness.py \
+  --campaign "$BUILD/publication-validation/iris-pendulum-final-test" \
+  --out "$BUILD/publication-validation/iris-pendulum-postfinal-robustness" \
+  --profile "$PROFILE" \
+  --backend auto
 
 echo "=== Reviewer hardening: pinned official IRIS references ==="
 "$VENV/bin/python" research/scripts/fetch_iris_reference_baselines.py   --out "$BUILD/publication-validation/iris-official-reference"
