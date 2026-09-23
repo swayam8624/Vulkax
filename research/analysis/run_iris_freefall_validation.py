@@ -671,6 +671,7 @@ def choose_ballistic_track_legacy(tracks,fps,minimum_interval_frames=12,identity
             "spatial_envelope_px":float(q["span_px"]),
             "relative_span":float(q["local_span_px"])/max(float(q["span_px"]),1e-9),
             "global_progress_span":float(q["global_progress_span"]),
+            "raw_global_progress_span":float(q.get("raw_global_progress_span",q["global_progress_span"])),
             "global_progress_start":float(q["global_progress_start"]),
             "global_progress_end":float(q["global_progress_end"]),
             "full_fall_time_s":float(q["full_fall_time_s"]),
@@ -940,6 +941,7 @@ def _fit_global_fragment(chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
         "interval_frames":int(bb-aa),
         "detected_frames":int(detected),
         "global_progress_span":pspan,
+        "raw_global_progress_span":raw_pspan,
         "global_progress_start":float(np.min(p)),
         "global_progress_end":float(np.max(p)),
         "spatial_envelope_top_px":float(top),
@@ -1336,9 +1338,23 @@ def _fit_constant_acceleration_fragment_v65(
     order=np.argsort(t_abs)
     p=np.clip(p[order],0.0,1.0)
     t_abs=t_abs[order];x=x[order];frames=frames[order]
+    raw_pspan=float(np.ptp(p))
+    if raw_pspan<float(selector_cfg["minimum_global_progress_span"]):
+        return _reject(diagnostics,"progress_span")
+
+    # Stationary top/bottom holds establish the spatial envelope but are not
+    # acceleration samples.  Including repeated p≈0 / p≈1 frames biases the
+    # quadratic curvature toward zero.  Fit only the moving interior; partial
+    # mid-flight fragments remain valid because their p values are already
+    # interior.
+    fit_edge=float(identity_cfg.get("kinematic_fit_edge_fraction",0.02))
+    moving=(p>fit_edge)&(p<1.0-fit_edge)
+    if int(np.sum(moving))<6:
+        return _reject(diagnostics,"too_few_moving_points")
+    p=p[moving];t_abs=t_abs[moving];x=x[moving];frames=frames[moving]
     pspan=float(np.ptp(p))
     if pspan<float(selector_cfg["minimum_global_progress_span"]):
-        return _reject(diagnostics,"progress_span")
+        return _reject(diagnostics,"moving_progress_span")
 
     monotone=float(np.mean(np.diff(p)>=-.02)) if len(p)>1 else 0.0
     if monotone<float(identity_cfg.get("minimum_monotone_fraction",.78)):
@@ -1814,6 +1830,7 @@ def self_test_video():
             "plateau_overlap_frames":6,
             "event_edge_fraction":0.03,
             "maximum_event_extrapolation_frames":30.0,
+            "kinematic_fit_edge_fraction":0.02,
         }
         ident=extract(
             p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12,
@@ -2141,7 +2158,7 @@ def main():
     if candidate_audit_rows:
         fields=["scene","split","event_rank","selected","track_id","sign","t0_s",
                 "local_span_px","spatial_envelope_px","relative_span",
-                "global_progress_span","global_progress_start","global_progress_end",
+                "global_progress_span","raw_global_progress_span","global_progress_start","global_progress_end",
                 "full_fall_time_s","interval_frames","observed_fragment_frames",
                 "inferred_full_fall_frames","detected_frames","detected_fraction",
                 "timing_fit_rms_frames","trajectory_shape_rms_fraction","release_speed_ratio",
