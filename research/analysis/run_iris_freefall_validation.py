@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
-"""Blind IRIS free-fall validation on development/validation/final partitions."""
+"""Blind IRIS free-fall validation on development/validation/final partitions.
+
+Development revision 2 (2026-09-23):
+The first development run exposed a segmentation/calibration failure: the old
+tracker chose the longest occupancy run between global position quantiles, which
+can select slow reset/handling motion rather than the actual ballistic descent.
+No validation or final free-fall result was analyzed before this redesign.
+
+Revision 2 selects the fastest monotone endpoint-to-endpoint descent, uses the
+independently measured drop height only as a known geometric input, and derives
+a release-to-impact time-of-flight acceleration diagnostic. The verification
+score remains candidate-vs-baseline trajectory residual with the global |S|=2
+decision rule.
+"""
 from __future__ import annotations
 import argparse,csv,json,math,pathlib,statistics,subprocess,tempfile
 import numpy as np
@@ -35,15 +48,84 @@ def resize_gray(frame,width,cv2):
     q=cv2.resize(frame,(width,max(1,int(round(h*scale)))),interpolation=cv2.INTER_AREA) if w!=width else frame
     return cv2.cvtColor(q,cv2.COLOR_BGR2GRAY)
 
-def longest_run(mask):
-    best=(0,0);start=None
-    for i,v in enumerate(mask):
-        if v and start is None:start=i
-        if (not v or i==len(mask)-1) and start is not None:
-            end=i+1 if v and i==len(mask)-1 else i
-            if end-start>best[1]-best[0]:best=(start,end)
-            start=None
+def crossing_time(t,p,level,start=1,end=None):
+    end=len(p) if end is None else min(end,len(p))
+    for i in range(max(1,start),end):
+        if p[i-1] < level <= p[i]:
+            den=p[i]-p[i-1]
+            frac=(level-p[i-1])/den if abs(den)>1e-12 else 0.0
+            return float(t[i-1]+frac*(t[i]-t[i-1])),i
+    return None,None
+
+def candidate_descent(t,y,fps):
+    """Find the fastest credible monotone full-height traversal in either direction.
+
+    Free fall is the fast ballistic traversal. Slow hand reset/reposition motion was
+    the failure mode of the v1 development tracker.
+    """
+    best=None
+    for sign in (1.0,-1.0):
+        proj=sign*np.asarray(y,float)
+        n=len(proj)
+        k=max(3,int(round(.05*n)))
+        order=np.sort(proj)
+        top=float(np.median(order[:k]))
+        bottom=float(np.median(order[-k:]))
+        span=bottom-top
+        if span<8.0:continue
+        progress=(proj-top)/span
+        # smooth progress only for event selection; raw/smoothed centroid is retained
+        ps=np.convolve(progress,np.ones(5)/5,mode="same")
+        ps[:2]=progress[:2];ps[-2:]=progress[-2:]
+        starts=[]
+        for i in range(1,n):
+            if ps[i-1] < .10 <= ps[i]:starts.append(i)
+        for i0 in starts:
+            # Require the 90% crossing within two seconds. Earliest crossing prevents
+            # a later slow handling/reset phase from winning.
+            lim=min(n,i0+max(12,int(round(2.0*fps))))
+            t90,j=crossing_time(t,ps,.90,start=i0,end=lim)
+            if j is None:continue
+            t10,_=crossing_time(t,ps,.10,start=max(1,i0-3),end=j+1)
+            if t10 is None:continue
+            duration=t90-t10
+            if duration<=3.0/fps:continue
+            seg=ps[max(0,i0-2):j+2]
+            if len(seg)<8:continue
+            d=np.diff(seg)
+            monotone=float(np.mean(d>=-0.015))
+            forward=float(np.mean(d>=0.0))
+            if monotone<.80 or forward<.60:continue
+            score=(duration,-monotone,-forward)
+            if best is None or score<best["rank"]:
+                best={"rank":score,"sign":sign,"top_px":top,"bottom_px":bottom,
+                      "span_px":span,"progress":progress,"progress_smooth":ps,
+                      "start_index":i0,"end_index":j,"duration_10_90_s":duration,
+                      "monotone_fraction":monotone,"forward_fraction":forward}
+    if best is None:raise RuntimeError("no credible ballistic descent found")
     return best
+
+def timing_fit(t,progress,start,end,drop_height,fps):
+    levels=np.asarray([.10,.20,.30,.40,.50,.60,.70,.80,.90],float)
+    times=[]
+    idx=max(1,start-3)
+    for lev in levels:
+        tt,j=crossing_time(t,progress,float(lev),start=idx,end=end+3)
+        if tt is None:raise RuntimeError(f"missing free-fall crossing at {lev:.2f}")
+        times.append(tt);idx=max(idx,j-1)
+    times=np.asarray(times,float)
+    x=np.sqrt(levels)
+    A=np.column_stack([np.ones(len(x)),x])
+    coef=np.linalg.lstsq(A,times,rcond=None)[0]
+    t0=float(coef[0]);T=float(coef[1])
+    if T<=0:raise RuntimeError("non-positive fitted free-fall duration")
+    pred=A@coef
+    rms=float(np.sqrt(np.mean((times-pred)**2)))
+    ghat=2.0*drop_height/(T*T)
+    return {"release_time_s":t0,"full_fall_time_s":T,
+            "timing_fit_rms_s":rms,"timing_fit_rms_frames":rms*fps,
+            "direct_acceleration_m_s2":ghat,
+            "crossing_levels":levels.tolist(),"crossing_times_s":times.tolist()}
 
 def extract(video,drop_height,width=640,max_seconds=5.0):
     cv2=import_cv();cap=cv2.VideoCapture(str(video))
@@ -78,27 +160,39 @@ def extract(video,drop_height,width=640,max_seconds=5.0):
         if len(xx)>=10:
             ww=np.maximum(crop[yy,xx].astype(float)-q+1,1)
             ys.append(float(np.sum((yy+y0)*ww)/np.sum(ww)));valid.append(True)
-        else:ys.append(float("nan"));valid.append(False)
+        else:ys.append(float("nan");valid.append(False))
         times.append(i/fps);i+=1
     cap.release()
     y=np.asarray(ys);v=np.asarray(valid,bool);t=np.asarray(times)
     if v.sum()<12:raise RuntimeError("insufficient tracked ball samples")
     idx=np.arange(len(y));good=np.flatnonzero(v);y=np.interp(idx,good,y[good])
     y=np.convolve(y,np.ones(3)/3,mode="same");y[0]=y[1];y[-1]=y[-2]
-    trend=np.median(y[int(.7*len(y)):])-np.median(y[:max(2,int(.3*len(y)))])
-    sign=1.0 if trend>=0 else -1.0;proj=sign*y
-    lo=float(np.percentile(proj,5));hi=float(np.percentile(proj,95));span=hi-lo
-    if span<8:raise RuntimeError("tracked vertical span too small")
-    norm=(proj-lo)/span
-    active=(norm>=.05)&(norm<=.85)
-    a,b=longest_run(active)
-    if b-a<12:raise RuntimeError(f"free-fall active segment too short: {b-a}")
-    ta=t[a:b]-t[a];sm=(proj[a:b]-lo)*(drop_height/span);one_px=drop_height/span
-    # direct acceleration estimate with free intercept/velocity
-    X=np.column_stack([np.ones(len(ta)),ta,.5*ta*ta]);coef=np.linalg.lstsq(X,sm,rcond=None)[0]
-    ghat=float(coef[2])
-    return {"fps":fps,"valid_fraction":float(v.mean()),"span_px":span,"one_pixel_m":one_px,
-            "active_frames":len(ta),"times":ta,"position_m":sm,"direct_acceleration_m_s2":ghat,
+
+    descent=candidate_descent(t,y,fps)
+    progress=descent["progress_smooth"]
+    fit=timing_fit(t,progress,descent["start_index"],descent["end_index"],drop_height,fps)
+
+    # Use the selected ballistic 10%-90% interval for the trajectory verifier.
+    # Scale is anchored to the independently measured total drop height.
+    a=max(0,descent["start_index"]-1);b=min(len(t),descent["end_index"]+2)
+    ta=t[a:b]-t[a]
+    sm=np.clip(progress[a:b],0.0,1.0)*drop_height
+    one_px=drop_height/descent["span_px"]
+    if len(ta)<12:raise RuntimeError(f"free-fall active segment too short: {len(ta)}")
+
+    X=np.column_stack([np.ones(len(ta)),ta,.5*ta*ta])
+    coef=np.linalg.lstsq(X,sm,rcond=None)[0]
+    trajectory_g=float(coef[2])
+    return {"fps":fps,"valid_fraction":float(v.mean()),"span_px":descent["span_px"],
+            "one_pixel_m":one_px,"active_frames":len(ta),"times":ta,"position_m":sm,
+            "direct_acceleration_m_s2":fit["direct_acceleration_m_s2"],
+            "trajectory_acceleration_m_s2":trajectory_g,
+            "full_fall_time_s":fit["full_fall_time_s"],
+            "timing_fit_rms_frames":fit["timing_fit_rms_frames"],
+            "monotone_fraction":descent["monotone_fraction"],
+            "forward_fraction":descent["forward_fraction"],
+            "selected_direction_sign":descent["sign"],
+            "duration_10_90_s":descent["duration_10_90_s"],
             "roi":[int(x0),int(y0),int(x1-x0),int(y1-y0)]}
 
 def residuals(t,y,acc,fit_n):
@@ -125,17 +219,29 @@ def self_test_video():
         T=math.sqrt(2*drop_m/G)
         writer=cv2.VideoWriter(str(p),cv2.VideoWriter_fourcc(*"MJPG"),fps,(w,h))
         if not writer.isOpened():raise RuntimeError("synthetic writer unavailable")
-        for i in range(int(fps*2.0)):
+        total=int(fps*2.5)
+        for i in range(total):
             t=i/fps
             q=np.zeros((h,w,3),dtype=np.uint8)
-            y=60+span_px*min(1.0,0.5*G*t*t/drop_m)
-            cv2.circle(q,(320,int(round(y))),10,(255,255,255),-1)
+            if t<.35:
+                frac=0.0
+            elif t<.35+T:
+                u=(t-.35)/T;frac=min(1.0,u*u)
+            elif t<1.45:
+                frac=1.0
+            else:
+                # Deliberately add a slow reset to the top. The v1 "longest run"
+                # selector can prefer this; revision 2 must still select free fall.
+                frac=max(0.0,1.0-(t-1.45)/.85)
+            yy=60+span_px*frac
+            cv2.circle(q,(320,int(round(yy))),10,(255,255,255),-1)
             writer.write(q)
         writer.release()
-        tr=extract(p,drop_m,width=640,max_seconds=2.0)
+        tr=extract(p,drop_m,width=640,max_seconds=2.5)
         rel=abs(tr["direct_acceleration_m_s2"]-G)/G
-        assert rel<=0.30,(tr["direct_acceleration_m_s2"],rel)
+        assert rel<=0.20,(tr["direct_acceleration_m_s2"],rel,tr)
         assert tr["active_frames"]>=12
+        assert tr["monotone_fraction"]>=.80
         print("VALID IRIS free-fall synthetic-video tracker",tr["direct_acceleration_m_s2"],rel)
 
 FIELDS=["record_version","trial_id","paired_key","dataset","scene","split","evidence_class","confirmatory",
@@ -153,6 +259,13 @@ def manifests(root,split,config):
         if len(parts)==3 and parts[0]=="dropping_ball" and parts[1]==desired[0] and parts[2] in desired[1]:
             out.append((p.parent,m))
     return sorted(out,key=lambda x:x[1]["scene"])
+
+def drop_height_from_manifest(m,expected):
+    try:h=float(m["ground_truth"]["parameters"]["drop_height"]["mean"])
+    except Exception as e:raise RuntimeError(f"IRIS drop_height missing from manifest: {e}")
+    if abs(h-expected)>1e-6:
+        raise RuntimeError(f"drop-height drift: manifest={h} config={expected}")
+    return h
 
 def main():
     ap=argparse.ArgumentParser()
@@ -174,24 +287,35 @@ def main():
     if a.split=="validation":
         d=json.loads(a.require_development_summary.read_text()) if a.require_development_summary else {}
         if not d.get("gate_pass"):raise SystemExit("development gate failed/missing")
+        if d.get("tracker_revision")!="ballistic_event_v2":raise SystemExit("development tracker revision mismatch")
     if a.split=="final_test":
         v=json.loads(a.require_validation_summary.read_text()) if a.require_validation_summary else {}
         if not v.get("gate_pass"):raise SystemExit("validation gate failed/missing")
+        if v.get("tracker_revision")!="ballistic_event_v2":raise SystemExit("validation tracker revision mismatch")
         if not a.lock:raise SystemExit("final_test requires lock")
         subprocess.run(["python3","research/analysis/freeze_iris_freefall_final_test.py","--check",str(a.lock)],check=True)
     out=a.out or pathlib.Path(f"build/publication-validation/iris-freefall-{a.split}")
     mm=manifests(a.adapted_root,a.split,cfg);expected={"development":4,"validation":4,"final_test":9}[a.split]
     if len(mm)!=expected:raise SystemExit(f"expected {expected} frozen scenes, got {len(mm)}")
     rows=[];takes=[];fails=[]
-    height=cfg["physics"]["drop_heights_m"][{"development":"drop_50","validation":"drop_100","final_test":"drop_150"}[a.split]]
+    setting={"development":"drop_50","validation":"drop_100","final_test":"drop_150"}[a.split]
+    expected_height=float(cfg["physics"]["drop_heights_m"][setting])
+    tg=cfg["tracker"]
     for pkg,m in mm:
         try:
-            tr=extract(pathlib.Path(m["video"]["path"]),height,width=cfg["tracker"]["analysis_width"],max_seconds=cfg["tracker"]["max_seconds"])
-            qok=tr["active_frames"]>=cfg["tracker"]["minimum_active_frames"]
+            height=drop_height_from_manifest(m,expected_height)
+            tr=extract(pathlib.Path(m["video"]["path"]),height,width=tg["analysis_width"],max_seconds=tg["max_seconds"])
+            qok=(tr["active_frames"]>=tg["minimum_active_frames"]
+                 and tr["monotone_fraction"]>=tg.get("minimum_monotone_fraction",.80)
+                 and tr["timing_fit_rms_frames"]<=tg.get("maximum_timing_fit_rms_frames",2.5))
             takes.append({"scene":m["scene"],"quality_ok":qok,"direct_acceleration_m_s2":tr["direct_acceleration_m_s2"],
+                          "trajectory_acceleration_m_s2":tr["trajectory_acceleration_m_s2"],
                           "acceleration_relative_error":abs(tr["direct_acceleration_m_s2"]-G)/G,
                           "active_frames":tr["active_frames"],"valid_fraction":tr["valid_fraction"],
-                          "span_px":tr["span_px"],"one_pixel_m":tr["one_pixel_m"]})
+                          "span_px":tr["span_px"],"one_pixel_m":tr["one_pixel_m"],
+                          "full_fall_time_s":tr["full_fall_time_s"],
+                          "timing_fit_rms_frames":tr["timing_fit_rms_frames"],
+                          "monotone_fraction":tr["monotone_fraction"]})
             if not qok:continue
             for name,fac,truth,family,neg in cases():
                 g0=1.25*G;g1=fac*G;s1,s2=score(tr,g0,g1)
@@ -205,7 +329,7 @@ def main():
                      "physical_delta":math.log(g1/g0),"target_error_delta":abs(math.log(g1/G))-abs(math.log(g0/G)),
                      "measurement_noise_sigma":tr["one_pixel_m"],"pose_noise_sigma":"","missing_fraction":1-tr["valid_fraction"],
                      "channel_dependence":0.0,"negative_control":str(neg).lower(),"seed":0,"source_artifact":str(pkg),
-                     "notes":f"factor={fac}; drop_height_m={height}; standardized evidence score; take01 forbidden"})
+                     "notes":f"factor={fac}; drop_height_m={height}; tracker=ballistic_event_v2; standardized evidence score; take01 forbidden"})
         except Exception as e:fails.append({"scene":m["scene"],"error":f"{type(e).__name__}: {e}"})
     out.mkdir(parents=True,exist_ok=True)
     if rows:
@@ -229,11 +353,12 @@ def main():
     elif a.split=="validation":
         vg=cfg["validation_gate"];gate=quality>=vg["minimum_quality_videos"] and tc>=vg["minimum_truth_control_accuracy"] and pfar<=vg["placebo_false_assertion_rate"] and sign>=vg["minimum_direction_sign_rate"]
     else:gate=True
-    summary={"schema":"vulkax.iris_freefall_blind_result","version":1,"split":a.split,"expected_videos":expected,
-      "quality_pass_videos":quality,"failures":fails,"median_acceleration_relative_error":median_err,
-      "records":len(rows),"truth_control_accuracy":tc,"placebo_false_assertion_rate":pfar,
-      "direction_sign_rate":sign,"gate_pass":gate,
-      "take01_forbidden":True,"claim_guard":"Different equation-family replication; gravity estimation itself is not novel."}
+    summary={"schema":"vulkax.iris_freefall_blind_result","version":2,"tracker_revision":"ballistic_event_v2",
+      "split":a.split,"expected_videos":expected,"quality_pass_videos":quality,"failures":fails,
+      "median_acceleration_relative_error":median_err,"records":len(rows),"truth_control_accuracy":tc,
+      "placebo_false_assertion_rate":pfar,"direction_sign_rate":sign,"gate_pass":gate,
+      "take01_forbidden":True,
+      "claim_guard":"Different equation-family replication; tracker revision 2 was fixed using development only after v1 development segmentation failure. Gravity estimation itself is not novel."}
     (out/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
     print("VALID IRIS free-fall",a.split)
     for k,v in summary.items():
