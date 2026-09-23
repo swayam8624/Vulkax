@@ -83,6 +83,44 @@ Revision 3 quality requirements:
 
 The global candidate schedule and `|S|=2` decision rule remain unchanged.
 
+## Third development failure and tracker revision 4
+
+Tracker revision 3 was executed only on the development population
+`drop_50/{02,03,04,05}`. It over-constrained the event and produced:
+
+- quality-pass videos: 0/4;
+- median acceleration relative error: unavailable;
+- emitted records: 0;
+- development gate: FAIL.
+
+No free-fall validation result was analyzed after this failure and no final-test
+video was opened.
+
+Revision 4 is therefore frozen before validation and changes only the
+development-stage visual tracker. It:
+
+1. extracts compact moving components in each frame;
+2. associates components temporally using predicted position, area consistency,
+   and continuity;
+3. searches contiguous track segments for release-from-rest motion;
+4. fits `y(t)=a+b t+c t^2` in image space;
+5. requires acceleration-dominated motion, near-zero release velocity, mostly
+   monotone vertical travel, bounded horizontal drift, and low normalized
+   trajectory residual;
+6. ranks candidates only by those image/model-consistency quantities;
+7. does **not** use the target value of `g` to choose the track;
+8. uses independently measured IRIS `drop_height` only after selection to map the
+   accepted image trajectory into physical units.
+
+Revision 4 quality requirements:
+- trajectory-shape RMS <=0.10 of fitted span;
+- release-speed ratio <=0.65;
+- horizontal drift <=0.45 of vertical span;
+- temporal gap penalty <=0.50;
+- >=78% monotone consistency.
+
+The candidate schedule and global `|S|=2` decision rule remain unchanged.
+
 ## Physical observable
 
 A deterministic static-camera tracker extracts the vertical trajectory of the ball.
