@@ -92,3 +92,40 @@ frozen DCS gates were negative, and the separately preregistered force-complianc
 follow-on improved median standardized signal by 11.46× but still produced 0%
 resolved coverage. The stop decision is therefore complete; the absence of a D5
 measured run is a scientific boundary, not unfinished repository work.
+
+
+## Publication-validation extension — 2026-09-23
+
+The following items are intentionally separate from the frozen 2026-09-21 result.
+Checked items mean infrastructure exists; unchecked items require new scientific
+execution and may not be claimed from old data.
+
+### Reviewer-facing infrastructure
+- [x] common SUPPORT/VETO/UNRESOLVED record schema
+- [x] frozen primary |z|=2 decision semantics
+- [x] final-test protocol hash/lock utility
+- [x] controlled truth/null/dose/robustness/dependence trial planner
+- [x] cluster-bootstrap confidence intervals
+- [x] risk-coverage and selective-risk tables
+- [x] negative-control false-assertion analysis
+- [x] evidence reliability bins
+- [x] paired baseline comparison
+- [x] dose-response rank analysis
+- [x] robustness slice analysis
+- [x] failure-case ledger
+- [x] commit-gate harm/benefit accounting
+- [x] precision-based sample-size planning
+- [x] measured-world prospective protocol
+- [x] CI smoke test for the validation framework
+
+### New evidence still required
+- [ ] execute SUPPORT/VETO/UNRESOLVED controlled trials on untouched worlds
+- [ ] execute placebo/null controls
+- [ ] execute dose-response sweep and estimate detection limits
+- [ ] execute measurement-noise, pose-noise, and missing-observation sweeps
+- [ ] execute proposal/probe channel-dependence sweep
+- [ ] ingest the planned multi-dataset campaign into the common schema
+- [ ] freeze a final-test world manifest before opening its labels
+- [ ] execute final-test campaign without threshold retuning
+- [ ] obtain prospective measured physical confirmation if feasible
+- [ ] update manuscript claims only after those results exist
