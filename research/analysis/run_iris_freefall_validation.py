@@ -601,6 +601,7 @@ def self_test_video():
             "maximum_area_cv":0.65,
             "maximum_aspect_log_mad":0.45,
             "minimum_detected_fraction":0.50,
+            "minimum_relative_span_fraction":0.70,
         }
         ident=extract(
             p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12,
@@ -618,6 +619,14 @@ def self_test_video():
         assert ident["median_axis_ratio"]>=v6cfg["minimum_median_axis_ratio"]
         assert ident["radius_cv"]<=v6cfg["maximum_radius_cv"]
         assert ident["aspect_log_median"]<=v6cfg["maximum_aspect_log_mad"]
+        audit=ident.get("candidate_audit",[])
+        assert audit, "candidate audit missing"
+        selected=[q for q in audit if q["selected"]]
+        assert len(selected)==1, selected
+        assert selected[0]["relative_span"]>=v6cfg["minimum_relative_span_fraction"]
+        assert selected[0]["full_fall_time_s"]==min(
+            q["full_fall_time_s"] for q in audit if q["passes_relative_span"]
+        )
         print("VALID IRIS free-fall synthetic-video tracker",
               ident["direct_acceleration_m_s2"],ident_rel,
               "identity",ident["identity_score"],
