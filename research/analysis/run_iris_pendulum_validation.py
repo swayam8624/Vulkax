@@ -15,6 +15,7 @@ import math
 from pathlib import Path
 import statistics
 import subprocess
+import tempfile
 from typing import Iterable
 
 G = 9.80665
@@ -590,6 +591,48 @@ def analyze_take(
     return rows, report
 
 
+def self_test_video() -> None:
+    cv2, np = import_cv()
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "pendulum.avi"
+        fps = 60.0
+        period = 1.50
+        width, height = 640, 360
+        writer = cv2.VideoWriter(
+            str(path),
+            cv2.VideoWriter_fourcc(*"MJPG"),
+            fps,
+            (width, height),
+        )
+        if not writer.isOpened():
+            raise RuntimeError("synthetic-video writer unavailable")
+        for i in range(int(fps * 10.0)):
+            t = i / fps
+            frame = np.zeros((height, width, 3), dtype=np.uint8)
+            # Static structure gives the background estimator something realistic.
+            cv2.line(frame, (320, 35), (320, 95), (90, 90, 90), 3)
+            phase = 2.0 * math.pi * t / period
+            x = int(round(320 + 105 * math.sin(phase)))
+            y = int(round(175 + 18 * (1.0 - math.cos(phase))))
+            cv2.line(frame, (320, 75), (x, y), (140, 140, 140), 2)
+            cv2.circle(frame, (x, y), 13, (255, 255, 255), -1)
+            writer.write(frame)
+        writer.release()
+
+        result = extract_motion_signal(path, width=640, max_seconds=9.5)
+        rel = abs(float(result["observed_period_s"]) - period) / period
+        assert rel <= 0.06, (result["observed_period_s"], period, rel)
+        assert float(result["valid_fraction"]) >= 0.75
+        assert len(result["cycle_periods_s"]) >= 3
+        print(
+            "VALID IRIS pendulum synthetic-video tracker",
+            "period",
+            result["observed_period_s"],
+            "relative_error",
+            rel,
+        )
+
+
 def self_test() -> None:
     small = predicted_period(0.5, 45.0, False)
     finite = predicted_period(0.5, 45.0, True)
@@ -634,10 +677,14 @@ def main() -> int:
     ap.add_argument("--width", type=int, default=640)
     ap.add_argument("--max-seconds", type=float, default=14.0)
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--self-test-video", action="store_true")
     args = ap.parse_args()
 
     if args.self_test:
         self_test()
+        return 0
+    if args.self_test_video:
+        self_test_video()
         return 0
 
     if args.split == "validation":
