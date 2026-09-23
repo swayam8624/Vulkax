@@ -9,6 +9,7 @@ BUILD="build"
 VENV=""
 CONFIG="research/validation/iris_freefall_rescue_v6.json"
 DEVELOPMENT_ONLY=0
+PREFLIGHT_ONLY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -16,6 +17,7 @@ while [[ $# -gt 0 ]]; do
     --venv) VENV="$2"; shift 2;;
     --config) CONFIG="$2"; shift 2;;
     --development-only) DEVELOPMENT_ONLY=1; shift;;
+    --preflight-only) PREFLIGHT_ONLY=1; shift;;
     *) echo "Unknown option $1" >&2; exit 2;;
   esac
 done
@@ -48,6 +50,10 @@ PY
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --self-test
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --self-test-video
 echo "[freefall-v6] preflight PASS"
+if [[ "$PREFLIGHT_ONLY" -eq 1 ]]; then
+  echo "[freefall-v6] preflight-only complete; no dataset materialization requested."
+  exit 0
+fi
 
 if [[ -d "$DEV" ]]; then
   STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
