@@ -1658,7 +1658,6 @@ def _fit_event_time_candidate_v66(
     x_all=smooth1(raw_x,5)
     frames=all_frames[aa:bb]
     z=z_all[aa:bb]
-    x=x_all[aa:bb]
     t_abs=frames/fps
     local_span=float(np.ptp(z))
     min_span=float(identity_cfg.get("minimum_raw_event_span_px",18.0))
