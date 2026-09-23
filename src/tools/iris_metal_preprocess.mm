@@ -25,6 +25,7 @@ struct Options {
     std::uint32_t seed{20260923u};
     int width{640};
     double maxSeconds{14.0};
+    bool selfTest{false};
 };
 
 [[noreturn]] void usage() {
@@ -54,9 +55,11 @@ Options parse(int argc, char** argv) {
         else if (a == "--seed") o.seed = static_cast<std::uint32_t>(std::stoul(need("--seed")));
         else if (a == "--width") o.width = std::stoi(need("--width"));
         else if (a == "--max-seconds") o.maxSeconds = std::stod(need("--max-seconds"));
+        else if (a == "--self-test") o.selfTest = true;
         else usage();
     }
-    if (o.input.empty() || o.output.empty() || o.meta.empty() || o.width <= 0 || o.maxSeconds <= 0.0) usage();
+    if ((!o.selfTest && (o.input.empty() || o.output.empty() || o.meta.empty())) ||
+        o.width <= 0 || o.maxSeconds <= 0.0) usage();
     const std::string allowed[] = {"clean","noise","blur","frame_drop","fps","occlusion","crop"};
     if (std::find(std::begin(allowed), std::end(allowed), o.kind) == std::end(allowed)) {
         throw std::runtime_error("unsupported corruption kind: " + o.kind);
@@ -242,6 +245,13 @@ kernel void scale_gray(texture2d<float, access::sample> src [[texture(0)]],
             id<MTLComputePipelineState> scalePipeline =
                 [device newComputePipelineStateWithFunction:scaleFunction error:&error];
             if (scalePipeline == nil) throw std::runtime_error("Metal scale pipeline failed: " + nsError(error));
+
+            if (options.selfTest) {
+                const char* name = [[device name] UTF8String];
+                std::cout << "VALID Metal IRIS preprocessor self-test\n"
+                          << "DEVICE " << (name != nullptr ? name : "Metal device") << "\n";
+                return 0;
+            }
 
             NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:options.input.c_str()]];
             AVURLAsset* asset = [AVURLAsset URLAssetWithURL:url options:nil];
