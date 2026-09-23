@@ -4,9 +4,9 @@
 Proposal generation never reads true rope length:
   baseline: estimate from first 20% of motion
   candidate repair: estimate from first 40%
-  ordinary acceptance: candidate must improve small-angle period residual on 40-50%
+  ordinary acceptance: candidate must improve small-angle period residual on 40-60%
 Only after proposals are hashed/written is ground truth joined for evaluation.
-Reality Probe verification uses the disjoint final 50% with the frozen
+Reality Probe verification uses the disjoint final 40% with the frozen
 finite-amplitude period model and |score|=2 rule.
 
 This is a post-final experiment; it never replaces the locked final result.
@@ -85,7 +85,7 @@ def main():
     for take in takes:
         scene=take["scene"];p=a.campaign/safe_scene(scene)/"motion_signal.csv"
         rr=read_csv(p);fps=1/(float(rr[1]["time_s"])-float(rr[0]["time_s"]))
-        t0,x0=segment(rr,0,.20);t1,x1=segment(rr,0,.40);tm,xm=segment(rr,.40,.50);tv,xv=segment(rr,.50,1.0)
+        t0,x0=segment(rr,0,.20);t1,x1=segment(rr,0,.40);tm,xm=segment(rr,.40,.60);tv,xv=segment(rr,.60,1.0)
         pb,_=estimate_period(t0,x0,fps)
         pc,_=estimate_period(t1,x1,fps)
         pm,_=estimate_period(tm,xm,fps)
@@ -142,7 +142,7 @@ def main():
       "verifier_correct_on_ordinary_improving":correct,
       "verifier_accuracy_on_ordinary_improving":correct/len(accepted) if accepted else None,
       "proposal_ground_truth_hidden_until_after_hash":True,
-      "proposal_windows":{"baseline":[0,.20],"candidate":[0,.40],"ordinary_holdout":[.40,.50],"verification":[.50,1.0]},
+      "proposal_windows":{"baseline":[0,.20],"candidate":[0,.40],"ordinary_holdout":[.40,.60],"verification":[.60,1.0]},
       "claim_guard":"Post-final GT-hidden proposal experiment; does not replace locked final result."
     }
     (a.out/"summary.json").write_text(json.dumps(summary,indent=2)+"\n",encoding="utf-8")
