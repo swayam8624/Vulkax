@@ -18,6 +18,7 @@ REQUIRED_REPO_FILES = [
     Path("research/validation/protocol_v1.json"),
     Path("research/validation/record_schema_v1.json"),
     Path("research/validation/iris_pendulum_final_test_v1.json"),
+    Path("research/validation/iris_pendulum_final_world_manifest_v1.csv"),
     Path("research/benchmarks/IRIS_PENDULUM_PROSPECTIVE_VALIDATION_PROTOCOL_2026-09-23.md"),
     Path("research/scripts/fetch_iris_pendulum_repeats.py"),
     Path("research/analysis/prepare_public_validation_datasets.py"),
