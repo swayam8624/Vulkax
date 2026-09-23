@@ -1,6 +1,6 @@
 {
   "schema": "vulkax.iris_freefall_blind_replication",
-  "version": 4,
+  "version": 5,
   "created": "2026-09-23",
   "dataset": {
     "repo_id": "rasulkhanbayov/IRIS",
@@ -59,7 +59,7 @@
     "nuisance_fit_fraction": 0.4,
     "minimum_active_frames": 12,
     "blocks": 6,
-    "revision": "temporal_ballistic_v4",
+    "revision": "full_flight_v5",
     "minimum_monotone_fraction": 0.78,
     "maximum_trajectory_shape_rms_fraction": 0.1,
     "maximum_release_speed_ratio": 0.65,
@@ -131,6 +131,21 @@
       "validation_analyzed": false,
       "final_test_opened": false
     },
-    "v4_change": "temporal association of compact moving components + release-from-rest quadratic image-motion fit; candidate rank excludes target g"
+    "v4_change": "temporal association of compact moving components + release-from-rest quadratic image-motion fit; candidate rank excludes target g",
+    "v4_failure": {
+      "observed_on": "2026-09-23",
+      "split": "development_only",
+      "issue": "temporal tracker selected short quadratic fragments; all four failed active-frame gate and full drop height was incorrectly bound to truncated intervals",
+      "quality_pass_videos": 0,
+      "per_take_relative_g_error": [
+        1.1631593759872298,
+        3.2261302657042874,
+        3.0237050757516726,
+        3.0080039105277994
+      ],
+      "validation_analyzed": false,
+      "final_test_opened": false
+    },
+    "v5_change": "permit short detection gaps but require the accepted physical interval to satisfy the existing minimum-active-frame duration; only whole coherent track chunks with <=2 edge trims are eligible; rank complete flights ahead of tiny low-residual fragments"
   }
 }
