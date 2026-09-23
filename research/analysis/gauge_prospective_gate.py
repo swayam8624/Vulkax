@@ -529,45 +529,72 @@ def summarize(rows: list[dict[str, object]], worlds: list[dict]) -> dict:
 
 
 def self_test() -> None:
+    ids = ["m0", "m1", "m2", "m3"]
+    rest = {
+        "m0": [0.0, 0.0, 0.0],
+        "m1": [0.0, 1.0, 0.0],
+        "m2": [0.8, 0.2, 0.3],
+        "m3": [0.2, 0.3, 0.9],
+    }
+
+    def good_frame(dx: float) -> dict[str, list[float]]:
+        return {m: [p[0] + dx, p[1], p[2]] for m, p in rest.items()}
+
     measured = {
-        0: {"m0": [0.0, 0.0, 0.0], "m1": [0.0, 1.0, 0.0]},
-        1: {"m0": [0.5, 0.0, 0.0], "m1": [0.5, 1.0, 0.0]},
-        2: {"m0": [1.2, 0.0, 0.0], "m1": [1.2, 1.0, 0.0]},
+        0: good_frame(0.0),
+        1: good_frame(0.5),
+        2: good_frame(1.2),
     }
     good = {
-        0: {"m0": [0.0, 0.0, 0.0], "m1": [0.0, 1.0, 0.0]},
-        1: {"m0": [0.5, 0.0, 0.0], "m1": [0.5, 1.0, 0.0]},
-        2: {"m0": [1.2, 0.0, 0.0], "m1": [1.2, 1.0, 0.0]},
+        f: {m: list(p) for m, p in frame.items()}
+        for f, frame in measured.items()
     }
     bad = {
-        0: {"m0": [0.0, 0.0, 0.0], "m1": [0.0, 1.0, 0.0]},
-        1: {"m0": [0.2, 0.0, 0.0], "m1": [0.45, 1.15, 0.0]},
-        2: {"m0": [0.7, 0.0, 0.0], "m1": [1.10, 1.35, 0.0]},
+        0: good_frame(0.0),
+        1: {
+            "m0": [0.2, 0.0, 0.0],
+            "m1": [0.45, 1.15, 0.0],
+            "m2": [1.05, 0.28, 0.38],
+            "m3": [0.55, 0.38, 1.02],
+        },
+        2: {
+            "m0": [0.7, 0.0, 0.0],
+            "m1": [1.10, 1.35, 0.0],
+            "m2": [1.70, 0.38, 0.52],
+            "m3": [1.18, 0.48, 1.18],
+        },
     }
-    g = marker_error_vectors(measured, good, ["m0", "m1"], 1, 3)
-    b = marker_error_vectors(measured, bad, ["m0", "m1"], 1, 3)
+    g = marker_error_vectors(measured, good, ids, 1, 3)
+    b = marker_error_vectors(measured, bad, ids, 1, 3)
     for method in METHODS:
         support = self_normalized_score([x - y for x, y in zip(b[method], g[method])])
         veto = self_normalized_score([x - y for x, y in zip(g[method], b[method])])
         placebo = self_normalized_score([x - x for x in g[method]])
-        assert support > 0.0
-        assert veto < 0.0
-        assert placebo == 0.0
+        assert support > 0.0, method
+        assert veto < 0.0, method
+        assert placebo == 0.0, method
+
     assert SPLIT_TRIALS["final_test"] == (8, 9, 10)
-    transformed = verification_rigid_nuisance(measured, 17.0, 0.023)
-    aligned = rigid_aligned_three_frame_errors(
-        transformed, measured, ["m0", "m1"], 1, 3
-    ) if False else None
-    # Horn alignment is tested with a non-degenerate tetrahedral point set.
+
+    # Horn alignment must remove a pure, non-trivial global rigid transform.
     src = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0.2]]
-    src_frames = {0:{str(i):p for i,p in enumerate(src)},
-                  1:{str(i):p for i,p in enumerate(src)},
-                  2:{str(i):p for i,p in enumerate(src)}}
+    src_frames = {
+        0:{str(i):list(p) for i,p in enumerate(src)},
+        1:{str(i):list(p) for i,p in enumerate(src)},
+        2:{str(i):list(p) for i,p in enumerate(src)},
+    }
     dst_frames = verification_rigid_nuisance(src_frames, 17.0, 0.023)
     e = rigid_aligned_three_frame_errors(
         dst_frames, src_frames, [str(i) for i in range(len(src))], 1, 3
     )
     assert max(e) < 1.0e-9
+
+    # Rigid-invariant strain must also be unchanged by that global transform.
+    invariant = rigid_invariant_strain_errors(
+        dst_frames, src_frames, [str(i) for i in range(len(src))], 1, 3
+    )
+    assert max(invariant) < 1.0e-12
+
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / "metadata").mkdir()
