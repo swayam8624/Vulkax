@@ -5,16 +5,13 @@ This script searches release->impact change points on the already-opened
 drop_50 development split. It NEVER uses target gravity, expected fall time, or
 validation/final clips in candidate generation/ranking.
 
-A candidate window is favored when:
-  1. its ball-like motion is well described by positive quadratic image motion;
-  2. the fitted zero-velocity release lies near the beginning of the window;
-  3. acceleration is reasonably stable across the window;
-  4. immediately after the endpoint, the fitted ballistic model stops predicting
-     the observed trajectory (impact/occlusion/handling change point), or the
-     identity track itself terminates.
+V6.6b fixes one diagnostic mistake exposed by the first all-development run:
+ranking the smallest in-window quadratic residual first inevitably selects an
+early clean PREFIX of a real free fall. Endpoint evidence must lead once a
+window already satisfies the frozen kinematic/identity quality constraints.
 
-The known 0.5 m height is used only for an *evaluation column printed after
-ranking*, so we can see whether a target-free boundary rule fixes development.
+The known 0.5 m height is used only for an evaluation column printed AFTER
+ranking. Neither g nor expected flight duration enters filtering or ranking.
 """
 from __future__ import annotations
 
@@ -52,11 +49,10 @@ def stability_score(frames, z, fps, c_full):
     n = len(frames)
     if n < 10:
         return float("inf")
-    # Overlapping halves reduce sensitivity to one noisy endpoint.
     half = max(5, int(math.ceil(0.60 * n)))
     cs = []
     for lo, hi in ((0, half), (n - half, n)):
-        tt, _, _, cc, _ = quad_fit(frames[lo:hi], z[lo:hi], fps)
+        _, _, _, cc, _ = quad_fit(frames[lo:hi], z[lo:hi], fps)
         if math.isfinite(cc):
             cs.append(cc)
     if len(cs) != 2:
@@ -72,13 +68,14 @@ def candidate_windows(diag, analyzer, chunk, fps, tracker):
     if len(frames) < 12:
         return []
 
+    max_shape = float(tracker.get("maximum_trajectory_shape_rms_fraction", 0.10))
+    max_xdrift = float(tracker.get("maximum_x_drift_fraction", 0.45))
+
     scale = max(float(np.ptp(z)), 1.0)
     runs = analyzer._monotone_runs((z - float(np.min(z))) / scale)
     out = []
 
     for run_id, (aa, bb) in enumerate(runs):
-        # Permit the quadratic window to start a few samples before/after the
-        # monotone detector's boundary and to stop before the monotone run ends.
         starts = range(max(0, aa - 2), min(len(frames) - 11, aa + 7))
         end_cap = min(len(frames), bb + 10)
 
@@ -101,13 +98,11 @@ def candidate_windows(diag, analyzer, chunk, fps, tracker):
 
                 fit_rms_px = float(np.sqrt(np.mean((zz - pred) ** 2)))
                 shape = fit_rms_px / span
-                if not math.isfinite(shape) or shape > 0.12:
+                if not math.isfinite(shape) or shape > max_shape:
                     continue
 
                 release_tau = -b / c
                 duration = float(t[-1])
-                # Release may be just before the fitted window or in its first
-                # quarter because the component tracker can acquire late.
                 release_phase = release_tau / max(duration, 1e-9)
                 if release_phase < -0.20 or release_phase > 0.30:
                     continue
@@ -119,8 +114,6 @@ def candidate_windows(diag, analyzer, chunk, fps, tracker):
                 stab = stability_score(fr, zz, fps, c)
                 xdrift = float(np.ptp(xx)) / span
 
-                # Hold the pre-impact fit fixed and test the following observations.
-                # A real impact/bounce/occlusion should create a prediction break.
                 post_hi = min(len(frames), e + 8)
                 post_n = post_hi - e
                 if post_n:
@@ -132,23 +125,36 @@ def candidate_windows(diag, analyzer, chunk, fps, tracker):
                     edge = 0
                 else:
                     post_rms = float("nan")
-                    # Track termination is itself a valid impact/occlusion cue.
-                    break_ratio = 8.0
+                    # Track termination is useful but weaker than an observed
+                    # post-window model break, so do not fabricate a huge score.
+                    break_ratio = 4.0
                     edge = 1
 
-                # Target-free lexicographic rank. Release alignment and a clean
-                # quadratic come first; endpoint change-point evidence is next.
+                release_good = -0.08 <= release_phase <= 0.20
+                x_good = xdrift <= max_xdrift
+
+                # V6.6b target-free endpoint ranking:
+                #
+                # 1. enforce the release-from-rest boundary condition qualitatively;
+                # 2. use the already-frozen lateral-drift gate;
+                # 3. among admissible quadratic windows, prefer the endpoint after
+                #    which the pre-impact model fails most strongly;
+                # 4. only then use stability/residual/span tie-breakers.
+                #
+                # This intentionally prevents a pristine 12-frame PREFIX from
+                # outranking a slightly noisier but much stronger impact boundary.
                 rank = (
-                    0 if (-0.08 <= release_phase <= 0.20) else 1,
-                    shape,
+                    0 if release_good else 1,
+                    0 if x_good else 1,
+                    -min(break_ratio, 50.0),
                     stab,
-                    -min(break_ratio, 20.0),
+                    shape,
                     xdrift,
                     -span,
                     -duration,
                 )
 
-                # Evaluation only -- NEVER referenced by rank/filter above.
+                # Development EVALUATION ONLY. These values never affect rank.
                 release_abs = float(fr[0]) / fps + release_tau
                 impact_abs = float(fr[-1]) / fps
                 T_eval = impact_abs - release_abs
@@ -222,7 +228,7 @@ def main():
 
         print("\n" + "=" * 150)
         print(f"TAKE {take} fps={fps:.3f} tracks={len(tracks)} chunks={len(chunks)} candidates={len(rows)}")
-        print("RANKING DOES NOT USE g OR EXPECTED FALL TIME; g_eval IS DEVELOPMENT EVALUATION ONLY")
+        print("V6.6b RANKING: release/x gates -> endpoint break -> stability/shape; g_eval is evaluation only")
         print("=" * 150)
         for i, r in enumerate(rows[: args.top], 1):
             print(
