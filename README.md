@@ -18,7 +18,7 @@
 
 ## Project status
 
-The research program implemented in this repository is complete and frozen for manuscript preparation.
+The original research program is frozen at the 2026-09-21 scientific snapshot. A separate publication-validation extension began on 2026-09-23 to strengthen verification, validation, uncertainty accounting, and external testing without changing the frozen evidence.
 
 The scientific snapshot is:
 
@@ -33,7 +33,24 @@ The final research outcome is not that every candidate repair can be certified. 
 
 > A repair can improve ordinary observational agreement while making an untouched physical target worse. Mechanism-selective counterfactual probes can reveal much stronger evidence about that mismatch, but the tested regime remains information-limited and does not justify a prospective certification claim.
 
-The remaining work is manuscript preparation and venue-specific submission packaging.
+The frozen result remains reproducible, but publication readiness now also depends on the separate reviewer-facing validation campaign: controlled SUPPORT/VETO/UNRESOLVED trials, null controls, robustness/dependence sweeps, multi-dataset evidence, and prospective measured confirmation where feasible.
+
+## Publication-validation extension
+
+The new validation framework lives under
+[`research/validation/`](research/validation/README.md). It standardizes the old
+D4V/OFC proposal ledgers for diagnostic comparison while keeping them explicitly
+non-confirmatory, and defines a prospective locked protocol for new experiments.
+
+Key entrypoint:
+
+```bash
+bash research/scripts/run_publication_validation.sh --diagnostic
+```
+
+Planned new evidence is tracked separately from completed evidence; unexecuted
+placebo, dose-response, robustness, dependence, multi-dataset, and measured trials
+are never represented as results.
 
 ## Explainer video
 

@@ -47,6 +47,30 @@ bash run_everything.sh --exhaustive
 The GAUGE retrospective now prints live material/trial progress during its 20
 definitive forward simulations.
 
+## Publication-validation extension (2026-09-23)
+
+The original paper-facing result remains frozen. A separate validation lane now
+implements the stronger experiment design needed for publication review:
+three-way ground truth, placebo controls, dose response, robustness, channel
+dependence, clustered confidence intervals, risk/coverage, failure ledgers, and a
+final-test protocol lock.
+
+Diagnostic analysis of existing D4V/OFC evidence:
+
+```bash
+bash research/scripts/run_publication_validation.sh --diagnostic
+```
+
+This command does **not** convert those historical results into confirmatory
+evidence. New multi-dataset or measured records are supplied through `--extra`
+only after the corresponding trials have actually run.
+
+Protocol and execution guide:
+- `validation/README.md`
+- `validation/protocol_v1.json`
+- `benchmarks/REAL_MEASURED_VALIDATION_PROTOCOL_2026-09-23.md`
+- `literature/VALIDATION_RELATED_WORK_MAP_2026-09-23.md`
+
 ## Paper-data entrypoints
 
 - `paper_data/README.md`

@@ -1,0 +1,4 @@
+dataset,scene,split,adapter,source_uri,truth_source,units,exclusion_rule
+EXAMPLE_ONLY,scene_dev,development,replace_with_adapter,replace_with_source,replace_with_independent_truth,SI,predeclared_only
+EXAMPLE_ONLY,scene_val,validation,replace_with_adapter,replace_with_source,replace_with_independent_truth,SI,predeclared_only
+EXAMPLE_ONLY,scene_final,final_test,replace_with_adapter,replace_with_source,replace_with_independent_truth,SI,predeclared_only
