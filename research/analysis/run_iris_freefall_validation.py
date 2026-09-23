@@ -503,6 +503,7 @@ def main():
             checks={
                 "active_frames":tr["active_frames"]>=tg["minimum_active_frames"],
                 "monotone":tr["monotone_fraction"]>=tg.get("minimum_monotone_fraction",.78),
+                "timing_fit":tr["timing_fit_rms_frames"]<=tg.get("maximum_timing_fit_rms_frames",2.5),
                 "trajectory_shape":tr["trajectory_shape_rms_fraction"]<=tg.get("maximum_trajectory_shape_rms_fraction",.10),
                 "release_speed":tr["release_speed_ratio"]<=tg.get("maximum_release_speed_ratio",.65),
                 "x_drift":tr["x_drift_fraction"]<=tg.get("maximum_x_drift_fraction",.45),
@@ -517,6 +518,7 @@ def main():
                           "active_frames":tr["active_frames"],"valid_fraction":tr["valid_fraction"],
                           "span_px":tr["span_px"],"one_pixel_m":tr["one_pixel_m"],
                           "full_fall_time_s":tr["full_fall_time_s"],
+                          "timing_fit_rms_frames":tr["timing_fit_rms_frames"],
                           "trajectory_shape_rms_fraction":tr["trajectory_shape_rms_fraction"],
                           "release_speed_ratio":tr["release_speed_ratio"],
                           "x_drift_fraction":tr["x_drift_fraction"],
@@ -578,6 +580,7 @@ def main():
               "QUALITY",t["quality_ok"],
               "REJECT",t["quality_reject_reason"] or "none",
               "G_REL_ERR",t["acceleration_relative_error"],
+              "TIMING_RMS_FRAMES",t["timing_fit_rms_frames"],
               "SHAPE_RMS",t["trajectory_shape_rms_fraction"],
               "RELEASE_RATIO",t["release_speed_ratio"],
               "X_DRIFT",t["x_drift_fraction"],
