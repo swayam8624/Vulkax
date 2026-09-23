@@ -76,17 +76,6 @@ OUT_DIR="${OUT_DIR:-$BUILD_DIR/publication-validation}"
 PUBLIC_DATA_ROOT="${PUBLIC_DATA_ROOT:-$BUILD_DIR/public-datasets}"
 mkdir -p "$OUT_DIR"
 
-if [[ -n "$PUBLIC_DATA_PROFILE" ]]; then
-  case "$PUBLIC_DATA_PROFILE" in
-    smoke|core|full) ;;
-    *) echo "invalid --public-data-profile: $PUBLIC_DATA_PROFILE" >&2; exit 2 ;;
-  esac
-  bash research/scripts/prepare_public_validation_data.sh \
-    --profile "$PUBLIC_DATA_PROFILE" \
-    --data-root "$PUBLIC_DATA_ROOT" \
-    --out "$OUT_DIR/public-data"
-fi
-
 if [[ -n "$LOCK" ]]; then
   python3 research/analysis/freeze_publication_validation.py --check "$LOCK"
 fi
@@ -99,7 +88,19 @@ python3 -m py_compile \
   research/analysis/plan_validation_sample_size.py \
   research/analysis/analyze_transaction_utility.py \
   research/analysis/prepare_public_validation_datasets.py \
+  research/analysis/adapt_public_validation_inputs.py \
   research/scripts/fetch_public_validation_datasets.py
+
+if [[ -n "$PUBLIC_DATA_PROFILE" ]]; then
+  case "$PUBLIC_DATA_PROFILE" in
+    smoke|core|full) ;;
+    *) echo "invalid --public-data-profile: $PUBLIC_DATA_PROFILE" >&2; exit 2 ;;
+  esac
+  bash research/scripts/prepare_public_validation_data.sh \
+    --profile "$PUBLIC_DATA_PROFILE" \
+    --data-root "$PUBLIC_DATA_ROOT" \
+    --out "$OUT_DIR/public-data"
+fi
 
 D4V="$BUILD_DIR/dcs-d4v-discovery/proposals.csv"
 OFC="$BUILD_DIR/orthogonal-force-compliance/proposals.csv"
