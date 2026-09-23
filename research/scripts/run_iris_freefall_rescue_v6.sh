@@ -28,8 +28,13 @@ VAL="$BUILD/publication-validation/iris-freefall-v6-validation"
 COMBINED="$BUILD/publication-validation/combined-freefall-v6-validation"
 
 [[ -x "$VENV/bin/python" ]] || python3 -m venv "$VENV"
-"$VENV/bin/python" -m pip install --quiet --disable-pip-version-check   "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
+"$VENV/bin/python" -m pip install --quiet --disable-pip-version-check   "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless==4.14.0.94"
 
+"$VENV/bin/python" - <<'PY'
+import cv2,numpy,sys
+print("[freefall-v6] runtime Python",sys.version.split()[0],
+      "OpenCV",cv2.__version__,"NumPy",numpy.__version__)
+PY
 echo "[freefall-v6] preflight: compile/config/contracts/synthetic tracker"
 "$VENV/bin/python" -m py_compile   research/analysis/run_iris_freefall_validation.py   research/scripts/fetch_iris_freefall_rescue_v6.py
 "$VENV/bin/python" - "$CONFIG" <<'PY'
