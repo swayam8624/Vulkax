@@ -1147,13 +1147,22 @@ def choose_ballistic_track_v64(tracks,fps,minimum_interval_frames=12,identity_cf
             rel_z=zsmooth[max(0,aa-3):min(len(frames),bb+4)]
             start_cross=_interp_crossing(rel_frames,rel_z,target_start,True)
             end_cross=_interp_crossing(rel_frames,rel_z,target_end,True)
-            release_frame=(start_cross-edge*(end_cross-start_cross)/(1-2*edge)
-                           if start_cross is not None and end_cross is not None and end_cross>start_cross
-                           else float(top["frame_end"]))
-            impact_frame=(release_frame+(end_cross-start_cross)/(1-2*edge)
-                          if start_cross is not None and end_cross is not None and end_cross>start_cross
-                          else float(bottom["frame_start"]))
-            full_frames=impact_frame-release_frame
+            if start_cross is not None and end_cross is not None and end_cross>start_cross:
+                # Free fall position fraction is quadratic in elapsed time:
+                # t(f)=t0+T*sqrt(f). Recover release/impact times from two
+                # position-fraction crossings without using target gravity.
+                s1=math.sqrt(edge)
+                s2=math.sqrt(1.0-edge)
+                denom=s2-s1
+                if denom<=1e-9:
+                    _reject(rejection_counts,"edge_geometry");continue
+                full_frames=(end_cross-start_cross)/denom
+                release_frame=start_cross-full_frames*s1
+                impact_frame=release_frame+full_frames
+            else:
+                release_frame=float(top["frame_end"])
+                impact_frame=float(bottom["frame_start"])
+                full_frames=impact_frame-release_frame
             if not math.isfinite(full_frames) or full_frames<minimum_interval_frames:
                 _reject(rejection_counts,"full_duration");continue
             T=full_frames/fps
