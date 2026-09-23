@@ -1371,8 +1371,6 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "span_px":float(chosen["span_px"]),
         "one_pixel_m":one_px,
         "active_frames":observed_fragment_frames,
-        "observed_fragment_frames":observed_fragment_frames,
-        "inferred_full_fall_frames":inferred_full_fall_frames,
         "times":times,
         "position_m":position_m,
         "direct_acceleration_m_s2":ghat,
