@@ -106,24 +106,24 @@ void writeMeta(const Options& o, int width, int height, double fps, std::uint64_
                const std::string& deviceName, double sourceFps, int sourceWidth, int sourceHeight) {
     std::ofstream f(o.meta, std::ios::binary);
     if (!f) throw std::runtime_error("cannot write metadata: " + o.meta);
-    f << "{\\n"
-      << "  \\"schema\\": \\"vulkax.iris_metal_gray_frames\\",\\n"
-      << "  \\"version\\": 2,\\n"
-      << "  \\"backend\\": \\"metal\\",\\n"
-      << "  \\"device\\": \\"" << deviceName << "\\",\\n"
-      << "  \\"corruption_space\\": \\"analysis_resolution_after_decode\\",\\n"
-      << "  \\"width\\": " << width << ",\\n"
-      << "  \\"height\\": " << height << ",\\n"
-      << "  \\"fps\\": " << fps << ",\\n"
-      << "  \\"frame_count\\": " << frames << ",\\n"
-      << "  \\"source_fps\\": " << sourceFps << ",\\n"
-      << "  \\"source_width\\": " << sourceWidth << ",\\n"
-      << "  \\"source_height\\": " << sourceHeight << ",\\n"
-      << "  \\"kind\\": \\"" << o.kind << "\\",\\n"
-      << "  \\"value\\": " << o.value << ",\\n"
-      << "  \\"seed\\": " << o.seed << ",\\n"
-      << "  \\"max_seconds\\": " << o.maxSeconds << "\\n"
-      << "}\\n";
+    f << "{\n"
+      << "  \"schema\": \"vulkax.iris_metal_gray_frames\",\n"
+      << "  \"version\": 2,\n"
+      << "  \"backend\": \"metal\",\n"
+      << "  \"device\": \"" << deviceName << "\",\n"
+      << "  \"corruption_space\": \"analysis_resolution_after_decode\",\n"
+      << "  \"width\": " << width << ",\n"
+      << "  \"height\": " << height << ",\n"
+      << "  \"fps\": " << fps << ",\n"
+      << "  \"frame_count\": " << frames << ",\n"
+      << "  \"source_fps\": " << sourceFps << ",\n"
+      << "  \"source_width\": " << sourceWidth << ",\n"
+      << "  \"source_height\": " << sourceHeight << ",\n"
+      << "  \"kind\": \"" << o.kind << "\",\n"
+      << "  \"value\": " << o.value << ",\n"
+      << "  \"seed\": " << o.seed << ",\n"
+      << "  \"max_seconds\": " << o.maxSeconds << "\n"
+      << "}\n";
 }
 
 MTLSize threadsFor(id<MTLComputePipelineState> pipeline) {
