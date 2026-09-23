@@ -246,7 +246,7 @@ def choose_ballistic_track(tracks,fps,minimum_interval_frames=12):
     if not candidates:raise RuntimeError("no temporally consistent release-from-rest track found")
     return min(candidates,key=lambda q:q["rank"])
 
-def extract(video,drop_height,width=640,max_seconds=5.0):
+def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=12):
     cv2=import_cv();cap=cv2.VideoCapture(str(video))
     if not cap.isOpened():raise RuntimeError(f"cannot open {video}")
     fps=float(cap.get(cv2.CAP_PROP_FPS));frames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -286,7 +286,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0):
 
     tracks=build_temporal_tracks(frame_candidates,fps)
     if not tracks:raise RuntimeError("no compact temporal motion tracks")
-    chosen=choose_ballistic_track(tracks,fps,minimum_interval_frames=12)
+    chosen=choose_ballistic_track(tracks,fps,minimum_interval_frames=minimum_interval_frames)
 
     fs=np.asarray(chosen["frames"],int)
     t_abs=fs/fps
@@ -387,7 +387,7 @@ def self_test_video():
             cv2.circle(q,(320,int(round(yy))),10,(255,255,255),-1)
             writer.write(q)
         writer.release()
-        tr=extract(p,drop_m,width=640,max_seconds=2.5)
+        tr=extract(p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12)
         rel=abs(tr["direct_acceleration_m_s2"]-G)/G
         assert rel<=0.20,(tr["direct_acceleration_m_s2"],rel,tr)
         assert tr["active_frames"]>=12
@@ -454,7 +454,7 @@ def main():
     for pkg,m in mm:
         try:
             height=drop_height_from_manifest(m,expected_height)
-            tr=extract(pathlib.Path(m["video"]["path"]),height,width=tg["analysis_width"],max_seconds=tg["max_seconds"])
+            tr=extract(pathlib.Path(m["video"]["path"]),height,width=tg["analysis_width"],max_seconds=tg["max_seconds"],minimum_interval_frames=tg["minimum_active_frames"])
             checks={
                 "active_frames":tr["active_frames"]>=tg["minimum_active_frames"],
                 "monotone":tr["monotone_fraction"]>=tg.get("minimum_monotone_fraction",.78),
