@@ -36,12 +36,13 @@ if [[ ! -s "$VAL/summary.json" ]]; then
   exit 2
 fi
 
-"$VENV/bin/python" - "$VAL/summary.json" <<'PY'
+"$VENV/bin/python" - "$VAL/summary.json" "$CONFIG" <<'PY'
 import json,sys
 s=json.load(open(sys.argv[1]))
+cfg=json.load(open(sys.argv[2]))
 if s.get("split")!="validation" or not s.get("gate_pass"):
     raise SystemExit("[freefall-v6-final] STOP: fresh V6 validation gate is not PASS; final data remains unopened.")
-if s.get("tracker_revision")!="ball_identity_v6" or int(s.get("version",0))!=6:
+if s.get("tracker_revision")!=cfg["tracker"]["revision"] or int(s.get("version",0))!=6:
     raise SystemExit("[freefall-v6-final] STOP: validation is not the frozen V6 protocol.")
 print("[freefall-v6-final] fresh validation PASS; creating/checking final lock")
 PY
