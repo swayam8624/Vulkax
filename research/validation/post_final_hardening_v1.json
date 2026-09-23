@@ -21,8 +21,22 @@
       ]
     },
     "gt_free_proposals": {
-      "proposal_fraction": 0.4,
-      "verification_fraction": 0.6,
+      "baseline_window": [
+        0,
+        0.2
+      ],
+      "candidate_window": [
+        0,
+        0.4
+      ],
+      "ordinary_holdout_window": [
+        0.4,
+        0.6
+      ],
+      "verification_window": [
+        0.6,
+        1
+      ],
       "ground_truth_hidden_until_evaluation": true
     },
     "robustness": {
