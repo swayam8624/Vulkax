@@ -42,7 +42,7 @@ CANDIDATE_NUMERIC_FIELDS=(
     "x_drift_fraction","gap_penalty","detected_window_fraction",
     "identity_score","median_circularity","median_solidity",
     "median_circle_fill","median_axis_ratio","radius_cv","area_cv",
-    "aspect_log_median",
+    "aspect_log_median","sign","t0_s",
 )
 CANDIDATE_REQUIRED_FIELDS=(
     "track_id","window_indices","abs_times","progress","interval_frames",
@@ -80,10 +80,15 @@ def validate_candidate(candidate):
 
 def validate_selector_config(identity_cfg):
     cfg=identity_cfg or {}
-    frac=float(cfg.get("minimum_relative_span_fraction",0.70))
-    if not math.isfinite(frac) or not (0.0 < frac <= 1.0):
+    expected_sign=float(cfg.get("expected_image_gravity_sign",1.0))
+    if expected_sign not in (-1.0,1.0):
         raise ContractError(
-            f"minimum_relative_span_fraction must be in (0,1], got {frac!r}"
+            f"expected_image_gravity_sign must be -1 or +1, got {expected_sign!r}"
+        )
+    min_global_span=float(cfg.get("minimum_global_progress_span",0.15))
+    if not math.isfinite(min_global_span) or not (0.0 < min_global_span <= 1.0):
+        raise ContractError(
+            f"minimum_global_progress_span must be in (0,1], got {min_global_span!r}"
         )
     for key in (
         "minimum_median_circularity","minimum_median_solidity",
@@ -94,12 +99,21 @@ def validate_selector_config(identity_cfg):
             q=float(cfg[key])
             if not math.isfinite(q) or not (0.0<=q<=1.0):
                 raise ContractError(f"{key} must be finite and in [0,1], got {q!r}")
-    for key in ("maximum_radius_cv","maximum_area_cv","maximum_aspect_log_mad"):
+    for key in (
+        "maximum_radius_cv","maximum_area_cv","maximum_aspect_log_mad",
+        "maximum_global_timing_fit_rms_frames",
+    ):
         if key in cfg:
             q=float(cfg[key])
             if not math.isfinite(q) or q<0:
                 raise ContractError(f"{key} must be finite and >=0, got {q!r}")
-    return frac
+    return {
+        "expected_sign":expected_sign,
+        "minimum_global_progress_span":min_global_span,
+        "maximum_global_timing_fit_rms_frames":float(
+            cfg.get("maximum_global_timing_fit_rms_frames",2.5)
+        ),
+    }
 
 def read_csv(p):
     with p.open(newline="",encoding="utf-8") as f:return list(csv.DictReader(f))
@@ -452,12 +466,125 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
                 candidates.append(cand)
     return candidates
 
+def _candidate_raw_y(candidate):
+    progress=np.asarray(candidate["progress"],float)
+    sign=float(candidate["sign"])
+    low=float(candidate["low_px"])
+    span=float(candidate["span_px"])
+    raw=sign*(low+progress*span)
+    if raw.ndim!=1 or len(raw)!=len(candidate["abs_times"]):
+        raise ContractError("candidate raw-y reconstruction length mismatch")
+    if not np.all(np.isfinite(raw)):
+        raise ContractError("candidate raw-y reconstruction is not finite")
+    return raw
+
+def _global_spatial_envelope(candidates):
+    """Estimate full top/bottom image travel from all ball-like tracks.
+
+    Timing from reset/handling is never used here; those motions contribute only
+    spatial support for the same ball's full image-space range.
+    """
+    by_track={}
+    for q in candidates:
+        tid=int(q["track_id"])
+        if tid not in by_track:
+            by_track[tid]=_candidate_raw_y(q)
+    if not by_track:
+        raise TrackSelectionError("no ball-like tracks available for spatial envelope")
+    all_y=np.concatenate(list(by_track.values()))
+    if len(all_y)<8:
+        raise TrackSelectionError("insufficient ball samples for spatial envelope")
+    top=float(np.percentile(all_y,2.0))
+    bottom=float(np.percentile(all_y,98.0))
+    span=bottom-top
+    if not math.isfinite(span) or span<18.0:
+        raise TrackSelectionError(
+            f"invalid global ball spatial envelope: top={top}, bottom={bottom}"
+        )
+    return top,bottom,span,len(by_track)
+
+def _recalibrate_gravity_candidate(candidate,top,bottom,envelope_px,fps,selector_cfg):
+    """Fit full fall time from a partial downward fragment in global coordinates."""
+    expected_sign=float(selector_cfg["expected_sign"])
+    if float(candidate["sign"])!=expected_sign:
+        return None
+
+    raw_y=_candidate_raw_y(candidate)
+    if expected_sign>0:
+        global_progress=(raw_y-top)/envelope_px
+    else:
+        global_progress=(bottom-raw_y)/envelope_px
+
+    abs_times=np.asarray(candidate["abs_times"],float)
+    ids=np.asarray(candidate["window_indices"],int)
+    if len(ids)<6:
+        return None
+    p=global_progress[ids]
+    t=abs_times[ids]
+    keep=np.isfinite(p)&np.isfinite(t)&(p>=-0.05)&(p<=1.05)
+    p=p[keep];t=t[keep];ids=ids[keep]
+    if len(p)<6:
+        return None
+
+    order=np.argsort(t)
+    p=p[order];t=t[order];ids=ids[order]
+    p=np.clip(p,0.0,1.0)
+    pspan=float(np.max(p)-np.min(p))
+    if pspan<float(selector_cfg["minimum_global_progress_span"]):
+        return None
+
+    monotone=float(np.mean(np.diff(p)>=-.02)) if len(p)>1 else 0.0
+    if monotone<.78:
+        return None
+
+    sqrtp=np.sqrt(np.clip(p,0.0,1.0))
+    if float(np.ptp(sqrtp))<0.08:
+        return None
+    A=np.column_stack([np.ones(len(p)),sqrtp])
+    coef=np.linalg.lstsq(A,t,rcond=None)[0]
+    t0=float(coef[0]);T=float(coef[1])
+    if not math.isfinite(T) or T<=0 or T>1.25:
+        return None
+
+    pred=A@coef
+    timing_rms_s=float(np.sqrt(np.mean((t-pred)**2)))
+    timing_rms_frames=timing_rms_s*fps
+    if timing_rms_frames>float(selector_cfg["maximum_global_timing_fit_rms_frames"]):
+        return None
+
+    pred_p=np.square(np.clip((t-t0)/T,0.0,1.0))
+    shape_rms=float(np.sqrt(np.mean((p-pred_p)**2)))
+    if not math.isfinite(shape_rms) or shape_rms>.12:
+        return None
+
+    q=dict(candidate)
+    q["local_span_px"]=float(candidate["span_px"])
+    q["span_px"]=float(envelope_px)
+    q["spatial_envelope_top_px"]=float(top)
+    q["spatial_envelope_bottom_px"]=float(bottom)
+    q["global_progress_span"]=pspan
+    q["global_progress_start"]=float(np.min(p))
+    q["global_progress_end"]=float(np.max(p))
+    q["progress"]=global_progress
+    q["window_indices"]=ids
+    q["t0_s"]=t0
+    q["full_fall_time_s"]=T
+    q["timing_fit_rms_s"]=timing_rms_s
+    q["timing_fit_rms_frames"]=timing_rms_frames
+    q["trajectory_shape_rms_fraction"]=shape_rms
+    q["monotone_fraction"]=monotone
+    q["interval_frames"]=len(ids)
+    q["detected_frames"]=len(ids)
+    q["detected_window_fraction"]=float(len(ids)/max(1,int(ids[-1]-ids[0]+1)))
+    return validate_candidate(q)
+
 def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     identity_cfg=identity_cfg or {}
-    min_span_fraction=validate_selector_config(identity_cfg)
+    selector_cfg=validate_selector_config(identity_cfg)
     if not isinstance(tracks,list):
         raise ContractError(f"tracks must be a list, got {type(tracks).__name__}")
-    candidates=[]
+
+    raw_candidates=[]
     for tr in tracks:
         produced=fit_full_flight_progress(
             tr,fps,minimum_interval_frames=minimum_interval_frames,
@@ -473,47 +600,57 @@ def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=No
                 f"{type(produced).__name__}; producer contract requires list"
             )
         for candidate in produced:
-            candidates.append(validate_candidate(candidate))
-    if not candidates:
+            raw_candidates.append(validate_candidate(candidate))
+    if not raw_candidates:
         raise TrackSelectionError(
-            "no temporally consistent full-flight progress track survived frozen filters"
+            "no ball-like temporal motion candidates survived frozen filters"
         )
 
-    # Identity is an eligibility gate, not the primary optimization target.
-    # The physical ball's release and reset can both be very ball-like. Require
-    # near-maximal ball travel first, then choose the fastest full-travel event.
-    max_span=max(float(q["span_px"]) for q in candidates)
-    span_floor=max_span*min_span_fraction
-    eligible=[q for q in candidates if float(q["span_px"])>=span_floor]
-    if not eligible:
-        raise ContractError(
-            "relative-span filter removed every candidate; selector invariant violated"
+    top,bottom,envelope_px,envelope_tracks=_global_spatial_envelope(raw_candidates)
+    calibrated=[]
+    for q in raw_candidates:
+        z=_recalibrate_gravity_candidate(
+            q,top,bottom,envelope_px,fps,selector_cfg
+        )
+        if z is not None:
+            calibrated.append(z)
+    if not calibrated:
+        raise TrackSelectionError(
+            "no downward ball fragment survived global-envelope free-fall calibration"
         )
 
+    # The spatial envelope may come from the later slow reset, but timing selection
+    # uses only the expected gravity direction. Prefer the strongest global timing
+    # fit and the largest observed fraction of the full drop; absolute event time is
+    # a late tie-breaker. Target g is never used.
     def event_rank(q):
         return (
-            float(q["full_fall_time_s"]),
             float(q["timing_fit_rms_frames"]),
             float(q["trajectory_shape_rms_fraction"]),
+            -float(q["global_progress_span"]),
+            float(q["t0_s"]),
             float(q["release_speed_ratio"]),
             float(q["x_drift_fraction"]),
-            -float(q["detected_window_fraction"]),
             -float(q["identity_score"]),
-            -float(q["span_px"]),
         )
 
-    eligible=sorted(eligible,key=event_rank)
-    chosen=eligible[0]
+    calibrated=sorted(calibrated,key=event_rank)
+    chosen=calibrated[0]
 
-    # Audit is descriptive only and never participates in selection.
     audit=[]
-    for i,q in enumerate(sorted(candidates,key=event_rank)[:20],start=1):
+    for i,q in enumerate(calibrated[:20],start=1):
         audit.append({
             "event_rank":i,
             "selected":q is chosen,
             "track_id":q["track_id"],
-            "span_px":float(q["span_px"]),
-            "relative_span":float(q["span_px"])/max(max_span,1e-9),
+            "sign":float(q["sign"]),
+            "t0_s":float(q["t0_s"]),
+            "local_span_px":float(q["local_span_px"]),
+            "spatial_envelope_px":float(q["span_px"]),
+            "relative_span":float(q["local_span_px"])/max(float(q["span_px"]),1e-9),
+            "global_progress_span":float(q["global_progress_span"]),
+            "global_progress_start":float(q["global_progress_start"]),
+            "global_progress_end":float(q["global_progress_end"]),
             "full_fall_time_s":float(q["full_fall_time_s"]),
             "interval_frames":int(q["interval_frames"]),
             "detected_frames":int(q["detected_frames"]),
@@ -531,7 +668,7 @@ def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=No
             "radius_cv":float(q["radius_cv"]),
             "area_cv":float(q["area_cv"]),
             "aspect_log_median":float(q["aspect_log_median"]),
-            "passes_relative_span":float(q["span_px"])>=span_floor,
+            "envelope_track_count":int(envelope_tracks),
         })
     return chosen,audit
 
