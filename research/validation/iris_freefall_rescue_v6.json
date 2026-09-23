@@ -91,7 +91,8 @@
     "plateau_max_x_delta_px": 45,
     "event_edge_fraction": 0.03,
     "plateau_overlap_frames": 6,
-    "maximum_event_extrapolation_frames": 30
+    "maximum_event_extrapolation_frames": 30,
+    "kinematic_fit_edge_fraction": 0.02
   },
   "repairs": {
     "baseline_factor": 1.25,
