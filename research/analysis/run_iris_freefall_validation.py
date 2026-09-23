@@ -304,6 +304,7 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
         circle_fills=np.asarray([p.get("circle_fill",0.0) for p in chunk_pts],float)
         axis_ratios=np.asarray([p.get("axis_ratio",0.0) for p in chunk_pts],float)
         radii=np.asarray([p.get("radius",0.0) for p in chunk_pts],float)
+        median_radius_px=float(np.median(radii)) if len(radii) else 0.0
         areas=np.asarray([p["area"] for p in chunk_pts],float)
         aspects=np.asarray([p.get("aspect_log_abs",0.0) for p in chunk_pts],float)
         median_circularity=float(np.median(circularities)) if len(circularities) else 0.0
@@ -424,10 +425,13 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
                       x_drift,release_ratio,-span)
                 cand={
                     "rank":rank,"track_id":track["id"],"sign":sign,
-                    "span_px":span,"low_px":low,"high_px":high,
+                    "span_px":span,"span_radius_ratio":span/max(median_radius_px,1e-9),
+                    "median_radius_px":median_radius_px,
+                    "low_px":low,"high_px":high,
                     "progress":progress,"dense_frames":dense_frames,
                     "abs_times":abs_times,"window_indices":ids,
-                    "t0_s":t0,"full_fall_time_s":T,
+                    "t0_s":t0,"t10_s":float(cross_times[0]),
+                    "t90_s":float(cross_times[-1]),"full_fall_time_s":T,
                     "timing_fit_rms_s":timing_rms_s,
                     "timing_fit_rms_frames":timing_rms_frames,
                     "trajectory_shape_rms_fraction":shape_rms,
@@ -512,7 +516,13 @@ def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=No
             "event_rank":i,
             "selected":q is chosen,
             "track_id":q["track_id"],
+            "sign":float(q["sign"]),
+            "t0_s":float(q["t0_s"]),
+            "t10_s":float(q["t10_s"]),
+            "t90_s":float(q["t90_s"]),
             "span_px":float(q["span_px"]),
+            "median_radius_px":float(q["median_radius_px"]),
+            "span_radius_ratio":float(q["span_radius_ratio"]),
             "relative_span":float(q["span_px"])/max(max_span,1e-9),
             "full_fall_time_s":float(q["full_fall_time_s"]),
             "interval_frames":int(q["interval_frames"]),
@@ -772,6 +782,8 @@ def main():
     ap.add_argument("--lock",type=pathlib.Path)
     ap.add_argument("--self-test",action="store_true")
     ap.add_argument("--self-test-video",action="store_true")
+    ap.add_argument("--allow-gate-failure",action="store_true",
+                    help="return success after writing a scientific gate-failure report; implementation errors still fail")
     a=ap.parse_args();cfg=json.loads(a.config.read_text())
     if a.self_test:
         assert len(cases())==11
@@ -926,7 +938,8 @@ def main():
         with (out/"take_summary.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=list(takes[0]));w.writeheader();w.writerows(takes)
     if candidate_audit_rows:
-        fields=["scene","split","event_rank","selected","track_id","span_px","relative_span",
+        fields=["scene","split","event_rank","selected","track_id","sign","t0_s","t10_s","t90_s",
+                "span_px","median_radius_px","span_radius_ratio","relative_span",
                 "full_fall_time_s","interval_frames","detected_frames","detected_fraction",
                 "timing_fit_rms_frames","trajectory_shape_rms_fraction","release_speed_ratio",
                 "x_drift_fraction","gap_penalty","identity_score","median_circularity",
@@ -1013,5 +1026,8 @@ def main():
                 f"{a.split} implementation error: {implementation_errors} take(s) crashed; "
                 f"see {out/'failure_details.json'}"
             )
+        if a.allow_gate_failure:
+            print(f"{a.split.upper()}_GATE_RESULT FAIL (report-only; process exit 0)")
+            return
         raise SystemExit(f"{a.split} gate failed")
 if __name__=="__main__":main()
