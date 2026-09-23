@@ -7,12 +7,14 @@ cd "$ROOT"
 BUILD="build"
 VENV=""
 CONFIG="research/validation/iris_freefall_rescue_v6.json"
+DEVELOPMENT_ONLY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --build-dir) BUILD="$2"; shift 2;;
     --venv) VENV="$2"; shift 2;;
     --config) CONFIG="$2"; shift 2;;
+    --development-only) DEVELOPMENT_ONLY=1; shift;;
     *) echo "Unknown option $1" >&2; exit 2;;
   esac
 done
@@ -27,7 +29,7 @@ COMBINED="$BUILD/publication-validation/combined-freefall-v6-validation"
 [[ -x "$VENV/bin/python" ]] || python3 -m venv "$VENV"
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check   "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
 
-rm -rf "$DEV" "$VAL"
+rm -rf "$DEV"
 
 echo "[freefall-v6] materializing FRESH development split only"
 "$VENV/bin/python" research/scripts/fetch_iris_freefall_rescue_v6.py   --data-root "$DATA" --config "$CONFIG" --phase development
@@ -36,6 +38,16 @@ python3 research/analysis/prepare_public_validation_datasets.py   --root "$DATA"
 python3 research/analysis/adapt_public_validation_inputs.py   --repo-root . --data-root "$DATA" --prepared-root "$PUBLIC"
 
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py   --adapted-root "$PUBLIC/adapted"   --config "$CONFIG"   --split development   --out "$DEV"
+
+if [[ "$DEVELOPMENT_ONLY" -eq 1 ]]; then
+  echo
+  echo "[freefall-v6] DEVELOPMENT-ONLY COMPLETE"
+  echo "[freefall-v6] candidate audit: $DEV/candidate_audit.csv"
+  echo "[freefall-v6] validation drop_100/06..10 was NOT requested by this command."
+  exit 0
+fi
+
+rm -rf "$VAL"
 
 echo "[freefall-v6] development gate PASS; materializing FRESH validation split"
 "$VENV/bin/python" research/scripts/fetch_iris_freefall_rescue_v6.py   --data-root "$DATA" --config "$CONFIG" --phase validation

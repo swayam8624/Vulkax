@@ -212,7 +212,7 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
 
     levels=np.asarray([.10,.20,.30,.40,.50,.60,.70,.80,.90],float)
     sqrt_levels=np.sqrt(levels)
-    best=None
+    candidates=[]
 
     for aa,bb in chunks:
         if bb-aa<8:continue
@@ -368,20 +368,75 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
                     "detected_frames":detected_in_window,
                     "crossing_times_s":cross_times.tolist(),
                 }
-                if best is None or cand["rank"]<best["rank"]:best=cand
-    return best
+                candidates.append(cand)
+    return candidates
 
 def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
+    identity_cfg=identity_cfg or {}
     candidates=[]
     for tr in tracks:
         q=fit_full_flight_progress(
             tr,fps,minimum_interval_frames=minimum_interval_frames,
             identity_cfg=identity_cfg
         )
-        if q is not None:candidates.append(q)
+        candidates.extend(q)
     if not candidates:
         raise RuntimeError("no temporally consistent full-flight progress track found")
-    return min(candidates,key=lambda q:q["rank"])
+
+    # Identity is an eligibility gate, not the primary optimization target.
+    # The physical ball's release and reset can both be very ball-like. Require
+    # near-maximal ball travel first, then choose the fastest full-travel event.
+    max_span=max(float(q["span_px"]) for q in candidates)
+    min_span_fraction=float(identity_cfg.get("minimum_relative_span_fraction",0.70))
+    span_floor=max_span*min_span_fraction
+    eligible=[q for q in candidates if float(q["span_px"])>=span_floor]
+    if not eligible:
+        eligible=candidates
+
+    def event_rank(q):
+        return (
+            float(q["full_fall_time_s"]),
+            float(q["timing_fit_rms_frames"]),
+            float(q["trajectory_shape_rms_fraction"]),
+            float(q["release_speed_ratio"]),
+            float(q["x_drift_fraction"]),
+            -float(q["detected_window_fraction"]),
+            -float(q["identity_score"]),
+            -float(q["span_px"]),
+        )
+
+    eligible=sorted(eligible,key=event_rank)
+    chosen=eligible[0]
+
+    # Audit is descriptive only and never participates in selection.
+    audit=[]
+    for i,q in enumerate(sorted(candidates,key=event_rank)[:20],start=1):
+        audit.append({
+            "event_rank":i,
+            "selected":q is chosen,
+            "track_id":q["track_id"],
+            "span_px":float(q["span_px"]),
+            "relative_span":float(q["span_px"])/max(max_span,1e-9),
+            "full_fall_time_s":float(q["full_fall_time_s"]),
+            "interval_frames":int(q["interval_frames"]),
+            "detected_frames":int(q["detected_frames"]),
+            "detected_fraction":float(q["detected_window_fraction"]),
+            "timing_fit_rms_frames":float(q["timing_fit_rms_frames"]),
+            "trajectory_shape_rms_fraction":float(q["trajectory_shape_rms_fraction"]),
+            "release_speed_ratio":float(q["release_speed_ratio"]),
+            "x_drift_fraction":float(q["x_drift_fraction"]),
+            "gap_penalty":float(q["gap_penalty"]),
+            "identity_score":float(q["identity_score"]),
+            "median_circularity":float(q["median_circularity"]),
+            "median_solidity":float(q["median_solidity"]),
+            "median_circle_fill":float(q["median_circle_fill"]),
+            "median_axis_ratio":float(q["median_axis_ratio"]),
+            "radius_cv":float(q["radius_cv"]),
+            "area_cv":float(q["area_cv"]),
+            "aspect_log_median":float(q["aspect_log_median"]),
+            "passes_relative_span":float(q["span_px"])>=span_floor,
+        })
+    return chosen,audit
 
 def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=12,tracker_config=None):
     cv2=import_cv();cap=cv2.VideoCapture(str(video))
@@ -422,7 +477,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
 
     tracks=build_temporal_tracks(frame_candidates,fps)
     if not tracks:raise RuntimeError("no compact temporal motion tracks")
-    chosen=choose_ballistic_track(
+    chosen,candidate_audit=choose_ballistic_track(
         tracks,fps,minimum_interval_frames=minimum_interval_frames,
         identity_cfg=tracker_config
     )
@@ -479,6 +534,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "aspect_log_median":float(chosen["aspect_log_median"]),
         "edge_trim_left":0,
         "edge_trim_right":0,
+        "candidate_audit":candidate_audit,
         "roi":[int(x0),int(yy0),int(x1-x0),int(y1-yy0)]
     }
 
@@ -545,6 +601,7 @@ def self_test_video():
             "maximum_area_cv":0.65,
             "maximum_aspect_log_mad":0.45,
             "minimum_detected_fraction":0.50,
+            "minimum_relative_span_fraction":0.70,
         }
         ident=extract(
             p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12,
@@ -562,6 +619,14 @@ def self_test_video():
         assert ident["median_axis_ratio"]>=v6cfg["minimum_median_axis_ratio"]
         assert ident["radius_cv"]<=v6cfg["maximum_radius_cv"]
         assert ident["aspect_log_median"]<=v6cfg["maximum_aspect_log_mad"]
+        audit=ident.get("candidate_audit",[])
+        assert audit, "candidate audit missing"
+        selected=[q for q in audit if q["selected"]]
+        assert len(selected)==1, selected
+        assert selected[0]["relative_span"]>=v6cfg["minimum_relative_span_fraction"]
+        assert selected[0]["full_fall_time_s"]==min(
+            q["full_fall_time_s"] for q in audit if q["passes_relative_span"]
+        )
         print("VALID IRIS free-fall synthetic-video tracker",
               ident["direct_acceleration_m_s2"],ident_rel,
               "identity",ident["identity_score"],
@@ -629,7 +694,7 @@ def main():
     mm=manifests(a.adapted_root,a.split,cfg)
     expected=len(cfg["dataset"][a.split]["takes"])
     if len(mm)!=expected:raise SystemExit(f"expected {expected} frozen scenes, got {len(mm)}")
-    rows=[];takes=[];fails=[]
+    rows=[];takes=[];fails=[];candidate_audit_rows=[]
     setting=cfg["dataset"][a.split]["setting"]
     expected_height=float(cfg["physics"]["drop_heights_m"][setting])
     tg=cfg["tracker"]
@@ -640,6 +705,13 @@ def main():
                        width=tg["analysis_width"],max_seconds=tg["max_seconds"],
                        minimum_interval_frames=tg["minimum_active_frames"],
                        tracker_config=tg)
+            for q in tr.get("candidate_audit",[]):
+                qq=dict(q)
+                qq["scene"]=m["scene"]
+                qq["split"]=a.split
+                qq["direct_acceleration_m_s2"]=2.0*height/(float(q["full_fall_time_s"])**2)
+                qq["acceleration_relative_error"]=abs(qq["direct_acceleration_m_s2"]-G)/G
+                candidate_audit_rows.append(qq)
             checks={
                 "active_frames":tr["active_frames"]>=tg["minimum_active_frames"],
                 "monotone":tr["monotone_fraction"]>=tg.get("minimum_monotone_fraction",.78),
@@ -708,6 +780,18 @@ def main():
     if takes:
         with (out/"take_summary.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=list(takes[0]));w.writeheader();w.writerows(takes)
+    if candidate_audit_rows:
+        fields=["scene","split","event_rank","selected","track_id","span_px","relative_span",
+                "full_fall_time_s","interval_frames","detected_frames","detected_fraction",
+                "timing_fit_rms_frames","trajectory_shape_rms_fraction","release_speed_ratio",
+                "x_drift_fraction","gap_penalty","identity_score","median_circularity",
+                "median_solidity","median_circle_fill","median_axis_ratio","radius_cv","area_cv",
+                "aspect_log_median","passes_relative_span","direct_acceleration_m_s2",
+                "acceleration_relative_error"]
+        with (out/"candidate_audit.csv").open("w",newline="",encoding="utf-8") as f:
+            w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
+            for row in candidate_audit_rows:
+                w.writerow({k:row.get(k,"") for k in fields})
     quality=sum(bool(x["quality_ok"]) for x in takes)
     errs=[x["acceleration_relative_error"] for x in takes if x["quality_ok"]]
     median_err=statistics.median(errs) if errs else None
@@ -733,7 +817,8 @@ def main():
     else:gate=True
     summary={"schema":"vulkax.iris_freefall_result","version":int(cfg.get("version",5)),"tracker_revision":tg["revision"],
       "split":a.split,"expected_videos":expected,"quality_pass_videos":quality,"failures":fails,
-      "median_acceleration_relative_error":median_err,"records":len(rows),"truth_control_accuracy":tc,
+      "median_acceleration_relative_error":median_err,"records":len(rows),
+      "candidate_audit_records":len(candidate_audit_rows),"truth_control_accuracy":tc,
       "placebo_false_assertion_rate":pfar,"direction_sign_rate":sign,"gate_pass":gate,
       "take01_forbidden":True,
       "claim_guard":("Different equation-family replication. "+(

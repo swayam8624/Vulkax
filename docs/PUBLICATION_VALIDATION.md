@@ -409,3 +409,24 @@ bash research/scripts/run_iris_freefall_v6_final_test.sh
 That final command creates/checks a V6-specific hash lock before the first
 `drop_150` request. If V6 validation is absent or failed, it exits before any final
 download.
+
+
+### V6.2 development-only audit
+
+After the V6.1 fresh-development failure, the next free-fall run must not open
+fresh validation automatically. Use:
+
+```bash
+bash research/scripts/run_iris_freefall_rescue_v6.sh --development-only
+```
+
+The command reuses the existing `drop_50/06..10` media, runs
+`ball_identity_v6_2`, and writes:
+
+```text
+build/publication-validation/iris-freefall-v6-development/candidate_audit.csv
+```
+
+Even when development passes, `--development-only` exits before requesting
+`drop_100/06..10`. The candidate audit is descriptive only and is not an input to
+event selection.
