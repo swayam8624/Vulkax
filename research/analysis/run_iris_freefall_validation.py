@@ -2082,7 +2082,6 @@ def extract_perspective_depth_v66(
 
     ad=np.interp(dense,fr,area)
     xd=np.interp(dense,fr,xx)
-    yd=np.interp(dense,fr,yy)
     rd=np.interp(dense,fr,radii)
     smooth_n=int(cfg.get("v66_depth_smoothing_frames",3))
     if smooth_n%2==0:
