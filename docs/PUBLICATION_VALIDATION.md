@@ -22,6 +22,50 @@ The repository now contains:
 - a measured-world protocol;
 - a strict multi-dataset adapter contract.
 
+## Public dataset acquisition and import
+
+The publication-validation campaign now has an operational public-data path for
+three complementary benchmarks:
+
+- **GAUGE** — measured deformable motion and calibrated physical metadata. The
+  default core profile downloads the 60 foam stretch/compression/shear trials used
+  by the Vulkax deformable adapter. Previously analyzed shearing trials remain
+  retrospective and are excluded from the new prospective world manifest.
+- **IRIS** — 240 real 4K/60fps dynamics videos with independently measured physical
+  parameters. The core profile downloads one take from every one of the 24 physical
+  settings (8 classes x 3 settings), then splits by physical setting rather than by
+  repeated take.
+- **RGBench Cloth Sim-to-Real v1** — real segmented cloth point clouds, robot
+  trajectories, camera calibration and garment meshes. The core profile selects one
+  grasp/fold/fling capture from each of three predeclared garments spanning
+  development, validation and final-test roles.
+
+Recommended command:
+
+```bash
+bash research/scripts/run_publication_validation.sh \
+  --public-data-profile core
+```
+
+That command:
+1. creates an isolated Python venv under `build/`;
+2. installs `huggingface_hub`;
+3. resolves and pins the exact Hugging Face revision of each dataset;
+4. downloads only the core subset;
+5. hashes every materialized file;
+6. writes a dataset inventory and prospective world manifest;
+7. imports GAUGE into SI-unit marker/driver CSV packages;
+8. binds IRIS videos to independently measured parameter manifests;
+9. validates/indexes RGBench calibration, joint streams and PCD headers;
+10. generates the controlled trial plan;
+11. runs the existing frozen D4V/OFC diagnostic analysis.
+
+Use `--public-data-profile smoke` for a very small connectivity/integrity check,
+or `--public-data-profile full` only when the complete multi-gigabyte releases
+are actually required.
+
+Generated data stay under `build/` and are not committed.
+
 ## Fast diagnostic
 
 If your existing D4V/OFC outputs are still under `build/`, this does not rerun
