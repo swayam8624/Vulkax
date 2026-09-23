@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """Development-only IRIS free-fall V6.6 boundary diagnostic.
 
-V6.6d detects the *onset* of impact/contact as a causal regime change.
+V6.6e keeps the causal first-onset detector from V6.6d and adds a diagnostic
+for *post-onset continuation*.  A genuine impact/contact event should terminate
+or strongly disrupt the gravity phase; a false innovation from centroid jitter
+can be followed by continued strong motion in the same direction.
 
-Important safeguards:
+Safeguards:
 - development split only;
 - no validation/final clips;
 - no target gravity or expected fall duration in filtering/ranking;
 - no centered smoothing in boundary evidence;
-- the first persistent out-of-model innovation is selected, not the largest
-  later innovation.
+- post-onset continuation is DIAGNOSTIC ONLY in V6.6e (not yet a selector gate).
 
 The known 0.5 m drop height is used only for EVAL_ONLY columns printed after
-selection so development behavior can be inspected without circular fitting.
+selection.
 """
 from __future__ import annotations
 
@@ -37,7 +39,6 @@ def load_raw_diag():
 
 
 def causal_median(x, width=3):
-    """Past-only median filter; never looks at future samples."""
     q = np.asarray(x, float)
     out = np.empty_like(q)
     for i in range(len(q)):
@@ -47,7 +48,6 @@ def causal_median(x, width=3):
 
 
 def causal_monotone_runs(progress, minimum_points=6):
-    """Sustained positive-motion phases using past-only smoothing."""
     p = np.asarray(progress, float)
     if len(p) < minimum_points:
         return []
@@ -55,10 +55,6 @@ def causal_monotone_runs(progress, minimum_points=6):
     dp = np.diff(ps)
     eps = max(0.0015, 0.03 / max(len(p), 1))
     active = dp > eps
-
-    # Bridge at most two inactive derivative samples. This is only a coarse
-    # candidate generator; final impact placement is handled by causal
-    # out-of-sample innovations below.
     bridged = active.copy()
     for i in range(1, len(active) - 1):
         if (
@@ -128,12 +124,10 @@ def robust_noise_scale(residual):
     mad = float(np.median(np.abs(r - med)))
     sigma = 1.4826 * mad
     rms = float(np.sqrt(np.mean(r * r)))
-    # Pixel floor prevents tiny residuals from creating enormous significance.
     return max(sigma, rms, 0.75)
 
 
 def evaluate_prefix(frames, z, x, s, e, fps, max_shape, max_xdrift):
-    """Fit frames[s:e] and test future samples without refitting."""
     fr = np.asarray(frames[s:e], int)
     zz = np.asarray(z[s:e], float)
     xx = np.asarray(x[s:e], float)
@@ -169,11 +163,8 @@ def evaluate_prefix(frames, z, x, s, e, fps, max_shape, max_xdrift):
     xdrift = float(np.ptp(xx)) / span
     release_good = -0.08 <= release_phase <= 0.20
     x_good = xdrift <= max_xdrift
-
     noise = robust_noise_scale(residual)
 
-    # Predict up to the next three observations using the *same* pre-change
-    # model. No future sample is allowed into the fit.
     innov = []
     velocity_departures = []
     gaps = []
@@ -199,9 +190,6 @@ def evaluate_prefix(frames, z, x, s, e, fps, max_shape, max_xdrift):
     first_vdep = float(velocity_departures[0]) if velocity_departures else 0.0
     contiguous = bool(gaps and gaps[0] <= 2)
 
-    # Four-sigma causal innovation, supported by either persistence into a
-    # second future sample or a large instantaneous velocity-regime departure.
-    # These are generic change-point criteria, not tuned against gravity.
     persistent = sum(
         1
         for q, gap in zip(innov, gaps)
@@ -212,6 +200,37 @@ def evaluate_prefix(frames, z, x, s, e, fps, max_shape, max_xdrift):
         and first_innov >= 4.0
         and (persistent >= 2 or first_vdep >= 0.50)
     )
+
+    # V6.6e diagnostic only: does strong gravity-direction motion continue
+    # *after* the proposed change point?  Compare robust post-onset speed with
+    # the predicted speed at the last fitted free-fall sample.  A ratio near 1
+    # means the object largely keeps falling; a small/negative ratio indicates
+    # termination, hold, reversal, or strong disruption.
+    post_vel = []
+    post_steps = []
+    j0 = e
+    j1 = min(len(frames) - 1, e + 5)
+    for j in range(j0, j1):
+        df = int(frames[j + 1] - frames[j])
+        if df <= 0 or df > 3:
+            continue
+        dt = df / fps
+        vv = (float(z[j + 1]) - float(z[j])) / dt
+        if math.isfinite(vv):
+            post_vel.append(vv)
+            post_steps.append(df)
+
+    predicted_terminal_speed = float(deriv[-1])
+    if post_vel:
+        post_median_v = float(np.median(post_vel))
+        post_positive_fraction = float(np.mean(np.asarray(post_vel) > 0.0))
+        continuation_ratio = max(0.0, post_median_v) / max(
+            abs(predicted_terminal_speed), 1.0
+        )
+    else:
+        post_median_v = float("nan")
+        post_positive_fraction = 0.0
+        continuation_ratio = 0.0
 
     release_abs = float(fr[0]) / fps + release_tau
     impact_abs = float(fr[-1]) / fps
@@ -240,6 +259,10 @@ def evaluate_prefix(frames, z, x, s, e, fps, max_shape, max_xdrift):
         "persistent": int(persistent),
         "gaps": gaps,
         "onset": bool(onset),
+        "post_median_v": post_median_v,
+        "post_positive_fraction": post_positive_fraction,
+        "continuation_ratio": continuation_ratio,
+        "post_velocity_samples": len(post_vel),
         "T_eval": T_eval,
         "g_eval": g_eval,
     }
@@ -247,9 +270,6 @@ def evaluate_prefix(frames, z, x, s, e, fps, max_shape, max_xdrift):
 
 def candidate_onsets(analyzer, chunk, fps, tracker):
     sign = float(tracker.get("expected_image_gravity_sign", 1.0))
-
-    # IMPORTANT: raw centroid samples for boundary detection. The analyzer's
-    # smooth1() is centered and would leak future impact samples backward.
     frames = np.asarray(chunk["frames"], int)
     z = sign * np.asarray(chunk["y"], float)
     x = np.asarray(chunk["x"], float)
@@ -271,7 +291,6 @@ def candidate_onsets(analyzer, chunk, fps, tracker):
 
         for s in starts:
             fallback = None
-            # Scan FORWARD in time and stop at the first persistent change point.
             for e in range(s + 12, end_cap + 1):
                 q = evaluate_prefix(
                     frames, z, x, s, e, fps, max_shape, max_xdrift
@@ -292,15 +311,15 @@ def candidate_onsets(analyzer, chunk, fps, tracker):
                     rows.append(q)
                     break
             else:
-                # Keep one best-effort non-onset row for audit visibility only.
                 if fallback is not None:
                     fallback = dict(fallback)
                     fallback["onset"] = False
                     rows.append(fallback)
 
     for q in rows:
-        # The endpoint itself is determined by the *first* causal onset above.
-        # Ranking only chooses among independent track/start hypotheses.
+        # V6.6e deliberately leaves ranking unchanged.  continuation_ratio is
+        # diagnostic evidence only until development demonstrates it separates
+        # terminal impact from transient tracking innovations consistently.
         q["rank"] = (
             0 if q["onset"] else 1,
             q["shape"],
@@ -352,16 +371,16 @@ def main():
             rows.extend(candidate_onsets(analyzer, chunk, fps, tracker))
         rows.sort(key=lambda r: r["rank"])
 
-        print("\n" + "=" * 180)
+        print("\n" + "=" * 196)
         print(
             f"TAKE {take} fps={fps:.3f} tracks={len(tracks)} "
             f"chunks={len(chunks)} onset_hypotheses={len(rows)}"
         )
         print(
-            "V6.6d CAUSAL RANKING: first persistent 4-sigma innovation onset; "
-            "raw boundary samples; g_eval is evaluation only"
+            "V6.6e: causal onset + post-onset continuation DIAGNOSTIC; "
+            "ranking unchanged; g_eval is evaluation only"
         )
-        print("=" * 180)
+        print("=" * 196)
         for i, r in enumerate(rows[: args.top], 1):
             print(
                 f"rank={i:2d} onset={int(r['onset'])} "
@@ -373,6 +392,9 @@ def main():
                 f"v0={r['v0']:8.2f} v1={r['v1']:8.2f} "
                 f"innov={r['first_innov']:7.2f} persist={r['persistent']} "
                 f"vdep={r['first_vdep']:6.2f} noise={r['noise']:.2f}px "
+                f"cont={r['continuation_ratio']:6.2f} "
+                f"pdir={r['post_positive_fraction']:.2f} "
+                f"pv={r['post_median_v']:8.2f} "
                 f"x={r['xdrift']:.3f} id={r['identity']:.3f} det={r['detected']:.3f} "
                 f"| EVAL_ONLY T={r['T_eval']:.4f}s g={r['g_eval']:.3f}"
             )
