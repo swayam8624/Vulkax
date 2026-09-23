@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vulkax.publication_validation_record.v1",
+  "title": "Reality Probe Publication Validation Record",
+  "type": "object",
+  "required": [
+    "record_version",
+    "trial_id",
+    "paired_key",
+    "dataset",
+    "scene",
+    "split",
+    "evidence_class",
+    "confirmatory",
+    "trial_family",
+    "ground_truth",
+    "method",
+    "score",
+    "decision",
+    "decision_threshold",
+    "negative_control",
+    "seed",
+    "source_artifact"
+  ],
+  "properties": {
+    "record_version": {"const": 1},
+    "trial_id": {"type": "string", "minLength": 1},
+    "paired_key": {"type": "string", "minLength": 1},
+    "dataset": {"type": "string", "minLength": 1},
+    "scene": {"type": "string", "minLength": 1},
+    "split": {
+      "enum": ["development", "validation", "final_test", "retrospective", "frozen_followon"]
+    },
+    "evidence_class": {"type": "string", "minLength": 1},
+    "confirmatory": {"type": "boolean"},
+    "trial_family": {
+      "enum": [
+        "truth_control",
+        "placebo",
+        "dose_response",
+        "measurement_noise",
+        "pose_noise",
+        "missing_observations",
+        "channel_dependence",
+        "external_dataset",
+        "real_measured",
+        "legacy_normalization"
+      ]
+    },
+    "ground_truth": {"enum": ["support", "veto", "unresolved"]},
+    "method": {"type": "string", "minLength": 1},
+    "score": {"type": "number"},
+    "decision": {"enum": ["support", "veto", "unresolved"]},
+    "decision_threshold": {"type": "number", "exclusiveMinimum": 0},
+    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "physical_delta": {"type": ["number", "null"]},
+    "target_error_delta": {"type": ["number", "null"]},
+    "measurement_noise_sigma": {"type": ["number", "null"], "minimum": 0},
+    "pose_noise_sigma": {"type": ["number", "null"], "minimum": 0},
+    "missing_fraction": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "channel_dependence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "negative_control": {"type": "boolean"},
+    "seed": {"type": "integer"},
+    "source_artifact": {"type": "string", "minLength": 1},
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": true
+}
