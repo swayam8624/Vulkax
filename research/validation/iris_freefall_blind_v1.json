@@ -64,7 +64,8 @@
     "maximum_trajectory_shape_rms_fraction": 0.1,
     "maximum_release_speed_ratio": 0.65,
     "maximum_x_drift_fraction": 0.45,
-    "maximum_gap_penalty": 0.5
+    "maximum_gap_penalty": 0.5,
+    "maximum_timing_fit_rms_frames": 2.5
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -146,6 +147,6 @@
       "validation_analyzed": false,
       "final_test_opened": false
     },
-    "v5_change": "permit short detection gaps but require the accepted physical interval to satisfy the existing minimum-active-frame duration; only whole coherent track chunks with <=2 edge trims are eligible; rank complete flights ahead of tiny low-residual fragments"
+    "v5_change": "temporal track + full-travel 10%-90% progress crossings; fit t(p)=t0+T sqrt(p) to recover full fall time without target g; require frozen minimum duration before binding measured drop height; arbitrary short-fragment calibration is forbidden"
   }
 }
