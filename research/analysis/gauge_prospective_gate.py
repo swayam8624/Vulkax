@@ -375,12 +375,19 @@ def main() -> int:
     ap.add_argument("--mode", choices=("pilot", "definitive"), default="pilot")
     ap.add_argument("--final-lock", type=Path)
     ap.add_argument("--max-worlds", type=int)
+    ap.add_argument("--shard-index", type=int, default=0)
+    ap.add_argument("--shard-count", type=int, default=1)
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
 
     if args.self_test:
         self_test()
         return 0
+
+    if args.shard_count < 1:
+        raise SystemExit("--shard-count must be >= 1")
+    if not (0 <= args.shard_index < args.shard_count):
+        raise SystemExit("--shard-index must satisfy 0 <= index < count")
 
     if args.split == "final_test":
         if args.final_lock is None:
@@ -406,6 +413,7 @@ def main() -> int:
     worlds: list[dict] = []
     rows: list[dict[str, object]] = []
     processed = 0
+    world_ordinal = 0
 
     with tempfile.TemporaryDirectory(prefix="vulkax-gauge-prospective-") as td:
         tmp = Path(td)
@@ -414,6 +422,10 @@ def main() -> int:
                 metadata_path, mat = load_material(args.root, task, material)
                 true_young = float(mat["young"])
                 for trial in SPLIT_TRIALS[args.split]:
+                    ordinal = world_ordinal
+                    world_ordinal += 1
+                    if ordinal % args.shard_count != args.shard_index:
+                        continue
                     if args.max_worlds is not None and processed >= args.max_worlds:
                         break
                     raw_path = args.root / "data" / task / material / f"{trial}.json"
@@ -568,6 +580,7 @@ def main() -> int:
         "mode": args.mode,
         "numerics": {"n_cross": n_cross, "n_long": n_long, "dt_s": dt},
         "records_path": str(records_path),
+        "shard": {"index": args.shard_index, "count": args.shard_count},
     })
     summary_path = args.out / f"summary_{args.split}_{args.profile}_{args.mode}.json"
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -576,6 +589,7 @@ def main() -> int:
     print("SPLIT", args.split)
     print("PROFILE", args.profile)
     print("MODE", args.mode)
+    print("SHARD", args.shard_index, "/", args.shard_count)
     print("WORLDS", len(worlds))
     print("RECORDS", len(rows))
     for method in METHODS:
