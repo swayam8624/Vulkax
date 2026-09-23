@@ -80,11 +80,17 @@ def extract_components(diff_crop,threshold,cv2,x0,y0):
         fill=area/max(1,bw*bh)
         if fill<.12:continue
         cx,cy=cent[lab]
+        component_mask=(labels==lab).astype(np.uint8)*255
+        contours,_=cv2.findContours(component_mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+        perimeter=max((cv2.arcLength(q,True) for q in contours),default=0.0)
+        circularity=(4.0*math.pi*area/(perimeter*perimeter)) if perimeter>1e-9 else 0.0
         mean_diff=float(np.mean(diff_crop[labels==lab]))
         compact=fill/math.sqrt(max(area,1))
         out.append({
             "x":float(cx+x0),"y":float(cy+y0),"area":area,
             "w":bw,"h":bh,"fill":fill,"mean_diff":mean_diff,
+            "circularity":float(circularity),
+            "aspect_log_abs":float(abs(math.log(max(aspect,1e-9)))),
             "appearance_score":mean_diff*(compact+.02)
         })
     return out
@@ -152,7 +158,7 @@ def crossing_after(times,progress,level,start_index=1):
             return tt,i
     return None,None
 
-def fit_full_flight_progress(track,fps,minimum_interval_frames=12):
+def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=None):
     """Recover full fall time from 10%-90% progress crossings on one track.
 
     For release-from-rest motion, normalized displacement p follows p=(t/T)^2,
@@ -161,6 +167,11 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12):
     full measured drop height to a short interior fragment.
     """
     pts=track["pts"]
+    identity_cfg=identity_cfg or {}
+    min_circularity=float(identity_cfg.get("minimum_median_circularity",0.0))
+    max_area_cv=float(identity_cfg.get("maximum_area_cv",float("inf")))
+    max_aspect=float(identity_cfg.get("maximum_aspect_log_mad",float("inf")))
+    min_detected=float(identity_cfg.get("minimum_detected_fraction",0.45))
     frames=np.asarray([p["frame"] for p in pts],int)
     xx=np.asarray([p["x"] for p in pts],float)
     yy=np.asarray([p["y"] for p in pts],float)
@@ -180,10 +191,19 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12):
     for aa,bb in chunks:
         if bb-aa<8:continue
         fr=frames[aa:bb];x=xx[aa:bb];y=yy[aa:bb]
+        chunk_pts=pts[aa:bb]
+        circularities=np.asarray([p.get("circularity",0.0) for p in chunk_pts],float)
+        areas=np.asarray([p["area"] for p in chunk_pts],float)
+        aspects=np.asarray([p.get("aspect_log_abs",0.0) for p in chunk_pts],float)
+        median_circularity=float(np.median(circularities)) if len(circularities) else 0.0
+        area_cv=float(np.std(areas)/max(np.mean(areas),1e-9)) if len(areas) else float("inf")
+        aspect_log_median=float(np.median(aspects)) if len(aspects) else float("inf")
+        if median_circularity<min_circularity or area_cv>max_area_cv or aspect_log_median>max_aspect:
+            continue
         dense_frames=np.arange(int(fr[0]),int(fr[-1])+1)
         if len(dense_frames)<minimum_interval_frames:continue
         detected_fraction=len(fr)/max(1,len(dense_frames))
-        if detected_fraction<.50:continue
+        if detected_fraction<min_detected:continue
         xd=np.interp(dense_frames,fr,x)
         yd=np.interp(dense_frames,fr,y)
         abs_times=dense_frames/fps
@@ -265,7 +285,8 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12):
 
                 # Rank by free-fall timing self-consistency first, then completeness.
                 # Target g is absent from this ranking.
-                rank=(timing_rms_frames,shape_rms,-full_interval_frames,
+                rank=(-median_circularity,area_cv,aspect_log_median,
+                      timing_rms_frames,shape_rms,-full_interval_frames,
                       x_drift,release_ratio,-span)
                 cand={
                     "rank":rank,"track_id":track["id"],"sign":sign,
@@ -282,6 +303,9 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12):
                     "gap_penalty":gap_penalty,
                     "detected_fraction":detected_fraction,
                     "detected_window_fraction":detected_window_fraction,
+                    "median_circularity":median_circularity,
+                    "area_cv":area_cv,
+                    "aspect_log_median":aspect_log_median,
                     "interval_frames":len(ids),
                     "detected_frames":detected_in_window,
                     "crossing_times_s":cross_times.tolist(),
@@ -289,18 +313,19 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12):
                 if best is None or cand["rank"]<best["rank"]:best=cand
     return best
 
-def choose_ballistic_track(tracks,fps,minimum_interval_frames=12):
+def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     candidates=[]
     for tr in tracks:
         q=fit_full_flight_progress(
-            tr,fps,minimum_interval_frames=minimum_interval_frames
+            tr,fps,minimum_interval_frames=minimum_interval_frames,
+            identity_cfg=identity_cfg
         )
         if q is not None:candidates.append(q)
     if not candidates:
         raise RuntimeError("no temporally consistent full-flight progress track found")
     return min(candidates,key=lambda q:q["rank"])
 
-def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=12):
+def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=12,tracker_config=None):
     cv2=import_cv();cap=cv2.VideoCapture(str(video))
     if not cap.isOpened():raise RuntimeError(f"cannot open {video}")
     fps=float(cap.get(cv2.CAP_PROP_FPS));frames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -340,7 +365,8 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
     tracks=build_temporal_tracks(frame_candidates,fps)
     if not tracks:raise RuntimeError("no compact temporal motion tracks")
     chosen=choose_ballistic_track(
-        tracks,fps,minimum_interval_frames=minimum_interval_frames
+        tracks,fps,minimum_interval_frames=minimum_interval_frames,
+        identity_cfg=tracker_config
     )
 
     ids=np.asarray(chosen["window_indices"],int)
@@ -385,6 +411,9 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "interval_frames":int(chosen["interval_frames"]),
         "detected_frames":int(chosen["detected_frames"]),
         "detected_fraction":float(chosen["detected_window_fraction"]),
+        "median_circularity":float(chosen["median_circularity"]),
+        "area_cv":float(chosen["area_cv"]),
+        "aspect_log_median":float(chosen["aspect_log_median"]),
         "edge_trim_left":0,
         "edge_trim_right":0,
         "roi":[int(x0),int(yy0),int(x1-x0),int(y1-yy0)]
@@ -482,24 +511,30 @@ def main():
     if a.split=="validation":
         d=json.loads(a.require_development_summary.read_text()) if a.require_development_summary else {}
         if not d.get("gate_pass"):raise SystemExit("development gate failed/missing")
-        if d.get("tracker_revision")!="full_flight_v5":raise SystemExit("development tracker revision mismatch")
+        expected_revision=cfg["tracker"]["revision"]
+        if d.get("tracker_revision")!=expected_revision:raise SystemExit("development tracker revision mismatch")
     if a.split=="final_test":
         v=json.loads(a.require_validation_summary.read_text()) if a.require_validation_summary else {}
         if not v.get("gate_pass"):raise SystemExit("validation gate failed/missing")
-        if v.get("tracker_revision")!="full_flight_v5":raise SystemExit("validation tracker revision mismatch")
+        expected_revision=cfg["tracker"]["revision"]
+        if v.get("tracker_revision")!=expected_revision:raise SystemExit("validation tracker revision mismatch")
         if not a.lock:raise SystemExit("final_test requires lock")
         subprocess.run(["python3","research/analysis/freeze_iris_freefall_final_test.py","--check",str(a.lock)],check=True)
     out=a.out or pathlib.Path(f"build/publication-validation/iris-freefall-{a.split}")
-    mm=manifests(a.adapted_root,a.split,cfg);expected={"development":4,"validation":4,"final_test":9}[a.split]
+    mm=manifests(a.adapted_root,a.split,cfg)
+    expected=len(cfg["dataset"][a.split]["takes"])
     if len(mm)!=expected:raise SystemExit(f"expected {expected} frozen scenes, got {len(mm)}")
     rows=[];takes=[];fails=[]
-    setting={"development":"drop_50","validation":"drop_100","final_test":"drop_150"}[a.split]
+    setting=cfg["dataset"][a.split]["setting"]
     expected_height=float(cfg["physics"]["drop_heights_m"][setting])
     tg=cfg["tracker"]
     for pkg,m in mm:
         try:
             height=drop_height_from_manifest(m,expected_height)
-            tr=extract(pathlib.Path(m["video"]["path"]),height,width=tg["analysis_width"],max_seconds=tg["max_seconds"],minimum_interval_frames=tg["minimum_active_frames"])
+            tr=extract(pathlib.Path(m["video"]["path"]),height,
+                       width=tg["analysis_width"],max_seconds=tg["max_seconds"],
+                       minimum_interval_frames=tg["minimum_active_frames"],
+                       tracker_config=tg)
             checks={
                 "active_frames":tr["active_frames"]>=tg["minimum_active_frames"],
                 "monotone":tr["monotone_fraction"]>=tg.get("minimum_monotone_fraction",.78),
@@ -508,6 +543,10 @@ def main():
                 "release_speed":tr["release_speed_ratio"]<=tg.get("maximum_release_speed_ratio",.65),
                 "x_drift":tr["x_drift_fraction"]<=tg.get("maximum_x_drift_fraction",.45),
                 "gap_penalty":tr["gap_penalty"]<=tg.get("maximum_gap_penalty",.50),
+                "circularity":tr["median_circularity"]>=tg.get("minimum_median_circularity",0.0),
+                "area_cv":tr["area_cv"]<=tg.get("maximum_area_cv",float("inf")),
+                "aspect_identity":tr["aspect_log_median"]<=tg.get("maximum_aspect_log_mad",float("inf")),
+                "detected_fraction":tr["detected_fraction"]>=tg.get("minimum_detected_fraction",0.45),
             }
             qok=all(checks.values())
             reject=";".join(k for k,v in checks.items() if not v)
@@ -527,6 +566,9 @@ def main():
                           "interval_frames":tr["interval_frames"],
                           "detected_frames":tr["detected_frames"],
                           "detected_fraction":tr["detected_fraction"],
+                          "median_circularity":tr["median_circularity"],
+                          "area_cv":tr["area_cv"],
+                          "aspect_log_median":tr["aspect_log_median"],
                           "edge_trim_left":tr["edge_trim_left"],
                           "edge_trim_right":tr["edge_trim_right"],
                           "monotone_fraction":tr["monotone_fraction"]})
@@ -536,14 +578,14 @@ def main():
                 for method,s in (("freefall_trajectory_probe",s1),("endpoint_kinematic_baseline",s2)):
                     d=decision(s);key=f"freefall:{m['scene']}:{name}"
                     rows.append({"record_version":1,"trial_id":f"{key}:{method}","paired_key":key,
-                     "dataset":"iris_real_freefall_blind","scene":m["scene"],"split":a.split,
+                     "dataset":"iris_real_freefall_"+("rescue_v6" if cfg.get("version")==6 else "blind"),"scene":m["scene"],"split":a.split,
                      "evidence_class":"prospective_real_video_freefall_probe",
                      "confirmatory":str(a.split=="final_test").lower(),"trial_family":family,"ground_truth":truth,
                      "method":method,"score":s,"decision":d,"decision_threshold":TAU,"confidence":"",
                      "physical_delta":math.log(g1/g0),"target_error_delta":abs(math.log(g1/G))-abs(math.log(g0/G)),
                      "measurement_noise_sigma":tr["one_pixel_m"],"pose_noise_sigma":"","missing_fraction":1-tr["valid_fraction"],
                      "channel_dependence":0.0,"negative_control":str(neg).lower(),"seed":0,"source_artifact":str(pkg),
-                     "notes":f"factor={fac}; drop_height_m={height}; tracker=full_flight_v5; standardized evidence score; take01 forbidden"})
+                     "notes":f"factor={fac}; drop_height_m={height}; tracker={tg['revision']}; standardized evidence score; take01 forbidden"})
         except Exception as e:fails.append({"scene":m["scene"],"error":f"{type(e).__name__}: {e}"})
     out.mkdir(parents=True,exist_ok=True)
     if rows:
@@ -563,16 +605,27 @@ def main():
     pfar=sum(r["decision"]!="unresolved" for r in placebo)/len(placebo) if placebo else 1
     sign=sum((float(r["score"])>0)==(r["ground_truth"]=="support") for r in directional)/len(directional) if directional else 0
     if a.split=="development":
-        gate=quality>=3 and median_err is not None and median_err<=.20
+        dg=cfg.get("development_gate",{"minimum_quality_videos":3,"maximum_median_acceleration_relative_error":.20})
+        gate=(quality>=dg["minimum_quality_videos"] and median_err is not None
+              and median_err<=dg["maximum_median_acceleration_relative_error"])
     elif a.split=="validation":
-        vg=cfg["validation_gate"];gate=quality>=vg["minimum_quality_videos"] and tc>=vg["minimum_truth_control_accuracy"] and pfar<=vg["placebo_false_assertion_rate"] and sign>=vg["minimum_direction_sign_rate"]
+        vg=cfg["validation_gate"]
+        gate=(quality>=vg["minimum_quality_videos"]
+              and tc>=vg["minimum_truth_control_accuracy"]
+              and pfar<=vg["placebo_false_assertion_rate"]
+              and sign>=vg["minimum_direction_sign_rate"]
+              and (median_err is not None)
+              and median_err<=vg.get("maximum_median_acceleration_relative_error",float("inf")))
     else:gate=True
-    summary={"schema":"vulkax.iris_freefall_blind_result","version":5,"tracker_revision":"full_flight_v5",
+    summary={"schema":"vulkax.iris_freefall_result","version":int(cfg.get("version",5)),"tracker_revision":tg["revision"],
       "split":a.split,"expected_videos":expected,"quality_pass_videos":quality,"failures":fails,
       "median_acceleration_relative_error":median_err,"records":len(rows),"truth_control_accuracy":tc,
       "placebo_false_assertion_rate":pfar,"direction_sign_rate":sign,"gate_pass":gate,
       "take01_forbidden":True,
-      "claim_guard":"Different equation-family replication; tracker revision 5 was fixed using development only after v1/v2/v3/v4 development failures. Gravity estimation itself is not novel."}
+      "claim_guard":("Different equation-family replication. "+(
+          "V6 uses fresh takes after the failed V5 validation; old validation is permanently nonconfirmatory. "
+          if int(cfg.get("version",5))>=6 else ""
+      )+"Gravity estimation itself is not novel.")}
     (out/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
     print("VALID IRIS free-fall",a.split)
     for t in takes:
@@ -588,7 +641,10 @@ def main():
               "TRACKS",t["candidate_track_count"],
               "INTERVAL_FRAMES",t["interval_frames"],
               "DETECTED_FRAMES",t["detected_frames"],
-              "DETECTED_FRACTION",t["detected_fraction"])
+              "DETECTED_FRACTION",t["detected_fraction"],
+              "CIRCULARITY",t["median_circularity"],
+              "AREA_CV",t["area_cv"],
+              "ASPECT_LOG",t["aspect_log_median"])
     for e in fails:
         print("TAKE_FAIL",e["scene"],e["error"])
     for k,v in summary.items():
