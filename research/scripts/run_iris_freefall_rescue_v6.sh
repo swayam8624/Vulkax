@@ -62,11 +62,26 @@ echo "[freefall-v6] materializing FRESH development split only"
 python3 research/analysis/prepare_public_validation_datasets.py   --root "$DATA" --out "$PUBLIC"
 python3 research/analysis/adapt_public_validation_inputs.py   --repo-root . --data-root "$DATA" --prepared-root "$PUBLIC"
 
-"$VENV/bin/python" research/analysis/run_iris_freefall_validation.py   --adapted-root "$PUBLIC/adapted"   --config "$CONFIG"   --split development   --out "$DEV"
+DEV_ARGS=(
+  --adapted-root "$PUBLIC/adapted"
+  --config "$CONFIG"
+  --split development
+  --out "$DEV"
+)
+if [[ "$DEVELOPMENT_ONLY" -eq 1 ]]; then
+  DEV_ARGS+=(--allow-gate-failure)
+fi
+"$VENV/bin/python" research/analysis/run_iris_freefall_validation.py "${DEV_ARGS[@]}"
 
 if [[ "$DEVELOPMENT_ONLY" -eq 1 ]]; then
   echo
   echo "[freefall-v6] DEVELOPMENT-ONLY COMPLETE"
+  "$VENV/bin/python" - "$DEV/summary.json" <<'PY'
+import json,sys
+s=json.load(open(sys.argv[1]))
+print("[freefall-v6] development scientific gate:", "PASS" if s["gate_pass"] else "FAIL")
+print("[freefall-v6] implementation errors:", s.get("implementation_errors",0))
+PY
   echo "[freefall-v6] candidate audit: $DEV/candidate_audit.csv"
   echo "[freefall-v6] validation drop_100/06..10 was NOT requested by this command."
   exit 0
