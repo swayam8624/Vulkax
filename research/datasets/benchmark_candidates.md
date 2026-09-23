@@ -1,3 +1,25 @@
+# Operational campaign selection — 2026-09-23
+
+The publication-validation implementation now directly downloads and prepares:
+
+1. **GAUGE** — core deformable measured benchmark; 60 foam trials in the default
+   subset.
+2. **IRIS** — real dynamics/identifiability benchmark; 24-setting stratified core
+   subset.
+3. **RGBench Cloth Sim-to-Real v1** — real cloth point-cloud/robot/calibration
+   benchmark; three-garment, three-action core subset.
+
+Use:
+
+```bash
+bash research/scripts/run_publication_validation.sh --public-data-profile core
+```
+
+M-PhyGs/Phlowers, Cloth-Sim2Real (2024), MOSIV, MPMWorlds and historical fabric
+datasets remain expansion candidates; they are not described as executed evidence
+until an adapter and campaign record exist.
+
+
 # Benchmark candidates for the Vulkax discovery campaign
 
 ## Tier A — immediate priority
