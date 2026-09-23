@@ -257,6 +257,18 @@ jobs:
             --data-root /tmp/iris-v65-one/public-datasets \
             --config /tmp/iris-v65-one/config.json \
             --phase development
+          # The standardized preparation layer expects all catalog families to
+          # have provenance manifests even when this diagnostic intentionally
+          # downloads only one IRIS video.  Provide empty provenance-only
+          # fixtures for the unrelated families; no GAUGE/RGBench samples enter
+          # the IRIS analysis.
+          mkdir -p /tmp/iris-v65-one/public-datasets/gauge /tmp/iris-v65-one/public-datasets/rgbench
+          cat > /tmp/iris-v65-one/public-datasets/gauge/vulkax_download_manifest.json <<'JSON'
+          {"schema":"vulkax.public_dataset_download","version":1,"dataset":"gauge","repo_id":"InternRobotics/GAUGE-Dataset","revision":"diagnostic-fixture","license":"MIT","citation_url":"https://huggingface.co/datasets/InternRobotics/GAUGE-Dataset","profile":"iris_one_take_diagnostic","requested_patterns":[],"file_count":0,"total_bytes":0,"files":[]}
+          JSON
+          cat > /tmp/iris-v65-one/public-datasets/rgbench/vulkax_download_manifest.json <<'JSON'
+          {"schema":"vulkax.public_dataset_download","version":1,"dataset":"rgbench","repo_id":"RGBench/RGBench-Cloth-Sim2Real-v1","revision":"diagnostic-fixture","license":"CC-BY-4.0","citation_url":"https://huggingface.co/datasets/RGBench/RGBench-Cloth-Sim2Real-v1","profile":"iris_one_take_diagnostic","requested_patterns":[],"file_count":0,"total_bytes":0,"files":[]}
+          JSON
           python3 research/analysis/prepare_public_validation_datasets.py \
             --root /tmp/iris-v65-one/public-datasets \
             --out /tmp/iris-v65-one/public-data
