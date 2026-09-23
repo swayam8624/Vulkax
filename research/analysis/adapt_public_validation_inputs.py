@@ -48,7 +48,7 @@ def adapt_gauge(
 ) -> dict:
     scene = row["scene"]
     task, material, _trial = scene.split("/")
-    trial_path = data_root / row["local_path"].split("/", 1)[1]
+    trial_path = data_root / row["local_path"]
     metadata = gauge_metadata_path(data_root, task)
     if not trial_path.is_file():
         raise FileNotFoundError(trial_path)
@@ -88,7 +88,7 @@ def adapt_iris(
     truth_index: dict,
 ) -> dict:
     scene = row["scene"]
-    video = data_root / row["local_path"].split("/", 1)[1]
+    video = data_root / row["local_path"]
     if not video.is_file():
         raise FileNotFoundError(video)
     truth = truth_index["datasets"]["iris"]["scenes"].get(scene)
@@ -163,7 +163,7 @@ def adapt_rgbench(
     row: dict[str, str],
 ) -> dict:
     scene = row["scene"]
-    capture = data_root / row["local_path"].split("/", 1)[1]
+    capture = data_root / row["local_path"]
     if not capture.is_dir():
         raise FileNotFoundError(capture)
     cal = capture / "calibration" / "world_to_camera_transform.json"
