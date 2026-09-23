@@ -29,7 +29,13 @@ COMBINED="$BUILD/publication-validation/combined-freefall-v6-validation"
 [[ -x "$VENV/bin/python" ]] || python3 -m venv "$VENV"
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check   "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
 
-rm -rf "$DEV"
+if [[ -d "$DEV" ]]; then
+  STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+  ARCHIVE="$BUILD/publication-validation/archive/iris-freefall-v6-development-$STAMP"
+  mkdir -p "$(dirname "$ARCHIVE")"
+  mv "$DEV" "$ARCHIVE"
+  echo "[freefall-v6] archived previous development output -> $ARCHIVE"
+fi
 
 echo "[freefall-v6] materializing FRESH development split only"
 "$VENV/bin/python" research/scripts/fetch_iris_freefall_rescue_v6.py   --data-root "$DATA" --config "$CONFIG" --phase development
