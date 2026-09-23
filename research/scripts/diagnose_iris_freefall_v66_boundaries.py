@@ -5,10 +5,11 @@ This script searches release->impact change points on the already-opened
 drop_50 development split. It NEVER uses target gravity, expected fall time, or
 validation/final clips in candidate generation/ranking.
 
-V6.6b fixes one diagnostic mistake exposed by the first all-development run:
-ranking the smallest in-window quadratic residual first inevitably selects an
-early clean PREFIX of a real free fall. Endpoint evidence must lead once a
-window already satisfies the frozen kinematic/identity quality constraints.
+V6.6c replaces the coarse eight-frame post-window RMS as the primary endpoint
+signal with a one-step innovation test.  A free-fall prefix ending at frame k is
+fit only on frames <=k; frame k+1 is then predicted without refitting.  A sharp
+next-frame violation is direct evidence that k+1 belongs to impact/contact,
+bounce, occlusion, or handling rather than the same ballistic regime.
 
 The known 0.5 m height is used only for an evaluation column printed AFTER
 ranking. Neither g nor expected flight duration enters filtering or ranking.
@@ -114,6 +115,7 @@ def candidate_windows(diag, analyzer, chunk, fps, tracker):
                 stab = stability_score(fr, zz, fps, c)
                 xdrift = float(np.ptp(xx)) / span
 
+                # Coarse multi-frame persistence diagnostic retained for audit.
                 post_hi = min(len(frames), e + 8)
                 post_n = post_hi - e
                 if post_n:
@@ -125,27 +127,47 @@ def candidate_windows(diag, analyzer, chunk, fps, tracker):
                     edge = 0
                 else:
                     post_rms = float("nan")
-                    # Track termination is useful but weaker than an observed
-                    # post-window model break, so do not fabricate a huge score.
-                    break_ratio = 4.0
+                    break_ratio = 0.0
                     edge = 1
+
+                # Primary V6.6c boundary evidence: predict exactly the next
+                # observed sample without refitting. If it abruptly violates the
+                # pre-impact quadratic, the current endpoint is immediately before
+                # a regime change.
+                next_break = 0.0
+                next_gap_frames = 999
+                next_velocity_departure = 0.0
+                if e < len(frames):
+                    next_gap_frames = int(frames[e] - fr[-1])
+                    next_t = float(frames[e] - fr[0]) / fps
+                    next_pred = a + b * next_t + 0.5 * c * next_t * next_t
+                    next_err = abs(float(z[e]) - float(next_pred))
+                    next_break = next_err / max(fit_rms_px, 0.75)
+
+                    dt_step = float(frames[e] - fr[-1]) / fps
+                    if dt_step > 0:
+                        observed_v = (float(z[e]) - float(zz[-1])) / dt_step
+                        predicted_v = b + c * next_t
+                        next_velocity_departure = abs(observed_v - predicted_v) / max(
+                            abs(predicted_v), 1.0
+                        )
 
                 release_good = -0.08 <= release_phase <= 0.20
                 x_good = xdrift <= max_xdrift
+                contiguous_next = next_gap_frames <= 2
 
-                # V6.6b target-free endpoint ranking:
+                # V6.6c target-free endpoint ranking:
+                #   release semantics -> frozen lateral gate -> contiguous
+                #   one-step change point -> velocity-regime departure ->
+                #   multi-frame persistence -> fit quality.
                 #
-                # 1. enforce the release-from-rest boundary condition qualitatively;
-                # 2. use the already-frozen lateral-drift gate;
-                # 3. among admissible quadratic windows, prefer the endpoint after
-                #    which the pre-impact model fails most strongly;
-                # 4. only then use stability/residual/span tie-breakers.
-                #
-                # This intentionally prevents a pristine 12-frame PREFIX from
-                # outranking a slightly noisier but much stronger impact boundary.
+                # g_eval / expected duration are not referenced here.
                 rank = (
                     0 if release_good else 1,
                     0 if x_good else 1,
+                    0 if contiguous_next else 1,
+                    -min(next_break, 100.0),
+                    -min(next_velocity_departure, 10.0),
                     -min(break_ratio, 50.0),
                     stab,
                     shape,
@@ -180,6 +202,9 @@ def candidate_windows(diag, analyzer, chunk, fps, tracker):
                     "post_n": post_n,
                     "post_rms": post_rms,
                     "break_ratio": break_ratio,
+                    "next_break": next_break,
+                    "next_gap_frames": next_gap_frames,
+                    "next_velocity_departure": next_velocity_departure,
                     "edge": edge,
                     "identity": float(chunk["identity_score"]),
                     "detected": float(chunk["detected_fraction_chunk"]),
@@ -226,10 +251,16 @@ def main():
             rows.extend(candidate_windows(diag, analyzer, chunk, fps, tracker))
         rows.sort(key=lambda r: r["rank"])
 
-        print("\n" + "=" * 150)
-        print(f"TAKE {take} fps={fps:.3f} tracks={len(tracks)} chunks={len(chunks)} candidates={len(rows)}")
-        print("V6.6b RANKING: release/x gates -> endpoint break -> stability/shape; g_eval is evaluation only")
-        print("=" * 150)
+        print("\n" + "=" * 170)
+        print(
+            f"TAKE {take} fps={fps:.3f} tracks={len(tracks)} "
+            f"chunks={len(chunks)} candidates={len(rows)}"
+        )
+        print(
+            "V6.6c RANKING: release/x -> one-step impact innovation -> "
+            "velocity departure -> persistence; g_eval is evaluation only"
+        )
+        print("=" * 170)
         for i, r in enumerate(rows[: args.top], 1):
             print(
                 f"rank={i:2d} tr={r['track']:3d} ch={r['chunk']:3d} run={r['run']:2d} "
@@ -238,8 +269,10 @@ def main():
                 f"shape={r['shape']:.4f} stab={r['stability']:7.3f} "
                 f"rel_tau={r['release_tau']:+.4f}s rel_phase={r['release_phase']:+.3f} "
                 f"v0={r['v0']:8.2f} v1={r['v1']:8.2f} "
-                f"break={r['break_ratio']:7.2f} post={r['post_n']} edge={r['edge']} "
-                f"x={r['xdrift']:.3f} id={r['identity']:.3f} det={r['detected']:.3f} "
+                f"next={r['next_break']:7.2f} ngap={r['next_gap_frames']:2d} "
+                f"vdep={r['next_velocity_departure']:6.2f} "
+                f"post={r['break_ratio']:7.2f} x={r['xdrift']:.3f} "
+                f"id={r['identity']:.3f} det={r['detected']:.3f} "
                 f"| EVAL_ONLY T={r['T_eval']:.4f}s g={r['g_eval']:.3f}"
             )
 
