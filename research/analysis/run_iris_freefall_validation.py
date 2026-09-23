@@ -747,6 +747,12 @@ def _identity_track_chunks(tracks,fps,identity_cfg):
                 continue
             xd=np.interp(dense,fr,x)
             yd=np.interp(dense,fr,y)
+            ad=np.interp(dense,fr,areas)
+            cad=np.interp(
+                dense,fr,
+                np.asarray([max(float(p.get("contour_area",p["area"])),1.0) for p in qpts],float)
+            )
+            rd=np.interp(dense,fr,np.maximum(radii,1e-6))
             gaps=np.diff(fr)
             gap_penalty=float(np.mean(np.maximum(gaps-1,0))) if len(gaps) else 0.0
             identity=(
@@ -756,6 +762,7 @@ def _identity_track_chunks(tracks,fps,identity_cfg):
             out.append({
                 "track_id":int(tr["id"]),"chunk_id":chunk_id,
                 "frames":dense,"abs_times":dense/fps,"x":xd,"y":yd,
+                "area":ad,"contour_area":cad,"radius":rd,
                 "detected_frames_original":fr,
                 "detected_fraction_chunk":float(detected_fraction),
                 "gap_penalty":gap_penalty,"identity_score":identity,
@@ -1532,6 +1539,288 @@ def _fit_constant_acceleration_fragment_v65(
         "impact_plateau_track":-1,
     })
 
+def choose_ballistic_track_v66(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
+    """V6.6: recover overhead free fall from perspective scale, not image Y.
+
+    IRIS Dropping_ball is filmed from above.  World vertical motion therefore
+    appears primarily as a change in apparent ball scale.  Under a pinhole camera,
+    inverse projected radius is proportional to camera depth.  Because equivalent
+    radius is proportional to sqrt(projected area), q=1/sqrt(A) is an affine depth
+    proxy.  Normalising q between the held/release state and the first impact
+    removes focal length and ball-radius nuisance parameters.
+
+    Candidate selection uses only ball identity, monotone depth increase, a
+    pre-release scale plateau, first-impact reversal, and release-from-rest
+    quadratic timing.  The target value of g is never used.
+    """
+    cfg=identity_cfg or {}
+    selector_cfg=validate_selector_config(cfg)
+    chunks=_identity_track_chunks(tracks,fps,cfg)
+    if not chunks:
+        raise TrackSelectionError("no ball-like identity tracks for V6.6 depth selector")
+
+    min_frames=max(8,int(minimum_interval_frames))
+    max_frames=max(min_frames+2,int(round(float(cfg.get("maximum_depth_event_seconds",0.75))*fps)))
+    min_rel_span=float(cfg.get("minimum_depth_proxy_relative_span",0.055))
+    min_mono=float(cfg.get("minimum_depth_monotone_fraction",0.72))
+    plateau_frames=max(3,int(cfg.get("depth_release_plateau_frames",5)))
+    reversal_frames=max(2,int(cfg.get("depth_impact_reversal_frames",4)))
+    max_shape=float(cfg.get("maximum_trajectory_shape_rms_fraction",.10))
+    max_timing=float(selector_cfg["maximum_global_timing_fit_rms_frames"])
+    candidates=[]
+    rejects={}
+
+    for chunk in chunks:
+        frames=np.asarray(chunk["frames"],int)
+        times=np.asarray(chunk["abs_times"],float)
+        x=np.asarray(chunk["x"],float)
+        if len(frames)<min_frames:
+            _reject(rejects,"short_chunk");continue
+
+        # Try two geometry-equivalent area observables.  They differ only in how
+        # the foreground boundary is discretised; ranking is based on target-free
+        # timing/shape residuals.
+        proxy_sources=(
+            ("component_area",np.asarray(chunk["area"],float)),
+            ("contour_area",np.asarray(chunk["contour_area"],float)),
+        )
+        for proxy_name,raw_area in proxy_sources:
+            area=np.maximum(raw_area,1.0)
+            # Smooth area before the nonlinear inverse-square-root transform.
+            area_s=smooth1(area,3)
+            depth=smooth1(1.0/np.sqrt(np.maximum(area_s,1.0)),3)
+            n=len(depth)
+
+            for i in range(0,n-min_frames+1):
+                pre_lo=max(0,i-plateau_frames)
+                pre=depth[pre_lo:i+1]
+                q0=float(np.median(pre))
+                if not math.isfinite(q0) or q0<=0:
+                    continue
+
+                for j in range(i+min_frames-1,min(n,i+max_frames)):
+                    q1=float(depth[j])
+                    span=q1-q0
+                    if not math.isfinite(span) or span<=min_rel_span*abs(q0):
+                        continue
+
+                    # The end of the first fall is identified by a scale reversal:
+                    # the ball reaches maximum camera depth at impact, then moves
+                    # back toward the camera during its first bounce.  If the
+                    # temporal track ends at impact, allow the endpoint instead.
+                    post=depth[j+1:min(n,j+1+reversal_frames)]
+                    if len(post)>=2:
+                        reversal=float(q1-np.median(post))/max(span,1e-12)
+                        if reversal<0.035:
+                            continue
+                    elif j<n-2:
+                        continue
+                    else:
+                        reversal=0.0
+
+                    plateau_mad=(1.4826*float(np.median(np.abs(pre-np.median(pre))))
+                                 if len(pre)>=3 else 0.0)
+                    plateau_rel=plateau_mad/max(span,1e-12)
+                    if len(pre)>=3 and plateau_rel>0.18:
+                        continue
+
+                    seg=depth[i:j+1]
+                    p=(seg-q0)/span
+                    finite=np.isfinite(p)
+                    if int(np.sum(finite))<min_frames:
+                        continue
+                    p=p[finite]
+                    tt=times[i:j+1][finite]
+                    xx=x[i:j+1][finite]
+                    ids=np.arange(i,j+1,dtype=int)[finite]
+                    if len(p)<min_frames:
+                        continue
+
+                    # Keep modest endpoint noise, but do not manufacture progress
+                    # by clipping grossly wrong observations.
+                    if float(np.mean((p>=-.12)&(p<=1.12)))<.90:
+                        continue
+                    p=np.clip(p,0.0,1.0)
+                    mono=float(np.mean(np.diff(p)>=-.025)) if len(p)>1 else 1.0
+                    if mono<min_mono:
+                        continue
+                    if float(np.ptp(p))<0.70:
+                        continue
+
+                    sqrtp=np.sqrt(p)
+                    A=np.column_stack([np.ones(len(tt)),sqrtp])
+                    coef=np.linalg.lstsq(A,tt,rcond=None)[0]
+                    t0=float(coef[0]);T=float(coef[1])
+                    if not math.isfinite(T) or T<=0.0 or T>1.25:
+                        continue
+                    full_frames=T*fps
+                    if full_frames+1e-9<minimum_interval_frames:
+                        continue
+
+                    pred_t=A@coef
+                    timing=float(np.sqrt(np.mean((tt-pred_t)**2))*fps)
+                    if timing>max_timing:
+                        continue
+                    model=np.square(np.clip((tt-t0)/T,0.0,1.0))
+                    shape=float(np.sqrt(np.mean((p-model)**2)))
+                    if not math.isfinite(shape) or shape>max_shape:
+                        continue
+
+                    impact_time=t0+T
+                    impact_miss=abs(impact_time-float(times[j]))*fps
+                    if impact_miss>float(cfg.get("maximum_depth_impact_miss_frames",4.5)):
+                        continue
+
+                    # Lateral drift is normal under an overhead perspective when
+                    # the release point is not exactly on the optical axis.  Scale
+                    # it by the ball diameter rather than by the (irrelevant) Y
+                    # excursion.
+                    eq_radius=np.sqrt(np.maximum(area_s[i:j+1],1.0)/math.pi)
+                    ball_diam=max(2.0*float(np.median(eq_radius)),1e-9)
+                    xdrift=float(np.ptp(xx))/ball_diam
+                    max_depth_x=float(cfg.get("maximum_depth_lateral_diameters",1.25))
+                    if xdrift>max_depth_x:
+                        continue
+
+                    det_frames=np.asarray(chunk["detected_frames_original"],int)
+                    flo=int(frames[i]);fhi=int(frames[j])
+                    detected=sum(1 for ff in det_frames if flo<=int(ff)<=fhi)
+                    detected_fraction=detected/max(1,fhi-flo+1)
+                    if detected_fraction<float(cfg.get("minimum_detected_fraction",.45)):
+                        continue
+
+                    # Map the complete chunk into the same perspective-depth
+                    # progress coordinate.  This is the coordinate consumed by
+                    # the downstream physics residual tests.
+                    progress_full=(depth-q0)/span
+                    effective_radius_span=float(abs(
+                        math.sqrt(max(float(area_s[i]),1.0)/math.pi)
+                        -math.sqrt(max(float(area_s[j]),1.0)/math.pi)
+                    ))
+                    effective_radius_span=max(effective_radius_span,1e-6)
+
+                    cand={
+                        "track_id":chunk["track_id"],"chunk_id":chunk["chunk_id"],
+                        "sign":1.0,
+                        "span_px":effective_radius_span,
+                        "local_span_px":effective_radius_span,
+                        "low_px":q0,"high_px":q1,
+                        "progress":progress_full,
+                        "dense_frames":frames,
+                        "abs_times":times,
+                        "window_indices":ids,
+                        "t0_s":t0,
+                        "full_fall_time_s":T,
+                        "timing_fit_rms_s":timing/fps,
+                        "timing_fit_rms_frames":timing,
+                        "trajectory_shape_rms_fraction":shape,
+                        "release_speed_ratio":0.0,
+                        "x_drift_fraction":xdrift,
+                        "monotone_fraction":mono,
+                        "gap_penalty":float(chunk["gap_penalty"]),
+                        "detected_fraction":float(chunk["detected_fraction_chunk"]),
+                        "detected_window_fraction":float(detected_fraction),
+                        "identity_score":float(chunk["identity_score"]),
+                        "median_circularity":float(chunk["median_circularity"]),
+                        "median_solidity":float(chunk["median_solidity"]),
+                        "median_circle_fill":float(chunk["median_circle_fill"]),
+                        "median_axis_ratio":float(chunk["median_axis_ratio"]),
+                        "radius_cv":float(chunk["radius_cv"]),
+                        "area_cv":float(chunk["area_cv"]),
+                        "aspect_log_median":float(chunk["aspect_log_median"]),
+                        "interval_frames":int(round(full_frames)),
+                        "observed_fragment_frames":int(fhi-flo+1),
+                        "inferred_full_fall_frames":float(full_frames),
+                        "detected_frames":int(detected),
+                        "global_progress_span":float(np.ptp(p)),
+                        "global_progress_start":float(np.min(p)),
+                        "global_progress_end":float(np.max(p)),
+                        # Normalized displacement p=(1/2)*(2/T^2)*tau^2.
+                        "normalized_acceleration_s2":float(2.0/(T*T)),
+                        "normalized_fit_a":0.0,
+                        "normalized_fit_b":0.0,
+                        "duration_10_90_s":float(T*(math.sqrt(.90)-math.sqrt(.10))),
+                        "roots_complete":1.0,
+                        "acceleration_stability":float(plateau_rel),
+                        "event_extrapolation_frames":float(impact_miss),
+                        "release_plateau_track":int(chunk["track_id"]),
+                        "impact_plateau_track":int(chunk["track_id"]),
+                        "depth_proxy":proxy_name,
+                        "depth_proxy_relative_span":float(span/max(abs(q0),1e-12)),
+                        "depth_impact_reversal":float(reversal),
+                    }
+                    candidates.append(validate_candidate(cand))
+
+    if not candidates:
+        raise TrackSelectionError(
+            "no perspective-depth free-fall event survived V6.6; "
+            f"chunks={len(chunks)} rejects={json.dumps(rejects,sort_keys=True)}"
+        )
+
+    # No target acceleration is present in ranking.  Prefer the event whose
+    # perspective progress most closely follows release-from-rest kinematics,
+    # then stronger first-impact reversal and stronger ball identity.
+    def rank(q):
+        return (
+            float(q["timing_fit_rms_frames"]),
+            float(q["trajectory_shape_rms_fraction"]),
+            float(q.get("event_extrapolation_frames",0.0)),
+            -float(q.get("depth_impact_reversal",0.0)),
+            -float(q["detected_window_fraction"]),
+            -float(q["identity_score"]),
+            float(q["t0_s"]),
+        )
+    candidates=sorted(candidates,key=rank)
+    chosen=candidates[0]
+    audit=[]
+    for k,q in enumerate(candidates[:20],1):
+        audit.append({
+            "event_rank":k,"selected":q is chosen,
+            "track_id":q["track_id"],"sign":float(q["sign"]),
+            "t0_s":float(q["t0_s"]),
+            "local_span_px":float(q["local_span_px"]),
+            "spatial_envelope_px":float(q["span_px"]),
+            "relative_span":1.0,
+            "global_progress_span":float(q["global_progress_span"]),
+            "raw_global_progress_span":float(q["global_progress_span"]),
+            "global_progress_start":float(q["global_progress_start"]),
+            "global_progress_end":float(q["global_progress_end"]),
+            "full_fall_time_s":float(q["full_fall_time_s"]),
+            "interval_frames":int(q["interval_frames"]),
+            "observed_fragment_frames":int(q["observed_fragment_frames"]),
+            "inferred_full_fall_frames":float(q["inferred_full_fall_frames"]),
+            "detected_frames":int(q["detected_frames"]),
+            "detected_fraction":float(q["detected_window_fraction"]),
+            "timing_fit_rms_frames":float(q["timing_fit_rms_frames"]),
+            "trajectory_shape_rms_fraction":float(q["trajectory_shape_rms_fraction"]),
+            "release_speed_ratio":0.0,
+            "x_drift_fraction":float(q["x_drift_fraction"]),
+            "gap_penalty":float(q["gap_penalty"]),
+            "identity_score":float(q["identity_score"]),
+            "median_circularity":float(q["median_circularity"]),
+            "median_solidity":float(q["median_solidity"]),
+            "median_circle_fill":float(q["median_circle_fill"]),
+            "median_axis_ratio":float(q["median_axis_ratio"]),
+            "radius_cv":float(q["radius_cv"]),
+            "area_cv":float(q["area_cv"]),
+            "aspect_log_median":float(q["aspect_log_median"]),
+            "envelope_source_track":int(q["track_id"]),
+            "envelope_source_chunk":int(q["chunk_id"]),
+            "normalized_acceleration_s2":float(q["normalized_acceleration_s2"]),
+            "normalized_fit_a":0.0,"normalized_fit_b":0.0,
+            "duration_10_90_s":float(q["duration_10_90_s"]),
+            "roots_complete":1.0,
+            "acceleration_stability":float(q["acceleration_stability"]),
+            "event_extrapolation_frames":float(q["event_extrapolation_frames"]),
+            "release_plateau_track":int(q["release_plateau_track"]),
+            "impact_plateau_track":int(q["impact_plateau_track"]),
+            "depth_proxy":q.get("depth_proxy",""),
+            "depth_proxy_relative_span":float(q.get("depth_proxy_relative_span",0.0)),
+            "depth_impact_reversal":float(q.get("depth_impact_reversal",0.0)),
+        })
+    return chosen,audit
+
+
 def choose_ballistic_track_v65(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     """V6.5: select a constant-acceleration ball fragment in global coordinates.
 
@@ -1631,6 +1920,11 @@ def choose_ballistic_track_v65(tracks,fps,minimum_interval_frames=12,identity_cf
 
 def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     cfg=identity_cfg or {}
+    if cfg.get("revision")=="ball_identity_v6_6_depth":
+        return choose_ballistic_track_v66(
+            tracks,fps,minimum_interval_frames=minimum_interval_frames,
+            identity_cfg=cfg
+        )
     if cfg.get("revision")=="ball_identity_v6_5":
         return choose_ballistic_track_v65(
             tracks,fps,minimum_interval_frames=minimum_interval_frames,
@@ -1711,7 +2005,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
     inferred_full_fall_frames=float(
         chosen.get("inferred_full_fall_frames",T*fps)
     )
-    if tracker_config and tracker_config.get("revision")=="ball_identity_v6_5":
+    if tracker_config and tracker_config.get("revision") in ("ball_identity_v6_5","ball_identity_v6_6_depth"):
         if observed_fragment_frames<minimum_interval_frames:
             raise ContractError(
                 "V6.5 selector returned insufficient observed motion support"
