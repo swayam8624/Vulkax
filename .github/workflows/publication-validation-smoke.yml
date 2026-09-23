@@ -84,6 +84,14 @@ jobs:
           bash -n research/scripts/run_publication_validation.sh
           bash -n research/scripts/prepare_public_validation_data.sh
 
+      - name: Live public dataset catalog check
+        run: |
+          python3 -m pip install --quiet "huggingface_hub>=0.34,<2"
+          python3 research/scripts/fetch_public_validation_datasets.py \
+            --profile core \
+            --catalog-only
+
+
       - name: End-to-end standardized analysis fixture
         run: |
           mkdir -p /tmp/pv
