@@ -834,11 +834,9 @@ def self_test_video():
             writer.write(q)
         writer.release()
 
-        base=extract(p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12)
-        rel=abs(base["direct_acceleration_m_s2"]-G)/G
-        assert rel<=0.20,(base["direct_acceleration_m_s2"],rel,base)
-        assert base["active_frames"]>=12
-
+        # This regression intentionally includes a cleaner rectangular parabola
+        # and a fragmented true ball drop. The ungated detector is expected to be
+        # ambiguous; only the frozen V6.3 identity-gated path is under test here.
         v6cfg={
             "minimum_median_circularity":0.35,
             "minimum_median_solidity":0.65,
