@@ -67,7 +67,7 @@
     "nuisance_fit_fraction": 0.4,
     "minimum_active_frames": 12,
     "blocks": 6,
-    "revision": "ball_identity_v6_2",
+    "revision": "ball_identity_v6_3",
     "minimum_monotone_fraction": 0.78,
     "maximum_timing_fit_rms_frames": 2.5,
     "maximum_trajectory_shape_rms_fraction": 0.1,
@@ -82,7 +82,9 @@
     "minimum_median_circle_fill": 0.45,
     "minimum_median_axis_ratio": 0.55,
     "maximum_radius_cv": 0.45,
-    "minimum_relative_span_fraction": 0.7
+    "expected_image_gravity_sign": 1,
+    "minimum_global_progress_span": 0.15,
+    "maximum_global_timing_fit_rms_frames": 2.5
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -169,6 +171,22 @@
       "validation_downloaded": false,
       "validation_analyzed": false,
       "fix": "candidate producer now has total list return contract; selector validates producer return type/candidate schema/finite fields; unexpected exceptions are saved with traceback and force gate false"
-    }
+    },
+    "v6_2_development_failure": {
+      "split": "drop_50/06..10",
+      "quality_pass_videos": 3,
+      "median_acceleration_relative_error": 0.3898968030718314,
+      "truth_control_accuracy": 1,
+      "placebo_false_assertion_rate": 0,
+      "direction_sign_rate": 1,
+      "validation_downloaded": false,
+      "validation_analyzed": false,
+      "diagnosis": [
+        "70% relative-span rule selected slow reset/handling because reset covered the largest image-space extent",
+        "fast gravity candidates on 06,07,09,10 were rejected for smaller local span even though they had much shorter durations",
+        "partial gravity fragments must be timed in a global full-drop coordinate rather than interpreted as 100% of the physical drop"
+      ]
+    },
+    "v6_3_change": "development-only redesign: estimate full top-bottom pixel envelope from all ball-like motion, use reset only as spatial calibration, keep only downward gravity-direction fragments, fit t=t0+T*sqrt(p_global) in global progress coordinates, and rank by global timing/shape fit; target g remains absent from selection"
   }
 }

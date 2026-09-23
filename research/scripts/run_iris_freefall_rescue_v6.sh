@@ -37,12 +37,12 @@ import json,sys
 p=sys.argv[1]
 cfg=json.load(open(p))
 assert int(cfg.get("version",0))==6, cfg.get("version")
-assert cfg["tracker"]["revision"]=="ball_identity_v6_2", cfg["tracker"]["revision"]
+assert cfg["tracker"]["revision"]=="ball_identity_v6_3", cfg["tracker"]["revision"]
 assert cfg["dataset"]["development"]["takes"]==["06","07","08","09","10"]
 assert cfg["dataset"]["validation"]["takes"]==["06","07","08","09","10"]
 assert not (set(cfg["dataset"]["prior_failed_validation"]["takes"])
             & set(cfg["dataset"]["validation"]["takes"]))
-print("VALID V6.2 config preflight")
+print("VALID V6.3 config preflight")
 PY
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --self-test
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --self-test-video
@@ -105,7 +105,7 @@ rows=list(csv.DictReader(open(sys.argv[1],newline="",encoding="utf-8")))
 by=defaultdict(list)
 for r in rows:
     by[r["scene"]].append(r)
-print("\n=== V6.2 DEVELOPMENT CANDIDATE AUDIT ===")
+print("\n=== V6.3 DEVELOPMENT CANDIDATE AUDIT ===")
 for scene in sorted(by):
     q=sorted(by[scene],key=lambda r:int(r["event_rank"]))[:6]
     print(scene)
@@ -113,14 +113,16 @@ for scene in sorted(by):
         mark="*" if r["selected"].lower()=="true" else " "
         print(
           f" {mark} rank={r['event_rank']} track={r['track_id']}"
+          f" sign={float(r['sign']):+.0f}"
           f" span_rel={float(r['relative_span']):.3f}"
+          f" pspan={float(r['global_progress_span']):.3f}"
           f" T={float(r['full_fall_time_s']):.4f}s"
+          f" t0={float(r['t0_s']):.3f}s"
           f" frames={r['interval_frames']}"
           f" timing={float(r['timing_fit_rms_frames']):.3f}"
           f" shape={float(r['trajectory_shape_rms_fraction']):.3f}"
           f" identity={float(r['identity_score']):.3f}"
           f" g_rel_err={float(r['acceleration_relative_error']):.3f}"
-          f" eligible={r['passes_relative_span']}"
         )
 PY
 }
