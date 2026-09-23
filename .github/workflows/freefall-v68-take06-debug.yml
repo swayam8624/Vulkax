@@ -1,0 +1,103 @@
+name: IRIS free-fall V6.8 take06 diagnostic
+
+on:
+  pull_request:
+    paths:
+      - "research/analysis/run_iris_freefall_validation.py"
+      - "research/validation/iris_freefall_rescue_v6.json"
+      - "research/scripts/run_iris_freefall_v68_take_smoke.sh"
+      - ".github/workflows/freefall-v68-take06-debug.yml"
+
+jobs:
+  take06-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless==4.14.0.94"
+
+      - name: Freeze single development take
+        run: |
+          python - <<'PY'
+          import json
+          src="research/validation/iris_freefall_rescue_v6.json"
+          dst="/tmp/iris-freefall-v68-take06.json"
+          cfg=json.load(open(src))
+          assert cfg["tracker"]["revision"]=="ball_identity_v6_8"
+          cfg["dataset"]["development"]["takes"]=["06"]
+          cfg["development_gate"]["minimum_quality_videos"]=1
+          json.dump(cfg,open(dst,"w"),indent=2)
+          print(dst)
+          PY
+
+      - name: Preflight V6.8
+        run: |
+          python -m py_compile research/analysis/run_iris_freefall_validation.py
+          python research/analysis/run_iris_freefall_validation.py --self-test
+          python research/analysis/run_iris_freefall_validation.py --self-test-video
+
+      - name: Download only drop_50/06
+        run: |
+          python research/scripts/fetch_iris_freefall_rescue_v6.py \
+            --data-root build/public-datasets \
+            --config /tmp/iris-freefall-v68-take06.json \
+            --phase development
+
+      - name: Provide empty companion manifests
+        run: |
+          mkdir -p build/public-datasets/gauge build/public-datasets/rgbench
+          cat > build/public-datasets/gauge/vulkax_download_manifest.json <<'JSON'
+          {"schema":"vulkax.public_dataset_download","version":1,"dataset":"gauge","repo_id":"InternRobotics/GAUGE-Dataset","revision":"ci-fixture","license":"MIT","citation_url":"https://huggingface.co/datasets/InternRobotics/GAUGE-Dataset","profile":"ci-empty","requested_patterns":[],"file_count":0,"total_bytes":0,"files":[]}
+          JSON
+          cat > build/public-datasets/rgbench/vulkax_download_manifest.json <<'JSON'
+          {"schema":"vulkax.public_dataset_download","version":1,"dataset":"rgbench","repo_id":"RGBench/RGBench-Cloth-Sim2Real-v1","revision":"ci-fixture","license":"CC-BY-4.0","citation_url":"https://huggingface.co/datasets/RGBench/RGBench-Cloth-Sim2Real-v1","profile":"ci-empty","requested_patterns":[],"file_count":0,"total_bytes":0,"files":[]}
+          JSON
+
+      - name: Prepare take06
+        run: |
+          python research/analysis/prepare_public_validation_datasets.py \
+            --root build/public-datasets \
+            --out build/publication-validation/public-data
+          python research/analysis/adapt_public_validation_inputs.py \
+            --repo-root . \
+            --data-root build/public-datasets \
+            --prepared-root build/publication-validation/public-data
+
+      - name: Analyze take06 without opening validation
+        continue-on-error: true
+        run: |
+          python research/analysis/run_iris_freefall_validation.py \
+            --adapted-root build/publication-validation/public-data/adapted \
+            --config /tmp/iris-freefall-v68-take06.json \
+            --split development \
+            --out build/publication-validation/iris-freefall-v68-take06
+
+      - name: Print track fragments and candidates
+        if: always()
+        run: |
+          echo "=== track_debug.json ==="
+          cat build/publication-validation/iris-freefall-v68-take06/track_debug.json || true
+          echo
+          echo "=== candidate_audit.csv ==="
+          cat build/publication-validation/iris-freefall-v68-take06/candidate_audit.csv || true
+          echo
+          echo "=== summary.json ==="
+          cat build/publication-validation/iris-freefall-v68-take06/summary.json || true
+          echo
+          echo "VALIDATION_STATUS NOT_REQUESTED"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iris-freefall-v68-take06-debug
+          path: build/publication-validation/iris-freefall-v68-take06
+          if-no-files-found: error
+          retention-days: 7
