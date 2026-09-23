@@ -541,7 +541,10 @@ def main():
         expected_revision=cfg["tracker"]["revision"]
         if v.get("tracker_revision")!=expected_revision:raise SystemExit("validation tracker revision mismatch")
         if not a.lock:raise SystemExit("final_test requires lock")
-        subprocess.run(["python3","research/analysis/freeze_iris_freefall_final_test.py","--check",str(a.lock)],check=True)
+        lock_checker=("research/analysis/freeze_iris_freefall_v6_final.py"
+                      if int(cfg.get("version",5))>=6
+                      else "research/analysis/freeze_iris_freefall_final_test.py")
+        subprocess.run(["python3",lock_checker,"--check",str(a.lock)],check=True)
     out=a.out or pathlib.Path(f"build/publication-validation/iris-freefall-{a.split}")
     mm=manifests(a.adapted_root,a.split,cfg)
     expected=len(cfg["dataset"][a.split]["takes"])
