@@ -57,6 +57,7 @@ SPLIT_TRIALS = {
 METHODS = (
     "reality_probe_dcs",
     "reality_probe_rigid_invariant_strain",
+    "same_cost_rigid_aligned_bundle",
     "same_cost_raw_bundle",
     "simple_residual_or_uncertainty_baseline",
 )
@@ -144,6 +145,122 @@ def mst_edges(
     return edges
 
 
+def apply_rotation_translation(
+    p: list[float], rotation: list[list[float]], translation: list[float]
+) -> list[float]:
+    return [
+        sum(rotation[i][j] * p[j] for j in range(3)) + translation[i]
+        for i in range(3)
+    ]
+
+
+def verification_rigid_nuisance(
+    frames: dict[int, dict[str, list[float]]],
+    rotation_degrees: float,
+    translation_m: float,
+) -> dict[int, dict[str, list[float]]]:
+    if abs(rotation_degrees) <= 1.0e-15 and abs(translation_m) <= 1.0e-15:
+        return frames
+    axis = [1.0, 2.0, 3.0]
+    axis_norm = math.sqrt(sum(x * x for x in axis))
+    x, y, z = [v / axis_norm for v in axis]
+    a = math.radians(rotation_degrees)
+    co, si, om = math.cos(a), math.sin(a), 1.0 - math.cos(a)
+    rotation = [
+        [co + x*x*om, x*y*om - z*si, x*z*om + y*si],
+        [y*x*om + z*si, co + y*y*om, y*z*om - x*si],
+        [z*x*om - y*si, z*y*om + x*si, co + z*z*om],
+    ]
+    # Fixed non-axis-aligned direction avoids a special relationship with any one task.
+    td = [0.37, -0.61, 0.70]
+    td_norm = math.sqrt(sum(v * v for v in td))
+    translation = [translation_m * v / td_norm for v in td]
+    return {
+        frame: {
+            marker: apply_rotation_translation(p, rotation, translation)
+            for marker, p in markers.items()
+        }
+        for frame, markers in frames.items()
+    }
+
+
+def horn_rigid_alignment(
+    source: list[list[float]], target: list[list[float]]
+) -> tuple[list[list[float]], list[float]]:
+    """Least-squares proper rigid transform source -> target (Horn quaternion)."""
+    if len(source) != len(target) or len(source) < 3:
+        raise ValueError("rigid alignment needs >=3 paired points")
+    n = len(source)
+    cs = [statistics.fmean(p[i] for p in source) for i in range(3)]
+    ct = [statistics.fmean(p[i] for p in target) for i in range(3)]
+    s = [[0.0] * 3 for _ in range(3)]
+    for p, q in zip(source, target):
+        px = [p[i] - cs[i] for i in range(3)]
+        qx = [q[i] - ct[i] for i in range(3)]
+        for i in range(3):
+            for j in range(3):
+                s[i][j] += px[i] * qx[j]
+    sxx, sxy, sxz = s[0]
+    syx, syy, syz = s[1]
+    szx, szy, szz = s[2]
+    nmat = [
+        [sxx+syy+szz, syz-szy, szx-sxz, sxy-syx],
+        [syz-szy, sxx-syy-szz, sxy+syx, szx+sxz],
+        [szx-sxz, sxy+syx, -sxx+syy-szz, syz+szy],
+        [sxy-syx, szx+sxz, syz+szy, -sxx-syy+szz],
+    ]
+    quat = [1.0, 0.2, 0.3, 0.4]
+    for _ in range(128):
+        nxt = [sum(nmat[i][j] * quat[j] for j in range(4)) for i in range(4)]
+        qn = math.sqrt(sum(v * v for v in nxt))
+        if qn <= 1.0e-18:
+            raise ValueError("degenerate rigid alignment")
+        nxt = [v / qn for v in nxt]
+        if sum((nxt[i]-quat[i])**2 for i in range(4)) < 1.0e-28:
+            quat = nxt
+            break
+        quat = nxt
+    qw, qx, qy, qz = quat
+    rotation = [
+        [1-2*(qy*qy+qz*qz), 2*(qx*qy-qw*qz), 2*(qx*qz+qw*qy)],
+        [2*(qx*qy+qw*qz), 1-2*(qx*qx+qz*qz), 2*(qy*qz-qw*qx)],
+        [2*(qx*qz-qw*qy), 2*(qy*qz+qw*qx), 1-2*(qx*qx+qy*qy)],
+    ]
+    translation = [
+        ct[i] - sum(rotation[i][j] * cs[j] for j in range(3))
+        for i in range(3)
+    ]
+    return rotation, translation
+
+
+def rigid_aligned_three_frame_errors(
+    measured: dict[int, dict[str, list[float]]],
+    predicted: dict[int, dict[str, list[float]]],
+    ids: list[str],
+    mid: int,
+    n: int,
+) -> list[float]:
+    common = min(n, len(predicted), len(measured))
+    last = common - 1
+    mid = min(max(1, mid), last - 1)
+    per_marker: dict[str, list[float]] = {m: [] for m in ids}
+    for frame in (0, mid, last):
+        src = [predicted[frame][m] for m in ids]
+        dst = [measured[frame][m] for m in ids]
+        rotation, translation = horn_rigid_alignment(src, dst)
+        for marker in ids:
+            aligned = apply_rotation_translation(
+                predicted[frame][marker], rotation, translation
+            )
+            per_marker[marker].append(
+                norm(vec_sub(aligned, measured[frame][marker]))
+            )
+    return [
+        math.sqrt(statistics.fmean(e * e for e in per_marker[m]))
+        for m in ids
+    ]
+
+
 def rigid_invariant_strain_errors(
     measured: dict[int, dict[str, list[float]]],
     predicted: dict[int, dict[str, list[float]]],
@@ -223,6 +340,9 @@ def marker_error_vectors(
     return {
         "reality_probe_dcs": dcs,
         "reality_probe_rigid_invariant_strain": rigid_invariant_strain_errors(
+            measured, predicted, ids, mid, n
+        ),
+        "same_cost_rigid_aligned_bundle": rigid_aligned_three_frame_errors(
             measured, predicted, ids, mid, n
         ),
         "same_cost_raw_bundle": raw3,
@@ -434,6 +554,20 @@ def self_test() -> None:
         assert veto < 0.0
         assert placebo == 0.0
     assert SPLIT_TRIALS["final_test"] == (8, 9, 10)
+    transformed = verification_rigid_nuisance(measured, 17.0, 0.023)
+    aligned = rigid_aligned_three_frame_errors(
+        transformed, measured, ["m0", "m1"], 1, 3
+    ) if False else None
+    # Horn alignment is tested with a non-degenerate tetrahedral point set.
+    src = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0.2]]
+    src_frames = {0:{str(i):p for i,p in enumerate(src)},
+                  1:{str(i):p for i,p in enumerate(src)},
+                  2:{str(i):p for i,p in enumerate(src)}}
+    dst_frames = verification_rigid_nuisance(src_frames, 17.0, 0.023)
+    e = rigid_aligned_three_frame_errors(
+        dst_frames, src_frames, [str(i) for i in range(len(src))], 1, 3
+    )
+    assert max(e) < 1.0e-9
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / "metadata").mkdir()
@@ -459,6 +593,8 @@ def main() -> int:
     ap.add_argument("--max-worlds", type=int)
     ap.add_argument("--shard-index", type=int, default=0)
     ap.add_argument("--shard-count", type=int, default=1)
+    ap.add_argument("--verification-rotation-deg", type=float, default=0.0)
+    ap.add_argument("--verification-translation-m", type=float, default=0.0)
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
 
@@ -519,6 +655,11 @@ def main() -> int:
                     ids, n = write_inputs(data, marker, driver)
                     mid, mid_progress, max_orth = select_mid_frame(data, n)
                     measured = measured_frames(data, ids, n)
+                    measured_eval = verification_rigid_nuisance(
+                        measured,
+                        args.verification_rotation_deg,
+                        args.verification_translation_m,
+                    )
                     scene = f"{task}/{material}/{trial:02d}"
                     cache = args.out / "simulations" / task.replace(" ", "_") / material / f"{trial:02d}"
 
@@ -540,7 +681,7 @@ def main() -> int:
                         )
                         predicted = read_pred(pred_path)
                         prediction_errors[factor] = marker_error_vectors(
-                            measured, predicted, ids, mid, n
+                            measured_eval, predicted, ids, mid, n
                         )
                         solver_evidence[factor_key(factor)] = {
                             "minimum_J": evidence.get("minimum_J"),
@@ -555,7 +696,9 @@ def main() -> int:
                         f"task={task}; material={material}; trial={trial}; "
                         f"metadata={metadata_path}; mid_frame={mid}; "
                         f"mid_progress={mid_progress:.9g}; driver_max_orthogonal_fraction={max_orth:.9g}; "
-                        f"numerics={n_cross}x{n_cross}x{n_long},dt={dt:.17g}"
+                        f"numerics={n_cross}x{n_cross}x{n_long},dt={dt:.17g}; "
+                        f"verification_rotation_deg={args.verification_rotation_deg:.17g}; "
+                        f"verification_translation_m={args.verification_translation_m:.17g}"
                     )
 
                     # Placebo: identical physical hypothesis, so asserting support/veto is a failure.
@@ -663,6 +806,11 @@ def main() -> int:
         "numerics": {"n_cross": n_cross, "n_long": n_long, "dt_s": dt},
         "records_path": str(records_path),
         "shard": {"index": args.shard_index, "count": args.shard_count},
+        "verification_nuisance": {
+            "rotation_degrees": args.verification_rotation_deg,
+            "translation_m": args.verification_translation_m,
+            "axis": [1.0, 2.0, 3.0],
+        },
     })
     summary_path = args.out / f"summary_{args.split}_{args.profile}_{args.mode}.json"
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
