@@ -107,9 +107,10 @@ Development history is retained rather than overwritten:
 The active development revision is V6.5. It retains ball identity and the global
 top-bottom spatial scale, but replaces the brittle assumption that every observed
 fragment begins at zero-velocity release. It fits
-`p(t)=a+b t+0.5 c t^2` with nuisance position/velocity and uses internal
-constant-acceleration consistency for event selection. Target gravity is not used
-for candidate selection/ranking. Existing development/validation gates, repair
+`p(t)=a+b t+0.5 c t^2` on the moving interior with nuisance
+position/velocity, requires sufficient observed motion support, and treats
+release/impact roots as optional diagnostics rather than eligibility conditions.
+Target gravity is not used for candidate selection/ranking. Existing development/validation gates, repair
 schedule, and `|S|=2` evidence threshold are unchanged.
 
 The V6 development/validation runner has no final-download mode. A separate V6
