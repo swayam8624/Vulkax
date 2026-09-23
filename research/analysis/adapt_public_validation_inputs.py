@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 
 def sha256(path: Path) -> str:
@@ -239,6 +240,70 @@ def adapt_rgbench(
     }
 
 
+def self_test() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data_root = root / "data"
+        out_root = root / "out"
+
+        # IRIS path resolution + truth binding.
+        video = data_root / "iris/Pendulum/pendulum_20/01.mp4"
+        video.parent.mkdir(parents=True, exist_ok=True)
+        video.write_bytes(b"fake-video")
+        truth = {
+            "datasets": {
+                "iris": {
+                    "scenes": {
+                        "pendulum/pendulum_20/01": {
+                            "parameters": {"rope_length": {"mean": 0.5}}
+                        }
+                    }
+                }
+            }
+        }
+        iris_row = {
+            "scene": "pendulum/pendulum_20/01",
+            "split": "development",
+            "campaign_role": "prospective_ready",
+            "local_path": "iris/Pendulum/pendulum_20/01.mp4",
+            "units": "dataset_native",
+            "license": "CC",
+        }
+        iris = adapt_iris(data_root, out_root, iris_row, truth)
+        assert (Path(iris["out"]) / "manifest.json").is_file()
+
+        # RGBench path resolution + PCD header validation.
+        capture = data_root / "rgbench/green_tshirt/green_tshirt_grasp_2025-01-01"
+        (capture / "calibration").mkdir(parents=True, exist_ok=True)
+        (capture / "joints").mkdir()
+        (capture / "segment_pcds").mkdir()
+        (capture / "calibration/world_to_camera_transform.json").write_text(
+            "{}", encoding="utf-8"
+        )
+        for side in ("left", "right"):
+            (capture / "joints" / f"{side}.csv").write_text(
+                "header.stamp.secs,position\n0,[]\n", encoding="utf-8"
+            )
+        pcd = (
+            "# .PCD v0.7\nVERSION 0.7\nFIELDS x y z\n"
+            "SIZE 4 4 4\nTYPE F F F\nCOUNT 1 1 1\n"
+            "WIDTH 1\nHEIGHT 1\nPOINTS 1\nDATA ascii\n0 0 0\n"
+        )
+        (capture / "segment_pcds/a.pcd").write_text(pcd, encoding="ascii")
+        rgb_row = {
+            "scene": "green_tshirt/grasp/green_tshirt_grasp_2025-01-01",
+            "split": "development",
+            "campaign_role": "prospective_ready",
+            "local_path": "rgbench/green_tshirt/green_tshirt_grasp_2025-01-01",
+            "truth_source": "real point cloud",
+            "license": "CC",
+        }
+        rgb = adapt_rgbench(data_root, out_root, rgb_row)
+        assert (Path(rgb["out"]) / "manifest.json").is_file()
+        assert rgb["frame_count"] == 1
+    print("VALID public input adapter self-test")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", type=Path, default=Path("."))
@@ -249,7 +314,11 @@ def main() -> int:
         default=Path("build/publication-validation/public-data"),
     )
     ap.add_argument("--out", type=Path)
+    ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
+    if args.self_test:
+        self_test()
+        return 0
 
     repo_root = args.repo_root.resolve()
     data_root = args.data_root.resolve()
