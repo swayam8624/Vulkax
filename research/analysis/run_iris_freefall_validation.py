@@ -1629,8 +1629,313 @@ def choose_ballistic_track_v65(tracks,fps,minimum_interval_frames=12,identity_cf
         })
     return chosen,audit
 
+
+def _fit_event_time_candidate_v66(
+        chunk,aa,bb,fps,selector_cfg,identity_cfg,minimum_interval_frames,
+        diagnostics=None):
+    """Recover a release->impact duration without a pixel-to-metre ruler.
+
+    V6.6 fits constant *pixel* acceleration only to identify the ballistic phase.
+    The release time is the fitted velocity-zero point.  The impact time is the
+    terminal change point where the positive-speed ballistic run stops, reverses,
+    or the track terminates.  The physical acceleration estimate is then obtained
+    downstream from the independently measured drop height h and elapsed time T:
+
+        g_hat = 2 h / T^2
+
+    Consequently neither the largest same-ball excursion nor manual reset motion
+    defines metric scale.  Target gravity is absent from candidate generation,
+    filtering, and ranking.
+    """
+    expected=float(selector_cfg["expected_sign"])
+    all_frames=np.asarray(chunk["frames"],int)
+    raw_y=np.asarray(chunk["y"],float)
+    raw_x=np.asarray(chunk["x"],float)
+    if len(all_frames)<6 or bb-aa<6:
+        return _reject(diagnostics,"too_few_points")
+
+    z_all=smooth1(expected*raw_y,5)
+    x_all=smooth1(raw_x,5)
+    frames=all_frames[aa:bb]
+    z=z_all[aa:bb]
+    x=x_all[aa:bb]
+    t_abs=frames/fps
+    local_span=float(np.ptp(z))
+    min_span=float(identity_cfg.get("minimum_raw_event_span_px",18.0))
+    if not math.isfinite(local_span) or local_span<min_span:
+        return _reject(diagnostics,"raw_event_span")
+
+    # Constant-acceleration fit in image coordinates.  This is used only for
+    # temporal event identification; no conversion from pixels to metres occurs.
+    tr=t_abs-float(t_abs[0])
+    X=np.column_stack([np.ones(len(tr)),tr,.5*tr*tr])
+    coef=np.linalg.lstsq(X,z,rcond=None)[0]
+    a0,b0,c0=map(float,coef)
+    if not all(math.isfinite(q) for q in (a0,b0,c0)) or c0<=0.0:
+        return _reject(diagnostics,"nonpositive_pixel_acceleration")
+
+    pred=X@coef
+    shape=float(np.sqrt(np.mean((z-pred)**2))/max(local_span,1e-9))
+    max_shape=float(identity_cfg.get("maximum_trajectory_shape_rms_fraction",.10))
+    if not math.isfinite(shape) or shape>max_shape:
+        return _reject(diagnostics,"shape_rms")
+
+    deriv=b0+c0*tr
+    if float(np.mean(deriv>=-1e-6))<.90:
+        return _reject(diagnostics,"predicted_direction")
+
+    # A release-from-rest event has a velocity-zero vertex close to (possibly
+    # shortly before) the first observed moving sample.  This prior is part of the
+    # published IRIS dropping-ball protocol, not a fit to the target value of g.
+    release_tau=-b0/c0
+    max_pre_frames=float(identity_cfg.get("maximum_release_extrapolation_frames",12.0))
+    max_future_frames=float(identity_cfg.get("maximum_release_future_frames",2.0))
+    release_offset_frames=release_tau*fps
+    if release_offset_frames < -max_pre_frames:
+        return _reject(diagnostics,"release_too_far_before_observation")
+    if release_offset_frames > max_future_frames:
+        return _reject(diagnostics,"release_after_motion_onset")
+    release_abs=float(t_abs[0]+release_tau)
+
+    # Locate the last clearly positive-speed sample in the monotone run.  The next
+    # sample is the impact boundary candidate.  A valid impact must be followed by
+    # a strong speed collapse/reversal, or by track termination.
+    v=np.gradient(z_all,all_frames.astype(float))
+    active_threshold=max(
+        0.20,
+        float(identity_cfg.get("plateau_max_speed_px_per_frame",.75))
+    )
+    run_v=np.asarray(v[aa:bb],float)
+    active=np.flatnonzero(run_v>active_threshold)
+    if len(active)<4:
+        return _reject(diagnostics,"too_few_accelerating_samples")
+    last_active=int(aa+active[-1])
+    impact_idx=min(last_active+1,len(all_frames)-1)
+    if impact_idx<=aa+4:
+        return _reject(diagnostics,"impact_too_early")
+
+    pre_lo=max(aa,last_active-2)
+    pre_speed=float(np.median(v[pre_lo:last_active+1]))
+    if not math.isfinite(pre_speed) or pre_speed<=active_threshold:
+        return _reject(diagnostics,"weak_preimpact_speed")
+
+    post_lo=impact_idx+1
+    post_hi=min(len(v),post_lo+4)
+    if post_lo>=len(v):
+        post_speed=0.0
+        impact_kind="track_end"
+    else:
+        post_speed=float(np.median(v[post_lo:post_hi])) if post_hi>post_lo else 0.0
+        impact_kind="reversal" if post_speed<0.0 else "slowdown"
+    impact_speed_ratio=post_speed/max(pre_speed,1e-9)
+    max_impact_ratio=float(identity_cfg.get("maximum_impact_speed_ratio",.55))
+    if impact_speed_ratio>max_impact_ratio:
+        return _reject(diagnostics,"no_terminal_impact_change")
+
+    impact_abs=float(all_frames[impact_idx]/fps)
+    T=impact_abs-release_abs
+    if not math.isfinite(T) or T<=0.0 or T>1.25:
+        return _reject(diagnostics,"invalid_event_duration")
+    if T*fps<minimum_interval_frames:
+        return _reject(diagnostics,"full_duration")
+
+    # Define a local release->impact image coordinate only for residual/scoring
+    # diagnostics.  The primary physical g estimate does not use this pixel scale.
+    z_release=float(a0+b0*release_tau+.5*c0*release_tau*release_tau)
+    z_impact=float(z_all[impact_idx])
+    event_span=z_impact-z_release
+    if not math.isfinite(event_span) or event_span<min_span:
+        return _reject(diagnostics,"release_impact_span")
+
+    progress_full=(expected*raw_y-z_release)/event_span
+    obs_start=max(aa,int(np.searchsorted(all_frames,math.ceil(release_abs*fps))))
+    obs_end=impact_idx+1
+    if obs_end-obs_start<6:
+        return _reject(diagnostics,"too_few_event_observations")
+    ids=np.arange(obs_start,obs_end,dtype=int)
+    p=np.clip(progress_full[ids],0.0,1.0)
+    monotone=float(np.mean(np.diff(p)>=-.02)) if len(p)>1 else 1.0
+    if monotone<float(identity_cfg.get("minimum_monotone_fraction",.78)):
+        return _reject(diagnostics,"monotone")
+
+    xdrift=float(np.ptp(x_all[ids]))/max(event_span,1e-9)
+    if xdrift>float(identity_cfg.get("maximum_x_drift_fraction",.45)):
+        return _reject(diagnostics,"x_drift")
+
+    frame_lo=int(all_frames[ids[0]]);frame_hi=int(all_frames[ids[-1]])
+    det_frames=np.asarray(chunk["detected_frames_original"],int)
+    detected=sum(1 for ff in det_frames if frame_lo<=int(ff)<=frame_hi)
+    detected_fraction=detected/max(1,frame_hi-frame_lo+1)
+    if detected_fraction<float(identity_cfg.get("minimum_detected_fraction",.45)):
+        return _reject(diagnostics,"detected_fraction")
+
+    # Split-half acceleration consistency is scale-free and therefore useful for
+    # ranking without consulting the target magnitude of gravity.
+    fit_ids=np.arange(aa,min(impact_idx+1,bb),dtype=int)
+    acc_parts=[]
+    if len(fit_ids)>=8:
+        mid=len(fit_ids)//2
+        for sub in (fit_ids[:max(4,mid+1)],fit_ids[max(0,mid-1):]):
+            if len(sub)<4:
+                continue
+            tt=all_frames[sub]/fps-float(all_frames[sub[0]]/fps)
+            zz=z_all[sub]
+            XX=np.column_stack([np.ones(len(tt)),tt,.5*tt*tt])
+            cc=float(np.linalg.lstsq(XX,zz,rcond=None)[0][2])
+            if math.isfinite(cc):
+                acc_parts.append(cc)
+    acc_stability=(
+        float(abs(acc_parts[0]-acc_parts[-1])/max(abs(c0),1e-9))
+        if len(acc_parts)>=2 else 0.0
+    )
+
+    # Convert normalized position residual to an approximate temporal residual for
+    # compatibility with the existing timing-quality field.
+    timing=float(shape*T*fps)
+    release_extrapolation_frames=max(0.0,-release_offset_frames)
+    start_speed_ratio=float(
+        abs(b0)/max(abs(b0+c0*max(impact_abs-float(t_abs[0]),0.0)),1e-9)
+    )
+
+    return validate_candidate({
+        "track_id":chunk["track_id"],"chunk_id":chunk["chunk_id"],
+        "sign":expected,
+        "span_px":float(event_span),
+        "local_span_px":float(local_span),
+        "low_px":float(z_release),
+        "high_px":float(z_impact),
+        "progress":progress_full,
+        "dense_frames":all_frames,
+        "abs_times":np.asarray(chunk["abs_times"],float),
+        "window_indices":ids,
+        "t0_s":release_abs,
+        "full_fall_time_s":float(T),
+        "timing_fit_rms_s":timing/fps,
+        "timing_fit_rms_frames":timing,
+        "trajectory_shape_rms_fraction":shape,
+        "release_speed_ratio":start_speed_ratio,
+        "x_drift_fraction":xdrift,
+        "monotone_fraction":monotone,
+        "gap_penalty":float(chunk["gap_penalty"]),
+        "detected_fraction":float(chunk["detected_fraction_chunk"]),
+        "detected_window_fraction":float(detected_fraction),
+        "identity_score":float(chunk["identity_score"]),
+        "median_circularity":float(chunk["median_circularity"]),
+        "median_solidity":float(chunk["median_solidity"]),
+        "median_circle_fill":float(chunk["median_circle_fill"]),
+        "median_axis_ratio":float(chunk["median_axis_ratio"]),
+        "radius_cv":float(chunk["radius_cv"]),
+        "area_cv":float(chunk["area_cv"]),
+        "aspect_log_median":float(chunk["aspect_log_median"]),
+        "interval_frames":int(round(T*fps)),
+        "observed_fragment_frames":int(frame_hi-frame_lo+1),
+        "inferred_full_fall_frames":float(T*fps),
+        "detected_frames":int(detected),
+        "global_progress_span":float(np.ptp(p)),
+        "global_progress_start":float(np.min(p)),
+        "global_progress_end":float(np.max(p)),
+        "duration_10_90_s":float(T*(math.sqrt(.90)-math.sqrt(.10))),
+        "roots_complete":1.0,
+        "acceleration_stability":acc_stability,
+        "event_extrapolation_frames":release_extrapolation_frames,
+        "release_extrapolation_frames":release_extrapolation_frames,
+        "impact_speed_ratio":float(impact_speed_ratio),
+        "impact_boundary_kind":impact_kind,
+        "release_plateau_track":-1,
+        "impact_plateau_track":-1,
+    })
+
+
+def choose_ballistic_track_v66(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
+    """V6.6 event-time selector: metric-free release/impact timing."""
+    cfg=identity_cfg or {}
+    selector_cfg=validate_selector_config(cfg)
+    chunks=_identity_track_chunks(tracks,fps,cfg)
+    if not chunks:
+        raise TrackSelectionError("no ball-like identity tracks for V6.6")
+
+    candidates=[]
+    rejection_counts={}
+    for chunk in chunks:
+        z=float(selector_cfg["expected_sign"])*np.asarray(chunk["y"],float)
+        scale=max(float(np.ptp(z)),1.0)
+        local_progress=(z-float(np.min(z)))/scale
+        for aa,bb in _monotone_runs(local_progress):
+            q=_fit_event_time_candidate_v66(
+                chunk,aa,bb,fps,selector_cfg,cfg,minimum_interval_frames,
+                diagnostics=rejection_counts
+            )
+            if q is not None:
+                candidates.append(q)
+
+    if not candidates:
+        raise TrackSelectionError(
+            "no release->impact constant-acceleration event survived V6.6; "
+            f"chunks={len(chunks)} rejects={json.dumps(rejection_counts,sort_keys=True)}"
+        )
+
+    def rank(q):
+        return (
+            float(q.get("impact_speed_ratio",1.0)),
+            float(q.get("release_extrapolation_frames",0.0)),
+            float(q.get("acceleration_stability",0.0)),
+            float(q["timing_fit_rms_frames"]),
+            float(q["trajectory_shape_rms_fraction"]),
+            -float(q["span_px"]),
+            -float(q["identity_score"]),
+            float(q["t0_s"]),
+        )
+    candidates=sorted(candidates,key=rank)
+    chosen=candidates[0]
+
+    audit=[]
+    for i,q in enumerate(candidates[:20],1):
+        audit.append({
+            "event_rank":i,"selected":q is chosen,
+            "track_id":q["track_id"],"sign":float(q["sign"]),
+            "t0_s":float(q["t0_s"]),
+            "local_span_px":float(q["local_span_px"]),
+            "spatial_envelope_px":float(q["span_px"]),
+            "relative_span":float(q["local_span_px"])/max(float(q["span_px"]),1e-9),
+            "global_progress_span":float(q["global_progress_span"]),
+            "global_progress_start":float(q["global_progress_start"]),
+            "global_progress_end":float(q["global_progress_end"]),
+            "full_fall_time_s":float(q["full_fall_time_s"]),
+            "interval_frames":int(q["interval_frames"]),
+            "observed_fragment_frames":int(q["observed_fragment_frames"]),
+            "inferred_full_fall_frames":float(q["inferred_full_fall_frames"]),
+            "detected_frames":int(q["detected_frames"]),
+            "detected_fraction":float(q["detected_window_fraction"]),
+            "timing_fit_rms_frames":float(q["timing_fit_rms_frames"]),
+            "trajectory_shape_rms_fraction":float(q["trajectory_shape_rms_fraction"]),
+            "release_speed_ratio":float(q["release_speed_ratio"]),
+            "x_drift_fraction":float(q["x_drift_fraction"]),
+            "gap_penalty":float(q["gap_penalty"]),
+            "identity_score":float(q["identity_score"]),
+            "median_circularity":float(q["median_circularity"]),
+            "median_solidity":float(q["median_solidity"]),
+            "median_circle_fill":float(q["median_circle_fill"]),
+            "median_axis_ratio":float(q["median_axis_ratio"]),
+            "radius_cv":float(q["radius_cv"]),
+            "area_cv":float(q["area_cv"]),
+            "aspect_log_median":float(q["aspect_log_median"]),
+            "acceleration_stability":float(q["acceleration_stability"]),
+            "event_extrapolation_frames":float(q["event_extrapolation_frames"]),
+            "release_extrapolation_frames":float(q["release_extrapolation_frames"]),
+            "impact_speed_ratio":float(q["impact_speed_ratio"]),
+            "impact_boundary_kind":q["impact_boundary_kind"],
+            "release_plateau_track":-1,
+            "impact_plateau_track":-1,
+        })
+    return chosen,audit
+
 def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     cfg=identity_cfg or {}
+    if cfg.get("revision")=="ball_identity_v6_6":
+        return choose_ballistic_track_v66(
+            tracks,fps,minimum_interval_frames=minimum_interval_frames,
+            identity_cfg=cfg
+        )
     if cfg.get("revision")=="ball_identity_v6_5":
         return choose_ballistic_track_v65(
             tracks,fps,minimum_interval_frames=minimum_interval_frames,
@@ -1730,8 +2035,13 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
     # acceleration estimate is the nuisance-velocity quadratic coefficient in
     # global spatial coordinates, not 2h/T^2 (which assumes release from rest is
     # directly observed).  Historical revisions retain the old diagnostic.
-    ghat=(float(chosen["normalized_acceleration_s2"])*drop_height
-          if "normalized_acceleration_s2" in chosen else release_rest_ghat)
+    if tracker_config and tracker_config.get("revision")=="ball_identity_v6_6":
+        # V6.6 is deliberately metric-free in image space: use independently
+        # measured drop height and release->impact event time only.
+        ghat=release_rest_ghat
+    else:
+        ghat=(float(chosen["normalized_acceleration_s2"])*drop_height
+              if "normalized_acceleration_s2" in chosen else release_rest_ghat)
 
     return {
         "fps":fps,
@@ -1834,7 +2144,7 @@ def self_test_video():
         # and a fragmented true ball drop. The ungated detector is expected to be
         # ambiguous; only the active V6.5 identity/kinematics path is under test here.
         v6cfg={
-            "revision":"ball_identity_v6_5",
+            "revision":"ball_identity_v6_6",
             "minimum_median_circularity":0.35,
             "minimum_median_solidity":0.65,
             "minimum_median_circle_fill":0.45,
@@ -1907,11 +2217,11 @@ def self_test_video():
                 "axis_ratio":.96,"radius":10.0,"aspect_log_abs":.02,
                 "appearance_score":10.0,
             })
-        chosen_evt,audit_evt=choose_ballistic_track_v65(
+        chosen_evt,audit_evt=choose_ballistic_track_v66(
             [{"id":1,"pts":pts,"missed":0}],
             fps,minimum_interval_frames=12,identity_cfg=v6cfg
         )
-        evt_g=float(chosen_evt["normalized_acceleration_s2"])*drop_m
+        evt_g=2.0*drop_m/(float(chosen_evt["full_fall_time_s"])**2)
         evt_rel=abs(evt_g-G)/G
         assert evt_rel<=.12,(evt_g,evt_rel,chosen_evt,audit_evt)
         assert chosen_evt["inferred_full_fall_frames"]>=12
@@ -2081,9 +2391,13 @@ def main():
                 qq["split"]=a.split
                 qq["release_rest_acceleration_m_s2"]=2.0*height/(float(q["full_fall_time_s"])**2)
                 qq["direct_acceleration_m_s2"]=(
-                    float(q["normalized_acceleration_s2"])*height
-                    if q.get("normalized_acceleration_s2","") not in ("",None)
-                    else qq["release_rest_acceleration_m_s2"]
+                    qq["release_rest_acceleration_m_s2"]
+                    if tg.get("revision")=="ball_identity_v6_6"
+                    else (
+                        float(q["normalized_acceleration_s2"])*height
+                        if q.get("normalized_acceleration_s2","") not in ("",None)
+                        else qq["release_rest_acceleration_m_s2"]
+                    )
                 )
                 qq["acceleration_relative_error"]=abs(qq["direct_acceleration_m_s2"]-G)/G
                 candidate_audit_rows.append(qq)
@@ -2097,7 +2411,7 @@ def main():
                 "timing_fit":tr["timing_fit_rms_frames"]<=tg.get("maximum_timing_fit_rms_frames",2.5),
                 "trajectory_shape":tr["trajectory_shape_rms_fraction"]<=tg.get("maximum_trajectory_shape_rms_fraction",.10),
                 "release_speed":(
-                    True if tg.get("revision")=="ball_identity_v6_5"
+                    True if tg.get("revision") in ("ball_identity_v6_5","ball_identity_v6_6")
                     else tr["release_speed_ratio"]<=tg.get("maximum_release_speed_ratio",.65)
                 ),
                 "x_drift":tr["x_drift_fraction"]<=tg.get("maximum_x_drift_fraction",.45),
@@ -2200,6 +2514,7 @@ def main():
                 "envelope_source_chunk","normalized_acceleration_s2",
                 "normalized_fit_a","normalized_fit_b","duration_10_90_s",
                 "roots_complete","acceleration_stability","event_extrapolation_frames",
+                "release_extrapolation_frames","impact_speed_ratio","impact_boundary_kind",
                 "release_plateau_track","impact_plateau_track",
                 "direct_acceleration_m_s2","release_rest_acceleration_m_s2",
                 "acceleration_relative_error"]
