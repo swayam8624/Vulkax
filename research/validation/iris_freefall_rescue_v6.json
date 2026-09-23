@@ -242,6 +242,6 @@
         "the remaining estimator still used 2h/T^2, which assumes the observed interval is anchored to zero-velocity release; development evidence shows the tracker often observes an interior flight fragment"
       ]
     },
-    "v6_5_change": "development-only redesign before fresh validation: retain global top-bottom spatial calibration, fit p(t)=a+b t+0.5 c t^2 on gravity-direction ball fragments with nuisance offset/velocity, infer release/impact roots without target gravity, rank by observed progress and internal constant-acceleration consistency, and use c*drop_height as the primary development acceleration diagnostic; gates/repair schedule/|S| unchanged"
+    "v6_5_change": "development-only redesign before fresh validation: retain ball identity and global top-bottom spatial calibration; fit p(t)=a+b t+0.5 c t^2 on the observed gravity-direction motion with nuisance position/velocity; exclude stationary holds from the kinematic fit; require sufficient observed moving-frame support rather than exact release/impact observation; treat full-event roots and release-rest timing as optional diagnostics; rank without target gravity; use c*drop_height as the primary development acceleration diagnostic; development/validation gates, repair schedule, and |S|=2 remain unchanged"
   }
 }
