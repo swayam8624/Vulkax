@@ -1,0 +1,116 @@
+name: IRIS free-fall V6 real development gate
+
+on:
+  pull_request:
+    paths:
+      - "research/analysis/run_iris_freefall_validation.py"
+      - "research/scripts/fetch_iris_freefall_rescue_v6.py"
+      - "research/scripts/run_iris_freefall_rescue_v6.sh"
+      - "research/validation/iris_freefall_rescue_v6.json"
+      - ".github/workflows/freefall-v6-real-development.yml"
+
+jobs:
+  real-development:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless==4.14.0.94"
+          python - <<'PY'
+          import cv2,numpy,sys
+          print("RUNTIME",sys.version.split()[0],cv2.__version__,numpy.__version__)
+          PY
+
+      - name: Preflight analyzer contracts and synthetic video
+        run: |
+          python -m py_compile research/analysis/run_iris_freefall_validation.py
+          python research/analysis/run_iris_freefall_validation.py --self-test
+          python research/analysis/run_iris_freefall_validation.py --self-test-video
+          python research/scripts/fetch_iris_freefall_rescue_v6.py \
+            --config research/validation/iris_freefall_rescue_v6.json \
+            --phase development --self-test
+
+      - name: Download real V6 development videos only
+        run: |
+          python research/scripts/fetch_iris_freefall_rescue_v6.py \
+            --data-root build/public-datasets \
+            --config research/validation/iris_freefall_rescue_v6.json \
+            --phase development
+
+      - name: Provide empty companion public-dataset manifests
+        run: |
+          mkdir -p build/public-datasets/gauge build/public-datasets/rgbench
+          cat > build/public-datasets/gauge/vulkax_download_manifest.json <<'JSON'
+          {"schema":"vulkax.public_dataset_download","version":1,"dataset":"gauge","repo_id":"InternRobotics/GAUGE-Dataset","revision":"ci-fixture","license":"MIT","citation_url":"https://huggingface.co/datasets/InternRobotics/GAUGE-Dataset","profile":"ci-empty","requested_patterns":[],"file_count":0,"total_bytes":0,"files":[]}
+          JSON
+          cat > build/public-datasets/rgbench/vulkax_download_manifest.json <<'JSON'
+          {"schema":"vulkax.public_dataset_download","version":1,"dataset":"rgbench","repo_id":"RGBench/RGBench-Cloth-Sim2Real-v1","revision":"ci-fixture","license":"CC-BY-4.0","citation_url":"https://huggingface.co/datasets/RGBench/RGBench-Cloth-Sim2Real-v1","profile":"ci-empty","requested_patterns":[],"file_count":0,"total_bytes":0,"files":[]}
+          JSON
+
+      - name: Prepare and adapt real development inputs
+        run: |
+          python research/analysis/prepare_public_validation_datasets.py \
+            --root build/public-datasets \
+            --out build/publication-validation/public-data
+          python research/analysis/adapt_public_validation_inputs.py \
+            --repo-root . \
+            --data-root build/public-datasets \
+            --prepared-root build/publication-validation/public-data
+
+      - name: Run real development analysis without aborting artifact collection
+        id: analyze
+        continue-on-error: true
+        run: |
+          python research/analysis/run_iris_freefall_validation.py \
+            --adapted-root build/publication-validation/public-data/adapted \
+            --config research/validation/iris_freefall_rescue_v6.json \
+            --split development \
+            --out build/publication-validation/iris-freefall-v6-development
+
+      - name: Print candidate audit and summary
+        if: always()
+        run: |
+          echo "=== summary.json ==="
+          cat build/publication-validation/iris-freefall-v6-development/summary.json || true
+          echo
+          echo "=== candidate_audit.csv ==="
+          cat build/publication-validation/iris-freefall-v6-development/candidate_audit.csv || true
+          echo
+          echo "=== failure_details.json ==="
+          cat build/publication-validation/iris-freefall-v6-development/failure_details.json || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iris-freefall-v6-real-development
+          path: build/publication-validation/iris-freefall-v6-development
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce real development gate
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path("build/publication-validation/iris-freefall-v6-development/summary.json")
+          if not p.is_file():
+              raise SystemExit("real development summary missing")
+          s=json.loads(p.read_text())
+          if s.get("implementation_errors",0):
+              raise SystemExit(f"implementation errors: {s['implementation_errors']}")
+          if not s.get("gate_pass"):
+              raise SystemExit(
+                  "REAL V6 DEVELOPMENT GATE FAILED: "
+                  f"quality={s.get('quality_pass_videos')}/{s.get('expected_videos')} "
+                  f"median_g_error={s.get('median_acceleration_relative_error')}"
+              )
+          print("VALID REAL V6 DEVELOPMENT GATE PASS")
+          PY
