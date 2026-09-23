@@ -85,7 +85,10 @@
     "minimum_relative_span_fraction": 0.7,
     "minimum_span_radius_ratio": 4,
     "minimum_ball_saturation": 80,
-    "minimum_ball_value": 55
+    "minimum_ball_value": 55,
+    "minimum_ball_hue": 0,
+    "maximum_ball_hue": 35,
+    "maximum_color_components_per_frame": 8
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -190,6 +193,6 @@
         "the IRIS dropping_ball class uses the same distinctive saturated soccer ball, visible in the public benchmark figure; appearance identity can isolate the target without using g"
       ]
     },
-    "v6_3_change": "development-only redesign: primary saturated-color ball tracker with motion fallback; require scale-free travel >=4 apparent ball radii; prefer color-source candidates when available; select earliest valid release event so later reset motion cannot win; no target-g or validation labels used"
+    "v6_3_change": "development-only redesign: full-frame orange/saturated ball tracker with motion fallback; HSV hue 0..35, saturation>=80, value>=55, top 8 shape-weighted components/frame; require scale-free travel >=4 apparent ball radii; prefer color-source candidates when available; select earliest valid release event so later reset motion cannot win; no target-g or validation labels used"
   }
 }
