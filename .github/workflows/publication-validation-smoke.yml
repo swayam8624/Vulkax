@@ -8,6 +8,9 @@ on:
       - "research/analysis/plan_validation_sample_size.py"
       - "research/analysis/analyze_transaction_utility.py"
       - "research/scripts/run_publication_validation.sh"
+      - "research/analysis/assemble_paper_evidence.py"
+      - "run_everything.sh"
+      - "research/paper_data/**"
       - ".github/workflows/publication-validation-smoke.yml"
   push:
     branches: ["main"]
