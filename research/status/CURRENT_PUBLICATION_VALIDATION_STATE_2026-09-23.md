@@ -68,19 +68,33 @@ The supported position is mixed:
 5. success on that one channel does not authorize universal physical-verification
    claims.
 
+## Reviewer-hardening extension
+
+A post-final hostile-reviewer campaign is now implemented but has not yet been
+promoted into result claims. It includes:
+
+- video-clustered statistics using the ten physical videos as the resampling unit;
+- direct-period and damped-nonlinear strong verification baselines;
+- GT-hidden proposal generation with proposal SHA closure before truth join;
+- noise/blur/frame-loss/temporal-subsampling/occlusion/crop robustness;
+- proposal/probe overlap-dependence sweeps;
+- measured rope-length truth-uncertainty sensitivity;
+- pinned official IRIS parameter-recovery reference tables;
+- evidence-driven measured-video rewrite-gating visuals;
+- a separately frozen non-pendulum IRIS free-fall replication.
+
+The free-fall campaign explicitly forbids all take-01 videos. Development uses
+drop_50/02-05, validation uses drop_100/02-05, and its nine-video final set is
+drop_150/02-10. The final downloader cannot request those nine videos until the
+free-fall validation gate passes and a domain-specific lock is created.
+
 ## Remaining publication extensions
 
-These are not prerequisites for preserving the locked IRIS result, but remain
-possible reviewer-facing strengthening work:
+After the hardening runs are executed, remaining optional strengthening includes:
 
-- explicit measurement-noise sweep;
-- pose-noise sweep;
-- missing-observation sweep;
-- proposal/probe dependence sweep;
-- RGBench cloth validation lane;
-- independent-sensor / physical-bench confirmation beyond same-video IRIS;
-- clustered confidence-interval and final per-factor detection-boundary reporting;
-- manuscript/figures/tables updated to the post-IRIS evidence story.
+- RGBench cloth validation;
+- genuinely independent-sensor / physical-bench confirmation;
+- any further graphics/system demonstration required by manuscript positioning.
 
-Any new method introduced after the IRIS final opening is a **post-final experiment**
-and must not replace the locked confirmatory result.
+Any new method introduced after the IRIS pendulum final opening is a
+**post-final experiment** and must not replace the locked confirmatory result.
