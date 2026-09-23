@@ -572,6 +572,8 @@ def main() -> int:
         "dataset_count": len({str(r["dataset"]) for r in rows}),
         "method_count": len({str(r["method"]) for r in rows}),
         "confirmatory_record_count": sum(bool(r["confirmatory_b"]) for r in rows),
+        "prospective_validation_record_count": sum(str(r["split"]) == "validation" for r in rows),
+        "prospective_development_record_count": sum(str(r["split"]) == "development" for r in rows),
         "retrospective_or_followon_record_count": sum(
             str(r["split"]) in {"retrospective", "frozen_followon"} for r in rows
         ),
