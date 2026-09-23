@@ -181,3 +181,23 @@ execution and may not be claimed from old data.
 - [x] final median rope-length relative error = 16.81%
 - [x] no post-final threshold/candidate/tracker retuning
 - [ ] independent-sensor or physical-bench confirmation beyond same-video IRIS, if required by venue/reviewer
+
+
+### Hostile-reviewer hardening
+- [x] 36-attack reviewer threat matrix committed
+- [x] video-clustered statistics implementation
+- [x] strong direct-period and damped-nonlinear baseline implementation
+- [x] GT-hidden proposal artifact with truth joined only after SHA closure
+- [x] corruption robustness battery implementation
+- [x] proposal/probe overlap-dependence sweep implementation
+- [x] measured-truth uncertainty sensitivity implementation
+- [x] pinned official IRIS reference-baseline importer
+- [x] evidence-driven rewrite storyboard/video generator
+- [x] second-domain free-fall protocol/config/final population frozen
+- [x] take-01 leakage explicitly forbidden in free-fall blind campaign
+- [x] lock-gated free-fall final downloader
+- [x] synthetic free-fall tracker CI regression
+- [ ] execute full pendulum post-final hardening runner and record outcomes
+- [ ] execute free-fall development/validation gate and record outcomes
+- [ ] if validation passes, execute the nine-video locked free-fall final test
+- [ ] update manuscript claims from actual hardening outputs, including failures
