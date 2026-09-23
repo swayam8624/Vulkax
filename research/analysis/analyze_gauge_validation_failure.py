@@ -6,7 +6,7 @@ run the simulator, change thresholds, change candidates, or inspect final-test
 repeats.
 """
 from __future__ import annotations
-import argparse,csv,json,math,pathlib,statistics
+import argparse,csv,json,math,pathlib,statistics,tempfile
 
 FRACTIONS=(0.25,0.50,0.75)
 WEIGHTS=(0.25,-0.50,0.25)
@@ -55,6 +55,19 @@ def representations(path,indices,ids):
     if ids2!=ids: raise ValueError(f"marker mismatch: {path}")
     return {"witness":witness(fr,ids,indices),"raw":response(fr,ids,indices)}
 
+def adapted_scene_map(adapted_root):
+    out={}
+    gauge=adapted_root/"gauge"
+    for p in gauge.glob("*/validation_manifest.json"):
+        m=json.loads(p.read_text(encoding="utf-8"))
+        scene=m.get("validation_scene")
+        if not scene:
+            raise ValueError(f"missing validation_scene in {p}")
+        if scene in out:
+            raise ValueError(f"duplicate adapted GAUGE scene: {scene}")
+        out[scene]=p.parent
+    return out
+
 def finite_div(a,b):
     return a/b if b>0 else None
 
@@ -69,18 +82,37 @@ def main():
     ap.add_argument("--adapted-root",type=pathlib.Path,
                     default=pathlib.Path("build/publication-validation/public-data/adapted"))
     ap.add_argument("--out",type=pathlib.Path)
+    ap.add_argument("--self-test",action="store_true")
     a=ap.parse_args()
+    if a.self_test:
+        with tempfile.TemporaryDirectory() as td:
+            root=pathlib.Path(td)/"adapted"
+            d=root/"gauge"/"foam_compression__hard__05"
+            d.mkdir(parents=True)
+            (d/"validation_manifest.json").write_text(
+                json.dumps({"validation_scene":"foam compression/hard/05"})+"\n",
+                encoding="utf-8")
+            mm=adapted_scene_map(root)
+            assert mm["foam compression/hard/05"]==d
+        print("VALID GAUGE forensic adapted-scene lookup self-test")
+        return
     out=a.out or (a.campaign/"forensics")
     out.mkdir(parents=True,exist_ok=True)
 
     cases=read_csv(a.campaign/"case_summary.csv")
     by_key={(r["scene"],r["truth"]):r for r in cases}
+    adapted_map=adapted_scene_map(a.adapted_root)
     details=[]
     for (scene,truth),row in sorted(by_key.items()):
         if truth=="unresolved":
             continue
         case_dir=a.campaign/scene.replace("/","__")
-        adapted=a.adapted_root/"gauge"/scene.replace("/","__")
+        if scene not in adapted_map:
+            raise FileNotFoundError(
+                f"no adapted GAUGE package for scene {scene!r}; "
+                f"available={sorted(adapted_map)[:8]}..."
+            )
+        adapted=adapted_map[scene]
         measured,ids=load_markers(adapted/"markers.csv")
         idx=peak_progress_indices(load_driver(adapted/"driver.csv"))
         meas={"witness":witness(measured,ids,idx),"raw":response(measured,ids,idx)}
