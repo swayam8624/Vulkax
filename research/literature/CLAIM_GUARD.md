@@ -154,3 +154,47 @@ A stronger prospective verification claim now requires a new untouched experimen
 with materially greater information content and, for a measured-world claim, real
 independent sensing rather than another retuning of the current synthetic
 force-compliance partition.
+
+
+## IRIS locked final-test claim guard — 2026-09-23
+
+A new real-video lane was frozen after the 45-degree IRIS validation forensic and
+then executed once on the untouched 90-degree setting.
+
+Locked final facts:
+- physical final-test units: **10 real videos**;
+- all 10 passed the frozen tracker quality gates;
+- median period-inferred rope-length relative error: **16.81%**;
+- finite-amplitude period probe: **90/110 = 81.82% strict accuracy**;
+- matched small-angle baseline: **40/110 = 36.36% strict accuracy**;
+- finite-amplitude SUPPORT: **40/50**;
+- finite-amplitude VETO: **40/50**;
+- finite-amplitude UNRESOLVED/placebo: **10/10**;
+- paired finite-amplitude-only correct: **50**;
+- paired small-angle-only correct: **0**;
+- paired ties: **60**;
+- global `|z|=2` threshold unchanged;
+- final tracker/candidate schedule/population unchanged after opening.
+
+The following narrow statement is now allowed:
+
+> On a locked ten-video IRIS pendulum final set at a previously untouched
+> 90-degree regime, a finite-amplitude period-based physical interrogation
+> achieved 90/110 correct controlled SUPPORT/VETO/UNRESOLVED decisions versus
+> 40/110 for a matched small-angle baseline, while preserving 10/10 placebo
+> abstentions.
+
+The following remain forbidden:
+- calling the IRIS observation an independent sensor modality;
+- claiming Reality Probe is universally reliable across physical channels;
+- claiming cloth/material/collision verification from the pendulum result;
+- treating 220 confirmatory rows as 220 independent physical experiments;
+- erasing the GAUGE information-limit failure or D2/D3/D4V negative results;
+- claiming exact material recovery from the final videos;
+- calling the finite-amplitude period equation itself novel;
+- replacing the locked final result with a post-final retuned method.
+
+The broader paper-level interpretation may now state that verification success is
+**information/channel dependent**: the tested DCS and GAUGE regimes can remain
+non-identifying, while a better-matched physical observable can produce useful
+locked decisions on a fresh real-video regime.

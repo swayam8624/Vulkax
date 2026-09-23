@@ -96,15 +96,43 @@ GAUGE:
 
 This is retrospective and must remain labelled as such.
 
+### C7 — Locked real-video physical interrogation
+
+A new IRIS pendulum lane tests a physically matched observable rather than another
+same-partition DCS retune.
+
+Frozen sequence:
+- development: pendulum_20, 10/10 quality-pass;
+- validation: pendulum_45, 10/10 quality-pass;
+- validation forensic before final opening: truth controls 100%, placebo 100%,
+  large effects 100%, dose-direction sign 100%, dose Spearman 0.974943, paired
+  finite-amplitude wins 18–0;
+- final population: untouched pendulum_90 takes 01–10;
+- global |z|=2 threshold and method configuration frozen before opening.
+
+Locked final result:
+- finite-amplitude period probe: **90/110 = 81.82% strict accuracy**;
+- small-angle baseline: **40/110 = 36.36%**;
+- primary SUPPORT: **40/50**;
+- primary VETO: **40/50**;
+- primary placebo: **10/10**;
+- paired comparison: **50 primary-only wins, 0 baseline-only wins, 60 ties**;
+- median final rope-length relative error: **16.81%**.
+
+This is narrow positive real-video confirmation for an information-matched
+period-based interrogation. It does not turn DCS into a solved universal verifier.
+
 ## Final scientific thesis
 
 The paper should defend:
 
 > Observational improvement is not equivalent to physical improvement in captured
-> executable worlds. Mechanism-sensitive verification can itself fail because the
-> experiment does not contain enough discriminating physical information. Adding an
-> orthogonal physical channel can sharply increase observability without necessarily
-> reaching a credible verification decision.
+> executable worlds. Verification is information- and channel-dependent: some
+> interventions remain non-identifying and should be left unresolved, while a
+> physically matched interrogation can produce materially stronger locked decisions
+> on a fresh real regime. Vulkax therefore treats SUPPORT, VETO, and UNRESOLVED as
+> evidence-governed outcomes rather than assuming every repair is verifiable from the
+> observations that proposed it.
 
 ## What the paper is not
 
@@ -115,9 +143,20 @@ It is not:
 - a new finite-difference theorem;
 - a new Möbius inversion theorem;
 - a new optimal-experiment-design theorem;
-- a measured force-sensor validation paper.
+- a measured force-sensor validation paper;
+- a claim that the IRIS pendulum result generalizes to every captured-world physics class.
 
-## Why unresolved decisions are publishable here
+## Why mixed resolved and unresolved decisions are publishable here
+
+The research now contains both kinds of outcomes:
+- DCS/GAUGE regimes that expose an information boundary and preserve abstention;
+- an untouched IRIS final regime where the matched finite-amplitude probe achieves
+  substantially higher locked three-way accuracy than the small-angle baseline.
+
+This combination is the point: the verification contract should resolve only when
+the interrogation carries enough relevant physical information.
+
+## Historical unresolved-result rationale
 
 “Unresolved” is the system-level decision.
 

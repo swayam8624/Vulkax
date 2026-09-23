@@ -50,7 +50,7 @@ accuracy number before the per-dose validation forensic is inspected.
 
 ## Final-test policy
 
-The `pendulum_90` final-test setting remains unopened.
+The `pendulum_90` final-test setting was subsequently opened exactly once under the frozen IRIS-specific lock; see `research/status/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.md`.
 
 Before deciding whether to freeze the finite-amplitude method for final test, run
 the descriptive validation forensic over the existing 220 validation records. It
@@ -94,3 +94,23 @@ This supports freezing the finite-amplitude method for the reserved 90-degree fi
 test without changing the global |z|=2 threshold, tracker, candidate schedule, or
 quality gates. This readiness classification is explicitly post-hoc descriptive;
 it is not presented as a preregistered confirmatory gate.
+
+
+## Locked final-test completion
+
+The reserved `pendulum_90` partition was subsequently executed under the frozen
+lock at commit `9e56f06145b8a56dd26c1c81e064ed9b185c77d7`.
+
+Headline final result:
+- 10/10 real videos passed the frozen quality gates;
+- finite-amplitude period probe: **90/110 = 81.82% strict accuracy**;
+- small-angle baseline: **40/110 = 36.36% strict accuracy**;
+- primary SUPPORT: **40/50**;
+- primary VETO: **40/50**;
+- primary placebo/UNRESOLVED: **10/10**;
+- paired primary-only correct: **50**;
+- paired baseline-only correct: **0**;
+- median rope-length relative error: **16.81%**;
+- confirmatory rows: **220**, arising from **10 physical video units**.
+
+The final result is frozen and must not be retuned.
