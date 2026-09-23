@@ -671,7 +671,6 @@ def choose_ballistic_track_legacy(tracks,fps,minimum_interval_frames=12,identity
             "spatial_envelope_px":float(q["span_px"]),
             "relative_span":float(q["local_span_px"])/max(float(q["span_px"]),1e-9),
             "global_progress_span":float(q["global_progress_span"]),
-            "raw_global_progress_span":float(q.get("raw_global_progress_span",q["global_progress_span"])),
             "global_progress_start":float(q["global_progress_start"]),
             "global_progress_end":float(q["global_progress_end"]),
             "full_fall_time_s":float(q["full_fall_time_s"]),
@@ -941,7 +940,6 @@ def _fit_global_fragment(chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
         "interval_frames":int(bb-aa),
         "detected_frames":int(detected),
         "global_progress_span":pspan,
-        "raw_global_progress_span":raw_pspan,
         "global_progress_start":float(np.min(p)),
         "global_progress_end":float(np.max(p)),
         "spatial_envelope_top_px":float(top),
@@ -1809,7 +1807,7 @@ def self_test_video():
 
         # This regression intentionally includes a cleaner rectangular parabola
         # and a fragmented true ball drop. The ungated detector is expected to be
-        # ambiguous; only the frozen V6.3 identity-gated path is under test here.
+        # ambiguous; only the active V6.5 identity/kinematics path is under test here.
         v6cfg={
             "revision":"ball_identity_v6_5",
             "minimum_median_circularity":0.35,
