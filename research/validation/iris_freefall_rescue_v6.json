@@ -187,6 +187,17 @@
         "partial gravity fragments must be timed in a global full-drop coordinate rather than interpreted as 100% of the physical drop"
       ]
     },
-    "v6_3_change": "development-only redesign: estimate full top-bottom pixel envelope from all ball-like motion, use reset only as spatial calibration, keep only downward gravity-direction fragments, fit t=t0+T*sqrt(p_global) in global progress coordinates, and rank by global timing/shape fit; target g remains absent from selection"
+    "v6_3_change": "development-only redesign: estimate full top-bottom pixel envelope from all ball-like motion, use reset only as spatial calibration, keep only downward gravity-direction fragments, fit t=t0+T*sqrt(p_global) in global progress coordinates, and rank by global timing/shape fit; target g remains absent from selection",
+    "v6_3_implementation_error": {
+      "observed_on": "2026-09-23",
+      "split": "drop_50/06..10",
+      "tracker_revision": "ball_identity_v6_3",
+      "error": "NameError: name 'reject' is not defined",
+      "root_cause": "V6.3 fragment rejection branches called a helper that existed only in a different legacy function scope; legacy recalibration also referenced diagnostics without declaring it",
+      "experimental_interpretation": "none; all five takes crashed before scientific evaluation",
+      "validation_downloaded": false,
+      "validation_analyzed": false,
+      "fix": "module-level _reject helper; explicit diagnostics signatures; rejection-path self-tests; pyflakes in CI and local preflight"
+    }
   }
 }

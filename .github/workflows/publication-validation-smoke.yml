@@ -195,6 +195,11 @@ jobs:
           python3 research/analysis/summarize_iris_pendulum_final_test.py --self-test
           python3 research/scripts/fetch_iris_pendulum_repeats.py --self-test
 
+      - name: Free-fall static analysis
+        run: |
+          python3 -m pip install --quiet "pyflakes>=3.2,<4"
+          python3 -m pyflakes research/analysis/run_iris_freefall_validation.py
+
       - name: Shell syntax
         run: |
           bash -n run_everything.sh
@@ -221,7 +226,7 @@ jobs:
 
       - name: IRIS synthetic-video tracker regression
         run: |
-          python3 -m pip install --quiet "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
+          python3 -m pip install --quiet "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5" "pyflakes>=3.2,<4"
           python3 research/analysis/run_iris_pendulum_validation.py --self-test-video
           python3 research/analysis/run_iris_freefall_validation.py --self-test-video
 

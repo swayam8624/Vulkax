@@ -36,6 +36,16 @@ class TrackSelectionError(FreefallValidationError):
 class ContractError(FreefallValidationError):
     """Internal producer/consumer or configuration contract violation."""
 
+def _reject(diagnostics, reason):
+    """Record a controlled candidate rejection and return None.
+
+    This helper is deliberately module-level so no rejection path depends on a
+    closure existing in another function/scope.
+    """
+    if diagnostics is not None:
+        diagnostics[reason]=int(diagnostics.get(reason,0))+1
+    return None
+
 CANDIDATE_NUMERIC_FIELDS=(
     "span_px","full_fall_time_s","timing_fit_rms_frames",
     "trajectory_shape_rms_fraction","release_speed_ratio",
@@ -503,13 +513,10 @@ def _global_spatial_envelope(candidates):
         )
     return top,bottom,span,len(by_track)
 
-def _recalibrate_gravity_candidate(candidate,top,bottom,envelope_px,fps,selector_cfg):
+def _recalibrate_gravity_candidate(candidate,top,bottom,envelope_px,fps,selector_cfg,
+                                  diagnostics=None):
     """Fit full fall time from a partial downward fragment in global coordinates."""
     expected_sign=float(selector_cfg["expected_sign"])
-    diagnostics=diagnostics if diagnostics is not None else {}
-    def reject(name):
-        diagnostics[name]=diagnostics.get(name,0)+1
-        return None
     if float(candidate["sign"])!=expected_sign:
         return None
 
@@ -528,18 +535,18 @@ def _recalibrate_gravity_candidate(candidate,top,bottom,envelope_px,fps,selector
     keep=np.isfinite(p)&np.isfinite(t)&(p>=-0.05)&(p<=1.05)
     p=p[keep];t=t[keep];ids=ids[keep]
     if len(p)<6:
-        return reject("too_few_points")
+        return _reject(diagnostics,"too_few_points")
 
     order=np.argsort(t)
     p=p[order];t=t[order];ids=ids[order]
     p=np.clip(p,0.0,1.0)
     pspan=float(np.max(p)-np.min(p))
     if pspan<float(selector_cfg["minimum_global_progress_span"]):
-        return reject("progress_span")
+        return _reject(diagnostics,"progress_span")
 
     monotone=float(np.mean(np.diff(p)>=-.02)) if len(p)>1 else 0.0
     if monotone<.78:
-        return reject("monotone")
+        return _reject(diagnostics,"monotone")
 
     sqrtp=np.sqrt(np.clip(p,0.0,1.0))
     if float(np.ptp(sqrtp))<0.08:
@@ -548,13 +555,13 @@ def _recalibrate_gravity_candidate(candidate,top,bottom,envelope_px,fps,selector
     coef=np.linalg.lstsq(A,t,rcond=None)[0]
     t0=float(coef[0]);T=float(coef[1])
     if not math.isfinite(T) or T<=0 or T>1.25:
-        return reject("invalid_T")
+        return _reject(diagnostics,"invalid_T")
 
     pred=A@coef
     timing_rms_s=float(np.sqrt(np.mean((t-pred)**2)))
     timing_rms_frames=timing_rms_s*fps
     if timing_rms_frames>float(selector_cfg["maximum_global_timing_fit_rms_frames"]):
-        return reject("timing_rms")
+        return _reject(diagnostics,"timing_rms")
 
     pred_p=np.square(np.clip((t-t0)/T,0.0,1.0))
     shape_rms=float(np.sqrt(np.mean((p-pred_p)**2)))
@@ -612,15 +619,18 @@ def choose_ballistic_track_legacy(tracks,fps,minimum_interval_frames=12,identity
 
     top,bottom,envelope_px,envelope_tracks=_global_spatial_envelope(raw_candidates)
     calibrated=[]
+    legacy_rejections={}
     for q in raw_candidates:
         z=_recalibrate_gravity_candidate(
-            q,top,bottom,envelope_px,fps,selector_cfg
+            q,top,bottom,envelope_px,fps,selector_cfg,
+            diagnostics=legacy_rejections
         )
         if z is not None:
             calibrated.append(z)
     if not calibrated:
         raise TrackSelectionError(
-            "no downward ball fragment survived global-envelope free-fall calibration"
+            "no downward ball fragment survived global-envelope free-fall calibration; "
+            f"rejects={json.dumps(legacy_rejections,sort_keys=True)}"
         )
 
     # The spatial envelope may come from the later slow reset, but timing selection
@@ -832,46 +842,46 @@ def _fit_global_fragment(chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
     keep=np.isfinite(p)&np.isfinite(t)&(p>=-0.05)&(p<=1.05)
     p=p[keep];t=t[keep];x=x[keep]
     if len(p)<6:
-        return None
+        return _reject(diagnostics,"too_few_points")
     p=np.clip(p,0.0,1.0)
     pspan=float(np.ptp(p))
     if pspan<float(selector_cfg["minimum_global_progress_span"]):
-        return None
+        return _reject(diagnostics,"progress_span")
     monotone=float(np.mean(np.diff(p)>=-.02)) if len(p)>1 else 0.0
     if monotone<.78:
-        return None
+        return _reject(diagnostics,"monotone")
     sqrtp=np.sqrt(p)
     if float(np.ptp(sqrtp))<.08:
-        return reject("sqrt_progress_span")
+        return _reject(diagnostics,"sqrt_progress_span")
     A=np.column_stack([np.ones(len(p)),sqrtp])
     coef=np.linalg.lstsq(A,t,rcond=None)[0]
     t0=float(coef[0]);T=float(coef[1])
     if not math.isfinite(T) or T<=0 or T>1.25:
-        return None
+        return _reject(diagnostics,"invalid_T")
     if T*fps<minimum_interval_frames:
-        return reject("full_duration")
+        return _reject(diagnostics,"full_duration")
     pred=A@coef
     timing_rms_s=float(np.sqrt(np.mean((t-pred)**2)))
     timing_rms_frames=timing_rms_s*fps
     if timing_rms_frames>float(selector_cfg["maximum_global_timing_fit_rms_frames"]):
-        return None
+        return _reject(diagnostics,"timing_rms")
     pred_p=np.square(np.clip((t-t0)/T,0.0,1.0))
     shape=float(np.sqrt(np.mean((p-pred_p)**2)))
     if shape>.12:
-        return reject("shape_rms")
+        return _reject(diagnostics,"shape_rms")
 
     trel=t-t0
     X=np.column_stack([np.ones(len(trel)),trel,.5*trel*trel])
     qcoef=np.linalg.lstsq(X,p,rcond=None)[0]
     qa,qb,qc=map(float,qcoef)
     if qc<=0:
-        return reject("nonpositive_acceleration")
+        return _reject(diagnostics,"nonpositive_acceleration")
     release_ratio=abs(qb)/max(abs(qc*T),1e-9)
     if release_ratio>.65:
-        return reject("release_speed")
+        return _reject(diagnostics,"release_speed")
     x_drift=float(np.ptp(x))/max(envelope_px,1e-9)
     if x_drift>.45:
-        return reject("x_drift")
+        return _reject(diagnostics,"x_drift")
 
     # Number of actually observed detections inside this dense fragment.
     frame_lo=int(chunk["frames"][aa]);frame_hi=int(chunk["frames"][bb-1])
@@ -881,7 +891,7 @@ def _fit_global_fragment(chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
     )
     detected_fraction=detected/max(1,bb-aa)
     if detected_fraction<.45:
-        return reject("detected_fraction")
+        return _reject(diagnostics,"detected_fraction")
 
     progress_full=np.full(len(chunk["frames"]),np.nan,float)
     if expected_sign>0:
@@ -1335,6 +1345,56 @@ def main():
             pass
         else:
             raise AssertionError("invalid global progress span was accepted")
+
+        # Rejection helper is total and records reasons without relying on closure
+        # scope. This is a direct regression for the V6.3 NameError incident.
+        diag={}
+        assert _reject(diag,"unit_test") is None
+        assert diag=={"unit_test":1}
+
+        # V6.3 fragment rejection must be controlled (None + reason), never an
+        # exception. Use a nearly stationary fragment to force progress_span.
+        selector_cfg={
+            "expected_sign":1.0,
+            "minimum_global_progress_span":0.15,
+            "maximum_global_timing_fit_rms_frames":2.5,
+        }
+        chunk={
+            "track_id":1,"chunk_id":0,
+            "frames":np.arange(12,dtype=int),
+            "abs_times":np.arange(12,dtype=float)/60.0,
+            "x":np.zeros(12,dtype=float),
+            "y":np.linspace(100.0,105.0,12),
+            "detected_frames_original":np.arange(12,dtype=int),
+            "detected_fraction_chunk":1.0,
+            "gap_penalty":0.0,"identity_score":0.9,
+            "median_circularity":0.9,"median_solidity":0.95,
+            "median_circle_fill":0.9,"median_axis_ratio":0.95,
+            "radius_cv":0.05,"area_cv":0.05,"aspect_log_median":0.02,
+        }
+        diag={}
+        bad=_fit_global_fragment(
+            chunk,0,12,0.0,220.0,220.0,60.0,selector_cfg,12,
+            diagnostics=diag
+        )
+        assert bad is None
+        assert diag.get("progress_span",0)==1,diag
+
+        # Static scope guard: reject(...) must never be called as a free/local
+        # name. Use AST rather than source-string matching so the test does not
+        # trigger on its own assertion text or comments.
+        import ast,inspect
+        tree=ast.parse(pathlib.Path(__file__).read_text())
+        bad=[
+            (getattr(node,"lineno",None),ast.unparse(node))
+            for node in ast.walk(tree)
+            if isinstance(node,ast.Call)
+            and isinstance(node.func,ast.Name)
+            and node.func.id=="reject"
+        ]
+        assert not bad,bad
+        sig=inspect.signature(_recalibrate_gravity_candidate)
+        assert "diagnostics" in sig.parameters,sig
 
         print("VALID IRIS free-fall analyzer self-test");return
     if a.self_test_video:
