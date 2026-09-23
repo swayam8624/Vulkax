@@ -123,10 +123,14 @@ def import_cv():
     except ImportError as e:raise SystemExit("opencv-python-headless required") from e
     return cv2
 
-def resize_gray(frame,width,cv2):
+def resize_frame(frame,width,cv2):
     h,w=frame.shape[:2];scale=width/w
-    q=cv2.resize(frame,(width,max(1,int(round(h*scale)))),interpolation=cv2.INTER_AREA) if w!=width else frame
-    return cv2.cvtColor(q,cv2.COLOR_BGR2GRAY)
+    return cv2.resize(
+        frame,(width,max(1,int(round(h*scale)))),interpolation=cv2.INTER_AREA
+    ) if w!=width else frame
+
+def resize_gray(frame,width,cv2):
+    return cv2.cvtColor(resize_frame(frame,width,cv2),cv2.COLOR_BGR2GRAY)
 
 def smooth1(x,n=5):
     x=np.asarray(x,float)
@@ -188,7 +192,85 @@ def extract_components(diff_crop,threshold,cv2,x0,y0):
             "axis_ratio":float(np.clip(axis_ratio,0.0,1.0)),
             "radius":float(radius),
             "aspect_log_abs":float(abs(math.log(max(aspect,1e-9)))),
-            "appearance_score":mean_diff*(compact+.02)
+            "appearance_score":mean_diff*(compact+.02),
+            "source":"motion",
+        })
+    return out
+
+
+def extract_saturated_components(frame_resized,cv2,x0,y0,x1,y1,cfg):
+    """Detect the distinctive saturated ball appearance without using physics truth.
+
+    IRIS dropping_ball uses the same colored soccer ball across takes. We use only
+    saturation/value and geometric compactness; no target g, drop height, or
+    validation labels enter this measurement cue.
+    """
+    cfg=cfg or {}
+    min_sat=int(cfg.get("minimum_ball_saturation",80))
+    min_val=int(cfg.get("minimum_ball_value",55))
+    roi=frame_resized[y0:y1,x0:x1]
+    if roi.size==0:return []
+    hsv=cv2.cvtColor(roi,cv2.COLOR_BGR2HSV)
+    sat=hsv[:,:,1];val=hsv[:,:,2]
+    mm=((sat>=min_sat)&(val>=min_val)).astype(np.uint8)*255
+    mm=cv2.morphologyEx(
+        mm,cv2.MORPH_CLOSE,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(9,9))
+    )
+    mm=cv2.morphologyEx(
+        mm,cv2.MORPH_OPEN,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
+    )
+    nlab,labels,stats,cent=cv2.connectedComponentsWithStats(mm,connectivity=8)
+    roi_area=max(1,roi.shape[0]*roi.shape[1])
+    out=[]
+    for lab in range(1,nlab):
+        area=int(stats[lab,cv2.CC_STAT_AREA])
+        bw=int(stats[lab,cv2.CC_STAT_WIDTH]);bh=int(stats[lab,cv2.CC_STAT_HEIGHT])
+        if area<10 or area>.05*roi_area or bw<=0 or bh<=0:continue
+        aspect=bw/bh
+        if not (.25<=aspect<=4.0):continue
+        fill=area/max(1,bw*bh)
+        if fill<.10:continue
+        cx,cy=cent[lab]
+        component_mask=(labels==lab).astype(np.uint8)*255
+        contours,_=cv2.findContours(
+            component_mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE
+        )
+        contour=max(contours,key=cv2.contourArea) if contours else None
+        contour_area=float(cv2.contourArea(contour)) if contour is not None else 0.0
+        perimeter=float(cv2.arcLength(contour,True)) if contour is not None else 0.0
+        circularity=(4.0*math.pi*contour_area/(perimeter*perimeter)) if perimeter>1e-9 else 0.0
+        circularity=float(np.clip(circularity,0.0,1.0))
+        hull=cv2.convexHull(contour) if contour is not None and len(contour)>=3 else None
+        hull_area=float(cv2.contourArea(hull)) if hull is not None else 0.0
+        solidity=float(np.clip(contour_area/max(hull_area,1e-9),0.0,1.0))
+        if contour is not None and len(contour)>=3:
+            (_, _),radius=cv2.minEnclosingCircle(contour)
+            circle_area=math.pi*float(radius)*float(radius)
+            circle_fill=float(np.clip(contour_area/max(circle_area,1e-9),0.0,1.0))
+            rect=cv2.minAreaRect(contour)
+            rw,rh=map(float,rect[1])
+            axis_ratio=(min(rw,rh)/max(rw,rh)) if max(rw,rh)>1e-9 else 0.0
+        else:
+            radius=0.0;circle_fill=0.0;axis_ratio=0.0
+        mean_sat=float(np.mean(sat[labels==lab]))
+        mean_val=float(np.mean(val[labels==lab]))
+        compact=fill/math.sqrt(max(area,1))
+        out.append({
+            "x":float(cx+x0),"y":float(cy+y0),"area":area,
+            "contour_area":contour_area,
+            "w":bw,"h":bh,"fill":fill,"mean_diff":mean_sat,
+            "circularity":circularity,
+            "solidity":solidity,
+            "circle_fill":circle_fill,
+            "axis_ratio":float(np.clip(axis_ratio,0.0,1.0)),
+            "radius":float(radius),
+            "aspect_log_abs":float(abs(math.log(max(aspect,1e-9)))),
+            "appearance_score":mean_sat*(compact+.02),
+            "mean_saturation":mean_sat,
+            "mean_value":mean_val,
+            "source":"color",
         })
     return out
 
@@ -247,7 +329,10 @@ def build_temporal_tracks(frame_candidates,fps):
         active=survivors
         for ci in sorted(unmatched):
             cc=dict(cands[ci]);cc["frame"]=frame_idx
-            active.append({"id":next_id,"pts":[cc],"missed":0});next_id+=1
+            active.append({
+                "id":next_id,"pts":[cc],"missed":0,
+                "source":cc.get("source","motion")
+            });next_id+=1
     for tr in active:
         if len(tr["pts"])>=6:finished.append(tr)
     return finished
@@ -424,7 +509,8 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
                       -detected_window_fraction,
                       x_drift,release_ratio,-span)
                 cand={
-                    "rank":rank,"track_id":track["id"],"sign":sign,
+                    "rank":rank,"track_id":track["id"],
+                    "track_source":track.get("source","motion"),"sign":sign,
                     "span_px":span,"span_radius_ratio":span/max(median_radius_px,1e-9),
                     "median_radius_px":median_radius_px,
                     "low_px":low,"high_px":high,
@@ -483,27 +569,34 @@ def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=No
             "no temporally consistent full-flight progress track survived frozen filters"
         )
 
-    # Identity is an eligibility gate, not the primary optimization target.
-    # The physical ball's release and reset can both be very ball-like. Require
-    # near-maximal ball travel first, then choose the fastest full-travel event.
+    # V6.3: identity is an eligibility gate. Cross-track maximum span is not:
+    # reset/handling can cover more pixels than the true drop. Instead require a
+    # scale-free travel of several apparent ball radii, then prefer the dedicated
+    # saturated-color measurement path when it exists. Within that pool select the
+    # earliest release-like event; later same-ball reset motion cannot outrank it.
     max_span=max(float(q["span_px"]) for q in candidates)
-    span_floor=max_span*min_span_fraction
-    eligible=[q for q in candidates if float(q["span_px"])>=span_floor]
-    if not eligible:
-        raise ContractError(
-            "relative-span filter removed every candidate; selector invariant violated"
+    min_span_radii=float(identity_cfg.get("minimum_span_radius_ratio",4.0))
+    scale_eligible=[
+        q for q in candidates
+        if float(q.get("span_radius_ratio",0.0))>=min_span_radii
+    ]
+    if not scale_eligible:
+        raise TrackSelectionError(
+            f"no candidate spans >= {min_span_radii} apparent ball radii"
         )
+    color=[q for q in scale_eligible if q.get("track_source")=="color"]
+    eligible=color if color else scale_eligible
 
     def event_rank(q):
         return (
-            float(q["full_fall_time_s"]),
+            float(q["t10_s"]),
             float(q["timing_fit_rms_frames"]),
             float(q["trajectory_shape_rms_fraction"]),
             float(q["release_speed_ratio"]),
+            float(q["full_fall_time_s"]),
             float(q["x_drift_fraction"]),
             -float(q["detected_window_fraction"]),
             -float(q["identity_score"]),
-            -float(q["span_px"]),
         )
 
     eligible=sorted(eligible,key=event_rank)
@@ -516,6 +609,7 @@ def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=No
             "event_rank":i,
             "selected":q is chosen,
             "track_id":q["track_id"],
+            "track_source":q.get("track_source","motion"),
             "sign":float(q["sign"]),
             "t0_s":float(q["t0_s"]),
             "t10_s":float(q["t10_s"]),
@@ -541,7 +635,11 @@ def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=No
             "radius_cv":float(q["radius_cv"]),
             "area_cv":float(q["area_cv"]),
             "aspect_log_median":float(q["aspect_log_median"]),
-            "passes_relative_span":float(q["span_px"])>=span_floor,
+            "passes_relative_span":float(q["span_px"])>=max_span*min_span_fraction,
+            "passes_scale_span":float(q.get("span_radius_ratio",0.0))>=min_span_radii,
+            "in_selected_source_pool":(
+                q.get("track_source")=="color" if color else True
+            ),
         })
     return chosen,audit
 
@@ -570,20 +668,34 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
     else:x0=yy0=0;y1,x1=bg.shape
 
     frame_candidates=[]
+    color_frame_candidates=[]
     cap=cv2.VideoCapture(str(video));i=0
     while i<n:
         ok,fr=cap.read()
         if not ok:break
-        g=resize_gray(fr,width,cv2)
+        resized=resize_frame(fr,width,cv2)
+        g=cv2.cvtColor(resized,cv2.COLOR_BGR2GRAY)
         diff=cv2.absdiff(g,bg);diff=cv2.GaussianBlur(diff,(5,5),0)
         crop=diff[yy0:y1,x0:x1]
         q=max(7.0,float(np.percentile(crop,99.5))*.55)
         frame_candidates.append(extract_components(crop,q,cv2,x0,yy0))
+        color_frame_candidates.append(
+            extract_saturated_components(
+                resized,cv2,x0,yy0,x1,y1,tracker_config or {}
+            )
+        )
         i+=1
     cap.release()
 
-    tracks=build_temporal_tracks(frame_candidates,fps)
-    if not tracks:raise RuntimeError("no compact temporal motion tracks")
+    motion_tracks=build_temporal_tracks(frame_candidates,fps)
+    color_tracks=build_temporal_tracks(color_frame_candidates,fps)
+    for i,tr in enumerate(color_tracks):
+        tr["id"]=1000000+i
+        tr["source"]="color"
+    for tr in motion_tracks:
+        tr["source"]="motion"
+    tracks=color_tracks+motion_tracks
+    if not tracks:raise RuntimeError("no compact temporal ball/motion tracks")
     selected=choose_ballistic_track(
         tracks,fps,minimum_interval_frames=minimum_interval_frames,
         identity_cfg=tracker_config
@@ -612,7 +724,10 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
 
     return {
         "fps":fps,
-        "valid_fraction":float(sum(bool(x) for x in frame_candidates)/max(1,len(frame_candidates))),
+        "valid_fraction":float(
+            sum(bool(x) for x in (color_frame_candidates if color_tracks else frame_candidates))
+            /max(1,len(frame_candidates))
+        ),
         "span_px":float(chosen["span_px"]),
         "one_pixel_m":one_px,
         "active_frames":len(times),
@@ -688,7 +803,7 @@ def self_test_video():
             else:
                 frac=max(0.0,1.0-(t-1.45)/.85)
             yy=60+span_px*frac
-            cv2.circle(q,(320,int(round(yy))),10,(255,255,255),-1)
+            cv2.circle(q,(320,int(round(yy))),10,(0,140,255),-1)
 
             # Deliberate non-ball distractor: excellent quadratic motion but wrong
             # duration/acceleration. V6 must reject it by object identity.
@@ -715,6 +830,9 @@ def self_test_video():
             "maximum_aspect_log_mad":0.45,
             "minimum_detected_fraction":0.50,
             "minimum_relative_span_fraction":0.70,
+            "minimum_span_radius_ratio":4.0,
+            "minimum_ball_saturation":80,
+            "minimum_ball_value":55,
         }
         ident=extract(
             p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12,
@@ -736,10 +854,14 @@ def self_test_video():
         assert audit, "candidate audit missing"
         selected=[q for q in audit if q["selected"]]
         assert len(selected)==1, selected
-        assert selected[0]["relative_span"]>=v6cfg["minimum_relative_span_fraction"]
-        assert selected[0]["full_fall_time_s"]==min(
-            q["full_fall_time_s"] for q in audit if q["passes_relative_span"]
-        )
+        assert selected[0]["passes_scale_span"]
+        color_pool=[q for q in audit if q["passes_scale_span"] and q["track_source"]=="color"]
+        if color_pool:
+            assert selected[0]["track_source"]=="color"
+            assert selected[0]["t10_s"]==min(q["t10_s"] for q in color_pool)
+        else:
+            pool=[q for q in audit if q["passes_scale_span"]]
+            assert selected[0]["t10_s"]==min(q["t10_s"] for q in pool)
         print("VALID IRIS free-fall synthetic-video tracker",
               ident["direct_acceleration_m_s2"],ident_rel,
               "identity",ident["identity_score"],
@@ -938,13 +1060,14 @@ def main():
         with (out/"take_summary.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=list(takes[0]));w.writeheader();w.writerows(takes)
     if candidate_audit_rows:
-        fields=["scene","split","event_rank","selected","track_id","sign","t0_s","t10_s","t90_s",
+        fields=["scene","split","event_rank","selected","track_id","track_source","sign","t0_s","t10_s","t90_s",
                 "span_px","median_radius_px","span_radius_ratio","relative_span",
                 "full_fall_time_s","interval_frames","detected_frames","detected_fraction",
                 "timing_fit_rms_frames","trajectory_shape_rms_fraction","release_speed_ratio",
                 "x_drift_fraction","gap_penalty","identity_score","median_circularity",
                 "median_solidity","median_circle_fill","median_axis_ratio","radius_cv","area_cv",
-                "aspect_log_median","passes_relative_span","direct_acceleration_m_s2",
+                "aspect_log_median","passes_relative_span","passes_scale_span",
+                "in_selected_source_pool","direct_acceleration_m_s2",
                 "acceleration_relative_error"]
         with (out/"candidate_audit.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
