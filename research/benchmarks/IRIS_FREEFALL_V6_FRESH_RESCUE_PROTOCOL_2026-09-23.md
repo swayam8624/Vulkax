@@ -148,6 +148,37 @@ controlled no-candidate errors, saved tracebacks for unexpected failures, archiv
 prior outputs, and a mandatory compile/config/contract/synthetic-video preflight in
 the runner.
 
+## V6.2 real-development failure and V6.3 appearance tracker
+
+After the V6.2 software-contract patch, the actual fresh development split was
+executed in cloud CI. The result still failed scientifically (3/5 quality,
+median acceleration relative error 0.7747), with zero implementation errors.
+Fresh validation remained unopened.
+
+The candidate audit showed that the global relative-span-to-maximum heuristic was
+not physically appropriate: reset/handling motion can span more pixels than the
+drop and thereby exclude the real event. It also showed that motion-only
+segmentation sometimes failed to isolate the actual ball.
+
+The public IRIS benchmark depicts the same saturated soccer ball across the
+`dropping_ball` sequence. V6.3 therefore adds a locked appearance measurement cue
+before validation:
+
+1. detect highly saturated, sufficiently bright components in the same video frame;
+2. apply the existing ball geometry/temporal consistency gates;
+3. build temporal color tracks independently of motion-difference tracks;
+4. require travel >=4 apparent ball radii;
+5. if a valid color-source candidate exists, use the color candidate pool;
+6. otherwise fall back to the motion candidate pool;
+7. choose the earliest valid release event, then use timing/shape residuals as
+   tie-breakers.
+
+No target gravity, drop-height-derived timing, validation labels, or final data are
+used in candidate selection.
+
+A dedicated GitHub Actions workflow now runs the five public development videos and
+must pass the actual development gate before this revision can merge.
+
 For each eligible object track:
 
 1. use the track's full observed vertical travel to define normalized progress
