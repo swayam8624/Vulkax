@@ -217,6 +217,13 @@ jobs:
           bash -n research/scripts/run_iris_freefall_rescue_v6.sh
           bash -n research/scripts/run_iris_freefall_v6_final_test.sh
 
+      - name: Free-fall rescue runner preflight contract
+        run: |
+          rm -rf /tmp/v6-runner-preflight
+          bash research/scripts/run_iris_freefall_rescue_v6.sh \
+            --build-dir /tmp/v6-runner-preflight \
+            --preflight-only
+
       - name: Live public dataset catalog check
         run: |
           python3 -m pip install --quiet "huggingface_hub>=0.34,<2"
