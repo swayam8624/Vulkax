@@ -59,6 +59,7 @@ CANONICAL = [
     ("research/validation/protocol_v1.json", "canonical/publication-validation-protocol", True),
     ("research/validation/record_schema_v1.json", "canonical/publication-validation-schema", True),
     ("research/validation/iris_pendulum_final_test_v1.json", "canonical/iris-pendulum-final-test-config", True),
+    ("research/validation/iris_pendulum_final_world_manifest_v1.csv", "canonical/iris-pendulum-final-world-manifest", True),
     ("research/validation/README.md", "canonical/publication-validation-guide", True),
     ("research/validation/DATASET_ADAPTER_CONTRACT.md", "canonical/publication-validation-adapter-contract", True),
     ("research/validation/world_manifest.example.csv", "canonical/publication-validation-manifest-template", True),
