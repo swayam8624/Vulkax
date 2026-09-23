@@ -69,6 +69,7 @@ CANONICAL = [
     ("research/status/GAUGE_PROSPECTIVE_VALIDATION_RESULT_2026-09-23.md", "canonical/gauge-prospective-validation-result", True),
     ("research/status/IRIS_PENDULUM_PROSPECTIVE_VALIDATION_RESULT_2026-09-23.md", "canonical/iris-pendulum-validation-result", True),
     ("research/status/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.md", "canonical/iris-pendulum-final-test-result", True),
+    ("research/status/CURRENT_PUBLICATION_VALIDATION_STATE_2026-09-23.md", "canonical/current-publication-validation-state", True),
     ("research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json", "canonical/iris-pendulum-final-test-json", True),
     ("research/literature/VALIDATION_RELATED_WORK_MAP_2026-09-23.md", "canonical/validation-related-work-map", True),
     ("docs/PAPER_EVIDENCE_REPRODUCTION.md", "canonical/reproduction-guide", True),
