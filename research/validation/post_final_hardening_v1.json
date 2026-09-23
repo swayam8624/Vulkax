@@ -1,0 +1,116 @@
+{
+  "schema": "vulkax.post_final_reviewer_hardening",
+  "version": 1,
+  "created": "2026-09-23",
+  "principle": "All experiments are post-final extensions. They may strengthen or narrow claims but may not replace the locked IRIS pendulum final result.",
+  "locked_reference_commit": "9e56f06145b8a56dd26c1c81e064ed9b185c77d7",
+  "frozen_primary_threshold_abs_score": 2,
+  "workstreams": {
+    "clustered_statistics": {
+      "unit": "video_scene",
+      "bootstrap_replicates": 10000,
+      "confidence_level": 0.95
+    },
+    "strong_baselines": {
+      "methods": [
+        "finite_amplitude_locked",
+        "small_angle_locked",
+        "direct_period_inversion",
+        "damped_nonlinear_fit",
+        "official_iris_estimator_import"
+      ]
+    },
+    "gt_free_proposals": {
+      "baseline_window": [
+        0,
+        0.2
+      ],
+      "candidate_window": [
+        0,
+        0.4
+      ],
+      "ordinary_holdout_window": [
+        0.4,
+        0.6
+      ],
+      "verification_window": [
+        0.6,
+        1
+      ],
+      "ground_truth_hidden_until_evaluation": true
+    },
+    "robustness": {
+      "noise_sigma_px": [
+        5,
+        15,
+        30
+      ],
+      "blur_kernel": [
+        3,
+        7,
+        15
+      ],
+      "frame_drop_fraction": [
+        0.1,
+        0.25,
+        0.5
+      ],
+      "temporal_fps": [
+        30,
+        15
+      ],
+      "occlusion_fraction": [
+        0.05,
+        0.15,
+        0.3
+      ],
+      "crop_fraction": [
+        0.02,
+        0.05,
+        0.1
+      ]
+    },
+    "channel_dependence": {
+      "overlap_fraction": [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1
+      ]
+    },
+    "second_blind_domain": {
+      "dataset": "IRIS",
+      "class": "dropping_ball",
+      "development_setting": "drop_50",
+      "validation_setting": "drop_100",
+      "final_setting": "drop_150",
+      "allowed_takes_development": [
+        "02",
+        "03",
+        "04",
+        "05"
+      ],
+      "allowed_takes_validation": [
+        "02",
+        "03",
+        "04",
+        "05"
+      ],
+      "allowed_takes_final": [
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10"
+      ],
+      "forbid_take01": true,
+      "target": "gravity_or_vertical_acceleration",
+      "final_download_before_lock": false
+    }
+  }
+}

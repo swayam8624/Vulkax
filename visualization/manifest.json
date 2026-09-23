@@ -1,6 +1,6 @@
 {
   "schema": "vulkax.visualization_manifest",
-  "version": 3,
+  "version": 4,
   "purpose": "presentation_only",
   "ai_generated_submission_imagery": false,
   "ledger": "research/results/VULKAX_FINAL_RESULTS_2026-09-21.json",
@@ -59,6 +59,31 @@
       "file": "fig_solver_state_residual_xray.svg",
       "class": "solver_replay_evidence",
       "claim": "candidate-minus-truth solver residual vectors with explicit display magnification only"
+    },
+    {
+      "file": "reviewer-hardening/fig_postfinal_strong_baselines.svg",
+      "class": "post_final_evidence",
+      "claim": "locked IRIS method compared with stronger post-final verification baselines; does not replace locked result"
+    },
+    {
+      "file": "reviewer-hardening/fig_postfinal_clustered_videos.svg",
+      "class": "post_final_evidence",
+      "claim": "per-video clustered accuracy emphasizes ten physical units rather than 220 rows"
+    },
+    {
+      "file": "reviewer-hardening/fig_postfinal_robustness.svg",
+      "class": "post_final_evidence",
+      "claim": "deterministic corruption robustness envelope with failures preserved"
+    },
+    {
+      "file": "reviewer-hardening/fig_gt_hidden_proposal_gate.svg",
+      "class": "post_final_evidence",
+      "claim": "GT-hidden baseline-to-repair proposals are closed before truth join and then verified"
+    },
+    {
+      "file": "reviewer-hardening/fig_gt_hidden_rewrite_storyboard.png",
+      "class": "measured_video_evidence_visual",
+      "claim": "measured IRIS frames with deterministic overlays of blind proposal and disjoint verification decision"
     }
   ]
 }

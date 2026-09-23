@@ -15,6 +15,12 @@ This is an **asset/source map**, not manuscript text.
 | Reality Inspector cinematic scene | same ledger via `visualization/blender/reality_inspector_scene.py` | schematic storyboard | procedural video language only until motion is driven by exported solver state |
 | Stage outcome table | same | mixed | compact D1–D6 status ledger |
 | Claim-boundary table | claim guard + final result JSON | integrity | separate supported from unsupported conclusions |
+| Clustered video-level accuracy | `iris-pendulum-final-test/clustered_statistics/per_video.csv` | post-final statistical hardening | show ten physical video units rather than 220 pseudo-independent rows |
+| Strong post-final baselines | `iris-pendulum-postfinal-baselines/summary.json` | post-final baseline hardening | compare locked method with direct period and damped nonlinear ODE residual tests |
+| Corruption robustness envelope | `iris-pendulum-postfinal-robustness/summary.csv` | post-final robustness | show noise/blur/frame-loss/occlusion/crop/fps failure envelope |
+| GT-hidden proposal gate | `iris-pendulum-postfinal-proposals/summary.json` | post-final end-to-end repair test | baseline→candidate proposal created before truth join, then independently verified |
+| GT-hidden rewrite gate storyboard | `visualization/scripts/render_gt_hidden_rewrite_demo.py` | measured real-video visualization | actual IRIS frames + blind proposal + disjoint verifier decision; no fabricated evidence |
+| Free-fall blind replication | `iris-freefall-*/summary.json` | prospective second-domain replication | non-pendulum equation family with take-01 exclusion and lock-gated final videos |
 
 | DOT C2 held-out geometry | successful `measured-dot-c2` artifact: `calibration/selected_samples.csv` | public measured-source quantitative visual | measured correspondence circles vs Vulkax prediction crosses at the later held-out checkpoint; true-scale residual segments; 90-sample 3-D held-out RMS remains 4.417 mm |
 | DOT C2 measured visual showcase | `.github/workflows/measured-world-showcase.yml` + pinned DOT C2 source | public measured-source presentation | native Vulkan baseline/rollback heroes, close-ups, comparison plate, and eight-view turntable; rollback semantics are qualitative implementation evidence, not material-ground-truth validation |
