@@ -129,3 +129,21 @@ protocol without new hardware. It cannot honestly manufacture evidence for trial
 families that have not been executed. Placebo, dose-response, channel-dependence,
 robustness, multi-dataset, and measured-world rows become scientific evidence only
 after the relevant adapters/probes produce records conforming to the schema.
+
+
+## Current prospective execution status — 2026-09-23
+
+GAUGE stretching/compression validation has now executed. It is a preserved
+information-limit result: controlled truth ordering was correct, but the available
+trajectory signal was far below repeat and numerical variability, so final-test
+repeats were not opened.
+
+IRIS single-pendulum is the next prospective lane. The frozen execution command is:
+
+```bash
+bash research/scripts/run_iris_pendulum_validation.sh
+```
+
+The command first expands only the development/validation pendulum repeats, runs a
+20-degree development gate, and opens the 45-degree validation videos only if that
+gate succeeds. The 90-degree setting remains reserved for final test.
