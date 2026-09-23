@@ -13,6 +13,7 @@ from pathlib import Path
 import subprocess
 import sys
 import importlib.metadata
+import csv
 
 REQUIRED_REPO_FILES = [
     Path("research/validation/protocol_v1.json"),
@@ -185,6 +186,14 @@ def self_test() -> None:
     assert config["dataset"]["expected_take_count"] == 10
     assert config["validation_freeze_basis"]["readiness"] == EXPECTED_READINESS
     assert config["final_test_policy"]["no_threshold_retuning"] is True
+    manifest_path = Path(config["dataset"]["world_manifest"])
+    with manifest_path.open(newline="", encoding="utf-8") as f:
+        manifest_rows = list(csv.DictReader(f))
+    assert len(manifest_rows) == 10
+    assert [r["scene"] for r in manifest_rows] == [
+        f"pendulum/pendulum_90/{i:02d}" for i in range(1, 11)
+    ]
+    assert all(r["split"] == "final_test" for r in manifest_rows)
     # Runtime packages are intentionally not required in the generic CI self-test;
     # the actual final runner creates/checks this snapshot inside its venv.
     print("VALID IRIS final-freeze wrapper self-test")
