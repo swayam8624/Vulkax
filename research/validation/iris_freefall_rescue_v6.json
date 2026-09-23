@@ -158,6 +158,17 @@
         "identity should be an eligibility gate; event ranking must operate on near-full-span candidates and prioritize fastest full travel"
       ]
     },
-    "v6_2_change": "development-only selector correction: require candidate span >=70% of the maximum eligible ball span in the video, then rank by shortest full-flight duration before timing/shape residuals; emit top-candidate audit; gates/repair schedule/|S| unchanged"
+    "v6_2_change": "development-only selector correction: require candidate span >=70% of the maximum eligible ball span in the video, then rank by shortest full-flight duration before timing/shape residuals; emit top-candidate audit; gates/repair schedule/|S| unchanged",
+    "v6_2_implementation_error": {
+      "observed_on": "2026-09-23",
+      "split": "drop_50/06..10",
+      "tracker_revision": "ball_identity_v6_2",
+      "error": "TypeError: 'NoneType' object is not iterable",
+      "root_cause": "fit_full_flight_progress returned None for short tracks while choose_ballistic_track unconditionally extended the result",
+      "experimental_interpretation": "none; no take produced a selected candidate and this run is classified as software failure, not scientific evidence",
+      "validation_downloaded": false,
+      "validation_analyzed": false,
+      "fix": "candidate producer now has total list return contract; selector validates producer return type/candidate schema/finite fields; unexpected exceptions are saved with traceback and force gate false"
+    }
   }
 }
