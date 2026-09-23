@@ -119,13 +119,36 @@ execution and may not be claimed from old data.
 - [x] CI smoke test for the validation framework
 
 ### New evidence still required
-- [ ] execute SUPPORT/VETO/UNRESOLVED controlled trials on untouched worlds
-- [ ] execute placebo/null controls
+- [x] execute SUPPORT/VETO/UNRESOLVED controlled trials on prospective GAUGE validation worlds (negative information-limit result preserved)
+- [x] execute GAUGE placebo/null controls (12/12 correct unresolved for both methods)
+- [ ] execute IRIS pendulum SUPPORT/VETO/UNRESOLVED + placebo + dose-response validation campaign
 - [ ] execute dose-response sweep and estimate detection limits
 - [ ] execute measurement-noise, pose-noise, and missing-observation sweeps
 - [ ] execute proposal/probe channel-dependence sweep
-- [ ] ingest the planned multi-dataset campaign into the common schema
+- [x] ingest GAUGE prospective validation-stage records into the common schema
+- [ ] ingest IRIS pendulum validation-stage records into the common schema
+- [ ] ingest RGBench validation-stage records into the common schema
 - [ ] freeze a final-test world manifest before opening its labels
 - [ ] execute final-test campaign without threshold retuning
 - [ ] obtain prospective measured physical confirmation if feasible
 - [ ] update manuscript claims only after those results exist
+
+
+### Executed GAUGE prospective gate
+- [x] GAUGE stretch/compression validation partition executed without opening final repeats
+- [x] truth-ordering forensic: 100% directional ordering before thresholding
+- [x] information-limit diagnosis recorded (signal/repeat = 0.00277 median; signal/numerical = 0.11793 median)
+- [x] GAUGE final-test repeats kept unopened after failed validation gate
+
+### IRIS pendulum lane
+- [x] validation protocol frozen before execution
+- [x] validation-only repeat downloader implemented (20-degree development + 45-degree validation)
+- [x] deterministic classical video tracker implemented
+- [x] finite-amplitude pendulum period verifier implemented
+- [x] small-angle matched baseline implemented
+- [x] one-frame uncertainty floor and |z|=2 rule fixed
+- [x] development quality gate implemented
+- [x] synthetic-video tracker regression added to CI
+- [ ] development gate executed on 10 real takes
+- [ ] 45-degree validation executed on 10 real takes
+- [ ] 90-degree final-test repeats opened only after lock

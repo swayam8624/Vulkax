@@ -65,3 +65,19 @@ inverse material fitting remained locked.
 This is **prospective validation-stage evidence**, not historical diagnostic
 evidence and not final-test confirmation. The global publication summary must keep
 those three classes separate.
+
+
+## Post-run failure forensic
+
+The saved-output forensic (no new simulation, no final-test access) reported:
+
+- raw truth-ordering correctness: **1.0000**
+- median raw signal / repeat variability: **0.0027697064**
+- median raw signal / numerical variability: **0.1179258867**
+- diagnosis: **information_limited_under_frozen_probe**
+
+Therefore the validation failure is not a sign error in repair ordering. The measured
+trajectory ranks the controlled truth in the correct direction, but the available
+signal is roughly 0.28% of repeat variability and 11.8% of the nominal-vs-refined
+numerical discrepancy. The frozen GAUGE probe is therefore retained as an
+information-limit/abstention result; repeats 8–10 remain unopened.

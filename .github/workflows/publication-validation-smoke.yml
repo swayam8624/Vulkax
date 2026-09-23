@@ -14,6 +14,9 @@ on:
       - "research/analysis/adapt_public_validation_inputs.py"
       - "research/analysis/run_gauge_prospective_validation.py"
       - "research/analysis/analyze_gauge_validation_failure.py"
+      - "research/analysis/run_iris_pendulum_validation.py"
+      - "research/scripts/fetch_iris_pendulum_repeats.py"
+      - "research/scripts/run_iris_pendulum_validation.sh"
       - "research/scripts/run_gauge_prospective_validation.sh"
       - "research/analysis/assemble_paper_evidence.py"
       - "run_everything.sh"
@@ -69,6 +72,8 @@ jobs:
             research/analysis/adapt_public_validation_inputs.py \
             research/analysis/run_gauge_prospective_validation.py \
             research/analysis/analyze_gauge_validation_failure.py \
+            research/analysis/run_iris_pendulum_validation.py \
+            research/scripts/fetch_iris_pendulum_repeats.py \
             research/scripts/fetch_public_validation_datasets.py
 
       - name: Script self-tests
@@ -83,6 +88,8 @@ jobs:
           python3 research/analysis/prepare_public_validation_datasets.py --self-test
           python3 research/analysis/adapt_public_validation_inputs.py --self-test
           python3 research/analysis/analyze_gauge_validation_failure.py --self-test
+          python3 research/analysis/run_iris_pendulum_validation.py --self-test
+          python3 research/scripts/fetch_iris_pendulum_repeats.py --self-test
 
       - name: Shell syntax
         run: |
@@ -90,6 +97,7 @@ jobs:
           bash -n research/scripts/run_publication_validation.sh
           bash -n research/scripts/prepare_public_validation_data.sh
           bash -n research/scripts/run_gauge_prospective_validation.sh
+          bash -n research/scripts/run_iris_pendulum_validation.sh
 
       - name: Live public dataset catalog check
         run: |
@@ -97,6 +105,11 @@ jobs:
           python3 research/scripts/fetch_public_validation_datasets.py \
             --profile core \
             --catalog-only
+
+      - name: IRIS synthetic-video tracker regression
+        run: |
+          python3 -m pip install --quiet "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
+          python3 research/analysis/run_iris_pendulum_validation.py --self-test-video
 
 
       - name: End-to-end standardized analysis fixture

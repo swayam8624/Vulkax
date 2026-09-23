@@ -66,6 +66,39 @@ are actually required.
 
 Generated data stay under `build/` and are not committed.
 
+
+## Prospective GAUGE result and IRIS pendulum lane
+
+The first new real-data validation-stage run used GAUGE stretching/compression.
+It correctly abstained on every placebo case but resolved zero SUPPORT/VETO cases.
+A saved-output forensic showed 100% correct truth ordering before thresholding, while
+the median signal was only 0.00277x repeat variability and 0.11793x numerical
+variability. GAUGE is therefore retained as an information-limit result and its
+final repeats remain unopened.
+
+The next real-data lane is IRIS single-pendulum video. Run:
+
+```bash
+bash research/scripts/run_iris_pendulum_validation.sh
+```
+
+That command:
+
+1. pins the existing IRIS dataset revision;
+2. downloads only `pendulum_20` and `pendulum_45` takes 01-10;
+3. does **not** request additional `pendulum_90` final-test videos;
+4. refreshes the public-data inventory and adapted manifests;
+5. runs a deterministic classical motion tracker on the 20-degree development set;
+6. requires at least 8/10 development takes to pass and <=20% median rope-length error;
+7. only after that gate, processes the 45-degree validation set;
+8. compares a finite-amplitude period probe against a small-angle baseline;
+9. emits SUPPORT/VETO/UNRESOLVED truth controls, placebo, and dose-response rows;
+10. merges the IRIS records with the existing publication-validation analysis.
+
+The IRIS verifier uses real video period as evidence and the independently measured
+rope length only for benchmark truth labels. It does not require CUDA or a learned
+tracker.
+
 ## Fast diagnostic
 
 If your existing D4V/OFC outputs are still under `build/`, this does not rerun
