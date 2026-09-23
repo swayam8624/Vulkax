@@ -506,6 +506,10 @@ def _global_spatial_envelope(candidates):
 def _recalibrate_gravity_candidate(candidate,top,bottom,envelope_px,fps,selector_cfg):
     """Fit full fall time from a partial downward fragment in global coordinates."""
     expected_sign=float(selector_cfg["expected_sign"])
+    diagnostics=diagnostics if diagnostics is not None else {}
+    def reject(name):
+        diagnostics[name]=diagnostics.get(name,0)+1
+        return None
     if float(candidate["sign"])!=expected_sign:
         return None
 
@@ -524,18 +528,18 @@ def _recalibrate_gravity_candidate(candidate,top,bottom,envelope_px,fps,selector
     keep=np.isfinite(p)&np.isfinite(t)&(p>=-0.05)&(p<=1.05)
     p=p[keep];t=t[keep];ids=ids[keep]
     if len(p)<6:
-        return None
+        return reject("too_few_points")
 
     order=np.argsort(t)
     p=p[order];t=t[order];ids=ids[order]
     p=np.clip(p,0.0,1.0)
     pspan=float(np.max(p)-np.min(p))
     if pspan<float(selector_cfg["minimum_global_progress_span"]):
-        return None
+        return reject("progress_span")
 
     monotone=float(np.mean(np.diff(p)>=-.02)) if len(p)>1 else 0.0
     if monotone<.78:
-        return None
+        return reject("monotone")
 
     sqrtp=np.sqrt(np.clip(p,0.0,1.0))
     if float(np.ptp(sqrtp))<0.08:
@@ -544,13 +548,13 @@ def _recalibrate_gravity_candidate(candidate,top,bottom,envelope_px,fps,selector
     coef=np.linalg.lstsq(A,t,rcond=None)[0]
     t0=float(coef[0]);T=float(coef[1])
     if not math.isfinite(T) or T<=0 or T>1.25:
-        return None
+        return reject("invalid_T")
 
     pred=A@coef
     timing_rms_s=float(np.sqrt(np.mean((t-pred)**2)))
     timing_rms_frames=timing_rms_s*fps
     if timing_rms_frames>float(selector_cfg["maximum_global_timing_fit_rms_frames"]):
-        return None
+        return reject("timing_rms")
 
     pred_p=np.square(np.clip((t-t0)/T,0.0,1.0))
     shape_rms=float(np.sqrt(np.mean((p-pred_p)**2)))
@@ -771,7 +775,7 @@ def _monotone_runs(progress,negative_break=.05):
     return [(a,b) for a,b in zip(cuts,cuts[1:]) if b-a>=6]
 
 def _fit_global_fragment(chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
-                         minimum_interval_frames):
+                         minimum_interval_frames,diagnostics=None):
     expected_sign=float(selector_cfg["expected_sign"])
     y=np.asarray(chunk["y"][aa:bb],float)
     x=np.asarray(chunk["x"][aa:bb],float)
@@ -793,14 +797,14 @@ def _fit_global_fragment(chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
         return None
     sqrtp=np.sqrt(p)
     if float(np.ptp(sqrtp))<.08:
-        return None
+        return reject("sqrt_progress_span")
     A=np.column_stack([np.ones(len(p)),sqrtp])
     coef=np.linalg.lstsq(A,t,rcond=None)[0]
     t0=float(coef[0]);T=float(coef[1])
     if not math.isfinite(T) or T<=0 or T>1.25:
         return None
     if T*fps<minimum_interval_frames:
-        return None
+        return reject("full_duration")
     pred=A@coef
     timing_rms_s=float(np.sqrt(np.mean((t-pred)**2)))
     timing_rms_frames=timing_rms_s*fps
@@ -809,20 +813,20 @@ def _fit_global_fragment(chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
     pred_p=np.square(np.clip((t-t0)/T,0.0,1.0))
     shape=float(np.sqrt(np.mean((p-pred_p)**2)))
     if shape>.12:
-        return None
+        return reject("shape_rms")
 
     trel=t-t0
     X=np.column_stack([np.ones(len(trel)),trel,.5*trel*trel])
     qcoef=np.linalg.lstsq(X,p,rcond=None)[0]
     qa,qb,qc=map(float,qcoef)
     if qc<=0:
-        return None
+        return reject("nonpositive_acceleration")
     release_ratio=abs(qb)/max(abs(qc*T),1e-9)
     if release_ratio>.65:
-        return None
+        return reject("release_speed")
     x_drift=float(np.ptp(x))/max(envelope_px,1e-9)
     if x_drift>.45:
-        return None
+        return reject("x_drift")
 
     # Number of actually observed detections inside this dense fragment.
     frame_lo=int(chunk["frames"][aa]);frame_hi=int(chunk["frames"][bb-1])
@@ -832,7 +836,7 @@ def _fit_global_fragment(chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
     )
     detected_fraction=detected/max(1,bb-aa)
     if detected_fraction<.45:
-        return None
+        return reject("detected_fraction")
 
     progress_full=np.full(len(chunk["frames"]),np.nan,float)
     if expected_sign>0:
@@ -885,6 +889,7 @@ def choose_ballistic_track_v63(tracks,fps,minimum_interval_frames=12,identity_cf
     chunks=_identity_track_chunks(tracks,fps,cfg)
     top,bottom,envelope_px=_global_envelope_from_chunks(chunks)
     candidates=[]
+    rejection_counts={}
     for chunk in chunks:
         if selector_cfg["expected_sign"]>0:
             gp=(np.asarray(chunk["y"],float)-top)/envelope_px
@@ -893,13 +898,15 @@ def choose_ballistic_track_v63(tracks,fps,minimum_interval_frames=12,identity_cf
         for aa,bb in _monotone_runs(gp):
             q=_fit_global_fragment(
                 chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
-                minimum_interval_frames
+                minimum_interval_frames,diagnostics=rejection_counts
             )
             if q is not None:
                 candidates.append(validate_candidate(q))
     if not candidates:
         raise TrackSelectionError(
-            "no gravity-direction ball fragment survived V6.3 global calibration"
+            "no gravity-direction ball fragment survived V6.3 global calibration; "
+            f"chunks={len(chunks)} envelope_px={envelope_px:.3f} "
+            f"rejects={json.dumps(rejection_counts,sort_keys=True)}"
         )
 
     def rank(q):
