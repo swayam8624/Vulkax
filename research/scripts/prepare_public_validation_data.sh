@@ -63,6 +63,8 @@ echo "[public-data] installing/updating downloader dependency"
 
 python3 research/analysis/prepare_public_validation_datasets.py   --root "$DATA_ROOT"   --out "$OUT_ROOT"
 
+python3 research/analysis/adapt_public_validation_inputs.py   --repo-root .   --data-root "$DATA_ROOT"   --prepared-root "$OUT_ROOT"
+
 python3 research/analysis/generate_controlled_validation_plan.py   --worlds "$OUT_ROOT/world_manifest.csv"   --profile "$([[ "$PROFILE" == "smoke" ]] && echo smoke || echo full)"   --out "$OUT_ROOT/trial_plan.csv"
 
 python3 - "$DATA_ROOT" "$OUT_ROOT" <<'PY'
@@ -84,8 +86,9 @@ for ds in download["datasets"]:
 print("inventory scenes:", prep["inventory_scene_count"])
 print("prospective-ready worlds:", prep["prospective_world_count"])
 print("world manifest:", out / "world_manifest.csv")
+print("adapted inputs:", out / "adapted/adapter_summary.json")
 print("trial plan:", out / "trial_plan.csv")
 print()
-print("NOTE: these are prepared inputs. They become Reality Probe evidence only")
-print("after dataset-specific experiment adapters execute the planned trials.")
+print("NOTE: files are downloaded, integrity-hashed, split, and adapted into Vulkax-facing inputs.")
+print("They become Reality Probe result evidence only after the planned method trials execute.")
 PY
