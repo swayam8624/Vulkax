@@ -63,6 +63,7 @@ CANONICAL = [
     ("research/validation/world_manifest.example.csv", "canonical/publication-validation-manifest-template", True),
     ("docs/PUBLICATION_VALIDATION.md", "canonical/publication-validation-execution-guide", True),
     ("research/benchmarks/REAL_MEASURED_VALIDATION_PROTOCOL_2026-09-23.md", "canonical/measured-validation-protocol", True),
+    ("research/benchmarks/IRIS_PENDULUM_PROSPECTIVE_VALIDATION_PROTOCOL_2026-09-23.md", "canonical/iris-pendulum-validation-protocol", True),
     ("research/status/GAUGE_PROSPECTIVE_VALIDATION_RESULT_2026-09-23.md", "canonical/gauge-prospective-validation-result", True),
     ("research/literature/VALIDATION_RELATED_WORK_MAP_2026-09-23.md", "canonical/validation-related-work-map", True),
     ("docs/PAPER_EVIDENCE_REPRODUCTION.md", "canonical/reproduction-guide", True),
@@ -115,6 +116,10 @@ GENERATED = [
     ("publication-validation/public-data/adapted/adapter_summary.json", "generated/public-data-adapter-summary", False),
     ("publication-validation/gauge-prospective-validation/forensics/summary.json", "generated/gauge-validation-failure-forensics", False),
     ("publication-validation/gauge-prospective-validation/forensics/per_case.csv", "generated/gauge-validation-failure-per-case", False),
+    ("publication-validation/iris-pendulum-development/summary.json", "generated/iris-pendulum-development-summary", False),
+    ("publication-validation/iris-pendulum-validation/summary.json", "generated/iris-pendulum-validation-summary", False),
+    ("publication-validation/iris-pendulum-validation/validation_records.csv", "generated/iris-pendulum-validation-records", False),
+    ("publication-validation/combined-iris-validation/analysis/summary.json", "generated/combined-iris-validation-summary", False),
 ]
 
 def sha256(path: Path) -> str:
