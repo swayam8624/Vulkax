@@ -121,15 +121,16 @@ execution and may not be claimed from old data.
 ### New evidence still required
 - [x] execute SUPPORT/VETO/UNRESOLVED controlled trials on prospective GAUGE validation worlds (negative information-limit result preserved)
 - [x] execute GAUGE placebo/null controls (12/12 correct unresolved for both methods)
-- [ ] execute IRIS pendulum SUPPORT/VETO/UNRESOLVED + placebo + dose-response validation campaign
-- [ ] execute dose-response sweep and estimate detection limits
+- [x] execute IRIS pendulum SUPPORT/VETO/UNRESOLVED + placebo + dose-response validation campaign
+- [x] execute IRIS dose-response sweep across validation and locked final-test partitions
+- [ ] report final detection limits from frozen per-factor tables without retuning
 - [ ] execute measurement-noise, pose-noise, and missing-observation sweeps
 - [ ] execute proposal/probe channel-dependence sweep
 - [x] ingest GAUGE prospective validation-stage records into the common schema
 - [x] ingest IRIS pendulum validation-stage records into the common schema
 - [ ] ingest RGBench validation-stage records into the common schema
 - [x] freeze IRIS pendulum final-test configuration and lock machinery before opening the reserved 90-degree split
-- [ ] execute locked IRIS pendulum 90-degree final-test campaign without threshold retuning
+- [x] execute locked IRIS pendulum 90-degree final-test campaign without threshold retuning
 - [ ] obtain prospective measured physical confirmation if feasible
 - [ ] update manuscript claims only after those results exist
 
@@ -151,7 +152,7 @@ execution and may not be claimed from old data.
 - [x] synthetic-video tracker regression added to CI
 - [x] development gate executed on 10 real takes (10/10 quality-pass; median rope-length relative error 4.23%)
 - [x] 45-degree validation executed on 10 real takes (10/10 quality-pass; median rope-length relative error 2.43%)
-- [ ] 90-degree final-test repeats opened only after lock
+- [x] 90-degree final-test repeats opened only after lock (10/10 quality-pass; 220 confirmatory records)
 
 
 ### IRIS final-test freeze readiness
@@ -165,4 +166,18 @@ execution and may not be claimed from old data.
 - [x] frozen final-test configuration committed
 - [x] final-test lock hashes code/config + validation forensic/evidence
 - [x] final-test runner refuses accidental overwrite
-- [ ] reserved pendulum_90 split executed under valid lock
+- [x] reserved pendulum_90 split executed under valid lock
+
+
+### IRIS locked final-test outcome
+- [x] exact 10-video pendulum_90 population executed under the frozen lock
+- [x] 10/10 final videos passed frozen quality gates
+- [x] 220 final-test rows marked confirmatory
+- [x] finite-amplitude probe strict accuracy = 90/110 = 81.82%
+- [x] small-angle baseline strict accuracy = 40/110 = 36.36%
+- [x] finite-amplitude SUPPORT = 40/50; VETO = 40/50; placebo = 10/10
+- [x] small-angle SUPPORT = 0/50; VETO = 30/50; placebo = 10/10
+- [x] paired finite-amplitude-only wins = 50; small-angle-only wins = 0; ties = 60
+- [x] final median rope-length relative error = 16.81%
+- [x] no post-final threshold/candidate/tracker retuning
+- [ ] independent-sensor or physical-bench confirmation beyond same-video IRIS, if required by venue/reviewer
