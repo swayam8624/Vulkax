@@ -147,6 +147,32 @@ jobs:
           python3 research/analysis/assemble_paper_evidence.py --self-test
           python3 research/scripts/fetch_public_validation_datasets.py --self-test
           python3 research/analysis/prepare_public_validation_datasets.py --self-test
+          # V6 manifest -> public-data adapter contract regression
+          rm -rf /tmp/v6-contract
+          mkdir -p /tmp/v6-contract/root/iris/Dropping_ball/drop_50
+          mkdir -p /tmp/v6-contract/root/gauge /tmp/v6-contract/root/rgbench
+          printf 'x' > /tmp/v6-contract/root/iris/Dropping_ball/drop_50/06.mp4
+          cat > /tmp/v6-contract/root/iris/parameters.json <<'JSON'
+          {"dropping_ball":{"drop_50":{"drop_height":{"mean":0.5}}}}
+          JSON
+          cat > /tmp/v6-contract/root/iris/vulkax_download_manifest.json <<'JSON'
+          {"schema":"vulkax.public_dataset_download","version":2,"dataset":"iris","repo_id":"rasulkhanbayov/IRIS","revision":"c253822f55431ca80ef2084de4bc5e79d1a488f1","license":"CC-BY-NC-4.0","citation_url":"https://huggingface.co/datasets/rasulkhanbayov/IRIS","profile":"freefall_rescue_v6_development","requested_patterns":[],"file_count":2,"total_bytes":1,"files":[]}
+          JSON
+          cat > /tmp/v6-contract/root/gauge/vulkax_download_manifest.json <<'JSON'
+          {"schema":"vulkax.public_dataset_download","version":1,"dataset":"gauge","repo_id":"InternRobotics/GAUGE-Dataset","revision":"test","license":"MIT","citation_url":"https://huggingface.co/datasets/InternRobotics/GAUGE-Dataset","profile":"fixture","requested_patterns":[],"file_count":0,"total_bytes":0,"files":[]}
+          JSON
+          cat > /tmp/v6-contract/root/rgbench/vulkax_download_manifest.json <<'JSON'
+          {"schema":"vulkax.public_dataset_download","version":1,"dataset":"rgbench","repo_id":"RGBench/RGBench-Cloth-Sim2Real-v1","revision":"test","license":"CC-BY-4.0","citation_url":"https://huggingface.co/datasets/RGBench/RGBench-Cloth-Sim2Real-v1","profile":"fixture","requested_patterns":[],"file_count":0,"total_bytes":0,"files":[]}
+          JSON
+          python3 research/analysis/prepare_public_validation_datasets.py --root /tmp/v6-contract/root --out /tmp/v6-contract/out
+          python3 - <<'PY'
+          import csv
+          rows=list(csv.DictReader(open("/tmp/v6-contract/out/dataset_inventory.csv")))
+          iris=[r for r in rows if r["dataset"]=="iris"]
+          assert len(iris)==1, iris
+          assert iris[0]["source_uri"]=="https://huggingface.co/datasets/rasulkhanbayov/IRIS", iris[0]
+          print("VALID V6 manifest/public-data adapter contract")
+          PY
           python3 research/analysis/adapt_public_validation_inputs.py --self-test
           python3 research/analysis/analyze_gauge_validation_failure.py --self-test
           python3 research/analysis/run_iris_pendulum_validation.py --self-test
