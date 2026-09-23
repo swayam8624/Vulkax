@@ -1664,17 +1664,35 @@ def _fit_event_time_candidate_v66(
     if not math.isfinite(local_span) or local_span<min_span:
         return _reject(diagnostics,"raw_event_span")
 
-    # Constant-acceleration fit in image coordinates.  This is used only for
-    # temporal event identification; no conversion from pixels to metres occurs.
-    tr=t_abs-float(t_abs[0])
+    # Detect the sustained positive-speed core first. Boundary samples are the
+    # least reliable part of a tracked event because the 5-frame smoother leaks a
+    # little motion into stationary holds. Fit the quadratic only on the moving
+    # core, then use observable stationary plateaus as boundary measurements.
+    v=np.gradient(z_all,all_frames.astype(float))
+    active_threshold=max(
+        0.20,
+        float(identity_cfg.get("plateau_max_speed_px_per_frame",.75))
+    )
+    run_indices=np.arange(aa,bb,dtype=int)
+    active=run_indices[v[run_indices]>active_threshold]
+    if len(active)<6:
+        return _reject(diagnostics,"too_few_accelerating_samples")
+
+    core_a=int(active[0]);core_b=int(active[-1])+1
+    core_frames=all_frames[core_a:core_b]
+    core_z=(expected*raw_y)[core_a:core_b]
+    core_t=core_frames/fps
+    t0core=float(core_t[0])
+    tr=core_t-t0core
     X=np.column_stack([np.ones(len(tr)),tr,.5*tr*tr])
-    coef=np.linalg.lstsq(X,z,rcond=None)[0]
+    coef=np.linalg.lstsq(X,core_z,rcond=None)[0]
     a0,b0,c0=map(float,coef)
     if not all(math.isfinite(q) for q in (a0,b0,c0)) or c0<=0.0:
         return _reject(diagnostics,"nonpositive_pixel_acceleration")
 
     pred=X@coef
-    shape=float(np.sqrt(np.mean((z-pred)**2))/max(local_span,1e-9))
+    core_span=max(float(np.ptp(core_z)),1e-9)
+    shape=float(np.sqrt(np.mean((core_z-pred)**2))/core_span)
     max_shape=float(identity_cfg.get("maximum_trajectory_shape_rms_fraction",.10))
     if not math.isfinite(shape) or shape>max_shape:
         return _reject(diagnostics,"shape_rms")
@@ -1683,55 +1701,71 @@ def _fit_event_time_candidate_v66(
     if float(np.mean(deriv>=-1e-6))<.90:
         return _reject(diagnostics,"predicted_direction")
 
-    # A release-from-rest event has a velocity-zero vertex close to (possibly
-    # shortly before) the first observed moving sample.  This prior is part of the
-    # published IRIS dropping-ball protocol, not a fit to the target value of g.
+    # Release is the zero-velocity vertex of the moving-core fit. Because the fit
+    # excludes the smoothed stationary edge, the vertex is not dragged backward
+    # by the top hold.
     release_tau=-b0/c0
+    release_abs=float(t0core+release_tau)
+    release_offset_frames=(release_abs-float(core_t[0]))*fps
     max_pre_frames=float(identity_cfg.get("maximum_release_extrapolation_frames",12.0))
     max_future_frames=float(identity_cfg.get("maximum_release_future_frames",2.0))
-    release_offset_frames=release_tau*fps
     if release_offset_frames < -max_pre_frames:
         return _reject(diagnostics,"release_too_far_before_observation")
     if release_offset_frames > max_future_frames:
         return _reject(diagnostics,"release_after_motion_onset")
-    release_abs=float(t_abs[0]+release_tau)
 
-    # Locate the last clearly positive-speed sample in the monotone run.  The next
-    # sample is the impact boundary candidate.  A valid impact must be followed by
-    # a strong speed collapse/reversal, or by track termination.
-    v=np.gradient(z_all,all_frames.astype(float))
-    active_threshold=max(
-        0.20,
-        float(identity_cfg.get("plateau_max_speed_px_per_frame",.75))
-    )
-    run_v=np.asarray(v[aa:bb],float)
-    active=np.flatnonzero(run_v>active_threshold)
-    if len(active)<4:
-        return _reject(diagnostics,"too_few_accelerating_samples")
-    last_active=int(aa+active[-1])
-    impact_idx=min(last_active+1,len(all_frames)-1)
-    if impact_idx<=aa+4:
-        return _reject(diagnostics,"impact_too_early")
+    # Prefer an actually observed post-flight stationary plateau. Its position is
+    # a boundary observation only; it is NOT treated as a metre ruler. Solve the
+    # fitted pixel parabola for that plateau position to estimate impact time.
+    # If no plateau is visible, fall back to the terminal motion change.
+    plateau_threshold=float(identity_cfg.get("plateau_max_speed_px_per_frame",.75))
+    plateau_min=int(identity_cfg.get("plateau_min_frames",4))
+    search0=max(core_b,bb-2)
+    plateau_idx=None
+    for j in range(search0,max(search0,len(all_frames)-plateau_min+1)):
+        j2=min(len(all_frames),j+plateau_min)
+        if j2-j<plateau_min:
+            break
+        if np.all(np.abs(v[j:j2])<=plateau_threshold):
+            plateau_idx=(j,j2)
+            break
 
-    pre_lo=max(aa,last_active-2)
-    pre_speed=float(np.median(v[pre_lo:last_active+1]))
+    if plateau_idx is not None:
+        j0,j1=plateau_idx
+        impact_level=float(np.median((expected*raw_y)[j0:j1]))
+        impact_tau=_increasing_quadratic_root(a0,b0,c0,impact_level)
+        if impact_tau is None:
+            return _reject(diagnostics,"impact_level_root")
+        impact_abs=float(t0core+impact_tau)
+        impact_idx=int(np.clip(np.searchsorted(all_frames,impact_abs*fps),0,len(all_frames)-1))
+        pre_lo=max(core_a,core_b-3)
+        pre_speed=float(np.median(v[pre_lo:core_b]))
+        post_speed=float(np.median(v[j0:j1]))
+        impact_kind="plateau"
+    else:
+        last_active=int(active[-1])
+        impact_idx=min(last_active+1,len(all_frames)-1)
+        if impact_idx<=core_a+4:
+            return _reject(diagnostics,"impact_too_early")
+        pre_lo=max(core_a,last_active-2)
+        pre_speed=float(np.median(v[pre_lo:last_active+1]))
+        post_lo=impact_idx+1
+        post_hi=min(len(v),post_lo+4)
+        if post_lo>=len(v):
+            post_speed=0.0
+            impact_kind="track_end"
+        else:
+            post_speed=float(np.median(v[post_lo:post_hi])) if post_hi>post_lo else 0.0
+            impact_kind="reversal" if post_speed<0.0 else "slowdown"
+        impact_abs=float(all_frames[impact_idx]/fps)
+
     if not math.isfinite(pre_speed) or pre_speed<=active_threshold:
         return _reject(diagnostics,"weak_preimpact_speed")
-
-    post_lo=impact_idx+1
-    post_hi=min(len(v),post_lo+4)
-    if post_lo>=len(v):
-        post_speed=0.0
-        impact_kind="track_end"
-    else:
-        post_speed=float(np.median(v[post_lo:post_hi])) if post_hi>post_lo else 0.0
-        impact_kind="reversal" if post_speed<0.0 else "slowdown"
     impact_speed_ratio=post_speed/max(pre_speed,1e-9)
     max_impact_ratio=float(identity_cfg.get("maximum_impact_speed_ratio",.55))
     if impact_speed_ratio>max_impact_ratio:
         return _reject(diagnostics,"no_terminal_impact_change")
 
-    impact_abs=float(all_frames[impact_idx]/fps)
     T=impact_abs-release_abs
     if not math.isfinite(T) or T<=0.0 or T>1.25:
         return _reject(diagnostics,"invalid_event_duration")
@@ -1740,7 +1774,8 @@ def _fit_event_time_candidate_v66(
 
     # Define a local release->impact image coordinate only for residual/scoring
     # diagnostics.  The primary physical g estimate does not use this pixel scale.
-    z_release=float(a0+b0*release_tau+.5*c0*release_tau*release_tau)
+    release_rel=release_abs-t0core
+    z_release=float(a0+b0*release_rel+.5*c0*release_rel*release_rel)
     z_impact=float(z_all[impact_idx])
     event_span=z_impact-z_release
     if not math.isfinite(event_span) or event_span<min_span:
@@ -1792,8 +1827,9 @@ def _fit_event_time_candidate_v66(
     # compatibility with the existing timing-quality field.
     timing=float(shape*T*fps)
     release_extrapolation_frames=max(0.0,-release_offset_frames)
+    impact_rel=max(impact_abs-t0core,0.0)
     start_speed_ratio=float(
-        abs(b0)/max(abs(b0+c0*max(impact_abs-float(t_abs[0]),0.0)),1e-9)
+        abs(b0)/max(abs(b0+c0*impact_rel),1e-9)
     )
 
     return validate_candidate({
