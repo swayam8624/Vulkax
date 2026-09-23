@@ -18,11 +18,42 @@ replication was designed.
 The nine final videos may not be downloaded by the blind-domain runner before the
 final-domain lock is created and checked.
 
+## Development-only tracker revision after failed v1 gate
+
+The first `drop_50/02..05` development execution on 2026-09-23 failed the
+predeclared acceleration gate (median relative error 98.56%) even though all four
+videos tracked and the controlled repair directions were ordered correctly. The v1
+event selector used the **longest** run between global position quantiles; inspection
+of the algorithm showed that a slow reset/handling traversal could therefore be
+selected instead of the ballistic descent.
+
+Because this occurred on the development split, before any free-fall validation
+result was analyzed and before any final-test video was opened, tracker revision 2
+is permitted as development-stage method design.
+
+Revision 2 is frozen before validation:
+- test both image-axis directions;
+- identify candidate 10%-90% traversals;
+- require >=80% monotone consistency;
+- select the **fastest** credible traversal, which is the ballistic release rather
+  than slow repositioning;
+- estimate full fall duration from crossing times fitted to
+  `t(p) = t0 + T sqrt(p)`;
+- use the independently measured `drop_height` from IRIS as a known geometric
+  input, not as the target acceleration;
+- require timing-fit RMS <=2.5 frames;
+- retain the same candidate schedule and global `|S|=2` decision rule.
+
+The failed v1 development result remains part of the audit trail. It is not
+relabelled as validation evidence.
+
 ## Physical observable
 
 A deterministic static-camera tracker extracts the vertical trajectory of the ball.
-The known controlled drop height calibrates pixels to meters. The free-fall segment
-is selected by frozen motion/monotonicity rules before any candidate is evaluated.
+The known controlled drop height is read from the IRIS measured parameter manifest.
+The free-fall event is the fastest credible monotone 10%-90% traversal, selected
+before any candidate is evaluated; this prevents slow hand/reset motion from being
+mistaken for ballistic descent.
 
 The target physical quantity is vertical acceleration `g`; canonical truth for the
 controlled benchmark is `9.80665 m/s^2`.
