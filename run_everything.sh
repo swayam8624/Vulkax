@@ -197,7 +197,13 @@ python3 -m py_compile   scripts/validate_evidence_registry.py   scripts/audit_re
   research/analysis/generate_paper_assets.py \
   research/analysis/validate_paper_reproduction.py \
   research/analysis/analyze_information_frontier.py \
-  research/probes/analyze_orthogonal_force_compliance.py
+  research/probes/analyze_orthogonal_force_compliance.py \
+  research/analysis/normalize_publication_validation.py \
+  research/analysis/analyze_publication_validation.py \
+  research/analysis/generate_controlled_validation_plan.py \
+  research/analysis/freeze_publication_validation.py \
+  research/analysis/plan_validation_sample_size.py \
+  research/analysis/analyze_transaction_utility.py
 
 python3 research/analysis/dcs_confirmatory_replay.py --self-test
 python3 research/analysis/export_dcs_spatial_map.py --self-test
@@ -276,6 +282,24 @@ run_logged orthogonal-force-run \
   "$BUILD_DIR/vulkax_orthogonal_force_compliance_probe" "$BUILD_DIR/orthogonal-force-compliance"
 run_logged orthogonal-force-analyze \
   python3 research/probes/analyze_orthogonal_force_compliance.py "$BUILD_DIR/orthogonal-force-compliance"
+
+stage "Publication-validation diagnostic normalization"
+rm -rf "$BUILD_DIR/publication-validation"
+python3 research/analysis/normalize_publication_validation.py \
+  --d4v "$BUILD_DIR/dcs-d4v-discovery/proposals.csv" \
+  --ofc "$BUILD_DIR/orthogonal-force-compliance/proposals.csv" \
+  --out "$BUILD_DIR/publication-validation/records.csv"
+python3 research/analysis/analyze_publication_validation.py \
+  --records "$BUILD_DIR/publication-validation/records.csv" \
+  --protocol research/validation/protocol_v1.json \
+  --out "$BUILD_DIR/publication-validation/analysis"
+python3 research/analysis/analyze_transaction_utility.py \
+  --records "$BUILD_DIR/publication-validation/records.csv" \
+  --threshold 2.0 \
+  --out "$BUILD_DIR/publication-validation/analysis/transaction_utility.csv"
+python3 research/analysis/plan_validation_sample_size.py \
+  --out "$BUILD_DIR/publication-validation/sample_size_plan.json" >/dev/null
+echo "Publication-validation outputs are diagnostic normalization of frozen D4V/OFC evidence; not new prospective confirmation."
 
 if [[ "$SKIP_GAUGE" == "0" ]]; then
   stage "GAUGE public measured-data fetch"
