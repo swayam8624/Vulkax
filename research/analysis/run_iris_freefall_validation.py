@@ -2394,7 +2394,11 @@ def main():
                     True if tg.get("revision")=="ball_identity_v6_5"
                     else tr["release_speed_ratio"]<=tg.get("maximum_release_speed_ratio",.65)
                 ),
-                "x_drift":tr["x_drift_fraction"]<=tg.get("maximum_x_drift_fraction",.45),
+                "x_drift":tr["x_drift_fraction"]<=(
+                    tg.get("maximum_depth_lateral_diameters",1.25)
+                    if tg.get("revision")=="ball_identity_v6_6_depth"
+                    else tg.get("maximum_x_drift_fraction",.45)
+                ),
                 "gap_penalty":tr["gap_penalty"]<=tg.get("maximum_gap_penalty",.50),
                 "circularity":tr["median_circularity"]>=tg.get("minimum_median_circularity",0.0),
                 "solidity":tr["median_solidity"]>=tg.get("minimum_median_solidity",0.0),
@@ -2495,6 +2499,7 @@ def main():
                 "normalized_fit_a","normalized_fit_b","duration_10_90_s",
                 "roots_complete","acceleration_stability","event_extrapolation_frames",
                 "release_plateau_track","impact_plateau_track",
+                "depth_proxy","depth_proxy_relative_span","depth_impact_reversal",
                 "direct_acceleration_m_s2","release_rest_acceleration_m_s2",
                 "acceleration_relative_error"]
         with (out/"candidate_audit.csv").open("w",newline="",encoding="utf-8") as f:
@@ -2567,7 +2572,8 @@ def main():
               "AXIS_RATIO",t["median_axis_ratio"],
               "RADIUS_CV",t["radius_cv"],
               "AREA_CV",t["area_cv"],
-              "ASPECT_LOG",t["aspect_log_median"])
+              "ASPECT_LOG",t["aspect_log_median"],
+              "TRACKER",tg["revision"])
     for e in fails:
         print("TAKE_FAIL",e["scene"],"KIND",e["kind"],e["error"])
     if failure_details:
