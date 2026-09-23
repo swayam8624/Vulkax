@@ -67,7 +67,7 @@
     "nuisance_fit_fraction": 0.4,
     "minimum_active_frames": 12,
     "blocks": 6,
-    "revision": "ball_identity_v6_5",
+    "revision": "ball_identity_v6_6_depth",
     "minimum_monotone_fraction": 0.78,
     "maximum_timing_fit_rms_frames": 2.5,
     "maximum_trajectory_shape_rms_fraction": 0.1,
@@ -92,7 +92,14 @@
     "event_edge_fraction": 0.03,
     "plateau_overlap_frames": 6,
     "maximum_event_extrapolation_frames": 30,
-    "kinematic_fit_edge_fraction": 0.02
+    "kinematic_fit_edge_fraction": 0.02,
+    "minimum_depth_proxy_relative_span": 0.055,
+    "minimum_depth_monotone_fraction": 0.72,
+    "depth_release_plateau_frames": 5,
+    "depth_impact_reversal_frames": 4,
+    "maximum_depth_event_seconds": 0.75,
+    "maximum_depth_impact_miss_frames": 4.5,
+    "maximum_depth_lateral_diameters": 1.25
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -242,6 +249,24 @@
         "the remaining estimator still used 2h/T^2, which assumes the observed interval is anchored to zero-velocity release; development evidence shows the tracker often observes an interior flight fragment"
       ]
     },
-    "v6_5_change": "development-only redesign before fresh validation: retain ball identity and global top-bottom spatial calibration; fit p(t)=a+b t+0.5 c t^2 on the observed gravity-direction motion with nuisance position/velocity; exclude stationary holds from the kinematic fit; require sufficient observed moving-frame support rather than exact release/impact observation; treat full-event roots and release-rest timing as optional diagnostics; rank without target gravity; use c*drop_height as the primary development acceleration diagnostic; development/validation gates, repair schedule, and |S|=2 remain unchanged"
+    "v6_5_change": "development-only redesign before fresh validation: retain ball identity and global top-bottom spatial calibration; fit p(t)=a+b t+0.5 c t^2 on the observed gravity-direction motion with nuisance position/velocity; exclude stationary holds from the kinematic fit; require sufficient observed moving-frame support rather than exact release/impact observation; treat full-event roots and release-rest timing as optional diagnostics; rank without target gravity; use c*drop_height as the primary development acceleration diagnostic; development/validation gates, repair schedule, and |S|=2 remain unchanged",
+    "v6_5_development_failure": {
+      "split": "drop_50/06..10",
+      "quality_pass_videos": 5,
+      "implementation_errors": 0,
+      "median_acceleration_relative_error": 0.8571277802117766,
+      "truth_control_accuracy": 0.9,
+      "placebo_false_assertion_rate": 0,
+      "direction_sign_rate": 1,
+      "validation_downloaded": false,
+      "validation_analyzed": false,
+      "diagnosis": [
+        "all five takes passed appearance/trajectory quality, but absolute gravity recovery remained wrong",
+        "real-frame forensic review showed the IRIS dropping-ball camera is overhead: gravity motion is primarily along camera depth while V6.5 treated image y as the metric drop axis",
+        "camera-to-horizontal metadata is 1.94 m for drop_50/drop_100/drop_150, so apparent ball scale carries the depth signal",
+        "good quadratic residuals in image y were therefore fits to the wrong projected coordinate, not evidence of correct metric acceleration"
+      ]
+    },
+    "v6_6_change": "development-only geometric correction before validation: use inverse square-root projected ball area as an affine perspective-depth proxy for the overhead IRIS dropping-ball camera; identify release plateau and first-impact scale reversal; fit release-from-rest p(t)=(t/T)^2 in depth coordinates; no target gravity enters candidate selection/ranking; development/validation gates, repair schedule, split assignments, and final lock policy remain unchanged"
   }
 }
