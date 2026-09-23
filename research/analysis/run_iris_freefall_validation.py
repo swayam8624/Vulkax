@@ -815,7 +815,14 @@ def self_test_video():
             else:
                 frac=max(0.0,1.0-(t-1.45)/.85)
             yy=60+span_px*frac
-            cv2.circle(q,(320,int(round(yy))),10,(255,255,255),-1)
+            # Make the gravity event intentionally incomplete in image space while
+            # leaving the later slow reset fully visible. V6.3 must use the reset
+            # only for the spatial envelope and recover full T from the partial drop.
+            visible=True
+            if .35<=t<.35+T:
+                visible=(.12<=frac<=.88)
+            if visible:
+                cv2.circle(q,(320,int(round(yy))),10,(255,255,255),-1)
 
             # Deliberate non-ball distractor: excellent quadratic motion but wrong
             # duration/acceleration. V6 must reject it by object identity.
@@ -841,7 +848,9 @@ def self_test_video():
             "maximum_area_cv":0.65,
             "maximum_aspect_log_mad":0.45,
             "minimum_detected_fraction":0.50,
-            "minimum_relative_span_fraction":0.70,
+            "expected_image_gravity_sign":1.0,
+            "minimum_global_progress_span":0.15,
+            "maximum_global_timing_fit_rms_frames":2.5,
         }
         ident=extract(
             p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12,
@@ -863,10 +872,11 @@ def self_test_video():
         assert audit, "candidate audit missing"
         selected=[q for q in audit if q["selected"]]
         assert len(selected)==1, selected
-        assert selected[0]["relative_span"]>=v6cfg["minimum_relative_span_fraction"]
-        assert selected[0]["full_fall_time_s"]==min(
-            q["full_fall_time_s"] for q in audit if q["passes_relative_span"]
-        )
+        assert selected[0]["sign"]==v6cfg["expected_image_gravity_sign"]
+        assert selected[0]["global_progress_span"]>=v6cfg["minimum_global_progress_span"]
+        # The gravity event is deliberately fragmented, so selection must succeed
+        # without requiring it to span most of the image-space envelope.
+        assert selected[0]["relative_span"]<0.95, selected[0]
         print("VALID IRIS free-fall synthetic-video tracker",
               ident["direct_acceleration_m_s2"],ident_rel,
               "identity",ident["identity_score"],
@@ -935,11 +945,11 @@ def main():
 
         # Invalid selector config is rejected explicitly.
         try:
-            validate_selector_config({"minimum_relative_span_fraction":0.0})
+            validate_selector_config({"minimum_global_progress_span":0.0})
         except ContractError:
             pass
         else:
-            raise AssertionError("invalid span fraction was accepted")
+            raise AssertionError("invalid global progress span was accepted")
 
         print("VALID IRIS free-fall analyzer self-test");return
     if a.self_test_video:
@@ -1016,6 +1026,12 @@ def main():
                           "interval_frames":tr["interval_frames"],
                           "detected_frames":tr["detected_frames"],
                           "detected_fraction":tr["detected_fraction"],
+                          "selected_direction_sign":tr["selected_direction_sign"],
+                          "release_time_s_absolute":tr["release_time_s_absolute"],
+                          "global_progress_span":float(
+                              max(np.asarray(tr["position_m"],float))/height
+                              - min(np.asarray(tr["position_m"],float))/height
+                          ),
                           "identity_score":tr["identity_score"],
                           "median_circularity":tr["median_circularity"],
                           "median_solidity":tr["median_solidity"],
@@ -1063,12 +1079,14 @@ def main():
         with (out/"take_summary.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=list(takes[0]));w.writeheader();w.writerows(takes)
     if candidate_audit_rows:
-        fields=["scene","split","event_rank","selected","track_id","span_px","relative_span",
+        fields=["scene","split","event_rank","selected","track_id","sign","t0_s",
+                "local_span_px","spatial_envelope_px","relative_span",
+                "global_progress_span","global_progress_start","global_progress_end",
                 "full_fall_time_s","interval_frames","detected_frames","detected_fraction",
                 "timing_fit_rms_frames","trajectory_shape_rms_fraction","release_speed_ratio",
                 "x_drift_fraction","gap_penalty","identity_score","median_circularity",
                 "median_solidity","median_circle_fill","median_axis_ratio","radius_cv","area_cv",
-                "aspect_log_median","passes_relative_span","direct_acceleration_m_s2",
+                "aspect_log_median","envelope_track_count","direct_acceleration_m_s2",
                 "acceleration_relative_error"]
         with (out/"candidate_audit.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
@@ -1129,6 +1147,8 @@ def main():
               "INTERVAL_FRAMES",t["interval_frames"],
               "DETECTED_FRAMES",t["detected_frames"],
               "DETECTED_FRACTION",t["detected_fraction"],
+              "SIGN",t["selected_direction_sign"],
+              "GLOBAL_PROGRESS_SPAN",t["global_progress_span"],
               "IDENTITY",t["identity_score"],
               "CIRCULARITY",t["median_circularity"],
               "SOLIDITY",t["median_solidity"],
