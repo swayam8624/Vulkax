@@ -138,7 +138,7 @@ information-limit result: controlled truth ordering was correct, but the availab
 trajectory signal was far below repeat and numerical variability, so final-test
 repeats were not opened.
 
-IRIS single-pendulum is the next prospective lane. The frozen execution command is:
+IRIS single-pendulum development, validation, and the locked 90-degree final test have now executed. The reproduction command for development/validation is:
 
 ```bash
 bash research/scripts/run_iris_pendulum_validation.sh
@@ -146,4 +146,9 @@ bash research/scripts/run_iris_pendulum_validation.sh
 
 The command first expands only the development/validation pendulum repeats, runs a
 20-degree development gate, and opens the 45-degree validation videos only if that
-gate succeeds. The 90-degree setting remains reserved for final test.
+gate succeeds. The separately frozen 90-degree final test subsequently executed
+under the IRIS-specific lock: 10/10 videos passed, the finite-amplitude probe
+achieved 90/110 strict correct decisions versus 40/110 for the small-angle baseline,
+and the paired comparison was 50 primary-only wins, 0 baseline-only wins, 60 ties.
+The 220 confirmatory rows arise from 10 physical videos and must be interpreted with
+that clustering structure.
