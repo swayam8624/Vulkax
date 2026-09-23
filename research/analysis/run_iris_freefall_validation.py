@@ -2202,11 +2202,13 @@ def choose_ballistic_track_v67(tracks,fps,minimum_interval_frames=12,identity_cf
         ))
 
     def rank(q):
+        # Boundary evidence is useful only when it improves the observed-law fit.
+        # Never allow a cross-track label to outrank a much cleaner local event.
         return (
-            0 if q.get("boundary_mode")=="cross_track_plateaus" else 1,
             float(q["timing_fit_rms_frames"]),
             float(q["trajectory_shape_rms_fraction"]),
             float(q.get("acceleration_stability",0.0)),
+            0 if q.get("boundary_mode")=="cross_track_plateaus" else 1,
             float(q.get("event_extrapolation_frames",0.0)),
             float(q.get("impact_speed_ratio",1.0)),
             -float(q["identity_score"]),
@@ -2266,6 +2268,11 @@ def choose_ballistic_track_v67(tracks,fps,minimum_interval_frames=12,identity_cf
 
 def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     cfg=identity_cfg or {}
+    if cfg.get("revision")=="ball_identity_v6_8":
+        return choose_ballistic_track_v67(
+            tracks,fps,minimum_interval_frames=minimum_interval_frames,
+            identity_cfg=cfg
+        )
     if cfg.get("revision")=="ball_identity_v6_7":
         return choose_ballistic_track_v67(
             tracks,fps,minimum_interval_frames=minimum_interval_frames,
@@ -2335,6 +2342,52 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
 
     tracks=build_temporal_tracks(frame_candidates,fps)
     if not tracks:raise RuntimeError("no compact temporal motion tracks")
+
+    track_debug={"chunks":[],"plateaus":[]}
+    if tracker_config and tracker_config.get("revision") in (
+        "ball_identity_v6_7","ball_identity_v6_8"
+    ):
+        dbg_chunks=_identity_track_chunks(tracks,fps,tracker_config)
+        dbg_selector=validate_selector_config(tracker_config)
+        expected_dbg=float(dbg_selector["expected_sign"])
+        for cc in dbg_chunks:
+            fr=np.asarray(cc["frames"],int)
+            yy=np.asarray(cc["y"],float)
+            xx=np.asarray(cc["x"],float)
+            zz=expected_dbg*yy
+            vv=np.gradient(zz,fr.astype(float)) if len(fr)>1 else np.zeros(len(fr))
+            track_debug["chunks"].append({
+                "track_id":int(cc["track_id"]),
+                "chunk_id":int(cc["chunk_id"]),
+                "frame_start":int(fr[0]),"frame_end":int(fr[-1]),
+                "dense_frames":int(len(fr)),
+                "detected_frames":int(len(cc["detected_frames_original"])),
+                "x_start":float(xx[0]),"x_end":float(xx[-1]),
+                "y_start":float(yy[0]),"y_end":float(yy[-1]),
+                "y_min":float(np.min(yy)),"y_max":float(np.max(yy)),
+                "signed_progress_px":float(zz[-1]-zz[0]),
+                "median_signed_speed_px_frame":float(np.median(vv)),
+                "max_signed_speed_px_frame":float(np.max(vv)),
+                "min_signed_speed_px_frame":float(np.min(vv)),
+                "identity_score":float(cc["identity_score"]),
+                "median_circularity":float(cc["median_circularity"]),
+                "median_solidity":float(cc["median_solidity"]),
+                "median_circle_fill":float(cc["median_circle_fill"]),
+                "median_axis_ratio":float(cc["median_axis_ratio"]),
+                "radius_cv":float(cc["radius_cv"]),
+                "area_cv":float(cc["area_cv"]),
+                "gap_penalty":float(cc["gap_penalty"]),
+            })
+        for pp in _plateau_segments(dbg_chunks,dbg_selector):
+            track_debug["plateaus"].append({
+                "track_id":int(pp["track_id"]),
+                "chunk_id":int(pp["chunk_id"]),
+                "frame_start":int(pp["frame_start"]),
+                "frame_end":int(pp["frame_end"]),
+                "x":float(pp["x"]),"y":float(pp["y"]),
+                "identity_score":float(pp["identity_score"]),
+            })
+
     selected=choose_ballistic_track(
         tracks,fps,minimum_interval_frames=minimum_interval_frames,
         identity_cfg=tracker_config
@@ -2375,7 +2428,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
     # acceleration estimate is the nuisance-velocity quadratic coefficient in
     # global spatial coordinates, not 2h/T^2 (which assumes release from rest is
     # directly observed).  Historical revisions retain the old diagnostic.
-    if tracker_config and tracker_config.get("revision") in ("ball_identity_v6_6","ball_identity_v6_7"):
+    if tracker_config and tracker_config.get("revision") in ("ball_identity_v6_6","ball_identity_v6_7","ball_identity_v6_8"):
         # V6.6 is deliberately metric-free in image space: use independently
         # measured drop height and release->impact event time only.
         ghat=release_rest_ghat
@@ -2428,6 +2481,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "acceleration_stability":float(chosen.get("acceleration_stability",0.0)),
         "roots_complete":bool(chosen.get("roots_complete",0.0)),
         "candidate_audit":candidate_audit,
+        "track_debug":track_debug,
         "roi":[int(x0),int(yy0),int(x1-x0),int(y1-yy0)]
     }
 
@@ -2484,7 +2538,7 @@ def self_test_video():
         # and a fragmented true ball drop. The ungated detector is expected to be
         # ambiguous; only the active V6.5 identity/kinematics path is under test here.
         v6cfg={
-            "revision":"ball_identity_v6_7",
+            "revision":"ball_identity_v6_8",
             "minimum_median_circularity":0.35,
             "minimum_median_solidity":0.65,
             "minimum_median_circle_fill":0.45,
@@ -2725,6 +2779,11 @@ def main():
                        width=tg["analysis_width"],max_seconds=tg["max_seconds"],
                        minimum_interval_frames=tg["minimum_active_frames"],
                        tracker_config=tg)
+            if tr.get("track_debug"):
+                track_debug_rows.append({
+                    "scene":m["scene"],"split":a.split,
+                    **tr["track_debug"]
+                })
             for q in tr.get("candidate_audit",[]):
                 qq=dict(q)
                 qq["scene"]=m["scene"]
@@ -2835,6 +2894,10 @@ def main():
         (out/"failure_details.json").write_text(
             json.dumps(failure_details,indent=2)+"\n"
         )
+    if track_debug_rows:
+        (out/"track_debug.json").write_text(
+            json.dumps(track_debug_rows,indent=2)+"\n"
+        )
     if rows:
         with (out/"validation_records.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=FIELDS);w.writeheader();w.writerows(rows)
@@ -2855,6 +2918,8 @@ def main():
                 "normalized_fit_a","normalized_fit_b","duration_10_90_s",
                 "roots_complete","acceleration_stability","event_extrapolation_frames",
                 "release_extrapolation_frames","impact_speed_ratio","impact_boundary_kind",
+                "boundary_mode","release_boundary_track","impact_boundary_track",
+                "boundary_pair_shape_rms","boundary_release_gap_frames","boundary_impact_gap_frames",
                 "release_plateau_track","impact_plateau_track",
                 "direct_acceleration_m_s2","release_rest_acceleration_m_s2",
                 "acceleration_relative_error"]
