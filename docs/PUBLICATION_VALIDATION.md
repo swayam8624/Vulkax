@@ -38,7 +38,7 @@ three complementary benchmarks:
 - **RGBench Cloth Sim-to-Real v1** — real segmented cloth point clouds, robot
   trajectories, camera calibration and garment meshes. The core profile selects one
   grasp/fold/fling capture from each of three predeclared garments spanning
-  development, validation and final-test roles.
+  development, validation and final-test roles. The current v1 Hugging Face revision does not expose the upstream-documented `reference_results/` tree, so Vulkax does not depend on it.
 
 Recommended command:
 
