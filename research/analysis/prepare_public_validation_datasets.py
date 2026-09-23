@@ -184,14 +184,36 @@ def iris_rows(root: Path) -> tuple[list[dict[str, str]], dict]:
     return rows, truth
 
 
-def rgbench_capture_roots(droot: Path) -> Iterable[tuple[str, Path]]:
+def selected_rgbench_capture_roots(download: dict) -> set[str] | None:
+    patterns = download.get("requested_patterns")
+    if patterns is None:
+        return None
+    selected: set[str] = set()
+    for pattern in patterns:
+        if not pattern.endswith("/**"):
+            continue
+        prefix = pattern[:-3].rstrip("/")
+        if prefix.startswith(("meshes/", "reference_results/")):
+            continue
+        if re.search(r"_(grasp|fold|fling)_", prefix):
+            selected.add(prefix)
+    return selected
+
+
+def rgbench_capture_roots(
+    droot: Path, selected: set[str] | None = None
+) -> Iterable[tuple[str, Path]]:
     for garment_dir in sorted(p for p in droot.iterdir() if p.is_dir()):
         garment = garment_dir.name
         if garment in {"meshes", "reference_results", ".cache"}:
             continue
         for capture in sorted(p for p in garment_dir.iterdir() if p.is_dir()):
-            if re.search(r"_(grasp|fold|fling)_", capture.name):
-                yield garment, capture
+            if not re.search(r"_(grasp|fold|fling)_", capture.name):
+                continue
+            rel = capture.relative_to(droot).as_posix()
+            if selected is not None and rel not in selected:
+                continue
+            yield garment, capture
 
 
 def rgbench_rows(root: Path) -> tuple[list[dict[str, str]], dict]:
@@ -202,7 +224,11 @@ def rgbench_rows(root: Path) -> tuple[list[dict[str, str]], dict]:
     if not droot.exists():
         return rows, truth
 
-    for garment, capture in rgbench_capture_roots(droot):
+    selected = selected_rgbench_capture_roots(download)
+    if selected is not None and not selected:
+        raise RuntimeError("RGBench core/full manifest contains no selected capture roots")
+
+    for garment, capture in rgbench_capture_roots(droot, selected):
         split = RGBENCH_GARMENT_SPLIT.get(garment, "development")
         action_match = re.search(r"_(grasp|fold|fling)_", capture.name)
         action = action_match.group(1) if action_match else "unknown"
@@ -345,9 +371,19 @@ def self_test() -> None:
         for ds, license_name in (("gauge", "MIT"), ("iris", "CC"), ("rgbench", "CC")):
             p = root / ds
             p.mkdir(parents=True, exist_ok=True)
-            (p / "vulkax_download_manifest.json").write_text(json.dumps({
-                "citation_url": f"https://example/{ds}", "license": license_name
-            }), encoding="utf-8")
+            manifest = {
+                "citation_url": f"https://example/{ds}",
+                "license": license_name,
+                "requested_patterns": None,
+            }
+            if ds == "rgbench":
+                manifest["requested_patterns"] = [
+                    "green_tshirt/green_tshirt_grasp_2025-01-01/**",
+                    "meshes/Green_Tshirt/**",
+                ]
+            (p / "vulkax_download_manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
 
         gp = root / "gauge/data/deformable/foam stretching/json/soft/8.json"
         gp.parent.mkdir(parents=True, exist_ok=True)
@@ -374,10 +410,24 @@ def self_test() -> None:
         (cap / "joints/right.csv").write_text("x", encoding="utf-8")
         (cap / "segment_pcds/a.pcd").write_bytes(b"pcd")
 
+        # Simulate stale/over-broad files left in the local HF cache. They must not
+        # enter the scientific manifest unless requested by the pinned core profile.
+        extra_cap = root / "rgbench/green_tshirt/green_tshirt_fold_2025-01-02"
+        (extra_cap / "calibration").mkdir(parents=True, exist_ok=True)
+        (extra_cap / "joints").mkdir()
+        (extra_cap / "segment_pcds").mkdir()
+        (extra_cap / "calibration/world_to_camera_transform.json").write_text("{}", encoding="utf-8")
+        (extra_cap / "joints/left.csv").write_text("x", encoding="utf-8")
+        (extra_cap / "joints/right.csv").write_text("x", encoding="utf-8")
+        (extra_cap / "segment_pcds/a.pcd").write_bytes(b"pcd")
+
         report = prepare(root, out)
         assert report["prospective_world_count"] >= 5
         world = list(csv.DictReader((out / "world_manifest.csv").open()))
         assert not any("foam shearing" in r["scene"] for r in world)
+        rgb = [r for r in world if r["dataset"] == "rgbench"]
+        assert len(rgb) == 1
+        assert "green_tshirt_grasp_2025-01-01" in rgb[0]["scene"]
         p90 = next(r for r in world if r["scene"].startswith("pendulum/pendulum_90"))
         assert p90["split"] == "final_test"
     print("VALID public dataset preparation self-test")
