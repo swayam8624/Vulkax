@@ -56,6 +56,7 @@ SPLIT_TRIALS = {
 }
 METHODS = (
     "reality_probe_dcs",
+    "reality_probe_rigid_invariant_strain",
     "same_cost_raw_bundle",
     "simple_residual_or_uncertainty_baseline",
 )
@@ -110,6 +111,73 @@ def self_normalized_score(deltas: list[float]) -> float:
     return score
 
 
+def mst_edges(
+    rest: dict[str, list[float]], ids: list[str]
+) -> list[tuple[str, str]]:
+    """Deterministic Euclidean MST over rest markers.
+
+    The MST limits the evidence vector to n-1 local geometric constraints rather
+    than treating all O(n^2) pair distances as independent evidence.
+    """
+    ordered = sorted(ids)
+    if len(ordered) < 2:
+        raise ValueError("rigid-invariant strain probe needs at least two markers")
+    used = {ordered[0]}
+    edges: list[tuple[str, str]] = []
+    while len(used) < len(ordered):
+        best: tuple[float, str, str] | None = None
+        for a in sorted(used):
+            for b in ordered:
+                if b in used:
+                    continue
+                d = norm(vec_sub(rest[a], rest[b]))
+                if d <= 1.0e-12:
+                    continue
+                candidate = (d, a, b)
+                if best is None or candidate < best:
+                    best = candidate
+        if best is None:
+            raise ValueError("marker rest geometry cannot form a non-degenerate MST")
+        _, a, b = best
+        edges.append((a, b))
+        used.add(b)
+    return edges
+
+
+def rigid_invariant_strain_errors(
+    measured: dict[int, dict[str, list[float]]],
+    predicted: dict[int, dict[str, list[float]]],
+    ids: list[str],
+    mid: int,
+    n: int,
+) -> list[float]:
+    """Per-MST-edge strain mismatch at frozen mid/final probe times.
+
+    Relative pair length is invariant to global translation and rotation, so this
+    selectively cancels rigid nuisance modes without annihilating stretch.
+    """
+    common = min(n, len(predicted), len(measured))
+    if common < 3:
+        raise RuntimeError("too few common frames for invariant strain probe")
+    last = common - 1
+    mid = min(max(1, mid), last - 1)
+    edges = mst_edges(measured[0], ids)
+    out: list[float] = []
+    for a, b in edges:
+        d0 = norm(vec_sub(measured[0][a], measured[0][b]))
+        if d0 <= 1.0e-12:
+            raise RuntimeError("degenerate rest edge in invariant strain probe")
+        residuals = []
+        for frame in (mid, last):
+            dm = norm(vec_sub(measured[frame][a], measured[frame][b]))
+            dp = norm(vec_sub(predicted[frame][a], predicted[frame][b]))
+            measured_strain = (dm - d0) / d0
+            predicted_strain = (dp - d0) / d0
+            residuals.append(predicted_strain - measured_strain)
+        out.append(math.sqrt(statistics.fmean(x * x for x in residuals)))
+    return out
+
+
 def marker_error_vectors(
     measured: dict[int, dict[str, list[float]]],
     predicted: dict[int, dict[str, list[float]]],
@@ -154,6 +222,9 @@ def marker_error_vectors(
 
     return {
         "reality_probe_dcs": dcs,
+        "reality_probe_rigid_invariant_strain": rigid_invariant_strain_errors(
+            measured, predicted, ids, mid, n
+        ),
         "same_cost_raw_bundle": raw3,
         "simple_residual_or_uncertainty_baseline": full,
     }
@@ -350,8 +421,8 @@ def self_test() -> None:
     }
     bad = {
         0: {"m0": [0.0, 0.0, 0.0], "m1": [0.0, 1.0, 0.0]},
-        1: {"m0": [0.2, 0.0, 0.0], "m1": [0.3, 1.0, 0.0]},
-        2: {"m0": [0.7, 0.0, 0.0], "m1": [0.8, 1.0, 0.0]},
+        1: {"m0": [0.2, 0.0, 0.0], "m1": [0.45, 1.15, 0.0]},
+        2: {"m0": [0.7, 0.0, 0.0], "m1": [1.10, 1.35, 0.0]},
     }
     g = marker_error_vectors(measured, good, ["m0", "m1"], 1, 3)
     b = marker_error_vectors(measured, bad, ["m0", "m1"], 1, 3)
