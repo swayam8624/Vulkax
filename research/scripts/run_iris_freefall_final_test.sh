@@ -18,6 +18,18 @@ PUBLIC="$BUILD/publication-validation/public-data"
 VAL="$BUILD/publication-validation/iris-freefall-validation"
 FINAL="$BUILD/publication-validation/iris-freefall-final-test"
 COMBINED="$BUILD/publication-validation/combined-freefall-final"
+if [[ ! -s "$VAL/summary.json" ]]; then
+  echo "[freefall-final] STOP: validation summary is missing. Development/validation did not pass; final data will not be downloaded." >&2
+  exit 2
+fi
+python3 - "$VAL/summary.json" <<'PY'
+import json,sys
+p=sys.argv[1]
+s=json.load(open(p))
+if s.get("split")!="validation" or not s.get("gate_pass"):
+    raise SystemExit("[freefall-final] STOP: validation gate is not PASS; final data remains unopened.")
+print("[freefall-final] validation gate PASS; final lock may be created")
+PY
 [[ -x "$VENV/bin/python" ]] || python3 -m venv "$VENV"
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
 if [[ -s "$FINAL/summary.json" && "$REPRO" -ne 1 ]]; then

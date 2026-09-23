@@ -121,13 +121,51 @@ Revision 4 quality requirements:
 
 The candidate schedule and global `|S|=2` decision rule remain unchanged.
 
+## Fourth development failure and tracker revision 5
+
+Tracker revision 4 was executed only on the development population
+`drop_50/{02,03,04,05}`. It exposed a different failure mode:
+
+- quality-pass videos: 0/4;
+- every take failed only the existing `minimum_active_frames` quality predicate;
+- normalized quadratic shape RMS remained very small;
+- relative acceleration errors were approximately 1.16, 3.23, 3.02, and 3.01.
+
+The combination shows that revision 4 was selecting very short, cleanly quadratic
+fragments and then binding the **entire measured drop height** to those truncated
+time intervals. That calibration is invalid and necessarily inflates the recovered
+acceleration.
+
+No validation result was analyzed and no final-test video was opened.
+
+Revision 5 is frozen before validation and changes only this development-stage
+selection/calibration rule:
+
+1. temporal association may bridge short detection gaps;
+2. for each coherent track, use its full observed vertical travel to define
+   normalized progress `p`;
+3. measure ordered 10%,20%,...,90% progress crossing times;
+4. fit `t(p)=t0+T*sqrt(p)` and recover the **full** fall duration `T`;
+5. require `T*fps` to satisfy the pre-existing `minimum_active_frames` rule
+   before drop-height calibration;
+6. require timing-fit RMS <=2.5 frames, plus the existing trajectory-shape,
+   verticality, release-speed, and continuity checks;
+7. arbitrary short-fragment/full-height calibration is forbidden;
+8. the target value of `g` remains absent from track/event selection;
+9. only after the full-flight timing fit passes is measured IRIS `drop_height`
+   used to compute `g=2h/T^2` and scale the observed trajectory.
+
+The 20% development acceleration gate, candidate schedule, and global `|S|=2`
+decision rule remain unchanged.
+
 ## Physical observable
 
 A deterministic static-camera tracker extracts the vertical trajectory of the ball.
 The known controlled drop height is read from the IRIS measured parameter manifest.
-The free-fall event is the fastest credible monotone 10%-90% traversal, selected
-before any candidate is evaluated; this prevents slow hand/reset motion from being
-mistaken for ballistic descent.
+The free-fall event is a temporally coherent release-from-rest track whose accepted
+interval satisfies the frozen minimum-duration gate before physical calibration.
+Arbitrary interior fragments are forbidden; short detection gaps are allowed only
+inside the same coherent track.
 
 The target physical quantity is vertical acceleration `g`; canonical truth for the
 controlled benchmark is `9.80665 m/s^2`.
