@@ -34,6 +34,9 @@ on:
       - "research/scripts/run_iris_freefall_blind_validation.sh"
       - "research/scripts/run_iris_freefall_rescue_v6.sh"
       - "research/scripts/run_iris_freefall_final_test.sh"
+      - "research/scripts/run_iris_freefall_v6_final_test.sh"
+      - "research/scripts/fetch_iris_freefall_v6_final.py"
+      - "research/analysis/freeze_iris_freefall_v6_final.py"
       - "visualization/scripts/render_reviewer_hardening.py"
       - "visualization/scripts/render_gt_hidden_rewrite_demo.py"
       - "research/reviewer_redteam/**"
@@ -119,6 +122,7 @@ jobs:
             research/analysis/analyze_iris_truth_uncertainty.py \
             research/analysis/run_iris_freefall_validation.py \
             research/analysis/freeze_iris_freefall_final_test.py \
+            research/analysis/freeze_iris_freefall_v6_final.py \
             research/analysis/freeze_iris_pendulum_final_test.py \
             research/analysis/summarize_iris_pendulum_final_test.py \
             research/scripts/fetch_iris_pendulum_repeats.py \
@@ -155,9 +159,11 @@ jobs:
           python3 research/analysis/analyze_iris_truth_uncertainty.py --self-test
           python3 research/analysis/run_iris_freefall_validation.py --self-test
           python3 research/analysis/freeze_iris_freefall_final_test.py --self-test
+          python3 research/analysis/freeze_iris_freefall_v6_final.py --self-test
           python3 research/scripts/fetch_iris_freefall_blind.py --self-test
           python3 research/scripts/fetch_iris_freefall_rescue_v6.py --config research/validation/iris_freefall_rescue_v6.json --phase development --self-test
           python3 research/scripts/fetch_iris_freefall_rescue_v6.py --config research/validation/iris_freefall_rescue_v6.json --phase validation --self-test
+          python3 research/scripts/fetch_iris_freefall_v6_final.py --config research/validation/iris_freefall_rescue_v6.json --lock /tmp/placeholder --self-test
           python3 research/scripts/fetch_iris_reference_baselines.py --self-test
           python3 research/analysis/freeze_iris_pendulum_final_test.py --self-test
           python3 research/analysis/summarize_iris_pendulum_final_test.py --self-test
@@ -177,6 +183,8 @@ jobs:
           bash -n research/scripts/run_iris_freefall_blind_validation.sh
           bash -n research/scripts/run_iris_freefall_rescue_v6.sh
           bash -n research/scripts/run_iris_freefall_final_test.sh
+          bash -n research/scripts/run_iris_freefall_rescue_v6.sh
+          bash -n research/scripts/run_iris_freefall_v6_final_test.sh
 
       - name: Live public dataset catalog check
         run: |
