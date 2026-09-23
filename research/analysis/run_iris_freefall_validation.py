@@ -19,12 +19,87 @@ acceleration remains absent from selection. The independently measured drop heig
 is bound only to the accepted full-flight interval.
 """
 from __future__ import annotations
-import argparse,csv,json,math,pathlib,statistics,subprocess,tempfile
+import argparse,csv,json,math,pathlib,statistics,subprocess,tempfile,traceback
 import numpy as np
 
 G=9.80665
 TAU=2.0
 DOSES=(.025,.05,.10,.20)
+
+
+class FreefallValidationError(RuntimeError):
+    """Base class for controlled free-fall analysis failures."""
+
+class TrackSelectionError(FreefallValidationError):
+    """No physically admissible track/event survived the frozen selector."""
+
+class ContractError(FreefallValidationError):
+    """Internal producer/consumer or configuration contract violation."""
+
+CANDIDATE_NUMERIC_FIELDS=(
+    "span_px","full_fall_time_s","timing_fit_rms_frames",
+    "trajectory_shape_rms_fraction","release_speed_ratio",
+    "x_drift_fraction","gap_penalty","detected_window_fraction",
+    "identity_score","median_circularity","median_solidity",
+    "median_circle_fill","median_axis_ratio","radius_cv","area_cv",
+    "aspect_log_median",
+)
+CANDIDATE_REQUIRED_FIELDS=(
+    "track_id","window_indices","abs_times","progress","interval_frames",
+    "detected_frames",*CANDIDATE_NUMERIC_FIELDS,
+)
+
+def _finite_number(value,name):
+    try:
+        q=float(value)
+    except (TypeError,ValueError) as e:
+        raise ContractError(f"candidate field {name!r} is not numeric: {value!r}") from e
+    if not math.isfinite(q):
+        raise ContractError(f"candidate field {name!r} is not finite: {value!r}")
+    return q
+
+def validate_candidate(candidate):
+    if not isinstance(candidate,dict):
+        raise ContractError(
+            f"candidate producer returned {type(candidate).__name__}, expected dict"
+        )
+    missing=[k for k in CANDIDATE_REQUIRED_FIELDS if k not in candidate]
+    if missing:
+        raise ContractError("candidate missing required fields: "+",".join(missing))
+    for name in CANDIDATE_NUMERIC_FIELDS:
+        _finite_number(candidate[name],name)
+    for name in ("median_circularity","median_solidity","median_circle_fill","median_axis_ratio"):
+        q=float(candidate[name])
+        if not (0.0<=q<=1.0):
+            raise ContractError(f"bounded shape field {name} outside [0,1]: {q}")
+    if float(candidate["span_px"])<=0 or float(candidate["full_fall_time_s"])<=0:
+        raise ContractError("candidate span/duration must be positive")
+    if int(candidate["interval_frames"])<=0 or int(candidate["detected_frames"])<=0:
+        raise ContractError("candidate frame counts must be positive")
+    return candidate
+
+def validate_selector_config(identity_cfg):
+    cfg=identity_cfg or {}
+    frac=float(cfg.get("minimum_relative_span_fraction",0.70))
+    if not math.isfinite(frac) or not (0.0 < frac <= 1.0):
+        raise ContractError(
+            f"minimum_relative_span_fraction must be in (0,1], got {frac!r}"
+        )
+    for key in (
+        "minimum_median_circularity","minimum_median_solidity",
+        "minimum_median_circle_fill","minimum_median_axis_ratio",
+        "minimum_detected_fraction",
+    ):
+        if key in cfg:
+            q=float(cfg[key])
+            if not math.isfinite(q) or not (0.0<=q<=1.0):
+                raise ContractError(f"{key} must be finite and in [0,1], got {q!r}")
+    for key in ("maximum_radius_cv","maximum_area_cv","maximum_aspect_log_mad"):
+        if key in cfg:
+            q=float(cfg[key])
+            if not math.isfinite(q) or q<0:
+                raise ContractError(f"{key} must be finite and >=0, got {q!r}")
+    return frac
 
 def read_csv(p):
     with p.open(newline="",encoding="utf-8") as f:return list(csv.DictReader(f))
@@ -125,6 +200,12 @@ def build_temporal_tracks(frame_candidates,fps):
     constant-velocity image prediction and component-scale gate. No physical truth
     or target acceleration enters association.
     """
+    if not isinstance(frame_candidates,list):
+        raise ContractError(
+            f"frame_candidates must be list, got {type(frame_candidates).__name__}"
+        )
+    if not math.isfinite(float(fps)) or float(fps)<=0:
+        raise ContractError(f"fps must be finite and positive, got {fps!r}")
     active=[];finished=[];next_id=0
     max_gap=5
     for frame_idx,cands in enumerate(frame_candidates):
@@ -201,7 +282,7 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
     frames=np.asarray([p["frame"] for p in pts],int)
     xx=np.asarray([p["x"] for p in pts],float)
     yy=np.asarray([p["y"] for p in pts],float)
-    if len(frames)<8:return None
+    if len(frames)<8:return []
 
     # Treat only gaps larger than the explicit association allowance as hard breaks.
     chunks=[];aa=0
@@ -373,25 +454,41 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
 
 def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     identity_cfg=identity_cfg or {}
+    min_span_fraction=validate_selector_config(identity_cfg)
+    if not isinstance(tracks,list):
+        raise ContractError(f"tracks must be a list, got {type(tracks).__name__}")
     candidates=[]
     for tr in tracks:
-        q=fit_full_flight_progress(
+        produced=fit_full_flight_progress(
             tr,fps,minimum_interval_frames=minimum_interval_frames,
             identity_cfg=identity_cfg
         )
-        candidates.extend(q)
+        if produced is None:
+            raise ContractError(
+                "fit_full_flight_progress returned None; producer contract requires list"
+            )
+        if not isinstance(produced,list):
+            raise ContractError(
+                "fit_full_flight_progress returned "
+                f"{type(produced).__name__}; producer contract requires list"
+            )
+        for candidate in produced:
+            candidates.append(validate_candidate(candidate))
     if not candidates:
-        raise RuntimeError("no temporally consistent full-flight progress track found")
+        raise TrackSelectionError(
+            "no temporally consistent full-flight progress track survived frozen filters"
+        )
 
     # Identity is an eligibility gate, not the primary optimization target.
     # The physical ball's release and reset can both be very ball-like. Require
     # near-maximal ball travel first, then choose the fastest full-travel event.
     max_span=max(float(q["span_px"]) for q in candidates)
-    min_span_fraction=float(identity_cfg.get("minimum_relative_span_fraction",0.70))
     span_floor=max_span*min_span_fraction
     eligible=[q for q in candidates if float(q["span_px"])>=span_floor]
     if not eligible:
-        eligible=candidates
+        raise ContractError(
+            "relative-span filter removed every candidate; selector invariant violated"
+        )
 
     def event_rank(q):
         return (
@@ -477,10 +574,16 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
 
     tracks=build_temporal_tracks(frame_candidates,fps)
     if not tracks:raise RuntimeError("no compact temporal motion tracks")
-    chosen,candidate_audit=choose_ballistic_track(
+    selected=choose_ballistic_track(
         tracks,fps,minimum_interval_frames=minimum_interval_frames,
         identity_cfg=tracker_config
     )
+    if (not isinstance(selected,tuple)) or len(selected)!=2:
+        raise ContractError("choose_ballistic_track must return (candidate, audit)")
+    chosen,candidate_audit=selected
+    validate_candidate(chosen)
+    if not isinstance(candidate_audit,list):
+        raise ContractError("candidate audit must be a list")
 
     ids=np.asarray(chosen["window_indices"],int)
     abs_times=np.asarray(chosen["abs_times"],float)
@@ -671,7 +774,36 @@ def main():
     ap.add_argument("--self-test-video",action="store_true")
     a=ap.parse_args();cfg=json.loads(a.config.read_text())
     if a.self_test:
-        assert len(cases())==11;assert decision(2)=="support" and decision(-2)=="veto"
+        assert len(cases())==11
+        assert decision(2)=="support" and decision(-2)=="veto"
+
+        # Producer contract: short/ineligible tracks return [], never None.
+        short={"id":0,"pts":[
+            {"frame":i,"x":0.0,"y":float(i),"area":10,
+             "circularity":1.0,"solidity":1.0,"circle_fill":1.0,
+             "axis_ratio":1.0,"radius":2.0,"aspect_log_abs":0.0}
+            for i in range(7)
+        ]}
+        produced=fit_full_flight_progress(short,60.0,12,{})
+        assert produced==[], produced
+
+        # Consumer contract: empty candidate population is a controlled selection
+        # failure, not a Python TypeError.
+        try:
+            choose_ballistic_track([],60.0,12,{})
+        except TrackSelectionError:
+            pass
+        else:
+            raise AssertionError("empty track population did not raise TrackSelectionError")
+
+        # Invalid selector config is rejected explicitly.
+        try:
+            validate_selector_config({"minimum_relative_span_fraction":0.0})
+        except ContractError:
+            pass
+        else:
+            raise AssertionError("invalid span fraction was accepted")
+
         print("VALID IRIS free-fall analyzer self-test");return
     if a.self_test_video:
         self_test_video();return
@@ -694,7 +826,7 @@ def main():
     mm=manifests(a.adapted_root,a.split,cfg)
     expected=len(cfg["dataset"][a.split]["takes"])
     if len(mm)!=expected:raise SystemExit(f"expected {expected} frozen scenes, got {len(mm)}")
-    rows=[];takes=[];fails=[];candidate_audit_rows=[]
+    rows=[];takes=[];fails=[];failure_details=[];candidate_audit_rows=[]
     setting=cfg["dataset"][a.split]["setting"]
     expected_height=float(cfg["physics"]["drop_heights_m"][setting])
     tg=cfg["tracker"]
@@ -772,8 +904,21 @@ def main():
                      "measurement_noise_sigma":tr["one_pixel_m"],"pose_noise_sigma":"","missing_fraction":1-tr["valid_fraction"],
                      "channel_dependence":0.0,"negative_control":str(neg).lower(),"seed":0,"source_artifact":str(pkg),
                      "notes":f"factor={fac}; drop_height_m={height}; tracker={tg['revision']}; standardized evidence score; take01 forbidden"})
-        except Exception as e:fails.append({"scene":m["scene"],"error":f"{type(e).__name__}: {e}"})
+        except Exception as e:
+            kind=("no_valid_candidate" if isinstance(e,TrackSelectionError)
+                  else "implementation_or_io_error")
+            short={"scene":m["scene"],"kind":kind,
+                   "error":f"{type(e).__name__}: {e}"}
+            fails.append(short)
+            failure_details.append({
+                **short,
+                "traceback":traceback.format_exc(),
+            })
     out.mkdir(parents=True,exist_ok=True)
+    if failure_details:
+        (out/"failure_details.json").write_text(
+            json.dumps(failure_details,indent=2)+"\n"
+        )
     if rows:
         with (out/"validation_records.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=FIELDS);w.writeheader();w.writerows(rows)
@@ -815,8 +960,14 @@ def main():
               and (median_err is not None)
               and median_err<=vg.get("maximum_median_acceleration_relative_error",float("inf")))
     else:gate=True
+    implementation_errors=sum(
+        1 for x in fails if x.get("kind")=="implementation_or_io_error"
+    )
+    if implementation_errors:
+        gate=False
     summary={"schema":"vulkax.iris_freefall_result","version":int(cfg.get("version",5)),"tracker_revision":tg["revision"],
-      "split":a.split,"expected_videos":expected,"quality_pass_videos":quality,"failures":fails,
+      "split":a.split,"expected_videos":expected,"quality_pass_videos":quality,
+      "failures":fails,"implementation_errors":implementation_errors,
       "median_acceleration_relative_error":median_err,"records":len(rows),
       "candidate_audit_records":len(candidate_audit_rows),"truth_control_accuracy":tc,
       "placebo_false_assertion_rate":pfar,"direction_sign_rate":sign,"gate_pass":gate,
@@ -850,9 +1001,17 @@ def main():
               "AREA_CV",t["area_cv"],
               "ASPECT_LOG",t["aspect_log_median"])
     for e in fails:
-        print("TAKE_FAIL",e["scene"],e["error"])
+        print("TAKE_FAIL",e["scene"],"KIND",e["kind"],e["error"])
+    if failure_details:
+        print("FAILURE_DETAILS",out/"failure_details.json")
     for k,v in summary.items():
         if not isinstance(v,(list,dict)):print(k.upper(),v)
     print("OUT",out)
-    if not gate and a.split in ("development","validation"):raise SystemExit(f"{a.split} gate failed")
+    if not gate and a.split in ("development","validation"):
+        if implementation_errors:
+            raise SystemExit(
+                f"{a.split} implementation error: {implementation_errors} take(s) crashed; "
+                f"see {out/'failure_details.json'}"
+            )
+        raise SystemExit(f"{a.split} gate failed")
 if __name__=="__main__":main()
