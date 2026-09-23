@@ -751,17 +751,27 @@ def _identity_track_chunks(tracks,fps,identity_cfg):
 def _global_envelope_from_chunks(chunks):
     if not chunks:
         raise TrackSelectionError("no ball-like identity tracks for global envelope")
-    all_y=np.concatenate([np.asarray(q["y"],float) for q in chunks])
-    if len(all_y)<8:
-        raise TrackSelectionError("insufficient samples for global spatial envelope")
-    top=float(np.percentile(all_y,2.0))
-    bottom=float(np.percentile(all_y,98.0))
-    span=bottom-top
+    # Use the single largest smoothed same-ball excursion as the spatial ruler.
+    # This is usually the full manual reset. Its timing is ignored completely.
+    # Choosing one coherent track avoids systematic percentile shrinkage when a
+    # shorter gravity fragment is also present.
+    best=None
+    for q in chunks:
+        y=smooth1(np.asarray(q["y"],float),5)
+        if len(y)<6:
+            continue
+        lo=float(np.min(y));hi=float(np.max(y));span=hi-lo
+        cand=(span,lo,hi,int(q["track_id"]),int(q["chunk_id"]))
+        if best is None or cand[0]>best[0]:
+            best=cand
+    if best is None:
+        raise TrackSelectionError("insufficient ball samples for spatial envelope")
+    span,top,bottom,source_track,source_chunk=best
     if not math.isfinite(span) or span<18.0:
         raise TrackSelectionError(
             f"invalid global spatial envelope top={top} bottom={bottom}"
         )
-    return top,bottom,span
+    return top,bottom,span,source_track,source_chunk
 
 def _monotone_runs(progress,minimum_points=6):
     """Return sustained positive-progress motion phases.
@@ -922,7 +932,7 @@ def choose_ballistic_track_v63(tracks,fps,minimum_interval_frames=12,identity_cf
     cfg=identity_cfg or {}
     selector_cfg=validate_selector_config(cfg)
     chunks=_identity_track_chunks(tracks,fps,cfg)
-    top,bottom,envelope_px=_global_envelope_from_chunks(chunks)
+    top,bottom,envelope_px,envelope_source_track,envelope_source_chunk=_global_envelope_from_chunks(chunks)
     candidates=[]
     rejection_counts={}
     chunk_diagnostics=[]
@@ -1001,6 +1011,8 @@ def choose_ballistic_track_v63(tracks,fps,minimum_interval_frames=12,identity_cf
             "area_cv":float(q["area_cv"]),
             "aspect_log_median":float(q["aspect_log_median"]),
             "envelope_track_count":len(chunks),
+            "envelope_source_track":int(envelope_source_track),
+            "envelope_source_chunk":int(envelope_source_chunk),
         })
     return chosen,audit
 
@@ -1459,7 +1471,8 @@ def main():
                 "timing_fit_rms_frames","trajectory_shape_rms_fraction","release_speed_ratio",
                 "x_drift_fraction","gap_penalty","identity_score","median_circularity",
                 "median_solidity","median_circle_fill","median_axis_ratio","radius_cv","area_cv",
-                "aspect_log_median","envelope_track_count","direct_acceleration_m_s2",
+                "aspect_log_median","envelope_track_count","envelope_source_track",
+                "envelope_source_chunk","direct_acceleration_m_s2",
                 "acceleration_relative_error"]
         with (out/"candidate_audit.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
