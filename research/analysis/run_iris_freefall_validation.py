@@ -1968,8 +1968,309 @@ def choose_ballistic_track_v66(tracks,fps,minimum_interval_frames=12,identity_cf
         })
     return chosen,audit
 
+def _refine_candidate_with_global_plateaus_v67(
+        candidate,source_chunk,plateaus,fps,selector_cfg,identity_cfg,
+        minimum_interval_frames,diagnostics=None):
+    """Bind a partial ballistic fragment to release/impact holds across track IDs.
+
+    V6.6 correctly removed manual-reset metric scaling but could terminate a
+    physical fall at the end of one fragmented temporal track.  V6.7 treats
+    stationary, ball-identity-qualified plateaus as *boundary evidence* even when
+    they were assigned a different track ID.  No target acceleration magnitude is
+    used: a proposed pair is judged only by temporal order, spatial bracketing,
+    object geometry, and the protocol's release-from-rest trajectory shape.
+    """
+    q=dict(candidate)
+    expected=float(selector_cfg["expected_sign"])
+    all_frames=np.asarray(source_chunk["frames"],int)
+    yy=np.asarray(source_chunk["y"],float)
+    xx=np.asarray(source_chunk["x"],float)
+    ids=np.asarray(q["window_indices"],int)
+    if len(ids)<6:
+        return q
+
+    obs_frames=all_frames[ids]
+    f0=int(obs_frames[0]);f1=int(obs_frames[-1])
+    z=expected*yy
+    z0=float(np.median(z[ids[:min(4,len(ids))]]))
+    z1=float(np.median(z[ids[-min(4,len(ids)):]]))
+    x0=float(np.median(xx[ids[:min(4,len(ids))]]))
+    x1=float(np.median(xx[ids[-min(4,len(ids)):]]))
+
+    overlap=int(identity_cfg.get("plateau_overlap_frames",6))
+    max_gap=int(identity_cfg.get("cross_track_plateau_max_gap_frames",30))
+    max_x=float(identity_cfg.get("cross_track_plateau_max_x_delta_px",100.0))
+    y_tol=float(identity_cfg.get("cross_track_plateau_y_tolerance_px",35.0))
+    min_span=float(identity_cfg.get("minimum_raw_event_span_px",18.0))
+
+    prior=[]
+    post=[]
+    for p in plateaus:
+        pz=expected*float(p["y"])
+        if (int(p["frame_end"])<=f0+overlap
+            and f0-int(p["frame_end"])<=max_gap
+            and abs(float(p["x"])-x0)<=max_x
+            and pz<=z0+y_tol):
+            prior.append(p)
+        if (int(p["frame_start"])>=f1-overlap
+            and int(p["frame_start"])-f1<=max_gap
+            and abs(float(p["x"])-x1)<=max_x
+            and pz>=z1-y_tol):
+            post.append(p)
+
+    if not prior or not post:
+        q["boundary_mode"]="local_fallback"
+        q["release_boundary_track"]=-1
+        q["impact_boundary_track"]=-1
+        q["boundary_pair_shape_rms"]=float(q["trajectory_shape_rms_fraction"])
+        return q
+
+    best=None
+    for top in prior:
+        topz=expected*float(top["y"])
+        for bottom in post:
+            botz=expected*float(bottom["y"])
+            span=botz-topz
+            if not math.isfinite(span) or span<min_span:
+                continue
+
+            # Mid-frame boundaries avoid systematically assigning a whole extra
+            # frame to both the top hold and bottom hold.
+            release_frame=float(top["frame_end"])+0.5
+            impact_frame=float(bottom["frame_start"])-0.5
+            full_frames=impact_frame-release_frame
+            if full_frames+1e-9<minimum_interval_frames or full_frames>75.0:
+                continue
+            if int(bottom["frame_start"])<=int(top["frame_end"]):
+                continue
+
+            release_abs=release_frame/fps
+            impact_abs=impact_frame/fps
+            T=impact_abs-release_abs
+            if T<=0.0:
+                continue
+
+            # Evaluate only actually observed points from the source fragment.
+            detset=set(int(x) for x in np.asarray(
+                source_chunk["detected_frames_original"],int
+            ))
+            use=np.asarray([
+                i for i in ids
+                if int(all_frames[i]) in detset
+                and release_frame-1e-9<=float(all_frames[i])<=impact_frame+1e-9
+            ],dtype=int)
+            if len(use)<6:
+                continue
+            pp=(z[use]-topz)/span
+            keep=(pp>=-0.08)&(pp<=1.08)
+            use=use[keep];pp=pp[keep]
+            if len(use)<6:
+                continue
+            pp=np.clip(pp,0.0,1.0)
+            tt=all_frames[use]/fps
+            model=np.square(np.clip((tt-release_abs)/T,0.0,1.0))
+            shape=float(np.sqrt(np.mean((pp-model)**2)))
+            if not math.isfinite(shape) or shape>float(
+                identity_cfg.get("maximum_cross_track_shape_rms_fraction",.12)
+            ):
+                continue
+
+            pred_t=release_abs+T*np.sqrt(np.clip(pp,0.0,1.0))
+            timing=float(np.sqrt(np.mean((tt-pred_t)**2))*fps)
+            if timing>float(selector_cfg["maximum_global_timing_fit_rms_frames"]):
+                continue
+            monotone=float(np.mean(np.diff(pp)>=-.02)) if len(pp)>1 else 1.0
+            if monotone<float(identity_cfg.get("minimum_monotone_fraction",.78)):
+                continue
+
+            xuse=xx[use]
+            xdrift=float(np.ptp(xuse))/max(span,1e-9)
+            if xdrift>float(identity_cfg.get("maximum_x_drift_fraction",.45)):
+                continue
+
+            release_gap=max(0.0,float(f0-int(top["frame_end"])))
+            impact_gap=max(0.0,float(int(bottom["frame_start"])-f1))
+            # Prefer the pair with the best law-consistency, then the broadest
+            # spatial bracket and closest temporal support.  Duration itself is
+            # deliberately absent from ranking.
+            key=(
+                timing,shape,
+                release_gap+impact_gap,
+                -span,
+                -float(top.get("identity_score",0.0))
+                -float(bottom.get("identity_score",0.0)),
+            )
+            if best is None or key<best[0]:
+                best=(key,top,bottom,use,pp,span,release_abs,T,timing,shape,
+                      monotone,xdrift,release_gap,impact_gap)
+
+    if best is None:
+        _reject(diagnostics,"no_global_plateau_pair")
+        q["boundary_mode"]="local_fallback"
+        q["release_boundary_track"]=-1
+        q["impact_boundary_track"]=-1
+        q["boundary_pair_shape_rms"]=float(q["trajectory_shape_rms_fraction"])
+        return q
+
+    (_key,top,bottom,use,pp,span,release_abs,T,timing,shape,
+     monotone,xdrift,release_gap,impact_gap)=best
+    topz=expected*float(top["y"])
+    botz=expected*float(bottom["y"])
+    progress_full=(z-topz)/span
+    detset=set(int(x) for x in np.asarray(source_chunk["detected_frames_original"],int))
+    frame_lo=int(all_frames[use[0]]);frame_hi=int(all_frames[use[-1]])
+    detected=sum(1 for ff in detset if frame_lo<=ff<=frame_hi)
+    detected_fraction=detected/max(1,frame_hi-frame_lo+1)
+
+    q.update({
+        "span_px":float(span),
+        "local_span_px":float(np.ptp(z[use])),
+        "low_px":float(topz),
+        "high_px":float(botz),
+        "progress":progress_full,
+        "window_indices":use,
+        "t0_s":float(release_abs),
+        "full_fall_time_s":float(T),
+        "timing_fit_rms_s":float(timing/fps),
+        "timing_fit_rms_frames":float(timing),
+        "trajectory_shape_rms_fraction":float(shape),
+        "release_speed_ratio":0.0,
+        "x_drift_fraction":float(xdrift),
+        "monotone_fraction":float(monotone),
+        "detected_window_fraction":float(detected_fraction),
+        "interval_frames":int(round(T*fps)),
+        "observed_fragment_frames":int(frame_hi-frame_lo+1),
+        "inferred_full_fall_frames":float(T*fps),
+        "detected_frames":int(detected),
+        "global_progress_span":float(np.ptp(pp)),
+        "global_progress_start":float(np.min(pp)),
+        "global_progress_end":float(np.max(pp)),
+        "duration_10_90_s":float(T*(math.sqrt(.90)-math.sqrt(.10))),
+        "roots_complete":1.0,
+        "event_extrapolation_frames":float(release_gap+impact_gap),
+        "release_extrapolation_frames":float(release_gap),
+        "impact_speed_ratio":0.0,
+        "impact_boundary_kind":"cross_track_plateau",
+        "boundary_mode":"cross_track_plateaus",
+        "release_boundary_track":int(top["track_id"]),
+        "impact_boundary_track":int(bottom["track_id"]),
+        "release_plateau_track":int(top["track_id"]),
+        "impact_plateau_track":int(bottom["track_id"]),
+        "boundary_pair_shape_rms":float(shape),
+        "boundary_release_gap_frames":float(release_gap),
+        "boundary_impact_gap_frames":float(impact_gap),
+    })
+    return validate_candidate(q)
+
+
+def choose_ballistic_track_v67(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
+    """V6.7: V6.6 metric-free timing plus cross-track physical boundaries."""
+    cfg=identity_cfg or {}
+    selector_cfg=validate_selector_config(cfg)
+    chunks=_identity_track_chunks(tracks,fps,cfg)
+    if not chunks:
+        raise TrackSelectionError("no ball-like identity tracks for V6.7")
+    plateaus=_plateau_segments(chunks,selector_cfg)
+    by_chunk={int(c["chunk_id"]):c for c in chunks}
+
+    base=[]
+    rejection_counts={}
+    for chunk in chunks:
+        z=float(selector_cfg["expected_sign"])*np.asarray(chunk["y"],float)
+        scale=max(float(np.ptp(z)),1.0)
+        local_progress=(z-float(np.min(z)))/scale
+        for aa,bb in _monotone_runs(local_progress):
+            q=_fit_event_time_candidate_v66(
+                chunk,aa,bb,fps,selector_cfg,cfg,minimum_interval_frames,
+                diagnostics=rejection_counts
+            )
+            if q is not None:
+                base.append(q)
+    if not base:
+        raise TrackSelectionError(
+            "no metric-free ballistic fragments survived V6.7 base selector; "
+            f"chunks={len(chunks)} plateaus={len(plateaus)} "
+            f"rejects={json.dumps(rejection_counts,sort_keys=True)}"
+        )
+
+    candidates=[]
+    for q in base:
+        source=by_chunk[int(q["chunk_id"])]
+        candidates.append(_refine_candidate_with_global_plateaus_v67(
+            q,source,plateaus,fps,selector_cfg,cfg,minimum_interval_frames,
+            diagnostics=rejection_counts
+        ))
+
+    def rank(q):
+        return (
+            0 if q.get("boundary_mode")=="cross_track_plateaus" else 1,
+            float(q["timing_fit_rms_frames"]),
+            float(q["trajectory_shape_rms_fraction"]),
+            float(q.get("acceleration_stability",0.0)),
+            float(q.get("event_extrapolation_frames",0.0)),
+            float(q.get("impact_speed_ratio",1.0)),
+            -float(q["identity_score"]),
+            float(q["t0_s"]),
+        )
+    candidates=sorted(candidates,key=rank)
+    chosen=candidates[0]
+
+    audit=[]
+    for i,q in enumerate(candidates[:30],1):
+        audit.append({
+            "event_rank":i,"selected":q is chosen,
+            "track_id":q["track_id"],"sign":float(q["sign"]),
+            "t0_s":float(q["t0_s"]),
+            "local_span_px":float(q["local_span_px"]),
+            "spatial_envelope_px":float(q["span_px"]),
+            "relative_span":float(q["local_span_px"])/max(float(q["span_px"]),1e-9),
+            "global_progress_span":float(q["global_progress_span"]),
+            "global_progress_start":float(q["global_progress_start"]),
+            "global_progress_end":float(q["global_progress_end"]),
+            "full_fall_time_s":float(q["full_fall_time_s"]),
+            "interval_frames":int(q["interval_frames"]),
+            "observed_fragment_frames":int(q["observed_fragment_frames"]),
+            "inferred_full_fall_frames":float(q["inferred_full_fall_frames"]),
+            "detected_frames":int(q["detected_frames"]),
+            "detected_fraction":float(q["detected_window_fraction"]),
+            "timing_fit_rms_frames":float(q["timing_fit_rms_frames"]),
+            "trajectory_shape_rms_fraction":float(q["trajectory_shape_rms_fraction"]),
+            "release_speed_ratio":float(q["release_speed_ratio"]),
+            "x_drift_fraction":float(q["x_drift_fraction"]),
+            "gap_penalty":float(q["gap_penalty"]),
+            "identity_score":float(q["identity_score"]),
+            "median_circularity":float(q["median_circularity"]),
+            "median_solidity":float(q["median_solidity"]),
+            "median_circle_fill":float(q["median_circle_fill"]),
+            "median_axis_ratio":float(q["median_axis_ratio"]),
+            "radius_cv":float(q["radius_cv"]),
+            "area_cv":float(q["area_cv"]),
+            "aspect_log_median":float(q["aspect_log_median"]),
+            "acceleration_stability":float(q.get("acceleration_stability",0.0)),
+            "event_extrapolation_frames":float(q.get("event_extrapolation_frames",0.0)),
+            "release_extrapolation_frames":float(q.get("release_extrapolation_frames",0.0)),
+            "impact_speed_ratio":float(q.get("impact_speed_ratio",0.0)),
+            "impact_boundary_kind":q.get("impact_boundary_kind",""),
+            "boundary_mode":q.get("boundary_mode","local_fallback"),
+            "release_boundary_track":int(q.get("release_boundary_track",-1)),
+            "impact_boundary_track":int(q.get("impact_boundary_track",-1)),
+            "boundary_pair_shape_rms":float(q.get(
+                "boundary_pair_shape_rms",q["trajectory_shape_rms_fraction"]
+            )),
+            "boundary_release_gap_frames":float(q.get("boundary_release_gap_frames",0.0)),
+            "boundary_impact_gap_frames":float(q.get("boundary_impact_gap_frames",0.0)),
+            "release_plateau_track":int(q.get("release_plateau_track",-1)),
+            "impact_plateau_track":int(q.get("impact_plateau_track",-1)),
+        })
+    return chosen,audit
+
 def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     cfg=identity_cfg or {}
+    if cfg.get("revision")=="ball_identity_v6_7":
+        return choose_ballistic_track_v67(
+            tracks,fps,minimum_interval_frames=minimum_interval_frames,
+            identity_cfg=cfg
+        )
     if cfg.get("revision")=="ball_identity_v6_6":
         return choose_ballistic_track_v66(
             tracks,fps,minimum_interval_frames=minimum_interval_frames,
@@ -2074,7 +2375,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
     # acceleration estimate is the nuisance-velocity quadratic coefficient in
     # global spatial coordinates, not 2h/T^2 (which assumes release from rest is
     # directly observed).  Historical revisions retain the old diagnostic.
-    if tracker_config and tracker_config.get("revision")=="ball_identity_v6_6":
+    if tracker_config and tracker_config.get("revision") in ("ball_identity_v6_6","ball_identity_v6_7"):
         # V6.6 is deliberately metric-free in image space: use independently
         # measured drop height and release->impact event time only.
         ghat=release_rest_ghat
@@ -2183,7 +2484,7 @@ def self_test_video():
         # and a fragmented true ball drop. The ungated detector is expected to be
         # ambiguous; only the active V6.5 identity/kinematics path is under test here.
         v6cfg={
-            "revision":"ball_identity_v6_6",
+            "revision":"ball_identity_v6_7",
             "minimum_median_circularity":0.35,
             "minimum_median_solidity":0.65,
             "minimum_median_circle_fill":0.45,
@@ -2431,7 +2732,7 @@ def main():
                 qq["release_rest_acceleration_m_s2"]=2.0*height/(float(q["full_fall_time_s"])**2)
                 qq["direct_acceleration_m_s2"]=(
                     qq["release_rest_acceleration_m_s2"]
-                    if tg.get("revision")=="ball_identity_v6_6"
+                    if tg.get("revision") in ("ball_identity_v6_6","ball_identity_v6_7")
                     else (
                         float(q["normalized_acceleration_s2"])*height
                         if q.get("normalized_acceleration_s2","") not in ("",None)
