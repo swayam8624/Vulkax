@@ -1,0 +1,127 @@
+{
+  "schema": "vulkax.iris_freefall_rescue_replication",
+  "version": 6,
+  "created": "2026-09-23",
+  "dataset": {
+    "repo_id": "rasulkhanbayov/IRIS",
+    "revision": "c253822f55431ca80ef2084de4bc5e79d1a488f1",
+    "development": {
+      "setting": "drop_50",
+      "takes": [
+        "06",
+        "07",
+        "08",
+        "09",
+        "10"
+      ]
+    },
+    "validation": {
+      "setting": "drop_100",
+      "takes": [
+        "06",
+        "07",
+        "08",
+        "09",
+        "10"
+      ]
+    },
+    "final_test": {
+      "setting": "drop_150",
+      "takes": [
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10"
+      ]
+    },
+    "take01_forbidden": true,
+    "prior_failed_validation": {
+      "setting": "drop_100",
+      "takes": [
+        "02",
+        "03",
+        "04",
+        "05"
+      ],
+      "reuse_for_validation": false
+    }
+  },
+  "physics": {
+    "truth_acceleration_m_s2": 9.80665,
+    "drop_heights_m": {
+      "drop_50": 0.5,
+      "drop_100": 1,
+      "drop_150": 1.5
+    }
+  },
+  "tracker": {
+    "analysis_width": 640,
+    "max_seconds": 5,
+    "background_samples": 31,
+    "minimum_motion_pixels": 10,
+    "nuisance_fit_fraction": 0.4,
+    "minimum_active_frames": 12,
+    "blocks": 6,
+    "revision": "ball_identity_v6",
+    "minimum_monotone_fraction": 0.78,
+    "maximum_timing_fit_rms_frames": 2.5,
+    "maximum_trajectory_shape_rms_fraction": 0.1,
+    "maximum_release_speed_ratio": 0.65,
+    "maximum_x_drift_fraction": 0.45,
+    "maximum_gap_penalty": 0.5,
+    "minimum_median_circularity": 0.35,
+    "maximum_area_cv": 0.65,
+    "maximum_aspect_log_mad": 0.45,
+    "minimum_detected_fraction": 0.5
+  },
+  "repairs": {
+    "baseline_factor": 1.25,
+    "support_factor": 1,
+    "veto_factor": 1.6,
+    "dose_levels": [
+      0.025,
+      0.05,
+      0.1,
+      0.2
+    ]
+  },
+  "decision": {
+    "threshold_abs_score": 2,
+    "language": "standardized evidence score"
+  },
+  "development_gate": {
+    "minimum_quality_videos": 4,
+    "maximum_median_acceleration_relative_error": 0.2
+  },
+  "validation_gate": {
+    "minimum_quality_videos": 4,
+    "maximum_median_acceleration_relative_error": 0.2,
+    "minimum_truth_control_accuracy": 0.75,
+    "placebo_false_assertion_rate": 0,
+    "minimum_direction_sign_rate": 0.9
+  },
+  "final_policy": {
+    "download_before_lock": false,
+    "no_threshold_retuning": true,
+    "no_tracker_change": true,
+    "no_candidate_change": true,
+    "no_scene_substitution": true
+  },
+  "provenance": {
+    "v5_failed_validation": {
+      "split": "drop_100/02..05",
+      "quality_pass_videos": 3,
+      "median_acceleration_relative_error": 2.223747613561782,
+      "truth_control_accuracy": 0,
+      "placebo_false_assertion_rate": 0,
+      "direction_sign_rate": 0,
+      "disposition": "failed_validation_permanently_nonconfirmatory"
+    },
+    "v6_change": "fresh development/validation takes; ball-identity appearance consistency added before any fresh validation is opened"
+  }
+}

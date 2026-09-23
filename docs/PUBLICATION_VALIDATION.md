@@ -367,3 +367,45 @@ bash research/scripts/manage_public_data_storage.sh local-hf-cache
 A global Hugging Face cache is only removed when explicitly requested with
 `--include-global-hf-cache`; the default cleanup never touches unrelated cached
 datasets.
+
+
+## IRIS free-fall V5 failure and fresh V6 rescue
+
+The first non-pendulum free-fall lane did **not** pass held-out validation.
+V5 passed development on `drop_50/02..05`, then failed validation on
+`drop_100/02..05` with median acceleration relative error 2.2237,
+truth-control accuracy 0.0, placebo FAR 0.0, and directional sign rate 0.0.
+
+Those four validation takes are permanently nonconfirmatory.
+
+V6 is a fresh-split rescue with object identity added before physical inference:
+
+- development: `drop_50/06..10`;
+- validation: `drop_100/06..10`;
+- final: still-unopened `drop_150/02..10`.
+
+Run fresh development + validation with:
+
+```bash
+bash research/scripts/run_iris_freefall_rescue_v6.sh
+```
+
+The command cannot download final data. It first requires >=4/5 development quality
+and <=20% median acceleration error. Only then does it materialize the fresh
+validation takes. Fresh validation requires >=4/5 quality, <=20% median acceleration
+error, >=75% truth-control accuracy, zero placebo false assertions, and >=90%
+directional score sign.
+
+V6 uses contour circularity, near-square aspect, apparent-area consistency and
+temporal continuity to identify the ball before fitting the full-flight
+`t(p)=t0+T sqrt(p)` timing model. Target gravity is not used for object selection.
+
+Only after V6 validation prints `GATE_PASS True` may the separate final command run:
+
+```bash
+bash research/scripts/run_iris_freefall_v6_final_test.sh
+```
+
+That final command creates/checks a V6-specific hash lock before the first
+`drop_150` request. If V6 validation is absent or failed, it exits before any final
+download.

@@ -222,3 +222,34 @@ It may not:
 
 Paper prose should use **standardized evidence score** unless a score is actually
 shown to have a standard-normal sampling distribution.
+
+
+## IRIS free-fall V5 failure / V6 rescue guard — 2026-09-23
+
+The first held-out free-fall validation failed and must remain visible:
+
+- V5 development: drop_50/02..05, gate PASS;
+- V5 validation: drop_100/02..05, gate FAIL;
+- V5 validation quality-pass: 3/4;
+- V5 validation median acceleration relative error: 2.223747613561782;
+- V5 validation truth-control accuracy: 0.0;
+- V5 validation placebo false-assertion rate: 0.0;
+- V5 validation directional sign rate: 0.0.
+
+Therefore:
+- drop_100/02..05 may never again be described as held-out validation for a redesigned method;
+- a successful later run may not erase or replace the V5 failure;
+- no claim may call the free-fall lane confirmed until a fresh validation and a lock-gated final test both pass.
+
+V6 uses disjoint, previously unused takes:
+- development: drop_50/06..10;
+- validation: drop_100/06..10;
+- final remains drop_150/02..10.
+
+V6 adds ball-identity constraints (circularity, aspect, apparent-area consistency)
+before physical timing. These are class-semantic measurement constraints and do
+not use target gravity. The repair schedule and |S|=2 decision rule remain unchanged.
+
+If V6 validation fails, the free-fall lane remains a negative external-validation
+result. If V6 succeeds, the manuscript must report both the failed V5 validation
+and the fresh-split V6 rescue.
