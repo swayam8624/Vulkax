@@ -1,0 +1,83 @@
+{
+  "schema": "vulkax.iris_pendulum_final_test_config",
+  "version": 1,
+  "created": "2026-09-23",
+  "dataset": {
+    "repo_id": "rasulkhanbayov/IRIS",
+    "revision": "c253822f55431ca80ef2084de4bc5e79d1a488f1",
+    "setting": "pendulum_90",
+    "takes": [
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10"
+    ],
+    "split": "final_test",
+    "expected_take_count": 10,
+    "world_manifest": "research/validation/iris_pendulum_final_world_manifest_v1.csv"
+  },
+  "tracker": {
+    "analysis_width": 640,
+    "max_seconds": 14,
+    "background_sample_count": 31,
+    "minimum_valid_fraction": 0.75,
+    "minimum_motion_amplitude_px": 5,
+    "minimum_cycle_count": 3,
+    "maximum_fft_autocorr_relative_disagreement": 0.15,
+    "minimum_spectral_peak_ratio": 5
+  },
+  "physics": {
+    "gravity_m_s2": 9.80665,
+    "primary_method": "finite_amplitude_period_probe",
+    "baseline_method": "small_angle_period_baseline",
+    "primary_model": "T=4*sqrt(L/g)*K(sin(theta0/2))",
+    "baseline_model": "T=2*pi*sqrt(L/g)"
+  },
+  "repairs": {
+    "baseline_factor": 1.25,
+    "truth_support_factor": 1,
+    "truth_veto_factor": 1.6,
+    "placebo_factor": 1.25,
+    "dose_levels": [
+      0.025,
+      0.05,
+      0.1,
+      0.2
+    ],
+    "support_dose_factor_rule": "1.25-d",
+    "veto_dose_factor_rule": "1.25+d"
+  },
+  "decision": {
+    "threshold_abs_z": 2,
+    "support": "z>=+2",
+    "veto": "z<=-2",
+    "unresolved": "otherwise",
+    "sigma_floor": "1/video_fps"
+  },
+  "validation_freeze_basis": {
+    "truth_control_correct_rate": 1,
+    "placebo_correct_rate": 1,
+    "large_effect_correct_rate": 1,
+    "dose_direction_sign_rate": 1,
+    "dose_monotonic_spearman": 0.9749430093917352,
+    "paired_primary_wins": 18,
+    "paired_baseline_wins": 0,
+    "paired_ties": 92,
+    "validation_median_length_relative_error": 0.024259394955441604,
+    "readiness": "validation_supports_freeze_without_retuning"
+  },
+  "final_test_policy": {
+    "no_threshold_retuning": true,
+    "no_candidate_schedule_changes": true,
+    "no_tracker_changes": true,
+    "no_scene_substitution": true,
+    "no_failed_take_dropping_without_predeclared_quality_rule": true,
+    "single_opening": true
+  }
+}

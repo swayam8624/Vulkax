@@ -16,6 +16,9 @@ on:
       - "research/analysis/analyze_gauge_validation_failure.py"
       - "research/analysis/run_iris_pendulum_validation.py"
       - "research/analysis/analyze_iris_pendulum_validation.py"
+      - "research/scripts/run_iris_pendulum_final_test.sh"
+      - "research/analysis/summarize_iris_pendulum_final_test.py"
+      - "research/analysis/freeze_iris_pendulum_final_test.py"
       - "research/scripts/fetch_iris_pendulum_repeats.py"
       - "research/scripts/run_iris_pendulum_validation.sh"
       - "research/scripts/run_gauge_prospective_validation.sh"
@@ -35,6 +38,9 @@ on:
       - "research/scripts/fetch_public_validation_datasets.py"
       - "research/analysis/prepare_public_validation_datasets.py"
       - "research/analysis/adapt_public_validation_inputs.py"
+      - "research/analysis/freeze_iris_pendulum_final_test.py"
+      - "research/analysis/summarize_iris_pendulum_final_test.py"
+      - "research/scripts/run_iris_pendulum_final_test.sh"
       - ".github/workflows/publication-validation-smoke.yml"
   workflow_dispatch:
 
@@ -54,6 +60,7 @@ jobs:
           for path in (
               "research/validation/protocol_v1.json",
               "research/validation/record_schema_v1.json",
+              "research/validation/iris_pendulum_final_test_v1.json",
           ):
               json.load(open(path))
               print("VALID", path)
@@ -75,6 +82,8 @@ jobs:
             research/analysis/analyze_gauge_validation_failure.py \
             research/analysis/run_iris_pendulum_validation.py \
             research/analysis/analyze_iris_pendulum_validation.py \
+            research/analysis/freeze_iris_pendulum_final_test.py \
+            research/analysis/summarize_iris_pendulum_final_test.py \
             research/scripts/fetch_iris_pendulum_repeats.py \
             research/scripts/fetch_public_validation_datasets.py
 
@@ -92,6 +101,8 @@ jobs:
           python3 research/analysis/analyze_gauge_validation_failure.py --self-test
           python3 research/analysis/run_iris_pendulum_validation.py --self-test
           python3 research/analysis/analyze_iris_pendulum_validation.py --self-test
+          python3 research/analysis/freeze_iris_pendulum_final_test.py --self-test
+          python3 research/analysis/summarize_iris_pendulum_final_test.py --self-test
           python3 research/scripts/fetch_iris_pendulum_repeats.py --self-test
 
       - name: Shell syntax
@@ -101,6 +112,7 @@ jobs:
           bash -n research/scripts/prepare_public_validation_data.sh
           bash -n research/scripts/run_gauge_prospective_validation.sh
           bash -n research/scripts/run_iris_pendulum_validation.sh
+          bash -n research/scripts/run_iris_pendulum_final_test.sh
 
       - name: Live public dataset catalog check
         run: |

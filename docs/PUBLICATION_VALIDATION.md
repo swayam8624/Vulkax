@@ -99,6 +99,40 @@ The IRIS verifier uses real video period as evidence and the independently measu
 rope length only for benchmark truth labels. It does not require CUDA or a learned
 tracker.
 
+
+## IRIS final-test freeze
+
+The IRIS validation forensic supports freezing without retuning:
+
+- truth-control correct rate: 1.0;
+- placebo correct rate: 1.0;
+- large-effect correct rate: 1.0;
+- dose-direction sign rate: 1.0;
+- dose-response Spearman: 0.974943;
+- paired finite-amplitude wins vs small-angle: 18 vs 0;
+- validation median rope-length relative error: 0.0242594.
+
+The final-test method is therefore frozen in
+`research/validation/iris_pendulum_final_test_v1.json`.
+
+Run the reserved 90-degree final test only through:
+
+```bash
+bash research/scripts/run_iris_pendulum_final_test.sh
+```
+
+The command creates a hash lock **before** opening the remaining
+`pendulum_90` videos. The lock covers the protocol, schema, frozen final-test
+configuration, tracker/scoring implementation, downloader, dataset preparation
+and adapter code, final summarizer, runner, and the validation records/forensic
+that justified the freeze.
+
+Any later modification to a locked input makes the final-test command abort.
+
+The final run keeps the global `|z|=2` rule, tracker parameters, repair schedule,
+and quality gates unchanged. It writes a descriptive final summary and does not
+perform post-final readiness tuning.
+
 ## Fast diagnostic
 
 If your existing D4V/OFC outputs are still under `build/`, this does not rerun

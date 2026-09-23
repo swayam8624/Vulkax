@@ -73,3 +73,24 @@ confirmation. Any final-test protocol must keep:
 - the global |z| = 2 threshold unchanged;
 - the candidate schedule frozen;
 - the 90-degree setting unopened until the final-test lock is verified.
+
+
+## Validation forensic
+
+The no-rerun validation forensic reported:
+
+- truth-control correct rate: **1.0**
+- placebo correct rate: **1.0**
+- large-effect correct rate: **1.0**
+- dose-direction sign rate: **1.0**
+- dose-response Spearman: **0.9749430094**
+- paired finite-amplitude-only wins: **18**
+- paired small-angle-only wins: **0**
+- paired ties: **92**
+- validation median rope-length relative error: **0.0242593950**
+- readiness: **validation_supports_freeze_without_retuning**
+
+This supports freezing the finite-amplitude method for the reserved 90-degree final
+test without changing the global |z|=2 threshold, tracker, candidate schedule, or
+quality gates. This readiness classification is explicitly post-hoc descriptive;
+it is not presented as a preregistered confirmatory gate.

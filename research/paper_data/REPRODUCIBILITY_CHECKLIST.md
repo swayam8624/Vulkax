@@ -128,8 +128,8 @@ execution and may not be claimed from old data.
 - [x] ingest GAUGE prospective validation-stage records into the common schema
 - [x] ingest IRIS pendulum validation-stage records into the common schema
 - [ ] ingest RGBench validation-stage records into the common schema
-- [ ] freeze a final-test world manifest before opening its labels
-- [ ] execute final-test campaign without threshold retuning
+- [x] freeze IRIS pendulum final-test configuration and lock machinery before opening the reserved 90-degree split
+- [ ] execute locked IRIS pendulum 90-degree final-test campaign without threshold retuning
 - [ ] obtain prospective measured physical confirmation if feasible
 - [ ] update manuscript claims only after those results exist
 
@@ -152,3 +152,17 @@ execution and may not be claimed from old data.
 - [x] development gate executed on 10 real takes (10/10 quality-pass; median rope-length relative error 4.23%)
 - [x] 45-degree validation executed on 10 real takes (10/10 quality-pass; median rope-length relative error 2.43%)
 - [ ] 90-degree final-test repeats opened only after lock
+
+
+### IRIS final-test freeze readiness
+- [x] validation forensic supports freeze without retuning
+- [x] truth-control correct rate = 1.0
+- [x] placebo correct rate = 1.0
+- [x] large-effect correct rate = 1.0
+- [x] dose-direction sign rate = 1.0
+- [x] dose-response Spearman = 0.974943
+- [x] paired primary wins = 18, baseline wins = 0
+- [x] frozen final-test configuration committed
+- [x] final-test lock hashes code/config + validation forensic/evidence
+- [x] final-test runner refuses accidental overwrite
+- [ ] reserved pendulum_90 split executed under valid lock
