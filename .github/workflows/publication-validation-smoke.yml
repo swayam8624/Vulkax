@@ -197,6 +197,7 @@ jobs:
 
       - name: Free-fall static analysis
         run: |
+          python3 -m pip install --quiet "pyflakes>=3.2,<4"
           python3 -m pyflakes research/analysis/run_iris_freefall_validation.py
 
       - name: Shell syntax
