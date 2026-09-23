@@ -1124,14 +1124,7 @@ def self_test_video():
             else:
                 frac=max(0.0,1.0-(t-1.45)/.85)
             yy=60+span_px*frac
-            # Make the gravity event intentionally incomplete in image space while
-            # leaving the later slow reset fully visible. V6.3 must use the reset
-            # only for the spatial envelope and recover full T from the partial drop.
-            visible=True
-            if .35<=t<.35+T:
-                visible=(.12<=frac<=.88)
-            if visible:
-                cv2.circle(q,(320,int(round(yy))),10,(255,255,255),-1)
+            cv2.circle(q,(320,int(round(yy))),10,(255,255,255),-1)
 
             # Deliberate non-ball distractor: excellent quadratic motion but wrong
             # duration/acceleration. V6 must reject it by object identity.
@@ -1182,9 +1175,46 @@ def self_test_video():
         assert len(selected)==1, selected
         assert selected[0]["sign"]==v6cfg["expected_image_gravity_sign"]
         assert selected[0]["global_progress_span"]>=v6cfg["minimum_global_progress_span"]
-        # The gravity event is deliberately fragmented, so selection must succeed
-        # without requiring it to span most of the image-space envelope.
-        assert selected[0]["relative_span"]<0.95, selected[0]
+        assert selected[0]["global_progress_span"]>=v6cfg["minimum_global_progress_span"]
+        # Direct V6.3 fragmentation regression: the gravity track contains
+        # only the middle of the fall; a later slow reset supplies full spatial
+        # extent. This isolates global-envelope timing from detector behavior.
+        top=60.0;bottom=280.0;span=bottom-top;t0=.30
+        true_T=math.sqrt(2.0*drop_m/G)
+        f0=int(math.ceil((t0+true_T*math.sqrt(.20))*fps))
+        f1=int(math.floor((t0+true_T*math.sqrt(.80))*fps))
+        drop_pts=[]
+        for ff in range(f0,f1+1):
+            tt=ff/fps
+            pp=((tt-t0)/true_T)**2
+            yy=top+span*pp
+            drop_pts.append({
+                "frame":ff,"x":320.0,"y":yy,"area":300,
+                "circularity":.90,"solidity":.98,"circle_fill":.88,
+                "axis_ratio":.96,"radius":10.0,"aspect_log_abs":.02,
+                "appearance_score":10.0,
+            })
+        reset_pts=[]
+        for k,ff in enumerate(range(90,121)):
+            frac=k/30.0
+            yy=bottom-span*frac
+            reset_pts.append({
+                "frame":ff,"x":320.0,"y":yy,"area":300,
+                "circularity":.90,"solidity":.98,"circle_fill":.88,
+                "axis_ratio":.96,"radius":10.0,"aspect_log_abs":.02,
+                "appearance_score":10.0,
+            })
+        chosen_frag,audit_frag=choose_ballistic_track_v63(
+            [{"id":1,"pts":drop_pts,"missed":0},
+             {"id":2,"pts":reset_pts,"missed":0}],
+            fps,minimum_interval_frames=12,identity_cfg=v6cfg
+        )
+        frag_g=2.0*drop_m/(float(chosen_frag["full_fall_time_s"])**2)
+        frag_rel=abs(frag_g-G)/G
+        assert frag_rel<=.10,(frag_g,frag_rel,chosen_frag,audit_frag)
+        assert chosen_frag["global_progress_span"]<.80
+        assert chosen_frag["sign"]==1.0
+
         print("VALID IRIS free-fall synthetic-video tracker",
               ident["direct_acceleration_m_s2"],ident_rel,
               "identity",ident["identity_score"],
