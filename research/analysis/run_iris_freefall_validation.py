@@ -160,7 +160,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0):
         if len(xx)>=10:
             ww=np.maximum(crop[yy,xx].astype(float)-q+1,1)
             ys.append(float(np.sum((yy+y0)*ww)/np.sum(ww)));valid.append(True)
-        else:ys.append(float("nan");valid.append(False))
+        else:ys.append(float("nan"));valid.append(False)
         times.append(i/fps);i+=1
     cap.release()
     y=np.asarray(ys);v=np.asarray(valid,bool);t=np.asarray(times)
