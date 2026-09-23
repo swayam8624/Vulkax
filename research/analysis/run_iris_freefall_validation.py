@@ -37,7 +37,8 @@ class ContractError(FreefallValidationError):
     """Internal producer/consumer or configuration contract violation."""
 
 CANDIDATE_NUMERIC_FIELDS=(
-    "span_px","full_fall_time_s","timing_fit_rms_frames",
+    "span_px","median_radius_px","span_radius_ratio","t0_s","t10_s","t90_s",
+    "full_fall_time_s","timing_fit_rms_frames",
     "trajectory_shape_rms_fraction","release_speed_ratio",
     "x_drift_fraction","gap_penalty","detected_window_fraction",
     "identity_score","median_circularity","median_solidity",
@@ -72,8 +73,13 @@ def validate_candidate(candidate):
         q=float(candidate[name])
         if not (0.0<=q<=1.0):
             raise ContractError(f"bounded shape field {name} outside [0,1]: {q}")
-    if float(candidate["span_px"])<=0 or float(candidate["full_fall_time_s"])<=0:
-        raise ContractError("candidate span/duration must be positive")
+    if (float(candidate["span_px"])<=0
+        or float(candidate["median_radius_px"])<=0
+        or float(candidate["span_radius_ratio"])<=0
+        or float(candidate["full_fall_time_s"])<=0):
+        raise ContractError("candidate span/radius/duration must be positive")
+    if candidate.get("track_source") not in ("motion","color"):
+        raise ContractError(f"unknown track source: {candidate.get('track_source')!r}")
     if int(candidate["interval_frames"])<=0 or int(candidate["detected_frames"])<=0:
         raise ContractError("candidate frame counts must be positive")
     return candidate
@@ -99,6 +105,17 @@ def validate_selector_config(identity_cfg):
             q=float(cfg[key])
             if not math.isfinite(q) or q<0:
                 raise ContractError(f"{key} must be finite and >=0, got {q!r}")
+    if "minimum_span_radius_ratio" in cfg:
+        q=float(cfg["minimum_span_radius_ratio"])
+        if not math.isfinite(q) or q<=0:
+            raise ContractError(
+                f"minimum_span_radius_ratio must be finite and >0, got {q!r}"
+            )
+    for key in ("minimum_ball_saturation","minimum_ball_value"):
+        if key in cfg:
+            q=int(cfg[key])
+            if not (0<=q<=255):
+                raise ContractError(f"{key} must be in [0,255], got {q!r}")
     return frac
 
 def read_csv(p):
