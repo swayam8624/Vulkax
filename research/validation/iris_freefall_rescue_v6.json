@@ -89,7 +89,8 @@
     "plateau_min_frames": 4,
     "plateau_max_gap_frames": 24,
     "plateau_max_x_delta_px": 45,
-    "event_edge_fraction": 0.03
+    "event_edge_fraction": 0.03,
+    "plateau_overlap_frames": 6
   },
   "repairs": {
     "baseline_factor": 1.25,
