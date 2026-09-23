@@ -67,7 +67,7 @@
     "nuisance_fit_fraction": 0.4,
     "minimum_active_frames": 12,
     "blocks": 6,
-    "revision": "ball_identity_v6_6",
+    "revision": "ball_identity_v6_7",
     "minimum_monotone_fraction": 0.78,
     "maximum_timing_fit_rms_frames": 2.5,
     "maximum_trajectory_shape_rms_fraction": 0.1,
@@ -96,7 +96,11 @@
     "minimum_raw_event_span_px": 18,
     "maximum_release_extrapolation_frames": 12,
     "maximum_release_future_frames": 2,
-    "maximum_impact_speed_ratio": 0.55
+    "maximum_impact_speed_ratio": 0.55,
+    "cross_track_plateau_max_gap_frames": 30,
+    "cross_track_plateau_max_x_delta_px": 100,
+    "cross_track_plateau_y_tolerance_px": 35,
+    "maximum_cross_track_shape_rms_fraction": 0.12
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -264,6 +268,31 @@
         "candidate ranking prioritized global image-progress span ahead of acceleration stability, allowing slow/manual trajectories to win"
       ]
     },
-    "v6_6_change": "development-only redesign before fresh validation: remove manual-reset image span from the primary gravity estimate; identify a positive constant-pixel-acceleration ballistic run, infer release from its velocity-zero vertex, infer impact from the terminal speed collapse/reversal or track end, and compute g solely from independently measured drop height and release-to-impact time g=2h/T^2. Target gravity remains absent from candidate generation/ranking; validation/final data remain unopened."
+    "v6_6_change": "development-only redesign before fresh validation: remove manual-reset image span from the primary gravity estimate; identify a positive constant-pixel-acceleration ballistic run, infer release from its velocity-zero vertex, infer impact from the terminal speed collapse/reversal or track end, and compute g solely from independently measured drop height and release-to-impact time g=2h/T^2. Target gravity remains absent from candidate generation/ranking; validation/final data remain unopened.",
+    "v6_6_development_failure": {
+      "split": "drop_50/06..10",
+      "quality_pass_videos": 5,
+      "implementation_errors": 0,
+      "median_acceleration_relative_error": 0.36941398010645665,
+      "truth_control_accuracy": null,
+      "placebo_false_assertion_rate": null,
+      "direction_sign_rate": 1,
+      "validation_downloaded": false,
+      "validation_analyzed": false,
+      "per_take_acceleration_relative_error": {
+        "10": 0.36941398010645665,
+        "06": 0.6897024027759067,
+        "07": 0.22069604734656034,
+        "08": 0.7496876209375755,
+        "09": 0.05784314263471489
+      },
+      "diagnosis": [
+        "metric-free event timing substantially improved the V6.5 median error but still failed the frozen 20% development gate",
+        "take 09 recovered a 19.739-frame fall and 5.78% gravity error, showing the 2h/T^2 timing estimator is sound when release/impact boundaries are correct",
+        "takes 06, 08, and 10 terminated at 14-16 frames and produced spuriously high gravity, indicating track-local plateaus were mistaken for physical impact after temporal fragmentation",
+        "the next revision must bind stationary release/impact evidence across track IDs rather than retune the gravity threshold or target magnitude"
+      ]
+    },
+    "v6_7_change": "development-only boundary-stitching revision: keep V6.6 metric-free g=2h/T^2, but allow ball-identity-qualified stationary release/impact plateaus from different temporal track IDs to bracket a partial falling fragment. Candidate selection uses temporal order, spatial continuity, release-from-rest trajectory shape, timing residual, and identity only; target gravity remains absent. Fresh drop_100 validation and final data remain unopened."
   }
 }
