@@ -1,6 +1,6 @@
 {
   "schema": "vulkax.iris_freefall_blind_replication",
-  "version": 1,
+  "version": 2,
   "created": "2026-09-23",
   "dataset": {
     "repo_id": "rasulkhanbayov/IRIS",
@@ -58,7 +58,10 @@
     ],
     "nuisance_fit_fraction": 0.4,
     "minimum_active_frames": 12,
-    "blocks": 6
+    "blocks": 6,
+    "revision": "ballistic_event_v2",
+    "minimum_monotone_fraction": 0.8,
+    "maximum_timing_fit_rms_frames": 2.5
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -88,5 +91,16 @@
     "no_tracker_change": true,
     "no_candidate_change": true,
     "no_scene_substitution": true
+  },
+  "development_history": {
+    "v1_failure": {
+      "observed_on": "2026-09-23",
+      "split": "development_only",
+      "issue": "longest occupancy run could select slow reset/handling motion rather than ballistic descent",
+      "median_acceleration_relative_error": 0.9856055698673896,
+      "validation_analyzed": false,
+      "final_test_opened": false
+    },
+    "v2_change": "select fastest credible monotone 10%-90% ballistic traversal; use measured drop height as known input; fit time-of-flight diagnostic"
   }
 }

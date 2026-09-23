@@ -7,7 +7,8 @@ from pathlib import Path
 
 REPO="rasulkhanbayov/IRIS"
 REV="c253822f55431ca80ef2084de4bc5e79d1a488f1"
-DEV={"drop_50":["02","03","04","05"],"drop_100":["02","03","04","05"]}
+DEV={"drop_50":["02","03","04","05"]}
+VAL={"drop_100":["02","03","04","05"]}
 FINAL={"drop_150":["02","03","04","05","06","07","08","09","10"]}
 
 def hf():
@@ -33,18 +34,21 @@ def manifest(root,phase,patterns):
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--data-root",type=Path,default=Path("build/public-datasets"))
-    ap.add_argument("--phase",choices=("development_validation","final_test"),default="development_validation")
+    ap.add_argument("--phase",choices=("development","validation","final_test"),default="development")
     ap.add_argument("--lock",type=Path)
     ap.add_argument("--self-test",action="store_true")
     a=ap.parse_args()
     if a.self_test:
-        assert "01" not in sum(DEV.values(),[]) and "01" not in sum(FINAL.values(),[])
+        assert "01" not in sum(DEV.values(),[]) and "01" not in sum(VAL.values(),[]) and "01" not in sum(FINAL.values(),[])
         print("VALID free-fall blind downloader self-test");return
     if a.phase=="final_test":
         if not a.lock:raise SystemExit("final_test download requires --lock")
         subprocess.run(["python3","research/analysis/freeze_iris_freefall_final_test.py","--check",str(a.lock)],check=True)
         selection=FINAL
-    else:selection=DEV
+    elif a.phase=="validation":
+        selection=VAL
+    else:
+        selection=DEV
     snapshot_download,HfApi=hf()
     info=HfApi().dataset_info(REPO)
     if str(info.sha)!=REV:raise SystemExit(f"IRIS revision drift: expected {REV}, got {info.sha}")
