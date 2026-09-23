@@ -17,11 +17,17 @@ VAL="$BUILD/publication-validation/iris-freefall-validation"
 COMBINED="$BUILD/publication-validation/combined-freefall-validation"
 [[ -x "$VENV/bin/python" ]] || python3 -m venv "$VENV"
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
-"$VENV/bin/python" research/scripts/fetch_iris_freefall_blind.py --data-root "$DATA" --phase development_validation
+rm -rf "$DEV" "$VAL"
+echo "[freefall] materializing development split only"
+"$VENV/bin/python" research/scripts/fetch_iris_freefall_blind.py --data-root "$DATA" --phase development
 python3 research/analysis/prepare_public_validation_datasets.py --root "$DATA" --out "$PUBLIC"
 python3 research/analysis/adapt_public_validation_inputs.py --repo-root . --data-root "$DATA" --prepared-root "$PUBLIC"
-rm -rf "$DEV" "$VAL"
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --adapted-root "$PUBLIC/adapted" --split development --out "$DEV"
+
+echo "[freefall] development gate passed; materializing/analyzing validation split"
+"$VENV/bin/python" research/scripts/fetch_iris_freefall_blind.py --data-root "$DATA" --phase validation
+python3 research/analysis/prepare_public_validation_datasets.py --root "$DATA" --out "$PUBLIC"
+python3 research/analysis/adapt_public_validation_inputs.py --repo-root . --data-root "$DATA" --prepared-root "$PUBLIC"
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --adapted-root "$PUBLIC/adapted" --split validation --out "$VAL" --require-development-summary "$DEV/summary.json"
 EXTRA=(--extra "$VAL/validation_records.csv")
 for p in  "$BUILD/publication-validation/iris-pendulum-validation/validation_records.csv"  "$BUILD/publication-validation/gauge-prospective-validation/validation_records.csv"; do
