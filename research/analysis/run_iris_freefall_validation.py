@@ -117,6 +117,27 @@ def score(tr,L0,L1):
     endpoint=(float(r0[-1])-float(r1[-1]))/max(float(tr["one_pixel_m"]),1e-9)
     return primary,endpoint
 
+def self_test_video():
+    cv2=import_cv()
+    with tempfile.TemporaryDirectory() as td:
+        p=pathlib.Path(td)/"drop.avi"
+        fps=60.0;w,h=640,360;drop_m=1.0;span_px=220.0
+        T=math.sqrt(2*drop_m/G)
+        writer=cv2.VideoWriter(str(p),cv2.VideoWriter_fourcc(*"MJPG"),fps,(w,h))
+        if not writer.isOpened():raise RuntimeError("synthetic writer unavailable")
+        for i in range(int(fps*2.0)):
+            t=i/fps
+            q=np.zeros((h,w,3),dtype=np.uint8)
+            y=60+span_px*min(1.0,0.5*G*t*t/drop_m)
+            cv2.circle(q,(320,int(round(y))),10,(255,255,255),-1)
+            writer.write(q)
+        writer.release()
+        tr=extract(p,drop_m,width=640,max_seconds=2.0)
+        rel=abs(tr["direct_acceleration_m_s2"]-G)/G
+        assert rel<=0.30,(tr["direct_acceleration_m_s2"],rel)
+        assert tr["active_frames"]>=12
+        print("VALID IRIS free-fall synthetic-video tracker",tr["direct_acceleration_m_s2"],rel)
+
 FIELDS=["record_version","trial_id","paired_key","dataset","scene","split","evidence_class","confirmatory",
 "trial_family","ground_truth","method","score","decision","decision_threshold","confidence","physical_delta",
 "target_error_delta","measurement_noise_sigma","pose_noise_sigma","missing_fraction","channel_dependence",
@@ -143,10 +164,13 @@ def main():
     ap.add_argument("--require-validation-summary",type=pathlib.Path)
     ap.add_argument("--lock",type=pathlib.Path)
     ap.add_argument("--self-test",action="store_true")
+    ap.add_argument("--self-test-video",action="store_true")
     a=ap.parse_args();cfg=json.loads(a.config.read_text())
     if a.self_test:
         assert len(cases())==11;assert decision(2)=="support" and decision(-2)=="veto"
         print("VALID IRIS free-fall analyzer self-test");return
+    if a.self_test_video:
+        self_test_video();return
     if a.split=="validation":
         d=json.loads(a.require_development_summary.read_text()) if a.require_development_summary else {}
         if not d.get("gate_pass"):raise SystemExit("development gate failed/missing")
