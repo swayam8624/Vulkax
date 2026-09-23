@@ -1568,25 +1568,17 @@ def choose_ballistic_track_v65(tracks,fps,minimum_interval_frames=12,identity_cf
             f"rejects={json.dumps(rejection_counts,sort_keys=True)}"
         )
 
-    # Identity is already an eligibility gate.  V6.5 used global-progress span
-    # as the first lexicographic key, which let long, smooth handling motion beat
-    # shorter ballistic motion even when the fitted acceleration changed wildly
-    # between the first and second halves of the event.  For a free-fall selector,
-    # constant-acceleration self-consistency must dominate image-space coverage.
-    #
-    # No target acceleration magnitude enters this ranking.  roots_complete is
-    # preferred only because, when available, it lets us test the independently
-    # stated "released from rest" condition without assuming a value of g.
+    # Identity is already an eligibility gate. Prefer fragments that cover more of
+    # the globally calibrated drop, then the most internally self-consistent
+    # constant-acceleration timing.  Target acceleration magnitude is absent.
     def rank(q):
-        roots_complete=float(q.get("roots_complete",0.0))>=0.5
-        release_penalty=(float(q["release_speed_ratio"]) if roots_complete else 1.0)
         return (
-            float(q.get("acceleration_stability",0.0)),
-            release_penalty,
-            float(q["trajectory_shape_rms_fraction"]),
-            float(q["timing_fit_rms_frames"]),
             -float(q["global_progress_span"]),
+            float(q.get("acceleration_stability",0.0)),
+            float(q["timing_fit_rms_frames"]),
+            float(q["trajectory_shape_rms_fraction"]),
             float(q.get("event_extrapolation_frames",0.0)),
+            float(q["release_speed_ratio"]),
             -float(q["identity_score"]),
             float(q["t0_s"]),
         )
