@@ -763,16 +763,51 @@ def _global_envelope_from_chunks(chunks):
         )
     return top,bottom,span
 
-def _monotone_runs(progress,negative_break=.05):
+def _monotone_runs(progress,minimum_points=6):
+    """Return sustained positive-progress motion phases.
+
+    A single temporal track can contain release, impact hold, and a later smooth
+    manual reset. Split by sustained derivative sign rather than requiring one
+    large negative jump. Short inactive gaps are bridged, but sustained reset
+    motion is never merged into the gravity phase.
+    """
     p=np.asarray(progress,float)
-    if len(p)<2:
+    if len(p)<minimum_points:
         return []
-    cuts=[0]
-    for i,d in enumerate(np.diff(p),start=1):
-        if d < -negative_break:
-            cuts.append(i)
-    cuts.append(len(p))
-    return [(a,b) for a,b in zip(cuts,cuts[1:]) if b-a>=6]
+    ps=smooth1(p,5)
+    dp=np.diff(ps)
+    # Scale-aware activity threshold; large enough to ignore centroid jitter while
+    # retaining partial free-fall fragments.
+    eps=max(0.0015,0.03/max(len(p),1))
+    active=dp>eps
+    # Bridge at most two derivative samples of dropout inside an active phase.
+    bridged=active.copy()
+    for i in range(1,len(active)-1):
+        if not active[i] and active[max(0,i-2):i].any() and active[i+1:min(len(active),i+3)].any():
+            bridged[i]=True
+    runs=[]
+    i=0
+    while i<len(bridged):
+        if not bridged[i]:
+            i+=1;continue
+        start=i
+        j=i
+        gap=0
+        while j+1<len(bridged):
+            j+=1
+            if bridged[j]:
+                gap=0
+            else:
+                gap+=1
+                if gap>2:
+                    j-=gap
+                    break
+        a=max(0,start-1)
+        b=min(len(p),j+2)
+        if b-a>=minimum_points and float(p[b-1]-p[a])>0.0:
+            runs.append((a,b))
+        i=max(i+1,j+1)
+    return runs
 
 def _fit_global_fragment(chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
                          minimum_interval_frames,diagnostics=None):
