@@ -1,4 +1,4 @@
-name: GAUGE development dose-response
+# Development rerun marker: non-degenerate rigid-alignment fixture verified in CI.\nname: GAUGE development dose-response
 
 on:
   pull_request:
