@@ -133,6 +133,35 @@ The final run keeps the global `|z|=2` rule, tracker parameters, repair schedule
 and quality gates unchanged. It writes a descriptive final summary and does not
 perform post-final readiness tuning.
 
+## IRIS locked final-test result
+
+The reserved 90-degree final split was executed under the frozen IRIS-specific
+lock without changing the global `|z|=2` decision rule, tracker, candidate
+schedule, quality gates, runtime, or ten-video final population.
+
+Final result:
+- 10/10 final videos passed the frozen quality gates;
+- median period-inferred rope-length relative error: **16.81%**;
+- finite-amplitude probe strict accuracy: **90/110 = 81.82%**;
+- small-angle baseline strict accuracy: **40/110 = 36.36%**;
+- finite-amplitude SUPPORT: **40/50**;
+- finite-amplitude VETO: **40/50**;
+- finite-amplitude placebo/UNRESOLVED: **10/10**;
+- paired primary-only correct: **50**;
+- paired baseline-only correct: **0**;
+- ties: **60**;
+- locked confirmatory records: **220**.
+
+The 220 rows come from **10 physical videos** crossed with controlled repair cases
+and two methods; they are not 220 independent physical experiments.
+
+The canonical result is recorded in:
+- `research/status/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.md`;
+- `research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json`.
+
+No post-final tuning is permitted. Any improved method must be reported as a new
+post-final experiment.
+
 ## Fast diagnostic
 
 If your existing D4V/OFC outputs are still under `build/`, this does not rerun
