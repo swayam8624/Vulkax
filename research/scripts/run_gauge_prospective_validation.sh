@@ -40,6 +40,12 @@ if [[ -n "$LOCK" ]]; then ARGS+=(--lock "$LOCK"); fi
 
 python3 research/analysis/run_gauge_prospective_validation.py "${ARGS[@]}"
 
+if [[ "$SPLIT" == "validation" ]]; then
+  python3 research/analysis/analyze_gauge_validation_failure.py \
+    --campaign "$OUT" \
+    --adapted-root "$ADAPTED"
+fi
+
 bash research/scripts/run_publication_validation.sh \
   --skip-probes \
   --extra "$OUT/validation_records.csv" \
