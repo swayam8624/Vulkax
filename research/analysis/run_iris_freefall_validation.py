@@ -754,7 +754,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "monotone_fraction":float(chosen["monotone_fraction"]),
         "forward_fraction":float(chosen["monotone_fraction"]),
         "selected_direction_sign":float(chosen["sign"]),
-        "duration_10_90_s":float(chosen["crossing_times_s"][-1]-chosen["crossing_times_s"][0]),
+        "duration_10_90_s":float(T*(math.sqrt(.90)-math.sqrt(.10))),
         "release_time_s_absolute":t0,
         "track_id":chosen["track_id"],
         "release_speed_ratio":float(chosen["release_speed_ratio"]),
