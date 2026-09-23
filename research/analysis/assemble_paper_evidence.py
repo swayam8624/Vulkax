@@ -119,6 +119,9 @@ GENERATED = [
     ("publication-validation/iris-pendulum-development/summary.json", "generated/iris-pendulum-development-summary", False),
     ("publication-validation/iris-pendulum-validation/summary.json", "generated/iris-pendulum-validation-summary", False),
     ("publication-validation/iris-pendulum-validation/validation_records.csv", "generated/iris-pendulum-validation-records", False),
+    ("publication-validation/iris-pendulum-validation/forensics/summary.json", "generated/iris-pendulum-validation-forensics", False),
+    ("publication-validation/iris-pendulum-validation/forensics/per_factor.csv", "generated/iris-pendulum-validation-per-factor", False),
+    ("publication-validation/iris-pendulum-validation/forensics/paired_comparison.csv", "generated/iris-pendulum-validation-paired-comparison", False),
     ("publication-validation/combined-iris-validation/analysis/summary.json", "generated/combined-iris-validation-summary", False),
 ]
 
