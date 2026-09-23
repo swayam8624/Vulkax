@@ -36,6 +36,7 @@ def manifest(root,phase,patterns,selection):
       "schema":"vulkax.public_dataset_download","version":2,
       "created_utc":datetime.now(timezone.utc).isoformat(),
       "dataset":"iris","repo_id":REPO,"revision":REV,"license":"CC-BY-NC-4.0",
+      "citation_url":"https://huggingface.co/datasets/rasulkhanbayov/IRIS",
       "profile":f"freefall_rescue_v6_{phase}",
       "selection":selection,
       "requested_patterns":patterns,
@@ -73,6 +74,16 @@ def main():
             assert not (old & set(takes))
         final=set(cfg["dataset"]["final_test"]["takes"])
         assert "01" not in final
+        probe={
+          "schema":"vulkax.public_dataset_download",
+          "dataset":"iris",
+          "repo_id":REPO,
+          "revision":REV,
+          "license":"CC-BY-NC-4.0",
+          "citation_url":"https://huggingface.co/datasets/rasulkhanbayov/IRIS",
+        }
+        for key in ("schema","dataset","repo_id","revision","license","citation_url"):
+            assert probe.get(key), key
         print("VALID free-fall V6 rescue downloader self-test")
         return
 
