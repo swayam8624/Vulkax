@@ -203,7 +203,10 @@ python3 -m py_compile   scripts/validate_evidence_registry.py   scripts/audit_re
   research/analysis/generate_controlled_validation_plan.py \
   research/analysis/freeze_publication_validation.py \
   research/analysis/plan_validation_sample_size.py \
-  research/analysis/analyze_transaction_utility.py
+  research/analysis/analyze_transaction_utility.py \
+  research/analysis/prepare_public_validation_datasets.py \
+  research/analysis/adapt_public_validation_inputs.py \
+  research/scripts/fetch_public_validation_datasets.py
 
 python3 research/analysis/dcs_confirmatory_replay.py --self-test
 python3 research/analysis/export_dcs_spatial_map.py --self-test
@@ -212,6 +215,9 @@ python3 research/analysis/assemble_paper_evidence.py --self-test
 python3 research/analysis/generate_paper_assets.py --self-test
 python3 research/analysis/validate_paper_reproduction.py --self-test
 python3 research/analysis/analyze_information_frontier.py --self-test
+python3 research/scripts/fetch_public_validation_datasets.py --self-test
+python3 research/analysis/prepare_public_validation_datasets.py --self-test
+python3 research/analysis/adapt_public_validation_inputs.py --self-test
 
 stage "Configure Release + tests"
 cmake -S . -B "$BUILD_DIR"   -DCMAKE_BUILD_TYPE=Release   -DVULKAX_BUILD_TESTS=ON

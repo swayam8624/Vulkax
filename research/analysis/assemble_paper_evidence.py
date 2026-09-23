@@ -106,6 +106,12 @@ GENERATED = [
     ("publication-validation/analysis/failure_cases.csv", "generated/publication-validation-failures", True),
     ("publication-validation/analysis/transaction_utility.csv", "generated/publication-validation-transaction-utility", True),
     ("publication-validation/sample_size_plan.json", "generated/publication-validation-sample-size", True),
+    ("publication-validation/public-data/dataset_inventory.csv", "generated/public-data-inventory", False),
+    ("publication-validation/public-data/world_manifest.csv", "generated/public-data-world-manifest", False),
+    ("publication-validation/public-data/dataset_truth_index.json", "generated/public-data-truth-index", False),
+    ("publication-validation/public-data/preparation_report.json", "generated/public-data-preparation-report", False),
+    ("publication-validation/public-data/trial_plan.csv", "generated/public-data-trial-plan", False),
+    ("publication-validation/public-data/adapted/adapter_summary.json", "generated/public-data-adapter-summary", False),
 ]
 
 def sha256(path: Path) -> str:

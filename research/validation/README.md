@@ -43,6 +43,40 @@ confirmatory evidence.
   before a final-test split is opened.
 - `../scripts/run_publication_validation.sh` — one-command orchestrator.
 
+## Operational public benchmark suite
+
+The framework now has a downloader/importer rather than requiring manual dataset
+assembly.
+
+```bash
+bash research/scripts/prepare_public_validation_data.sh --profile core
+```
+
+Core profile:
+- GAUGE: 60 foam trials across stretching, compression and shearing;
+- IRIS: 24 videos covering every class/setting combination with one repeated take;
+- RGBench: representative grasp/fold/fling captures from `green_tshirt`,
+  `grey_pleat_skirt`, and `white_shirt`, plus required garment meshes.
+
+Every download is revision-pinned and SHA-256 indexed. The prepared campaign writes:
+
+```text
+build/publication-validation/public-data/
+  dataset_inventory.csv
+  world_manifest.csv
+  dataset_truth_index.json
+  preparation_report.json
+  trial_plan.csv
+  adapted/
+    adapter_summary.json
+    gauge/...
+    iris/...
+    rgbench/...
+```
+
+Scientific separation is enforced automatically: legacy GAUGE shearing is marked
+retrospective and cannot enter the new prospective world manifest.
+
 ## Required interpretation
 
 A decision is generated from a signed standardized score (z):

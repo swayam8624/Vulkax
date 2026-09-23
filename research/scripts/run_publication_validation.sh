@@ -17,7 +17,9 @@ REFRESH_PROBES=0
 SKIP_PROBES=0
 LOCK=""
 BOOTSTRAP_REPS=""
-EXTRAS=()
+PUBLIC_DATA_PROFILE=""
+PUBLIC_DATA_ROOT=""
+EXTRA_COUNT=0
 
 usage() {
   cat <<'EOF'
@@ -29,6 +31,9 @@ Options:
   --refresh-probes      Re-run frozen D4V/OFC probes even if outputs already exist
   --skip-probes         Do not build/run D4V/OFC; use only available/--extra records
   --extra CSV           Add standardized prospective/multi-dataset records (repeatable)
+  --public-data-profile smoke|core|full
+                        Download + prepare public GAUGE/IRIS/RGBench inputs before analysis
+  --public-data-root DIR Dataset cache root (default: BUILD/public-datasets)
   --lock JSON           Check a previously frozen final-test lock before analysis
   --bootstrap-reps N    Override bootstrap replicate count for quick diagnostics
   --diagnostic          Alias for default conservative behavior
@@ -37,6 +42,7 @@ Options:
 Examples:
   bash research/scripts/run_publication_validation.sh --diagnostic
   bash research/scripts/run_publication_validation.sh --refresh-probes
+  bash research/scripts/run_publication_validation.sh --public-data-profile core
   bash research/scripts/run_publication_validation.sh --extra build/new-dataset/records.csv
   bash research/scripts/run_publication_validation.sh \
     --lock build/publication-validation/final_test_lock.json \
@@ -50,7 +56,14 @@ while [[ $# -gt 0 ]]; do
     --out) OUT_DIR="$2"; shift 2 ;;
     --refresh-probes) REFRESH_PROBES=1; shift ;;
     --skip-probes) SKIP_PROBES=1; shift ;;
-    --extra) EXTRAS+=("$2"); shift 2 ;;
+    --extra)
+      var="EXTRA_${EXTRA_COUNT}"
+      printf -v "$var" "%s" "$2"
+      EXTRA_COUNT=$((EXTRA_COUNT + 1))
+      shift 2
+      ;;
+    --public-data-profile) PUBLIC_DATA_PROFILE="$2"; shift 2 ;;
+    --public-data-root) PUBLIC_DATA_ROOT="$2"; shift 2 ;;
     --lock) LOCK="$2"; shift 2 ;;
     --bootstrap-reps) BOOTSTRAP_REPS="$2"; shift 2 ;;
     --diagnostic) shift ;;
@@ -60,6 +73,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 OUT_DIR="${OUT_DIR:-$BUILD_DIR/publication-validation}"
+PUBLIC_DATA_ROOT="${PUBLIC_DATA_ROOT:-$BUILD_DIR/public-datasets}"
 mkdir -p "$OUT_DIR"
 
 if [[ -n "$LOCK" ]]; then
@@ -72,7 +86,21 @@ python3 -m py_compile \
   research/analysis/generate_controlled_validation_plan.py \
   research/analysis/freeze_publication_validation.py \
   research/analysis/plan_validation_sample_size.py \
-  research/analysis/analyze_transaction_utility.py
+  research/analysis/analyze_transaction_utility.py \
+  research/analysis/prepare_public_validation_datasets.py \
+  research/analysis/adapt_public_validation_inputs.py \
+  research/scripts/fetch_public_validation_datasets.py
+
+if [[ -n "$PUBLIC_DATA_PROFILE" ]]; then
+  case "$PUBLIC_DATA_PROFILE" in
+    smoke|core|full) ;;
+    *) echo "invalid --public-data-profile: $PUBLIC_DATA_PROFILE" >&2; exit 2 ;;
+  esac
+  bash research/scripts/prepare_public_validation_data.sh \
+    --profile "$PUBLIC_DATA_PROFILE" \
+    --data-root "$PUBLIC_DATA_ROOT" \
+    --out "$OUT_DIR/public-data"
+fi
 
 D4V="$BUILD_DIR/dcs-d4v-discovery/proposals.csv"
 OFC="$BUILD_DIR/orthogonal-force-compliance/proposals.csv"
@@ -98,9 +126,13 @@ fi
 NORMALIZE_ARGS=(--out "$OUT_DIR/records.csv")
 if [[ -s "$D4V" ]]; then NORMALIZE_ARGS+=(--d4v "$D4V"); fi
 if [[ -s "$OFC" ]]; then NORMALIZE_ARGS+=(--ofc "$OFC"); fi
-for extra in "${EXTRAS[@]}"; do
+i=0
+while [[ "$i" -lt "$EXTRA_COUNT" ]]; do
+  var="EXTRA_$i"
+  extra="${!var}"
   [[ -s "$extra" ]] || { echo "missing/empty --extra record file: $extra" >&2; exit 1; }
   NORMALIZE_ARGS+=(--extra "$extra")
+  i=$((i + 1))
 done
 
 if [[ ${#NORMALIZE_ARGS[@]} -eq 2 ]]; then
@@ -146,4 +178,8 @@ if summary["confirmatory_record_count"] == 0:
 else:
     print("STATUS: prospective records present; interpret by split/evidence_class and lock status.")
 print("outputs:", root)
+public_manifest = root / "public-data/world_manifest.csv"
+if public_manifest.is_file():
+    print("public dataset world manifest:", public_manifest)
+    print("public dataset trial plan:", root / "public-data/trial_plan.csv")
 PY

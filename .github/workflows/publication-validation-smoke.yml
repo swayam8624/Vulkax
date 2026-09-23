@@ -8,6 +8,10 @@ on:
       - "research/analysis/plan_validation_sample_size.py"
       - "research/analysis/analyze_transaction_utility.py"
       - "research/scripts/run_publication_validation.sh"
+      - "research/scripts/prepare_public_validation_data.sh"
+      - "research/scripts/fetch_public_validation_datasets.py"
+      - "research/analysis/prepare_public_validation_datasets.py"
+      - "research/analysis/adapt_public_validation_inputs.py"
       - "research/analysis/assemble_paper_evidence.py"
       - "run_everything.sh"
       - "research/paper_data/**"
@@ -20,6 +24,10 @@ on:
       - "research/analysis/plan_validation_sample_size.py"
       - "research/analysis/analyze_transaction_utility.py"
       - "research/scripts/run_publication_validation.sh"
+      - "research/scripts/prepare_public_validation_data.sh"
+      - "research/scripts/fetch_public_validation_datasets.py"
+      - "research/analysis/prepare_public_validation_datasets.py"
+      - "research/analysis/adapt_public_validation_inputs.py"
       - ".github/workflows/publication-validation-smoke.yml"
   workflow_dispatch:
 
@@ -53,7 +61,10 @@ jobs:
             research/analysis/freeze_publication_validation.py \
             research/analysis/plan_validation_sample_size.py \
             research/analysis/analyze_transaction_utility.py \
-            research/analysis/assemble_paper_evidence.py
+            research/analysis/assemble_paper_evidence.py \
+            research/analysis/prepare_public_validation_datasets.py \
+            research/analysis/adapt_public_validation_inputs.py \
+            research/scripts/fetch_public_validation_datasets.py
 
       - name: Script self-tests
         run: |
@@ -63,11 +74,23 @@ jobs:
           python3 research/analysis/freeze_publication_validation.py --self-test
           python3 research/analysis/plan_validation_sample_size.py --out /tmp/sample-size.json
           python3 research/analysis/assemble_paper_evidence.py --self-test
+          python3 research/scripts/fetch_public_validation_datasets.py --self-test
+          python3 research/analysis/prepare_public_validation_datasets.py --self-test
+          python3 research/analysis/adapt_public_validation_inputs.py --self-test
 
       - name: Shell syntax
         run: |
           bash -n run_everything.sh
           bash -n research/scripts/run_publication_validation.sh
+          bash -n research/scripts/prepare_public_validation_data.sh
+
+      - name: Live public dataset catalog check
+        run: |
+          python3 -m pip install --quiet "huggingface_hub>=0.34,<2"
+          python3 research/scripts/fetch_public_validation_datasets.py \
+            --profile core \
+            --catalog-only
+
 
       - name: End-to-end standardized analysis fixture
         run: |
@@ -86,3 +109,24 @@ jobs:
             --records /tmp/pv/normalized.csv --out /tmp/pv/analysis/transaction_utility.csv
           test -s /tmp/pv/analysis/summary.json
           test -s /tmp/pv/analysis/method_summary.csv
+
+      - name: No-extra runner path
+        run: |
+          rm -rf /tmp/pvbuild
+          mkdir -p /tmp/pvbuild/dcs-d4v-discovery /tmp/pvbuild/orthogonal-force-compliance
+          cat > /tmp/pvbuild/dcs-d4v-discovery/proposals.csv <<'CSV'
+          truth_id,baseline,repair,baseline_target_m,repair_target_m,label,dcs_progress_z,dcs_decision,raw_bundle_progress_z,raw_bundle_decision,raw_point_progress_z,raw_point_decision,fisher_progress_z,fisher_decision,maxmotion_progress_z,maxmotion_decision
+          1,a,b,0.1,0.2,deceptive,-0.5,unresolved,-0.4,unresolved,-0.3,unresolved,-0.2,unresolved,-0.1,unresolved
+          CSV
+          cat > /tmp/pvbuild/orthogonal-force-compliance/proposals.csv <<'CSV'
+          truth_id,baseline,repair,baseline_target_m,repair_target_m,label,dcs_progress_z,dcs_decision,raw_bundle_progress_z,raw_bundle_decision,raw_point_progress_z,raw_point_decision,fisher_progress_z,fisher_decision,maxmotion_progress_z,maxmotion_decision,force_progress_z,force_decision
+          1,a,b,0.2,0.1,beneficial,0.5,unresolved,0.4,unresolved,0.3,unresolved,0.2,unresolved,0.1,unresolved,0.7,unresolved
+          CSV
+          bash research/scripts/run_publication_validation.sh \
+            --build-dir /tmp/pvbuild \
+            --out /tmp/pv-runner \
+            --skip-probes \
+            --bootstrap-reps 20 \
+            --diagnostic
+          test -s /tmp/pv-runner/records.csv
+          test -s /tmp/pv-runner/analysis/summary.json
