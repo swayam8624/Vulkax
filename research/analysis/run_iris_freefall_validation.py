@@ -1598,7 +1598,7 @@ def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=No
             identity_cfg=cfg
         )
     if cfg.get("revision")=="ball_identity_v6_4":
-        return choose_ballistic_track_v65(
+        return choose_ballistic_track_v64(
             tracks,fps,minimum_interval_frames=minimum_interval_frames,
             identity_cfg=cfg
         )
@@ -1802,6 +1802,7 @@ def self_test_video():
             "plateau_max_x_delta_px":45.0,
             "plateau_overlap_frames":6,
             "event_edge_fraction":0.03,
+            "maximum_event_extrapolation_frames":30.0,
         }
         ident=extract(
             p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12,
@@ -1826,9 +1827,9 @@ def self_test_video():
         assert selected[0]["sign"]==v6cfg["expected_image_gravity_sign"]
         assert selected[0]["global_progress_span"]>=v6cfg["minimum_global_progress_span"]
         assert selected[0]["global_progress_span"]>=v6cfg["minimum_global_progress_span"]
-        # Direct V6.4 event-time regression: top hold -> partially observed
-        # downward fall -> bottom hold -> later upward reset. Fall timing must be
-        # recovered from release/impact plateaus; reset timing is irrelevant.
+        # Direct V6.5 regression: top hold -> partially observed downward fall ->
+        # bottom hold -> later upward reset.  The fitted constant acceleration may
+        # begin mid-flight and must remain independent of reset timing.
         top=60.0;bottom=280.0;span=bottom-top;t0=.30
         true_T=math.sqrt(2.0*drop_m/G)
         pts=[]
@@ -1859,7 +1860,7 @@ def self_test_video():
             [{"id":1,"pts":pts,"missed":0}],
             fps,minimum_interval_frames=12,identity_cfg=v6cfg
         )
-        evt_g=2.0*drop_m/(float(chosen_evt["full_fall_time_s"])**2)
+        evt_g=float(chosen_evt["normalized_acceleration_s2"])*drop_m
         evt_rel=abs(evt_g-G)/G
         assert evt_rel<=.12,(evt_g,evt_rel,chosen_evt,audit_evt)
         assert chosen_evt["inferred_full_fall_frames"]>=12
