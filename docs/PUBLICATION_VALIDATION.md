@@ -323,3 +323,47 @@ An empty table is allowed. A negative result is allowed. Zero coverage is allowe
 What is not allowed is manufacturing rows for experiments that were never run,
 lowering the final threshold because the final data did not resolve, or calling
 retrospective D4V/OFC/GAUGE evidence prospective confirmation.
+
+
+## Public-data disk cleanup
+
+Downloaded benchmark media are redownloadable from pinned public revisions. Result
+evidence under `build/publication-validation/` is separate and must not be deleted
+by the cleanup tool.
+
+Inspect current usage:
+
+```bash
+bash research/scripts/manage_public_data_storage.sh usage
+```
+
+After the pendulum final/hardening evidence exists, reclaim the large raw pendulum
+videos:
+
+```bash
+bash research/scripts/manage_public_data_storage.sh pendulum
+```
+
+After a free-fall development/validation result has been recorded, remove those raw
+videos:
+
+```bash
+bash research/scripts/manage_public_data_storage.sh freefall
+```
+
+To remove every raw IRIS MP4 while preserving parameters, manifests, result tables,
+figures, hashes, and paper evidence:
+
+```bash
+bash research/scripts/manage_public_data_storage.sh all-iris-videos
+```
+
+The repo-local Hugging Face cache is also safe to recreate:
+
+```bash
+bash research/scripts/manage_public_data_storage.sh local-hf-cache
+```
+
+A global Hugging Face cache is only removed when explicitly requested with
+`--include-global-hf-cache`; the default cleanup never touches unrelated cached
+datasets.

@@ -1,6 +1,6 @@
 {
   "schema": "vulkax.iris_freefall_blind_replication",
-  "version": 2,
+  "version": 3,
   "created": "2026-09-23",
   "dataset": {
     "repo_id": "rasulkhanbayov/IRIS",
@@ -59,9 +59,11 @@
     "nuisance_fit_fraction": 0.4,
     "minimum_active_frames": 12,
     "blocks": 6,
-    "revision": "ballistic_event_v2",
+    "revision": "plateau_ballistic_v3",
     "minimum_monotone_fraction": 0.8,
-    "maximum_timing_fit_rms_frames": 2.5
+    "maximum_timing_fit_rms_frames": 2.5,
+    "maximum_trajectory_shape_rms_fraction": 0.1,
+    "maximum_plateau_relative_mad": 0.12
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -101,6 +103,19 @@
       "validation_analyzed": false,
       "final_test_opened": false
     },
-    "v2_change": "select fastest credible monotone 10%-90% ballistic traversal; use measured drop height as known input; fit time-of-flight diagnostic"
+    "v2_change": "select fastest credible monotone 10%-90% ballistic traversal; use measured drop height as known input; fit time-of-flight diagnostic",
+    "v2_failure": {
+      "observed_on": "2026-09-23",
+      "split": "development_only",
+      "issue": "fastest monotone traversal improved segmentation but remained insufficiently calibrated/quality-stable",
+      "quality_pass_videos": 2,
+      "median_acceleration_relative_error": 0.36057242713824783,
+      "truth_control_accuracy": 0,
+      "placebo_false_assertion_rate": 0,
+      "direction_sign_rate": 1,
+      "validation_analyzed": false,
+      "final_test_opened": false
+    },
+    "v3_change": "compact moving-component tracking + stationary top/bottom plateaus + ballistic t(p)=t0+T sqrt(p) self-consistency ranking; target g absent from selector"
   }
 }
