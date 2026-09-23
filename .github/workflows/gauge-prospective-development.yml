@@ -45,6 +45,7 @@ jobs:
           path: |
             build/gauge-prospective-shard-${{ matrix.shard }}/records_development_truth_pilot.csv
             build/gauge-prospective-shard-${{ matrix.shard }}/summary_development_truth_pilot.json
+            build/gauge-prospective-shard-${{ matrix.shard }}/simulations/**
           if-no-files-found: error
           retention-days: 30
 
