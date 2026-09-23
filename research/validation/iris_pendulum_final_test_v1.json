@@ -19,7 +19,8 @@
       "10"
     ],
     "split": "final_test",
-    "expected_take_count": 10
+    "expected_take_count": 10,
+    "world_manifest": "research/validation/iris_pendulum_final_world_manifest_v1.csv"
   },
   "tracker": {
     "analysis_width": 640,
