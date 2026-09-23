@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import hashlib
+import fnmatch
 import json
 from pathlib import Path
 import re
@@ -226,6 +227,46 @@ def write_dataset_manifest(
     return manifest
 
 
+def catalog_one(key: str, profile: str) -> dict:
+    HfApi, _snapshot_download = require_hf()
+    spec = SPECS[key]
+    api = HfApi()
+    info = api.dataset_info(spec.repo_id)
+    revision = str(info.sha)
+    repo_files = api.list_repo_files(spec.repo_id, repo_type="dataset", revision=revision)
+    if key == "gauge":
+        patterns = gauge_patterns(profile)
+    elif key == "iris":
+        patterns = iris_patterns(profile)
+    elif key == "rgbench":
+        patterns = rgbench_patterns(profile, repo_files)
+    else:
+        raise ValueError(key)
+
+    missing = []
+    if patterns is not None:
+        for pattern in patterns:
+            if pattern in {"LICENSE*", "DATA_LICENSE*"}:
+                continue
+            if not any(fnmatch.fnmatch(path, pattern) for path in repo_files):
+                missing.append(pattern)
+    if missing:
+        raise RuntimeError(
+            f"{key} catalog @ {revision} is missing requested core paths: {missing}"
+        )
+    print(
+        f"[catalog] VALID {key}: {spec.repo_id}@{revision[:12]} "
+        f"files={len(repo_files)} profile={profile}"
+    )
+    return {
+        "dataset": key,
+        "repo_id": spec.repo_id,
+        "revision": revision,
+        "repo_file_count": len(repo_files),
+        "requested_pattern_count": None if patterns is None else len(patterns),
+    }
+
+
 def download_one(key: str, profile: str, root: Path) -> dict:
     HfApi, snapshot_download = require_hf()
     spec = SPECS[key]
@@ -301,9 +342,15 @@ def main() -> int:
         default=["gauge", "iris", "rgbench"],
     )
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--catalog-only", action="store_true")
     args = ap.parse_args()
     if args.self_test:
         self_test()
+        return 0
+
+    if args.catalog_only:
+        catalog = [catalog_one(key, args.profile) for key in args.datasets]
+        print(json.dumps({"profile": args.profile, "datasets": catalog}, indent=2))
         return 0
 
     args.root.mkdir(parents=True, exist_ok=True)
