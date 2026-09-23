@@ -1,0 +1,41 @@
+name: GAUGE prospective development gate
+
+on:
+  pull_request:
+    paths:
+      - "research/analysis/gauge_prospective_gate.py"
+      - "research/scripts/run_gauge_prospective_gate.sh"
+      - "research/probes/gauge_shearing_forward_probe.cpp"
+      - ".github/workflows/gauge-prospective-development.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  development:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run prospective GAUGE development truth controls
+        run: |
+          bash research/scripts/run_gauge_prospective_gate.sh \
+            --split development \
+            --profile truth \
+            --mode pilot \
+            --build-dir build \
+            --out build/gauge-prospective-gate
+
+      - name: Archive prospective evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauge-prospective-development
+          path: |
+            build/gauge-prospective-gate/records_development_truth_pilot.csv
+            build/gauge-prospective-gate/records_development_truth_pilot_normalized.csv
+            build/gauge-prospective-gate/summary_development_truth_pilot.json
+            build/gauge-prospective-gate/analysis_development_truth_pilot/**
+          if-no-files-found: error
+          retention-days: 30
