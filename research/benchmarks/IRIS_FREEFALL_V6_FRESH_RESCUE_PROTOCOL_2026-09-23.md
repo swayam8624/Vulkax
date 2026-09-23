@@ -50,14 +50,55 @@ The target object is a ball. Candidate moving components record:
 A candidate track is eligible only if the track remains ball-like across time.
 The selection logic does not use the target value of gravity.
 
-Frozen identity requirements:
+Frozen V6.1 identity requirements:
 
 - median circularity >= 0.35;
+- median solidity >= 0.65;
+- median enclosing-circle fill >= 0.45;
+- median minimum-area-rectangle axis ratio >= 0.55;
+- radius coefficient of variation <= 0.45;
 - area coefficient of variation <= 0.65;
 - median absolute log aspect <= 0.45;
 - detected fraction in the accepted full-flight interval >= 0.50.
 
-## Physical event and timing
+All shape ratios are mathematically bounded to [0,1] before aggregation.
+
+## V6 initial development failure and V6.1 correction
+
+The first `ball_identity_v6` run on the fresh development population
+`drop_50/06..10` failed its frozen development gate:
+
+- quality-pass videos: 4/5;
+- median acceleration relative error: 0.49908529289123515;
+- truth-control accuracy: 0.875;
+- placebo false-assertion rate: 0.0;
+- directional sign rate: 0.95.
+
+Fresh validation `drop_100/06..10` was not downloaded or analyzed.
+
+Development diagnostics exposed two non-scientific implementation/design defects:
+the circularity feature could exceed 1.0 because pixel-count area was mixed with
+contour perimeter, and the candidate rank explicitly preferred longer traversals,
+which can select slow same-ball reset motion over the gravity-driven drop.
+
+`ball_identity_v6_1` is frozen before fresh validation and changes only the
+development-stage identity/event selection:
+
+- circularity uses contour area and the same contour's perimeter and is bounded
+  to [0,1];
+- median contour solidity is required;
+- median fill inside the minimum enclosing circle is required;
+- median minimum-area-rectangle axis ratio is required;
+- temporal radius coefficient of variation is bounded;
+- these bounded features form a ball-identity score;
+- among ball-like release-from-rest candidates, the fastest full-travel event is
+  preferred rather than the longest event;
+- the existing 12-frame minimum full-flight duration remains in force.
+
+No numerical value of gravity is used to choose a track or event. Development and
+validation populations, the 20% acceleration gate, repair factors, and `|S|=2`
+remain unchanged.
+
 
 For each eligible object track:
 

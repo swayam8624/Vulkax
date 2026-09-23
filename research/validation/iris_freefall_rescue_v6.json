@@ -67,7 +67,7 @@
     "nuisance_fit_fraction": 0.4,
     "minimum_active_frames": 12,
     "blocks": 6,
-    "revision": "ball_identity_v6",
+    "revision": "ball_identity_v6_1",
     "minimum_monotone_fraction": 0.78,
     "maximum_timing_fit_rms_frames": 2.5,
     "maximum_trajectory_shape_rms_fraction": 0.1,
@@ -77,7 +77,11 @@
     "minimum_median_circularity": 0.35,
     "maximum_area_cv": 0.65,
     "maximum_aspect_log_mad": 0.45,
-    "minimum_detected_fraction": 0.5
+    "minimum_detected_fraction": 0.5,
+    "minimum_median_solidity": 0.65,
+    "minimum_median_circle_fill": 0.45,
+    "minimum_median_axis_ratio": 0.55,
+    "maximum_radius_cv": 0.45
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -122,6 +126,21 @@
       "direction_sign_rate": 0,
       "disposition": "failed_validation_permanently_nonconfirmatory"
     },
-    "v6_change": "fresh development/validation takes; ball-identity appearance consistency added before any fresh validation is opened"
+    "v6_change": "fresh development/validation takes; ball-identity appearance consistency added before any fresh validation is opened",
+    "v6_initial_development_failure": {
+      "split": "drop_50/06..10",
+      "quality_pass_videos": 4,
+      "median_acceleration_relative_error": 0.49908529289123515,
+      "truth_control_accuracy": 0.875,
+      "placebo_false_assertion_rate": 0,
+      "direction_sign_rate": 0.95,
+      "validation_downloaded": false,
+      "validation_analyzed": false,
+      "diagnosis": [
+        "component circularity used connected-component pixel area with contour perimeter and produced impossible values >1",
+        "candidate ranking favored longer full-flight intervals, allowing slow same-object reset motion to outrank the fast gravity event"
+      ]
+    },
+    "v6_1_change": "development-only correction before fresh validation: bounded contour geometry/solidity/circle-fill/axis-ratio/radius stability; rank fastest ball-like release-from-rest full-travel event instead of longest; gates/repair schedule/|S| unchanged"
   }
 }
