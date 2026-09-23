@@ -51,9 +51,18 @@ echo "=== Reviewer hardening: pinned official IRIS references ==="
 echo "=== Reviewer hardening: deterministic figures ==="
 "$VENV/bin/python" visualization/scripts/render_reviewer_hardening.py   --build-root "$BUILD"   --out "$BUILD/visualization/reviewer-hardening"
 
-VIS_ARGS=()
-[[ "$NO_VIDEO" -eq 1 ]] && VIS_ARGS+=(--no-video)
-"$VENV/bin/python" visualization/scripts/render_gt_hidden_rewrite_demo.py   --campaign "$BUILD/publication-validation/iris-pendulum-final-test"   --proposals "$BUILD/publication-validation/iris-pendulum-postfinal-proposals/evaluated_proposals.csv"   --out "$BUILD/visualization/reviewer-hardening"   "${VIS_ARGS[@]}"
+if [[ "$NO_VIDEO" -eq 1 ]]; then
+  "$VENV/bin/python" visualization/scripts/render_gt_hidden_rewrite_demo.py \
+    --campaign "$BUILD/publication-validation/iris-pendulum-final-test" \
+    --proposals "$BUILD/publication-validation/iris-pendulum-postfinal-proposals/evaluated_proposals.csv" \
+    --out "$BUILD/visualization/reviewer-hardening" \
+    --no-video
+else
+  "$VENV/bin/python" visualization/scripts/render_gt_hidden_rewrite_demo.py \
+    --campaign "$BUILD/publication-validation/iris-pendulum-final-test" \
+    --proposals "$BUILD/publication-validation/iris-pendulum-postfinal-proposals/evaluated_proposals.csv" \
+    --out "$BUILD/visualization/reviewer-hardening"
+fi
 
 if [[ "$WITH_FREEFALL_VALIDATION" -eq 1 ]]; then
   echo "=== Reviewer hardening: second blind domain development+validation ==="
