@@ -67,7 +67,7 @@
     "nuisance_fit_fraction": 0.4,
     "minimum_active_frames": 12,
     "blocks": 6,
-    "revision": "ball_identity_v6_5",
+    "revision": "ball_identity_v6_6",
     "minimum_monotone_fraction": 0.78,
     "maximum_timing_fit_rms_frames": 2.5,
     "maximum_trajectory_shape_rms_fraction": 0.1,
@@ -92,7 +92,11 @@
     "event_edge_fraction": 0.03,
     "plateau_overlap_frames": 6,
     "maximum_event_extrapolation_frames": 30,
-    "kinematic_fit_edge_fraction": 0.02
+    "kinematic_fit_edge_fraction": 0.02,
+    "minimum_raw_event_span_px": 18,
+    "maximum_release_extrapolation_frames": 12,
+    "maximum_release_future_frames": 2,
+    "maximum_impact_speed_ratio": 0.55
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -242,6 +246,24 @@
         "the remaining estimator still used 2h/T^2, which assumes the observed interval is anchored to zero-velocity release; development evidence shows the tracker often observes an interior flight fragment"
       ]
     },
-    "v6_5_change": "development-only redesign before fresh validation: retain ball identity and global top-bottom spatial calibration; fit p(t)=a+b t+0.5 c t^2 on the observed gravity-direction motion with nuisance position/velocity; exclude stationary holds from the kinematic fit; require sufficient observed moving-frame support rather than exact release/impact observation; treat full-event roots and release-rest timing as optional diagnostics; rank without target gravity; use c*drop_height as the primary development acceleration diagnostic; development/validation gates, repair schedule, and |S|=2 remain unchanged"
+    "v6_5_change": "development-only redesign before fresh validation: retain ball identity and global top-bottom spatial calibration; fit p(t)=a+b t+0.5 c t^2 on the observed gravity-direction motion with nuisance position/velocity; exclude stationary holds from the kinematic fit; require sufficient observed moving-frame support rather than exact release/impact observation; treat full-event roots and release-rest timing as optional diagnostics; rank without target gravity; use c*drop_height as the primary development acceleration diagnostic; development/validation gates, repair schedule, and |S|=2 remain unchanged",
+    "v6_5_development_failure": {
+      "split": "drop_50/06..10",
+      "quality_pass_videos": 5,
+      "implementation_errors": 0,
+      "median_acceleration_relative_error": 0.8571277802117766,
+      "truth_control_accuracy": 0.9,
+      "placebo_false_assertion_rate": 0,
+      "direction_sign_rate": 1,
+      "validation_downloaded": false,
+      "validation_analyzed": false,
+      "diagnosis": [
+        "all five clips passed appearance/trajectory quality while the primary acceleration estimate remained 72-100% wrong, falsifying V6.5 image-space metric calibration",
+        "the largest same-ball image excursion was used as the 0.5 m ruler even though it can be manual reset/handling motion rather than release-to-impact travel",
+        "V6.5 disabled the release-speed quality gate and admitted selected candidates with release-speed ratios up to 11.266",
+        "candidate ranking prioritized global image-progress span ahead of acceleration stability, allowing slow/manual trajectories to win"
+      ]
+    },
+    "v6_6_change": "development-only redesign before fresh validation: remove manual-reset image span from the primary gravity estimate; identify a positive constant-pixel-acceleration ballistic run, infer release from its velocity-zero vertex, infer impact from the terminal speed collapse/reversal or track end, and compute g solely from independently measured drop height and release-to-impact time g=2h/T^2. Target gravity remains absent from candidate generation/ranking; validation/final data remain unopened."
   }
 }
