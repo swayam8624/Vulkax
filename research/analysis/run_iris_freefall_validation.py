@@ -1123,6 +1123,7 @@ def self_test_video():
         # and a fragmented true ball drop. The ungated detector is expected to be
         # ambiguous; only the frozen V6.3 identity-gated path is under test here.
         v6cfg={
+            "revision":"ball_identity_v6_3",
             "minimum_median_circularity":0.35,
             "minimum_median_solidity":0.65,
             "minimum_median_circle_fill":0.45,
