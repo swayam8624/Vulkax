@@ -14,6 +14,8 @@ FINAL_LOCK=""
 MAX_WORLDS=""
 SHARD_INDEX="0"
 SHARD_COUNT="1"
+VERIFY_ROT_DEG="0"
+VERIFY_TRANSLATION_M="0"
 
 usage() {
   cat <<'EOF'
@@ -30,6 +32,10 @@ Options:
   --max-worlds N         Debug/smoke limit only
   --shard-index N        Deterministic world shard index (default: 0)
   --shard-count N        Deterministic world shard count (default: 1)
+  --verification-rotation-deg X
+                        Global verification-channel rotation nuisance
+  --verification-translation-m X
+                        Global verification-channel translation nuisance
 EOF
 }
 
@@ -45,6 +51,8 @@ while [[ $# -gt 0 ]]; do
     --max-worlds) MAX_WORLDS="$2"; shift 2 ;;
     --shard-index) SHARD_INDEX="$2"; shift 2 ;;
     --shard-count) SHARD_COUNT="$2"; shift 2 ;;
+    --verification-rotation-deg) VERIFY_ROT_DEG="$2"; shift 2 ;;
+    --verification-translation-m) VERIFY_TRANSLATION_M="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -93,6 +101,8 @@ RUN_ARGS=(
   --mode "$MODE"
   --shard-index "$SHARD_INDEX"
   --shard-count "$SHARD_COUNT"
+  --verification-rotation-deg "$VERIFY_ROT_DEG"
+  --verification-translation-m "$VERIFY_TRANSLATION_M"
 )
 if [[ -n "$FINAL_LOCK" ]]; then
   RUN_ARGS+=(--final-lock "$FINAL_LOCK")
