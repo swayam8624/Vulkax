@@ -123,6 +123,14 @@ def validate_selector_config(identity_cfg):
         "maximum_global_timing_fit_rms_frames":float(
             cfg.get("maximum_global_timing_fit_rms_frames",2.5)
         ),
+        "plateau_max_speed_px_per_frame":float(
+            cfg.get("plateau_max_speed_px_per_frame",0.75)
+        ),
+        "plateau_min_frames":int(cfg.get("plateau_min_frames",4)),
+        "plateau_max_gap_frames":int(cfg.get("plateau_max_gap_frames",24)),
+        "plateau_max_x_delta_px":float(cfg.get("plateau_max_x_delta_px",45.0)),
+        "plateau_overlap_frames":int(cfg.get("plateau_overlap_frames",6)),
+        "event_edge_fraction":float(cfg.get("event_edge_fraction",0.03)),
     }
 
 def read_csv(p):
@@ -1026,8 +1034,271 @@ def choose_ballistic_track_v63(tracks,fps,minimum_interval_frames=12,identity_cf
         })
     return chosen,audit
 
+
+def _plateau_segments(chunks,selector_cfg):
+    out=[]
+    vmax=float(selector_cfg["plateau_max_speed_px_per_frame"])
+    nmin=int(selector_cfg["plateau_min_frames"])
+    for q in chunks:
+        z=smooth1(np.asarray(q["y"],float),5)
+        x=smooth1(np.asarray(q["x"],float),5)
+        frames=np.asarray(q["frames"],int)
+        if len(z)<nmin:
+            continue
+        speed=np.abs(np.gradient(z))
+        stationary=speed<=vmax
+        i=0
+        while i<len(stationary):
+            if not stationary[i]:
+                i+=1;continue
+            a=i
+            while i+1<len(stationary) and stationary[i+1]:
+                i+=1
+            b=i+1
+            if b-a>=nmin:
+                out.append({
+                    "track_id":q["track_id"],"chunk_id":q["chunk_id"],
+                    "a":a,"b":b,
+                    "frame_start":int(frames[a]),"frame_end":int(frames[b-1]),
+                    "y":float(np.median(z[a:b])),
+                    "x":float(np.median(x[a:b])),
+                    "identity_score":float(q["identity_score"]),
+                })
+            i+=1
+    return out
+
+def _interp_crossing(frames,z,target,increasing=True):
+    frames=np.asarray(frames,float);z=np.asarray(z,float)
+    if len(frames)<2:
+        return None
+    for i in range(len(z)-1):
+        a=z[i]-target;b=z[i+1]-target
+        ok=(a<=0<=b) if increasing else (a>=0>=b)
+        if not ok:
+            continue
+        dz=z[i+1]-z[i]
+        if abs(dz)<1e-9:
+            return float(frames[i])
+        u=(target-z[i])/dz
+        return float(frames[i]+u*(frames[i+1]-frames[i]))
+    return None
+
+def choose_ballistic_track_v64(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
+    cfg=identity_cfg or {}
+    selector_cfg=validate_selector_config(cfg)
+    chunks=_identity_track_chunks(tracks,fps,cfg)
+    if not chunks:
+        raise TrackSelectionError("no ball-like identity tracks for V6.4")
+    plateaus=_plateau_segments(chunks,selector_cfg)
+    if not plateaus:
+        raise TrackSelectionError("no stationary ball plateaus for V6.4")
+
+    expected=float(selector_cfg["expected_sign"])
+    max_gap=int(selector_cfg["plateau_max_gap_frames"])
+    max_x=float(selector_cfg["plateau_max_x_delta_px"])
+    overlap=int(selector_cfg["plateau_overlap_frames"])
+    edge=float(selector_cfg["event_edge_fraction"])
+    candidates=[]
+    rejection_counts={}
+
+    for chunk in chunks:
+        frames=np.asarray(chunk["frames"],int)
+        y=np.asarray(chunk["y"],float)
+        x=np.asarray(chunk["x"],float)
+        z=expected*y
+        zsmooth=smooth1(z,5)
+        scale=max(float(np.ptp(zsmooth)),1.0)
+        runs=_monotone_runs((zsmooth-float(np.min(zsmooth)))/scale)
+        for aa,bb in runs:
+            if bb-aa<6:
+                _reject(rejection_counts,"too_few_motion_points");continue
+            f0=int(frames[aa]);f1=int(frames[bb-1])
+            xm=float(np.median(x[aa:bb]))
+            z0=float(zsmooth[aa]);z1=float(zsmooth[bb-1])
+            if z1<=z0:
+                _reject(rejection_counts,"wrong_direction");continue
+
+            prior=[
+                p for p in plateaus
+                if p["frame_start"]<=f0
+                and p["frame_end"]<=f0+overlap
+                and f0-p["frame_end"]<=max_gap
+                and abs(p["x"]-xm)<=max_x
+                and expected*p["y"]<=z0+12.0
+            ]
+            post=[
+                p for p in plateaus
+                if p["frame_end"]>=f1
+                and p["frame_start"]>=f1-overlap
+                and p["frame_start"]-f1<=max_gap
+                and abs(p["x"]-xm)<=max_x
+                and expected*p["y"]>=z1-12.0
+            ]
+            if not prior:
+                _reject(rejection_counts,"missing_release_plateau");continue
+            if not post:
+                _reject(rejection_counts,"missing_impact_plateau");continue
+            top=max(prior,key=lambda p:p["frame_end"])
+            bottom=min(post,key=lambda p:p["frame_start"])
+            topz=expected*float(top["y"]);botz=expected*float(bottom["y"])
+            span=botz-topz
+            if not math.isfinite(span) or span<18.0:
+                _reject(rejection_counts,"plateau_span");continue
+
+            target_start=topz+edge*span
+            target_end=botz-edge*span
+            rel_frames=frames[max(0,aa-3):min(len(frames),bb+4)]
+            rel_z=zsmooth[max(0,aa-3):min(len(frames),bb+4)]
+            start_cross=_interp_crossing(rel_frames,rel_z,target_start,True)
+            end_cross=_interp_crossing(rel_frames,rel_z,target_end,True)
+            if start_cross is not None and end_cross is not None and end_cross>start_cross:
+                # Free fall position fraction is quadratic in elapsed time:
+                # t(f)=t0+T*sqrt(f). Recover release/impact times from two
+                # position-fraction crossings without using target gravity.
+                s1=math.sqrt(edge)
+                s2=math.sqrt(1.0-edge)
+                denom=s2-s1
+                if denom<=1e-9:
+                    _reject(rejection_counts,"edge_geometry");continue
+                full_frames=(end_cross-start_cross)/denom
+                release_frame=start_cross-full_frames*s1
+                impact_frame=release_frame+full_frames
+            else:
+                release_frame=float(top["frame_end"])
+                impact_frame=float(bottom["frame_start"])
+                full_frames=impact_frame-release_frame
+            if not math.isfinite(full_frames) or full_frames<minimum_interval_frames:
+                _reject(rejection_counts,"full_duration");continue
+            T=full_frames/fps
+
+            lo=max(0,aa-2);hi=min(len(frames),bb+3)
+            event_frames=frames[lo:hi].astype(float)
+            event_t=(event_frames-release_frame)/fps
+            event_z=zsmooth[lo:hi]
+            p=np.clip((event_z-topz)/span,0.0,1.0)
+            valid=(event_t>=-2.0/fps)&(event_t<=T+2.0/fps)
+            event_t=event_t[valid];p=p[valid]
+            event_ids=np.arange(lo,hi,dtype=int)[valid]
+            if len(event_t)<6:
+                _reject(rejection_counts,"too_few_event_points");continue
+            model=np.square(np.clip(event_t/T,0.0,1.0))
+            shape=float(np.sqrt(np.mean((p-model)**2)))
+            if not math.isfinite(shape) or shape>.12:
+                _reject(rejection_counts,"shape_rms");continue
+            sqrtp=np.sqrt(np.clip(p,0.0,1.0))
+            pred_time=T*sqrtp
+            timing=float(np.sqrt(np.mean((event_t-pred_time)**2))*fps)
+            if timing>float(selector_cfg["maximum_global_timing_fit_rms_frames"]):
+                _reject(rejection_counts,"timing_rms");continue
+
+            det_frames=np.asarray(chunk["detected_frames_original"],int)
+            detected=sum(1 for ff in det_frames if frames[lo]<=ff<=frames[hi-1])
+            detected_fraction=detected/max(1,hi-lo)
+            if detected_fraction<float(cfg.get("minimum_detected_fraction",.45)):
+                _reject(rejection_counts,"detected_fraction");continue
+
+            xdrift=float(np.ptp(x[lo:hi]))/span
+            if xdrift>float(cfg.get("maximum_x_drift_fraction",.45)):
+                _reject(rejection_counts,"x_drift");continue
+
+            progress_full=(expected*y-topz)/span
+            q={
+                "track_id":chunk["track_id"],"chunk_id":chunk["chunk_id"],
+                "sign":expected,"span_px":span,"local_span_px":float(np.ptp(event_z)),
+                "low_px":float(topz),"high_px":float(botz),
+                "progress":progress_full,
+                "dense_frames":frames,
+                "abs_times":frames/fps,
+                "window_indices":event_ids,
+                "t0_s":release_frame/fps,
+                "full_fall_time_s":T,
+                "timing_fit_rms_s":timing/fps,
+                "timing_fit_rms_frames":timing,
+                "trajectory_shape_rms_fraction":shape,
+                "release_speed_ratio":0.0,
+                "x_drift_fraction":xdrift,
+                "monotone_fraction":float(np.mean(np.diff(p)>=-.02)) if len(p)>1 else 1.0,
+                "gap_penalty":float(chunk["gap_penalty"]),
+                "detected_fraction":float(chunk["detected_fraction_chunk"]),
+                "detected_window_fraction":float(detected_fraction),
+                "identity_score":float(chunk["identity_score"]),
+                "median_circularity":float(chunk["median_circularity"]),
+                "median_solidity":float(chunk["median_solidity"]),
+                "median_circle_fill":float(chunk["median_circle_fill"]),
+                "median_axis_ratio":float(chunk["median_axis_ratio"]),
+                "radius_cv":float(chunk["radius_cv"]),
+                "area_cv":float(chunk["area_cv"]),
+                "aspect_log_median":float(chunk["aspect_log_median"]),
+                "interval_frames":int(round(full_frames)),
+                "observed_fragment_frames":int(len(event_ids)),
+                "inferred_full_fall_frames":float(full_frames),
+                "detected_frames":int(detected),
+                "global_progress_span":float(np.ptp(p)),
+                "global_progress_start":float(np.min(p)),
+                "global_progress_end":float(np.max(p)),
+                "release_plateau_track":int(top["track_id"]),
+                "impact_plateau_track":int(bottom["track_id"]),
+            }
+            candidates.append(validate_candidate(q))
+
+    if not candidates:
+        raise TrackSelectionError(
+            "no release->impact V6.4 event survived; "
+            f"chunks={len(chunks)} plateaus={len(plateaus)} "
+            f"rejects={json.dumps(rejection_counts,sort_keys=True)}"
+        )
+
+    def rank(q):
+        return (
+            float(q["timing_fit_rms_frames"]),
+            float(q["trajectory_shape_rms_fraction"]),
+            -float(q["detected_window_fraction"]),
+            float(q["t0_s"]),
+            -float(q["identity_score"]),
+        )
+    candidates=sorted(candidates,key=rank)
+    chosen=candidates[0]
+    audit=[]
+    for i,q in enumerate(candidates[:20],1):
+        audit.append({
+            "event_rank":i,"selected":q is chosen,"track_id":q["track_id"],
+            "sign":float(q["sign"]),"t0_s":float(q["t0_s"]),
+            "local_span_px":float(q["local_span_px"]),
+            "spatial_envelope_px":float(q["span_px"]),
+            "relative_span":float(q["local_span_px"])/max(float(q["span_px"]),1e-9),
+            "global_progress_span":float(q["global_progress_span"]),
+            "global_progress_start":float(q["global_progress_start"]),
+            "global_progress_end":float(q["global_progress_end"]),
+            "full_fall_time_s":float(q["full_fall_time_s"]),
+            "interval_frames":int(q["interval_frames"]),
+            "observed_fragment_frames":int(q["observed_fragment_frames"]),
+            "inferred_full_fall_frames":float(q["inferred_full_fall_frames"]),
+            "detected_frames":int(q["detected_frames"]),
+            "detected_fraction":float(q["detected_window_fraction"]),
+            "timing_fit_rms_frames":float(q["timing_fit_rms_frames"]),
+            "trajectory_shape_rms_fraction":float(q["trajectory_shape_rms_fraction"]),
+            "release_speed_ratio":float(q["release_speed_ratio"]),
+            "x_drift_fraction":float(q["x_drift_fraction"]),
+            "gap_penalty":float(q["gap_penalty"]),
+            "identity_score":float(q["identity_score"]),
+            "median_circularity":float(q["median_circularity"]),
+            "median_solidity":float(q["median_solidity"]),
+            "median_circle_fill":float(q["median_circle_fill"]),
+            "median_axis_ratio":float(q["median_axis_ratio"]),
+            "radius_cv":float(q["radius_cv"]),"area_cv":float(q["area_cv"]),
+            "aspect_log_median":float(q["aspect_log_median"]),
+            "release_plateau_track":int(q["release_plateau_track"]),
+            "impact_plateau_track":int(q["impact_plateau_track"]),
+        })
+    return chosen,audit
+
 def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     cfg=identity_cfg or {}
+    if cfg.get("revision")=="ball_identity_v6_4":
+        return choose_ballistic_track_v64(
+            tracks,fps,minimum_interval_frames=minimum_interval_frames,
+            identity_cfg=cfg
+        )
     if cfg.get("revision")=="ball_identity_v6_3":
         return choose_ballistic_track_v63(
             tracks,fps,minimum_interval_frames=minimum_interval_frames,
@@ -1094,8 +1365,12 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
     t0=float(chosen["t0_s"]);T=float(chosen["full_fall_time_s"])
     times=abs_times[ids]-t0
     position_m=np.clip(progress[ids],0.0,1.0)*drop_height
-    if len(times)<minimum_interval_frames:
-        raise RuntimeError("selected full-flight window violates minimum duration")
+    observed_fragment_frames=int(len(times))
+    inferred_full_fall_frames=float(T*fps)
+    if inferred_full_fall_frames+1e-9<minimum_interval_frames:
+        raise ContractError(
+            "selector returned event whose inferred full fall violates minimum duration"
+        )
 
     one_px=drop_height/max(float(chosen["span_px"]),1e-9)
     ghat=2.0*drop_height/(T*T)
@@ -1108,7 +1383,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "valid_fraction":float(sum(bool(x) for x in frame_candidates)/max(1,len(frame_candidates))),
         "span_px":float(chosen["span_px"]),
         "one_pixel_m":one_px,
-        "active_frames":len(times),
+        "active_frames":observed_fragment_frames,
         "times":times,
         "position_m":position_m,
         "direct_acceleration_m_s2":ghat,
@@ -1128,6 +1403,8 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "gap_penalty":float(chosen["gap_penalty"]),
         "candidate_track_count":len(tracks),
         "interval_frames":int(chosen["interval_frames"]),
+        "observed_fragment_frames":int(chosen.get("observed_fragment_frames",observed_fragment_frames)),
+        "inferred_full_fall_frames":float(chosen.get("inferred_full_fall_frames",inferred_full_fall_frames)),
         "detected_frames":int(chosen["detected_frames"]),
         "detected_fraction":float(chosen["detected_window_fraction"]),
         "identity_score":float(chosen["identity_score"]),
@@ -1197,7 +1474,7 @@ def self_test_video():
         # and a fragmented true ball drop. The ungated detector is expected to be
         # ambiguous; only the frozen V6.3 identity-gated path is under test here.
         v6cfg={
-            "revision":"ball_identity_v6_3",
+            "revision":"ball_identity_v6_4",
             "minimum_median_circularity":0.35,
             "minimum_median_solidity":0.65,
             "minimum_median_circle_fill":0.45,
@@ -1209,6 +1486,12 @@ def self_test_video():
             "expected_image_gravity_sign":1.0,
             "minimum_global_progress_span":0.15,
             "maximum_global_timing_fit_rms_frames":2.5,
+            "plateau_max_speed_px_per_frame":0.75,
+            "plateau_min_frames":4,
+            "plateau_max_gap_frames":24,
+            "plateau_max_x_delta_px":45.0,
+            "plateau_overlap_frames":6,
+            "event_edge_fraction":0.03,
         }
         ident=extract(
             p,drop_m,width=640,max_seconds=2.5,minimum_interval_frames=12,
@@ -1233,44 +1516,45 @@ def self_test_video():
         assert selected[0]["sign"]==v6cfg["expected_image_gravity_sign"]
         assert selected[0]["global_progress_span"]>=v6cfg["minimum_global_progress_span"]
         assert selected[0]["global_progress_span"]>=v6cfg["minimum_global_progress_span"]
-        # Direct V6.3 fragmentation regression: the gravity track contains
-        # only the middle of the fall; a later slow reset supplies full spatial
-        # extent. This isolates global-envelope timing from detector behavior.
+        # Direct V6.4 event-time regression: top hold -> partially observed
+        # downward fall -> bottom hold -> later upward reset. Fall timing must be
+        # recovered from release/impact plateaus; reset timing is irrelevant.
         top=60.0;bottom=280.0;span=bottom-top;t0=.30
         true_T=math.sqrt(2.0*drop_m/G)
-        f0=int(math.ceil((t0+true_T*math.sqrt(.20))*fps))
-        f1=int(math.floor((t0+true_T*math.sqrt(.80))*fps))
-        drop_pts=[]
-        for ff in range(f0,f1+1):
+        pts=[]
+        frame0=8
+        frame_end=85
+        for ff in range(frame0,frame_end+1):
             tt=ff/fps
-            pp=((tt-t0)/true_T)**2
+            if tt<t0:
+                pp=0.0
+            elif tt<=t0+true_T:
+                pp=((tt-t0)/true_T)**2
+            elif tt<1.15:
+                pp=1.0
+            else:
+                pp=max(0.0,1.0-(tt-1.15)/.45)
             yy=top+span*pp
-            drop_pts.append({
+            # Drop a few interior detections to exercise interpolation/partial
+            # observation without losing the release or impact plateaus.
+            if t0+.08<tt<t0+true_T-.06 and ff%5==0:
+                continue
+            pts.append({
                 "frame":ff,"x":320.0,"y":yy,"area":300,
                 "circularity":.90,"solidity":.98,"circle_fill":.88,
                 "axis_ratio":.96,"radius":10.0,"aspect_log_abs":.02,
                 "appearance_score":10.0,
             })
-        reset_pts=[]
-        for k,ff in enumerate(range(90,121)):
-            frac=k/30.0
-            yy=bottom-span*frac
-            reset_pts.append({
-                "frame":ff,"x":320.0,"y":yy,"area":300,
-                "circularity":.90,"solidity":.98,"circle_fill":.88,
-                "axis_ratio":.96,"radius":10.0,"aspect_log_abs":.02,
-                "appearance_score":10.0,
-            })
-        chosen_frag,audit_frag=choose_ballistic_track_v63(
-            [{"id":1,"pts":drop_pts,"missed":0},
-             {"id":2,"pts":reset_pts,"missed":0}],
+        chosen_evt,audit_evt=choose_ballistic_track_v64(
+            [{"id":1,"pts":pts,"missed":0}],
             fps,minimum_interval_frames=12,identity_cfg=v6cfg
         )
-        frag_g=2.0*drop_m/(float(chosen_frag["full_fall_time_s"])**2)
-        frag_rel=abs(frag_g-G)/G
-        assert frag_rel<=.10,(frag_g,frag_rel,chosen_frag,audit_frag)
-        assert chosen_frag["global_progress_span"]<.80
-        assert chosen_frag["sign"]==1.0
+        evt_g=2.0*drop_m/(float(chosen_evt["full_fall_time_s"])**2)
+        evt_rel=abs(evt_g-G)/G
+        assert evt_rel<=.12,(evt_g,evt_rel,chosen_evt,audit_evt)
+        assert chosen_evt["inferred_full_fall_frames"]>=12
+        assert chosen_evt["observed_fragment_frames"]>=6
+        assert chosen_evt["sign"]==1.0
 
         print("VALID IRIS free-fall synthetic-video tracker",
               ident["direct_acceleration_m_s2"],ident_rel,
@@ -1437,7 +1721,7 @@ def main():
                 qq["acceleration_relative_error"]=abs(qq["direct_acceleration_m_s2"]-G)/G
                 candidate_audit_rows.append(qq)
             checks={
-                "active_frames":tr["active_frames"]>=tg["minimum_active_frames"],
+                "full_duration_frames":tr["inferred_full_fall_frames"]>=tg["minimum_active_frames"],
                 "monotone":tr["monotone_fraction"]>=tg.get("minimum_monotone_fraction",.78),
                 "timing_fit":tr["timing_fit_rms_frames"]<=tg.get("maximum_timing_fit_rms_frames",2.5),
                 "trajectory_shape":tr["trajectory_shape_rms_fraction"]<=tg.get("maximum_trajectory_shape_rms_fraction",.10),
@@ -1459,7 +1743,10 @@ def main():
                           "direct_acceleration_m_s2":tr["direct_acceleration_m_s2"],
                           "trajectory_acceleration_m_s2":tr["trajectory_acceleration_m_s2"],
                           "acceleration_relative_error":abs(tr["direct_acceleration_m_s2"]-G)/G,
-                          "active_frames":tr["active_frames"],"valid_fraction":tr["valid_fraction"],
+                          "active_frames":tr["active_frames"],
+                          "observed_fragment_frames":tr["observed_fragment_frames"],
+                          "inferred_full_fall_frames":tr["inferred_full_fall_frames"],
+                          "valid_fraction":tr["valid_fraction"],
                           "span_px":tr["span_px"],"one_pixel_m":tr["one_pixel_m"],
                           "full_fall_time_s":tr["full_fall_time_s"],
                           "timing_fit_rms_frames":tr["timing_fit_rms_frames"],
@@ -1527,12 +1814,14 @@ def main():
         fields=["scene","split","event_rank","selected","track_id","sign","t0_s",
                 "local_span_px","spatial_envelope_px","relative_span",
                 "global_progress_span","global_progress_start","global_progress_end",
-                "full_fall_time_s","interval_frames","detected_frames","detected_fraction",
+                "full_fall_time_s","interval_frames","observed_fragment_frames",
+                "inferred_full_fall_frames","detected_frames","detected_fraction",
                 "timing_fit_rms_frames","trajectory_shape_rms_fraction","release_speed_ratio",
                 "x_drift_fraction","gap_penalty","identity_score","median_circularity",
                 "median_solidity","median_circle_fill","median_axis_ratio","radius_cv","area_cv",
                 "aspect_log_median","envelope_track_count","envelope_source_track",
-                "envelope_source_chunk","direct_acceleration_m_s2",
+                "envelope_source_chunk","release_plateau_track","impact_plateau_track",
+                "direct_acceleration_m_s2",
                 "acceleration_relative_error"]
         with (out/"candidate_audit.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
@@ -1591,6 +1880,8 @@ def main():
               "GAP",t["gap_penalty"],
               "TRACKS",t["candidate_track_count"],
               "INTERVAL_FRAMES",t["interval_frames"],
+              "OBSERVED_FRAGMENT_FRAMES",t["observed_fragment_frames"],
+              "INFERRED_FULL_FALL_FRAMES",t["inferred_full_fall_frames"],
               "DETECTED_FRAMES",t["detected_frames"],
               "DETECTED_FRACTION",t["detected_fraction"],
               "SIGN",t["selected_direction_sign"],

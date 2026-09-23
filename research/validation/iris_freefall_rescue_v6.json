@@ -67,7 +67,7 @@
     "nuisance_fit_fraction": 0.4,
     "minimum_active_frames": 12,
     "blocks": 6,
-    "revision": "ball_identity_v6_3",
+    "revision": "ball_identity_v6_4",
     "minimum_monotone_fraction": 0.78,
     "maximum_timing_fit_rms_frames": 2.5,
     "maximum_trajectory_shape_rms_fraction": 0.1,
@@ -84,7 +84,13 @@
     "maximum_radius_cv": 0.45,
     "expected_image_gravity_sign": 1,
     "minimum_global_progress_span": 0.15,
-    "maximum_global_timing_fit_rms_frames": 2.5
+    "maximum_global_timing_fit_rms_frames": 2.5,
+    "plateau_max_speed_px_per_frame": 0.75,
+    "plateau_min_frames": 4,
+    "plateau_max_gap_frames": 24,
+    "plateau_max_x_delta_px": 45,
+    "event_edge_fraction": 0.03,
+    "plateau_overlap_frames": 6
   },
   "repairs": {
     "baseline_factor": 1.25,
@@ -198,6 +204,25 @@
       "validation_downloaded": false,
       "validation_analyzed": false,
       "fix": "module-level _reject helper; explicit diagnostics signatures; rejection-path self-tests; pyflakes in CI and local preflight"
-    }
+    },
+    "v6_3_second_implementation_error": {
+      "observed_on": "2026-09-23",
+      "split": "drop_50/06..10",
+      "tracker_revision": "ball_identity_v6_3",
+      "error": "RuntimeError: selected full-flight window violates minimum duration",
+      "affected_takes": [
+        "06",
+        "07"
+      ],
+      "experimental_interpretation": "none for the affected takes; the downstream duration check was incompatible with V6.3 partial-fragment semantics",
+      "validation_downloaded": false,
+      "validation_analyzed": false,
+      "diagnosis": [
+        "V6.3 selector enforced inferred full duration T*fps >= minimum_active_frames",
+        "extract() incorrectly re-applied the old rule to observed fragment sample count",
+        "the quality gate duplicated the same obsolete assumption via active_frames"
+      ]
+    },
+    "v6_4_change": "development-only redesign before validation: separate observed fragment frames from inferred full-fall duration; identify release and impact stationary plateaus around downward ball motion; infer T from release->impact timing; validate normalized p(t)~(t/T)^2; ignore later upward reset timing; gates/repair schedule/|S| unchanged"
   }
 }
