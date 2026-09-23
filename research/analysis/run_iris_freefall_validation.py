@@ -81,15 +81,37 @@ def extract_components(diff_crop,threshold,cv2,x0,y0):
         if fill<.12:continue
         cx,cy=cent[lab]
         component_mask=(labels==lab).astype(np.uint8)*255
-        contours,_=cv2.findContours(component_mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-        perimeter=max((cv2.arcLength(q,True) for q in contours),default=0.0)
-        circularity=(4.0*math.pi*area/(perimeter*perimeter)) if perimeter>1e-9 else 0.0
+        contours,_=cv2.findContours(
+            component_mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE
+        )
+        contour=max(contours,key=cv2.contourArea) if contours else None
+        contour_area=float(cv2.contourArea(contour)) if contour is not None else 0.0
+        perimeter=float(cv2.arcLength(contour,True)) if contour is not None else 0.0
+        circularity=(4.0*math.pi*contour_area/(perimeter*perimeter)) if perimeter>1e-9 else 0.0
+        circularity=float(np.clip(circularity,0.0,1.0))
+        hull=cv2.convexHull(contour) if contour is not None and len(contour)>=3 else None
+        hull_area=float(cv2.contourArea(hull)) if hull is not None else 0.0
+        solidity=float(np.clip(contour_area/max(hull_area,1e-9),0.0,1.0))
+        if contour is not None and len(contour)>=3:
+            (_, _),radius=cv2.minEnclosingCircle(contour)
+            circle_area=math.pi*float(radius)*float(radius)
+            circle_fill=float(np.clip(contour_area/max(circle_area,1e-9),0.0,1.0))
+            rect=cv2.minAreaRect(contour)
+            rw,rh=map(float,rect[1])
+            axis_ratio=(min(rw,rh)/max(rw,rh)) if max(rw,rh)>1e-9 else 0.0
+        else:
+            radius=0.0;circle_fill=0.0;axis_ratio=0.0
         mean_diff=float(np.mean(diff_crop[labels==lab]))
         compact=fill/math.sqrt(max(area,1))
         out.append({
             "x":float(cx+x0),"y":float(cy+y0),"area":area,
+            "contour_area":contour_area,
             "w":bw,"h":bh,"fill":fill,"mean_diff":mean_diff,
-            "circularity":float(circularity),
+            "circularity":circularity,
+            "solidity":solidity,
+            "circle_fill":circle_fill,
+            "axis_ratio":float(np.clip(axis_ratio,0.0,1.0)),
+            "radius":float(radius),
             "aspect_log_abs":float(abs(math.log(max(aspect,1e-9)))),
             "appearance_score":mean_diff*(compact+.02)
         })
@@ -169,6 +191,10 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
     pts=track["pts"]
     identity_cfg=identity_cfg or {}
     min_circularity=float(identity_cfg.get("minimum_median_circularity",0.0))
+    min_solidity=float(identity_cfg.get("minimum_median_solidity",0.0))
+    min_circle_fill=float(identity_cfg.get("minimum_median_circle_fill",0.0))
+    min_axis_ratio=float(identity_cfg.get("minimum_median_axis_ratio",0.0))
+    max_radius_cv=float(identity_cfg.get("maximum_radius_cv",float("inf")))
     max_area_cv=float(identity_cfg.get("maximum_area_cv",float("inf")))
     max_aspect=float(identity_cfg.get("maximum_aspect_log_mad",float("inf")))
     min_detected=float(identity_cfg.get("minimum_detected_fraction",0.45))
@@ -193,13 +219,34 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
         fr=frames[aa:bb];x=xx[aa:bb];y=yy[aa:bb]
         chunk_pts=pts[aa:bb]
         circularities=np.asarray([p.get("circularity",0.0) for p in chunk_pts],float)
+        solidities=np.asarray([p.get("solidity",0.0) for p in chunk_pts],float)
+        circle_fills=np.asarray([p.get("circle_fill",0.0) for p in chunk_pts],float)
+        axis_ratios=np.asarray([p.get("axis_ratio",0.0) for p in chunk_pts],float)
+        radii=np.asarray([p.get("radius",0.0) for p in chunk_pts],float)
         areas=np.asarray([p["area"] for p in chunk_pts],float)
         aspects=np.asarray([p.get("aspect_log_abs",0.0) for p in chunk_pts],float)
         median_circularity=float(np.median(circularities)) if len(circularities) else 0.0
+        median_solidity=float(np.median(solidities)) if len(solidities) else 0.0
+        median_circle_fill=float(np.median(circle_fills)) if len(circle_fills) else 0.0
+        median_axis_ratio=float(np.median(axis_ratios)) if len(axis_ratios) else 0.0
+        radius_cv=float(np.std(radii)/max(np.mean(radii),1e-9)) if len(radii) else float("inf")
         area_cv=float(np.std(areas)/max(np.mean(areas),1e-9)) if len(areas) else float("inf")
         aspect_log_median=float(np.median(aspects)) if len(aspects) else float("inf")
-        if median_circularity<min_circularity or area_cv>max_area_cv or aspect_log_median>max_aspect:
+        if (median_circularity<min_circularity
+            or median_solidity<min_solidity
+            or median_circle_fill<min_circle_fill
+            or median_axis_ratio<min_axis_ratio
+            or radius_cv>max_radius_cv
+            or area_cv>max_area_cv
+            or aspect_log_median>max_aspect):
             continue
+        identity_score=(
+            0.28*median_circularity
+            +0.22*median_circle_fill
+            +0.18*median_solidity
+            +0.17*median_axis_ratio
+            +0.15*max(0.0,1.0-min(radius_cv,1.0))
+        )
         dense_frames=np.arange(int(fr[0]),int(fr[-1])+1)
         if len(dense_frames)<minimum_interval_frames:continue
         detected_fraction=len(fr)/max(1,len(dense_frames))
@@ -285,8 +332,14 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
 
                 # Rank by free-fall timing self-consistency first, then completeness.
                 # Target g is absent from this ranking.
-                rank=(-median_circularity,area_cv,aspect_log_median,
-                      timing_rms_frames,shape_rms,-full_interval_frames,
+                # Once a track is ball-like and satisfies the release-from-rest
+                # model, prefer the *fastest* full-travel event. IRIS defines this
+                # class as a ball released under gravity; slower same-ball motion is
+                # typically reset/handling. The numerical value of g is never used.
+                rank=(-identity_score,
+                      timing_rms_frames,shape_rms,
+                      full_interval_frames,
+                      -detected_window_fraction,
                       x_drift,release_ratio,-span)
                 cand={
                     "rank":rank,"track_id":track["id"],"sign":sign,
@@ -303,7 +356,12 @@ def fit_full_flight_progress(track,fps,minimum_interval_frames=12,identity_cfg=N
                     "gap_penalty":gap_penalty,
                     "detected_fraction":detected_fraction,
                     "detected_window_fraction":detected_window_fraction,
+                    "identity_score":identity_score,
                     "median_circularity":median_circularity,
+                    "median_solidity":median_solidity,
+                    "median_circle_fill":median_circle_fill,
+                    "median_axis_ratio":median_axis_ratio,
+                    "radius_cv":radius_cv,
                     "area_cv":area_cv,
                     "aspect_log_median":aspect_log_median,
                     "interval_frames":len(ids),
@@ -411,7 +469,12 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "interval_frames":int(chosen["interval_frames"]),
         "detected_frames":int(chosen["detected_frames"]),
         "detected_fraction":float(chosen["detected_window_fraction"]),
+        "identity_score":float(chosen["identity_score"]),
         "median_circularity":float(chosen["median_circularity"]),
+        "median_solidity":float(chosen["median_solidity"]),
+        "median_circle_fill":float(chosen["median_circle_fill"]),
+        "median_axis_ratio":float(chosen["median_axis_ratio"]),
+        "radius_cv":float(chosen["radius_cv"]),
         "area_cv":float(chosen["area_cv"]),
         "aspect_log_median":float(chosen["aspect_log_median"]),
         "edge_trim_left":0,
@@ -569,6 +632,10 @@ def main():
                 "x_drift":tr["x_drift_fraction"]<=tg.get("maximum_x_drift_fraction",.45),
                 "gap_penalty":tr["gap_penalty"]<=tg.get("maximum_gap_penalty",.50),
                 "circularity":tr["median_circularity"]>=tg.get("minimum_median_circularity",0.0),
+                "solidity":tr["median_solidity"]>=tg.get("minimum_median_solidity",0.0),
+                "circle_fill":tr["median_circle_fill"]>=tg.get("minimum_median_circle_fill",0.0),
+                "axis_ratio":tr["median_axis_ratio"]>=tg.get("minimum_median_axis_ratio",0.0),
+                "radius_cv":tr["radius_cv"]<=tg.get("maximum_radius_cv",float("inf")),
                 "area_cv":tr["area_cv"]<=tg.get("maximum_area_cv",float("inf")),
                 "aspect_identity":tr["aspect_log_median"]<=tg.get("maximum_aspect_log_mad",float("inf")),
                 "detected_fraction":tr["detected_fraction"]>=tg.get("minimum_detected_fraction",0.45),
@@ -591,7 +658,12 @@ def main():
                           "interval_frames":tr["interval_frames"],
                           "detected_frames":tr["detected_frames"],
                           "detected_fraction":tr["detected_fraction"],
+                          "identity_score":tr["identity_score"],
                           "median_circularity":tr["median_circularity"],
+                          "median_solidity":tr["median_solidity"],
+                          "median_circle_fill":tr["median_circle_fill"],
+                          "median_axis_ratio":tr["median_axis_ratio"],
+                          "radius_cv":tr["radius_cv"],
                           "area_cv":tr["area_cv"],
                           "aspect_log_median":tr["aspect_log_median"],
                           "edge_trim_left":tr["edge_trim_left"],
@@ -667,7 +739,12 @@ def main():
               "INTERVAL_FRAMES",t["interval_frames"],
               "DETECTED_FRAMES",t["detected_frames"],
               "DETECTED_FRACTION",t["detected_fraction"],
+              "IDENTITY",t["identity_score"],
               "CIRCULARITY",t["median_circularity"],
+              "SOLIDITY",t["median_solidity"],
+              "CIRCLE_FILL",t["median_circle_fill"],
+              "AXIS_RATIO",t["median_axis_ratio"],
+              "RADIUS_CV",t["radius_cv"],
               "AREA_CV",t["area_cv"],
               "ASPECT_LOG",t["aspect_log_median"])
     for e in fails:
