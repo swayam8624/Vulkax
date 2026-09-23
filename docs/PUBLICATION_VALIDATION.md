@@ -162,6 +162,42 @@ The canonical result is recorded in:
 No post-final tuning is permitted. Any improved method must be reported as a new
 post-final experiment.
 
+## Reviewer-hardening campaign
+
+The locked IRIS pendulum result is not modified by the reviewer-hardening campaign.
+
+Run all local post-final attacks:
+
+```bash
+bash research/scripts/run_postfinal_reviewer_hardening.sh --profile full
+```
+
+This performs video-clustered statistics, strong direct-period and damped-nonlinear
+baselines, a GT-hidden proposal→verification experiment, measured-truth uncertainty
+sensitivity, proposal/probe dependence, corruption robustness, pinned official IRIS
+reference imports, and deterministic evidence visuals.
+
+To additionally open the **development/validation** portion of the second blind
+domain:
+
+```bash
+bash research/scripts/run_postfinal_reviewer_hardening.sh \
+  --profile full \
+  --with-freefall-validation
+```
+
+That command still cannot download the final `drop_150/02..10` videos.
+
+If and only if the free-fall validation gate passes, the separate final command is:
+
+```bash
+bash research/scripts/run_iris_freefall_final_test.sh
+```
+
+The free-fall final downloader refuses to fetch those nine videos until the
+domain-specific lock validates. `take 01` is permanently excluded from this blind
+campaign because it existed in the original core profile.
+
 ## Fast diagnostic
 
 If your existing D4V/OFC outputs are still under `build/`, this does not rerun
