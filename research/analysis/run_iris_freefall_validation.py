@@ -123,6 +123,13 @@ def validate_selector_config(identity_cfg):
         "maximum_global_timing_fit_rms_frames":float(
             cfg.get("maximum_global_timing_fit_rms_frames",2.5)
         ),
+        "plateau_max_speed_px_per_frame":float(
+            cfg.get("plateau_max_speed_px_per_frame",0.75)
+        ),
+        "plateau_min_frames":int(cfg.get("plateau_min_frames",4)),
+        "plateau_max_gap_frames":int(cfg.get("plateau_max_gap_frames",24)),
+        "plateau_max_x_delta_px":float(cfg.get("plateau_max_x_delta_px",45.0)),
+        "event_edge_fraction":float(cfg.get("event_edge_fraction",0.03)),
     }
 
 def read_csv(p):
@@ -1026,8 +1033,259 @@ def choose_ballistic_track_v63(tracks,fps,minimum_interval_frames=12,identity_cf
         })
     return chosen,audit
 
+
+def _plateau_segments(chunks,selector_cfg):
+    out=[]
+    vmax=float(selector_cfg["plateau_max_speed_px_per_frame"])
+    nmin=int(selector_cfg["plateau_min_frames"])
+    for q in chunks:
+        z=smooth1(np.asarray(q["y"],float),5)
+        x=smooth1(np.asarray(q["x"],float),5)
+        frames=np.asarray(q["frames"],int)
+        if len(z)<nmin:
+            continue
+        speed=np.abs(np.gradient(z))
+        stationary=speed<=vmax
+        i=0
+        while i<len(stationary):
+            if not stationary[i]:
+                i+=1;continue
+            a=i
+            while i+1<len(stationary) and stationary[i+1]:
+                i+=1
+            b=i+1
+            if b-a>=nmin:
+                out.append({
+                    "track_id":q["track_id"],"chunk_id":q["chunk_id"],
+                    "a":a,"b":b,
+                    "frame_start":int(frames[a]),"frame_end":int(frames[b-1]),
+                    "y":float(np.median(z[a:b])),
+                    "x":float(np.median(x[a:b])),
+                    "identity_score":float(q["identity_score"]),
+                })
+            i+=1
+    return out
+
+def _interp_crossing(frames,z,target,increasing=True):
+    frames=np.asarray(frames,float);z=np.asarray(z,float)
+    if len(frames)<2:
+        return None
+    for i in range(len(z)-1):
+        a=z[i]-target;b=z[i+1]-target
+        ok=(a<=0<=b) if increasing else (a>=0>=b)
+        if not ok:
+            continue
+        dz=z[i+1]-z[i]
+        if abs(dz)<1e-9:
+            return float(frames[i])
+        u=(target-z[i])/dz
+        return float(frames[i]+u*(frames[i+1]-frames[i]))
+    return None
+
+def choose_ballistic_track_v64(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
+    cfg=identity_cfg or {}
+    selector_cfg=validate_selector_config(cfg)
+    chunks=_identity_track_chunks(tracks,fps,cfg)
+    if not chunks:
+        raise TrackSelectionError("no ball-like identity tracks for V6.4")
+    plateaus=_plateau_segments(chunks,selector_cfg)
+    if not plateaus:
+        raise TrackSelectionError("no stationary ball plateaus for V6.4")
+
+    expected=float(selector_cfg["expected_sign"])
+    max_gap=int(selector_cfg["plateau_max_gap_frames"])
+    max_x=float(selector_cfg["plateau_max_x_delta_px"])
+    edge=float(selector_cfg["event_edge_fraction"])
+    candidates=[]
+    rejection_counts={}
+
+    for chunk in chunks:
+        frames=np.asarray(chunk["frames"],int)
+        y=np.asarray(chunk["y"],float)
+        x=np.asarray(chunk["x"],float)
+        z=expected*y
+        zsmooth=smooth1(z,5)
+        scale=max(float(np.ptp(zsmooth)),1.0)
+        runs=_monotone_runs((zsmooth-float(np.min(zsmooth)))/scale)
+        for aa,bb in runs:
+            if bb-aa<6:
+                _reject(rejection_counts,"too_few_motion_points");continue
+            f0=int(frames[aa]);f1=int(frames[bb-1])
+            xm=float(np.median(x[aa:bb]))
+            z0=float(zsmooth[aa]);z1=float(zsmooth[bb-1])
+            if z1<=z0:
+                _reject(rejection_counts,"wrong_direction");continue
+
+            prior=[
+                p for p in plateaus
+                if p["frame_end"]<=f0+2
+                and f0-p["frame_end"]<=max_gap
+                and abs(p["x"]-xm)<=max_x
+                and expected*p["y"]<=z0+12.0
+            ]
+            post=[
+                p for p in plateaus
+                if p["frame_start"]>=f1-2
+                and p["frame_start"]-f1<=max_gap
+                and abs(p["x"]-xm)<=max_x
+                and expected*p["y"]>=z1-12.0
+            ]
+            if not prior:
+                _reject(rejection_counts,"missing_release_plateau");continue
+            if not post:
+                _reject(rejection_counts,"missing_impact_plateau");continue
+            top=max(prior,key=lambda p:p["frame_end"])
+            bottom=min(post,key=lambda p:p["frame_start"])
+            topz=expected*float(top["y"]);botz=expected*float(bottom["y"])
+            span=botz-topz
+            if not math.isfinite(span) or span<18.0:
+                _reject(rejection_counts,"plateau_span");continue
+
+            target_start=topz+edge*span
+            target_end=botz-edge*span
+            rel_frames=frames[max(0,aa-3):min(len(frames),bb+4)]
+            rel_z=zsmooth[max(0,aa-3):min(len(frames),bb+4)]
+            start_cross=_interp_crossing(rel_frames,rel_z,target_start,True)
+            end_cross=_interp_crossing(rel_frames,rel_z,target_end,True)
+            release_frame=(start_cross-edge*(end_cross-start_cross)/(1-2*edge)
+                           if start_cross is not None and end_cross is not None and end_cross>start_cross
+                           else float(top["frame_end"]))
+            impact_frame=(release_frame+(end_cross-start_cross)/(1-2*edge)
+                          if start_cross is not None and end_cross is not None and end_cross>start_cross
+                          else float(bottom["frame_start"]))
+            full_frames=impact_frame-release_frame
+            if not math.isfinite(full_frames) or full_frames<minimum_interval_frames:
+                _reject(rejection_counts,"full_duration");continue
+            T=full_frames/fps
+
+            lo=max(0,aa-2);hi=min(len(frames),bb+3)
+            event_frames=frames[lo:hi].astype(float)
+            event_t=(event_frames-release_frame)/fps
+            event_z=zsmooth[lo:hi]
+            p=np.clip((event_z-topz)/span,0.0,1.0)
+            valid=(event_t>=-2.0/fps)&(event_t<=T+2.0/fps)
+            event_t=event_t[valid];p=p[valid]
+            event_ids=np.arange(lo,hi,dtype=int)[valid]
+            if len(event_t)<6:
+                _reject(rejection_counts,"too_few_event_points");continue
+            model=np.square(np.clip(event_t/T,0.0,1.0))
+            shape=float(np.sqrt(np.mean((p-model)**2)))
+            if not math.isfinite(shape) or shape>.12:
+                _reject(rejection_counts,"shape_rms");continue
+            sqrtp=np.sqrt(np.clip(p,0.0,1.0))
+            pred_time=T*sqrtp
+            timing=float(np.sqrt(np.mean((event_t-pred_time)**2))*fps)
+            if timing>float(selector_cfg["maximum_global_timing_fit_rms_frames"]):
+                _reject(rejection_counts,"timing_rms");continue
+
+            det_frames=np.asarray(chunk["detected_frames_original"],int)
+            detected=sum(1 for ff in det_frames if frames[lo]<=ff<=frames[hi-1])
+            detected_fraction=detected/max(1,hi-lo)
+            if detected_fraction<float(cfg.get("minimum_detected_fraction",.45)):
+                _reject(rejection_counts,"detected_fraction");continue
+
+            xdrift=float(np.ptp(x[lo:hi]))/span
+            if xdrift>float(cfg.get("maximum_x_drift_fraction",.45)):
+                _reject(rejection_counts,"x_drift");continue
+
+            progress_full=(expected*y-topz)/span
+            q={
+                "track_id":chunk["track_id"],"chunk_id":chunk["chunk_id"],
+                "sign":expected,"span_px":span,"local_span_px":float(np.ptp(event_z)),
+                "low_px":float(topz),"high_px":float(botz),
+                "progress":progress_full,
+                "dense_frames":frames,
+                "abs_times":frames/fps,
+                "window_indices":event_ids,
+                "t0_s":release_frame/fps,
+                "full_fall_time_s":T,
+                "timing_fit_rms_s":timing/fps,
+                "timing_fit_rms_frames":timing,
+                "trajectory_shape_rms_fraction":shape,
+                "release_speed_ratio":0.0,
+                "x_drift_fraction":xdrift,
+                "monotone_fraction":float(np.mean(np.diff(p)>=-.02)) if len(p)>1 else 1.0,
+                "gap_penalty":float(chunk["gap_penalty"]),
+                "detected_fraction":float(chunk["detected_fraction_chunk"]),
+                "detected_window_fraction":float(detected_fraction),
+                "identity_score":float(chunk["identity_score"]),
+                "median_circularity":float(chunk["median_circularity"]),
+                "median_solidity":float(chunk["median_solidity"]),
+                "median_circle_fill":float(chunk["median_circle_fill"]),
+                "median_axis_ratio":float(chunk["median_axis_ratio"]),
+                "radius_cv":float(chunk["radius_cv"]),
+                "area_cv":float(chunk["area_cv"]),
+                "aspect_log_median":float(chunk["aspect_log_median"]),
+                "interval_frames":int(round(full_frames)),
+                "observed_fragment_frames":int(len(event_ids)),
+                "inferred_full_fall_frames":float(full_frames),
+                "detected_frames":int(detected),
+                "global_progress_span":float(np.ptp(p)),
+                "global_progress_start":float(np.min(p)),
+                "global_progress_end":float(np.max(p)),
+                "release_plateau_track":int(top["track_id"]),
+                "impact_plateau_track":int(bottom["track_id"]),
+            }
+            candidates.append(validate_candidate(q))
+
+    if not candidates:
+        raise TrackSelectionError(
+            "no release->impact V6.4 event survived; "
+            f"chunks={len(chunks)} plateaus={len(plateaus)} "
+            f"rejects={json.dumps(rejection_counts,sort_keys=True)}"
+        )
+
+    def rank(q):
+        return (
+            float(q["timing_fit_rms_frames"]),
+            float(q["trajectory_shape_rms_fraction"]),
+            -float(q["detected_window_fraction"]),
+            float(q["t0_s"]),
+            -float(q["identity_score"]),
+        )
+    candidates=sorted(candidates,key=rank)
+    chosen=candidates[0]
+    audit=[]
+    for i,q in enumerate(candidates[:20],1):
+        audit.append({
+            "event_rank":i,"selected":q is chosen,"track_id":q["track_id"],
+            "sign":float(q["sign"]),"t0_s":float(q["t0_s"]),
+            "local_span_px":float(q["local_span_px"]),
+            "spatial_envelope_px":float(q["span_px"]),
+            "relative_span":float(q["local_span_px"])/max(float(q["span_px"]),1e-9),
+            "global_progress_span":float(q["global_progress_span"]),
+            "global_progress_start":float(q["global_progress_start"]),
+            "global_progress_end":float(q["global_progress_end"]),
+            "full_fall_time_s":float(q["full_fall_time_s"]),
+            "interval_frames":int(q["interval_frames"]),
+            "observed_fragment_frames":int(q["observed_fragment_frames"]),
+            "inferred_full_fall_frames":float(q["inferred_full_fall_frames"]),
+            "detected_frames":int(q["detected_frames"]),
+            "detected_fraction":float(q["detected_window_fraction"]),
+            "timing_fit_rms_frames":float(q["timing_fit_rms_frames"]),
+            "trajectory_shape_rms_fraction":float(q["trajectory_shape_rms_fraction"]),
+            "release_speed_ratio":float(q["release_speed_ratio"]),
+            "x_drift_fraction":float(q["x_drift_fraction"]),
+            "gap_penalty":float(q["gap_penalty"]),
+            "identity_score":float(q["identity_score"]),
+            "median_circularity":float(q["median_circularity"]),
+            "median_solidity":float(q["median_solidity"]),
+            "median_circle_fill":float(q["median_circle_fill"]),
+            "median_axis_ratio":float(q["median_axis_ratio"]),
+            "radius_cv":float(q["radius_cv"]),"area_cv":float(q["area_cv"]),
+            "aspect_log_median":float(q["aspect_log_median"]),
+            "release_plateau_track":int(q["release_plateau_track"]),
+            "impact_plateau_track":int(q["impact_plateau_track"]),
+        })
+    return chosen,audit
+
 def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=None):
     cfg=identity_cfg or {}
+    if cfg.get("revision")=="ball_identity_v6_4":
+        return choose_ballistic_track_v64(
+            tracks,fps,minimum_interval_frames=minimum_interval_frames,
+            identity_cfg=cfg
+        )
     if cfg.get("revision")=="ball_identity_v6_3":
         return choose_ballistic_track_v63(
             tracks,fps,minimum_interval_frames=minimum_interval_frames,
@@ -1094,8 +1352,12 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
     t0=float(chosen["t0_s"]);T=float(chosen["full_fall_time_s"])
     times=abs_times[ids]-t0
     position_m=np.clip(progress[ids],0.0,1.0)*drop_height
-    if len(times)<minimum_interval_frames:
-        raise RuntimeError("selected full-flight window violates minimum duration")
+    observed_fragment_frames=int(len(times))
+    inferred_full_fall_frames=float(T*fps)
+    if inferred_full_fall_frames+1e-9<minimum_interval_frames:
+        raise ContractError(
+            "selector returned event whose inferred full fall violates minimum duration"
+        )
 
     one_px=drop_height/max(float(chosen["span_px"]),1e-9)
     ghat=2.0*drop_height/(T*T)
@@ -1108,7 +1370,9 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "valid_fraction":float(sum(bool(x) for x in frame_candidates)/max(1,len(frame_candidates))),
         "span_px":float(chosen["span_px"]),
         "one_pixel_m":one_px,
-        "active_frames":len(times),
+        "active_frames":observed_fragment_frames,
+        "observed_fragment_frames":observed_fragment_frames,
+        "inferred_full_fall_frames":inferred_full_fall_frames,
         "times":times,
         "position_m":position_m,
         "direct_acceleration_m_s2":ghat,
@@ -1128,6 +1392,8 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "gap_penalty":float(chosen["gap_penalty"]),
         "candidate_track_count":len(tracks),
         "interval_frames":int(chosen["interval_frames"]),
+        "observed_fragment_frames":int(chosen.get("observed_fragment_frames",observed_fragment_frames)),
+        "inferred_full_fall_frames":float(chosen.get("inferred_full_fall_frames",inferred_full_fall_frames)),
         "detected_frames":int(chosen["detected_frames"]),
         "detected_fraction":float(chosen["detected_window_fraction"]),
         "identity_score":float(chosen["identity_score"]),
