@@ -538,6 +538,10 @@ def self_test_video():
 
         v6cfg={
             "minimum_median_circularity":0.35,
+            "minimum_median_solidity":0.65,
+            "minimum_median_circle_fill":0.45,
+            "minimum_median_axis_ratio":0.55,
+            "maximum_radius_cv":0.45,
             "maximum_area_cv":0.65,
             "maximum_aspect_log_mad":0.45,
             "minimum_detected_fraction":0.50,
@@ -548,11 +552,24 @@ def self_test_video():
         )
         ident_rel=abs(ident["direct_acceleration_m_s2"]-G)/G
         assert ident_rel<=0.20,(ident["direct_acceleration_m_s2"],ident_rel,ident)
+        assert 0.0<=ident["median_circularity"]<=1.0
+        assert 0.0<=ident["median_solidity"]<=1.0
+        assert 0.0<=ident["median_circle_fill"]<=1.0
+        assert 0.0<=ident["median_axis_ratio"]<=1.0
         assert ident["median_circularity"]>=v6cfg["minimum_median_circularity"]
+        assert ident["median_solidity"]>=v6cfg["minimum_median_solidity"]
+        assert ident["median_circle_fill"]>=v6cfg["minimum_median_circle_fill"]
+        assert ident["median_axis_ratio"]>=v6cfg["minimum_median_axis_ratio"]
+        assert ident["radius_cv"]<=v6cfg["maximum_radius_cv"]
         assert ident["aspect_log_median"]<=v6cfg["maximum_aspect_log_mad"]
         print("VALID IRIS free-fall synthetic-video tracker",
               ident["direct_acceleration_m_s2"],ident_rel,
-              "circularity",ident["median_circularity"])
+              "identity",ident["identity_score"],
+              "circularity",ident["median_circularity"],
+              "solidity",ident["median_solidity"],
+              "circle_fill",ident["median_circle_fill"],
+              "axis_ratio",ident["median_axis_ratio"],
+              "radius_cv",ident["radius_cv"])
 
 FIELDS=["record_version","trial_id","paired_key","dataset","scene","split","evidence_class","confirmatory",
 "trial_family","ground_truth","method","score","decision","decision_threshold","confidence","physical_delta",
