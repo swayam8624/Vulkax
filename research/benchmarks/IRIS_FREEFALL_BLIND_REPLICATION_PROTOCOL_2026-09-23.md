@@ -142,16 +142,18 @@ Revision 5 is frozen before validation and changes only this development-stage
 selection/calibration rule:
 
 1. temporal association may bridge short detection gaps;
-2. accepted flight duration must satisfy the pre-existing
-   `minimum_active_frames` requirement **before** drop-height calibration;
-3. only a whole coherent track chunk may be used, with at most two detections
-   trimmed from either edge for segmentation noise;
-4. arbitrary interior subsegments are forbidden;
-5. among physically consistent candidates, longer-duration / larger-span flights
-   rank ahead of tiny low-residual fragments;
-6. the target value of `g` remains absent from candidate selection;
-7. the measured IRIS `drop_height` is bound only after a full-flight interval has
-   passed those rules.
+2. for each coherent track, use its full observed vertical travel to define
+   normalized progress `p`;
+3. measure ordered 10%,20%,...,90% progress crossing times;
+4. fit `t(p)=t0+T*sqrt(p)` and recover the **full** fall duration `T`;
+5. require `T*fps` to satisfy the pre-existing `minimum_active_frames` rule
+   before drop-height calibration;
+6. require timing-fit RMS <=2.5 frames, plus the existing trajectory-shape,
+   verticality, release-speed, and continuity checks;
+7. arbitrary short-fragment/full-height calibration is forbidden;
+8. the target value of `g` remains absent from track/event selection;
+9. only after the full-flight timing fit passes is measured IRIS `drop_height`
+   used to compute `g=2h/T^2` and scale the observed trajectory.
 
 The 20% development acceleration gate, candidate schedule, and global `|S|=2`
 decision rule remain unchanged.
