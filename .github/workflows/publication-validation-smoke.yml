@@ -16,6 +16,22 @@ on:
       - "research/analysis/analyze_gauge_validation_failure.py"
       - "research/analysis/run_iris_pendulum_validation.py"
       - "research/analysis/analyze_iris_pendulum_validation.py"
+      - "research/analysis/analyze_iris_clustered_statistics.py"
+      - "research/analysis/analyze_iris_strong_baselines.py"
+      - "research/analysis/run_iris_gt_hidden_proposal_gate.py"
+      - "research/analysis/run_iris_postfinal_robustness.py"
+      - "research/analysis/run_iris_channel_dependence.py"
+      - "research/analysis/analyze_iris_truth_uncertainty.py"
+      - "research/analysis/run_iris_freefall_validation.py"
+      - "research/analysis/freeze_iris_freefall_final_test.py"
+      - "research/scripts/fetch_iris_freefall_blind.py"
+      - "research/scripts/fetch_iris_reference_baselines.py"
+      - "research/scripts/run_postfinal_reviewer_hardening.sh"
+      - "research/scripts/run_iris_freefall_blind_validation.sh"
+      - "research/scripts/run_iris_freefall_final_test.sh"
+      - "visualization/scripts/render_reviewer_hardening.py"
+      - "visualization/scripts/render_gt_hidden_rewrite_demo.py"
+      - "research/reviewer_redteam/**"
       - "research/scripts/run_iris_pendulum_final_test.sh"
       - "research/analysis/summarize_iris_pendulum_final_test.py"
       - "research/analysis/freeze_iris_pendulum_final_test.py"
@@ -65,6 +81,8 @@ jobs:
               "research/validation/protocol_v1.json",
               "research/validation/record_schema_v1.json",
               "research/validation/iris_pendulum_final_test_v1.json",
+              "research/validation/post_final_hardening_v1.json",
+              "research/validation/iris_freefall_blind_v1.json",
               "research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json",
           ):
               json.load(open(path))
@@ -87,9 +105,21 @@ jobs:
             research/analysis/analyze_gauge_validation_failure.py \
             research/analysis/run_iris_pendulum_validation.py \
             research/analysis/analyze_iris_pendulum_validation.py \
+            research/analysis/analyze_iris_clustered_statistics.py \
+            research/analysis/analyze_iris_strong_baselines.py \
+            research/analysis/run_iris_gt_hidden_proposal_gate.py \
+            research/analysis/run_iris_postfinal_robustness.py \
+            research/analysis/run_iris_channel_dependence.py \
+            research/analysis/analyze_iris_truth_uncertainty.py \
+            research/analysis/run_iris_freefall_validation.py \
+            research/analysis/freeze_iris_freefall_final_test.py \
             research/analysis/freeze_iris_pendulum_final_test.py \
             research/analysis/summarize_iris_pendulum_final_test.py \
             research/scripts/fetch_iris_pendulum_repeats.py \
+            research/scripts/fetch_iris_freefall_blind.py \
+            research/scripts/fetch_iris_reference_baselines.py \
+            visualization/scripts/render_reviewer_hardening.py \
+            visualization/scripts/render_gt_hidden_rewrite_demo.py \
             research/scripts/fetch_public_validation_datasets.py
 
       - name: Script self-tests
@@ -106,6 +136,16 @@ jobs:
           python3 research/analysis/analyze_gauge_validation_failure.py --self-test
           python3 research/analysis/run_iris_pendulum_validation.py --self-test
           python3 research/analysis/analyze_iris_pendulum_validation.py --self-test
+          python3 research/analysis/analyze_iris_clustered_statistics.py --self-test
+          python3 research/analysis/analyze_iris_strong_baselines.py --self-test
+          python3 research/analysis/run_iris_gt_hidden_proposal_gate.py --self-test
+          python3 research/analysis/run_iris_postfinal_robustness.py --self-test
+          python3 research/analysis/run_iris_channel_dependence.py --self-test
+          python3 research/analysis/analyze_iris_truth_uncertainty.py --self-test
+          python3 research/analysis/run_iris_freefall_validation.py --self-test
+          python3 research/analysis/freeze_iris_freefall_final_test.py --self-test
+          python3 research/scripts/fetch_iris_freefall_blind.py --self-test
+          python3 research/scripts/fetch_iris_reference_baselines.py --self-test
           python3 research/analysis/freeze_iris_pendulum_final_test.py --self-test
           python3 research/analysis/summarize_iris_pendulum_final_test.py --self-test
           python3 research/scripts/fetch_iris_pendulum_repeats.py --self-test
@@ -118,6 +158,9 @@ jobs:
           bash -n research/scripts/run_gauge_prospective_validation.sh
           bash -n research/scripts/run_iris_pendulum_validation.sh
           bash -n research/scripts/run_iris_pendulum_final_test.sh
+          bash -n research/scripts/run_postfinal_reviewer_hardening.sh
+          bash -n research/scripts/run_iris_freefall_blind_validation.sh
+          bash -n research/scripts/run_iris_freefall_final_test.sh
 
       - name: Live public dataset catalog check
         run: |
@@ -130,6 +173,7 @@ jobs:
         run: |
           python3 -m pip install --quiet "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
           python3 research/analysis/run_iris_pendulum_validation.py --self-test-video
+          python3 research/analysis/run_iris_freefall_validation.py --self-test-video
 
 
       - name: End-to-end standardized analysis fixture
