@@ -122,6 +122,10 @@ jobs:
             visualization/scripts/render_gt_hidden_rewrite_demo.py \
             research/scripts/fetch_public_validation_datasets.py
 
+      - name: Install hardening test dependencies
+        run: |
+          python3 -m pip install --quiet "numpy>=1.26,<3"
+
       - name: Script self-tests
         run: |
           python3 research/analysis/normalize_publication_validation.py --self-test
