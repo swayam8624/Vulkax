@@ -13,29 +13,92 @@ permissions:
   contents: read
 
 jobs:
-  development:
+  development-shards:
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run prospective GAUGE development truth controls
+      - name: Run prospective GAUGE development shard
         run: |
           bash research/scripts/run_gauge_prospective_gate.sh \
             --split development \
             --profile truth \
             --mode pilot \
             --build-dir build \
-            --out build/gauge-prospective-gate
+            --shard-index "${{ matrix.shard }}" \
+            --shard-count 8 \
+            --out "build/gauge-prospective-shard-${{ matrix.shard }}"
 
-      - name: Archive prospective evidence
+      - name: Archive shard evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauge-prospective-development-shard-${{ matrix.shard }}
+          path: |
+            build/gauge-prospective-shard-${{ matrix.shard }}/records_development_truth_pilot.csv
+            build/gauge-prospective-shard-${{ matrix.shard }}/summary_development_truth_pilot.json
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    needs: development-shards
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download shard evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gauge-prospective-development-shard-*
+          path: build/gauge-shards
+
+      - name: Aggregate and analyze
+        run: |
+          ARGS=()
+          while IFS= read -r f; do
+            ARGS+=(--extra "$f")
+          done < <(find build/gauge-shards -name 'records_development_truth_pilot.csv' -type f | sort)
+
+          if [[ "${#ARGS[@]}" -ne 16 ]]; then
+            echo "expected 8 record files / 16 normalize args, got ${#ARGS[@]}" >&2
+            find build/gauge-shards -maxdepth 3 -type f -print >&2
+            exit 1
+          fi
+
+          mkdir -p build/gauge-prospective-development
+          python3 research/analysis/normalize_publication_validation.py \
+            "${ARGS[@]}" \
+            --out build/gauge-prospective-development/records.csv
+
+          python3 research/analysis/analyze_publication_validation.py \
+            --records build/gauge-prospective-development/records.csv \
+            --protocol research/validation/protocol_v1.json \
+            --out build/gauge-prospective-development/analysis
+
+          python3 - <<'PY'
+          import csv, json
+          from pathlib import Path
+          root=Path("build/gauge-prospective-development")
+          rows=list(csv.DictReader((root/"records.csv").open()))
+          summary=json.loads((root/"analysis/summary.json").read_text())
+          print("GAUGE_PROSPECTIVE_DEVELOPMENT_RECORDS",len(rows))
+          print("GAUGE_PROSPECTIVE_DEVELOPMENT_PAIRS",len({r["paired_key"] for r in rows}))
+          print("GAUGE_PROSPECTIVE_DEVELOPMENT_METHODS",sorted({r["method"] for r in rows}))
+          print("GAUGE_PROSPECTIVE_DEVELOPMENT_CONFIRMATORY",summary["confirmatory_record_count"])
+          print("\nMETHOD_SUMMARY")
+          print((root/"analysis/method_summary.csv").read_text())
+          PY
+
+      - name: Archive combined development evidence
         uses: actions/upload-artifact@v4
         with:
           name: gauge-prospective-development
           path: |
-            build/gauge-prospective-gate/records_development_truth_pilot.csv
-            build/gauge-prospective-gate/records_development_truth_pilot_normalized.csv
-            build/gauge-prospective-gate/summary_development_truth_pilot.json
-            build/gauge-prospective-gate/analysis_development_truth_pilot/**
+            build/gauge-prospective-development/records.csv
+            build/gauge-prospective-development/analysis/**
           if-no-files-found: error
           retention-days: 30
