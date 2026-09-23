@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """Blind IRIS free-fall validation on development/validation/final partitions.
 
-Development revision 2 (2026-09-23):
+Development revisions 1-3 (2026-09-23):
 The first development run exposed a segmentation/calibration failure: the old
 tracker chose the longest occupancy run between global position quantiles, which
 can select slow reset/handling motion rather than the actual ballistic descent.
 No validation or final free-fall result was analyzed before this redesign.
 
-Revision 2 selects the fastest monotone endpoint-to-endpoint descent, uses the
-independently measured drop height only as a known geometric input, and derives
-a release-to-impact time-of-flight acceleration diagnostic. The verification
-score remains candidate-vs-baseline trajectory residual with the global |S|=2
-decision rule.
+Revision 2 improved event selection but still failed development (2/4 quality
+pass; 36.06% median acceleration error). Revision 3 therefore adds compact
+component tracking plus explicit stationary-top / ballistic-descent /
+stationary-bottom structure and ranks candidates by free-fall shape consistency
+without using the target acceleration. The independently measured drop height is
+used only as a known geometric input. The verification score remains
+candidate-vs-baseline trajectory residual with the global |S|=2 decision rule.
 """
 from __future__ import annotations
 import argparse,csv,json,math,pathlib,statistics,subprocess,tempfile
@@ -47,15 +49,6 @@ def resize_gray(frame,width,cv2):
     h,w=frame.shape[:2];scale=width/w
     q=cv2.resize(frame,(width,max(1,int(round(h*scale)))),interpolation=cv2.INTER_AREA) if w!=width else frame
     return cv2.cvtColor(q,cv2.COLOR_BGR2GRAY)
-
-def crossing_time(t,p,level,start=1,end=None):
-    end=len(p) if end is None else min(end,len(p))
-    for i in range(max(1,start),end):
-        if p[i-1] < level <= p[i]:
-            den=p[i]-p[i-1]
-            frac=(level-p[i-1])/den if abs(den)>1e-12 else 0.0
-            return float(t[i-1]+frac*(t[i]-t[i-1])),i
-    return None,None
 
 def stable_median(x):
     x=np.asarray(x,float)
@@ -234,7 +227,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0):
         mm=(crop>=q).astype(np.uint8)
         mm=cv2.morphologyEx(mm,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)))
         # Prefer a compact moving component over a whole-frame weighted centroid.
-        nlab,labels,stats,cent=cv2.connectedComponentsWithStats(mm,8)
+        nlab,labels,stats,cent=cv2.connectedComponentsWithStats(mm,connectivity=8)
         candidates=[]
         roi_area=max(1,crop.shape[0]*crop.shape[1])
         for lab in range(1,nlab):
@@ -329,7 +322,7 @@ def self_test_video():
                 frac=1.0
             else:
                 # Deliberately add a slow reset to the top. The v1 "longest run"
-                # selector can prefer this; revision 2 must still select free fall.
+                # selector can prefer this; revision 3 must still select free fall.
                 frac=max(0.0,1.0-(t-1.45)/.85)
             yy=60+span_px*frac
             cv2.circle(q,(320,int(round(yy))),10,(255,255,255),-1)
