@@ -15,6 +15,7 @@ on:
       - "research/analysis/run_gauge_prospective_validation.py"
       - "research/analysis/analyze_gauge_validation_failure.py"
       - "research/analysis/run_iris_pendulum_validation.py"
+      - "research/analysis/analyze_iris_pendulum_validation.py"
       - "research/scripts/fetch_iris_pendulum_repeats.py"
       - "research/scripts/run_iris_pendulum_validation.sh"
       - "research/scripts/run_gauge_prospective_validation.sh"
@@ -73,6 +74,7 @@ jobs:
             research/analysis/run_gauge_prospective_validation.py \
             research/analysis/analyze_gauge_validation_failure.py \
             research/analysis/run_iris_pendulum_validation.py \
+            research/analysis/analyze_iris_pendulum_validation.py \
             research/scripts/fetch_iris_pendulum_repeats.py \
             research/scripts/fetch_public_validation_datasets.py
 
@@ -89,6 +91,7 @@ jobs:
           python3 research/analysis/adapt_public_validation_inputs.py --self-test
           python3 research/analysis/analyze_gauge_validation_failure.py --self-test
           python3 research/analysis/run_iris_pendulum_validation.py --self-test
+          python3 research/analysis/analyze_iris_pendulum_validation.py --self-test
           python3 research/scripts/fetch_iris_pendulum_repeats.py --self-test
 
       - name: Shell syntax
