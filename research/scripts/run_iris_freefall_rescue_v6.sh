@@ -62,15 +62,100 @@ echo "[freefall-v6] materializing FRESH development split only"
 python3 research/analysis/prepare_public_validation_datasets.py   --root "$DATA" --out "$PUBLIC"
 python3 research/analysis/adapt_public_validation_inputs.py   --repo-root . --data-root "$DATA" --prepared-root "$PUBLIC"
 
-"$VENV/bin/python" research/analysis/run_iris_freefall_validation.py   --adapted-root "$PUBLIC/adapted"   --config "$CONFIG"   --split development   --out "$DEV"
+echo "[freefall-v6] analyzing development split"
+set +e
+"$VENV/bin/python" research/analysis/run_iris_freefall_validation.py \
+  --adapted-root "$PUBLIC/adapted" \
+  --config "$CONFIG" \
+  --split development \
+  --out "$DEV"
+DEV_RC=$?
+set -e
 
-if [[ "$DEVELOPMENT_ONLY" -eq 1 ]]; then
-  echo
-  echo "[freefall-v6] DEVELOPMENT-ONLY COMPLETE"
-  echo "[freefall-v6] candidate audit: $DEV/candidate_audit.csv"
-  echo "[freefall-v6] validation drop_100/06..10 was NOT requested by this command."
-  exit 0
+if [[ ! -s "$DEV/summary.json" ]]; then
+  echo "[freefall-v6] ERROR: analyzer exited rc=$DEV_RC without summary.json" >&2
+  exit "$DEV_RC"
 fi
+
+DEV_CLASS="$("$VENV/bin/python" - "$DEV/summary.json" <<'PY'
+import json,sys
+s=json.load(open(sys.argv[1]))
+impl=int(s.get("implementation_errors",0))
+gate=bool(s.get("gate_pass"))
+if impl:
+    print("implementation_error")
+elif gate:
+    print("gate_pass")
+else:
+    print("gate_fail")
+PY
+)"
+
+print_candidate_audit() {
+  if [[ ! -s "$DEV/candidate_audit.csv" ]]; then
+    echo "[freefall-v6] candidate audit unavailable (no candidate rows)"
+    return 0
+  fi
+  "$VENV/bin/python" - "$DEV/candidate_audit.csv" <<'PY'
+import csv,sys
+from collections import defaultdict
+rows=list(csv.DictReader(open(sys.argv[1],newline="",encoding="utf-8")))
+by=defaultdict(list)
+for r in rows:
+    by[r["scene"]].append(r)
+print("\n=== V6.2 DEVELOPMENT CANDIDATE AUDIT ===")
+for scene in sorted(by):
+    q=sorted(by[scene],key=lambda r:int(r["event_rank"]))[:6]
+    print(scene)
+    for r in q:
+        mark="*" if r["selected"].lower()=="true" else " "
+        print(
+          f" {mark} rank={r['event_rank']} track={r['track_id']}"
+          f" span_rel={float(r['relative_span']):.3f}"
+          f" T={float(r['full_fall_time_s']):.4f}s"
+          f" frames={r['interval_frames']}"
+          f" timing={float(r['timing_fit_rms_frames']):.3f}"
+          f" shape={float(r['trajectory_shape_rms_fraction']):.3f}"
+          f" identity={float(r['identity_score']):.3f}"
+          f" g_rel_err={float(r['acceleration_relative_error']):.3f}"
+          f" eligible={r['passes_relative_span']}"
+        )
+PY
+}
+
+case "$DEV_CLASS" in
+  implementation_error)
+    echo "[freefall-v6] ERROR: development analyzer reported implementation/I/O failure" >&2
+    [[ -s "$DEV/failure_details.json" ]] && echo "[freefall-v6] details: $DEV/failure_details.json" >&2
+    exit "$DEV_RC"
+    ;;
+  gate_fail)
+    echo
+    echo "[freefall-v6] DEVELOPMENT_GATE_FAIL (scientific outcome, not software error)"
+    print_candidate_audit
+    echo "[freefall-v6] candidate audit: $DEV/candidate_audit.csv"
+    echo "[freefall-v6] validation drop_100/06..10 was NOT requested."
+    if [[ "$DEVELOPMENT_ONLY" -eq 1 ]]; then
+      exit 0
+    fi
+    echo "[freefall-v6] STOP: development gate failed; validation remains unopened."
+    exit 0
+    ;;
+  gate_pass)
+    echo
+    echo "[freefall-v6] DEVELOPMENT_GATE_PASS"
+    if [[ "$DEVELOPMENT_ONLY" -eq 1 ]]; then
+      print_candidate_audit
+      echo "[freefall-v6] candidate audit: $DEV/candidate_audit.csv"
+      echo "[freefall-v6] validation drop_100/06..10 was NOT requested by --development-only."
+      exit 0
+    fi
+    ;;
+  *)
+    echo "[freefall-v6] ERROR: unknown development classification: $DEV_CLASS" >&2
+    exit 3
+    ;;
+esac
 
 rm -rf "$VAL"
 
