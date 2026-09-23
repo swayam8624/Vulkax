@@ -1,0 +1,131 @@
+name: GAUGE development dose-response
+
+on:
+  pull_request:
+    paths:
+      - "research/analysis/gauge_prospective_gate.py"
+      - "research/scripts/run_gauge_prospective_gate.sh"
+      - ".github/workflows/gauge-prospective-development-dose.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gauge-development-dose-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dose-shards:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run GAUGE development dose-response shard
+        run: |
+          bash research/scripts/run_gauge_prospective_gate.sh \
+            --split development \
+            --profile dose \
+            --mode pilot \
+            --build-dir build \
+            --shard-index "${{ matrix.shard }}" \
+            --shard-count 8 \
+            --out "build/gauge-dose-shard-${{ matrix.shard }}"
+
+      - name: Archive dose shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauge-development-dose-shard-${{ matrix.shard }}
+          path: |
+            build/gauge-dose-shard-${{ matrix.shard }}/records_development_dose_pilot.csv
+            build/gauge-dose-shard-${{ matrix.shard }}/summary_development_dose_pilot.json
+            build/gauge-dose-shard-${{ matrix.shard }}/simulations/**
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    needs: dose-shards
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dose shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gauge-development-dose-shard-*
+          path: build/gauge-dose-shards
+
+      - name: Aggregate dose-response
+        run: |
+          ARGS=()
+          while IFS= read -r f; do
+            ARGS+=(--extra "$f")
+          done < <(find build/gauge-dose-shards -name 'records_development_dose_pilot.csv' -type f | sort)
+
+          if [[ "${#ARGS[@]}" -ne 16 ]]; then
+            echo "expected 8 record files / 16 normalize args, got ${#ARGS[@]}" >&2
+            exit 1
+          fi
+
+          mkdir -p build/gauge-development-dose
+          python3 research/analysis/normalize_publication_validation.py \
+            "${ARGS[@]}" \
+            --out build/gauge-development-dose/records.csv
+
+          python3 research/analysis/analyze_publication_validation.py \
+            --records build/gauge-development-dose/records.csv \
+            --protocol research/validation/protocol_v1.json \
+            --out build/gauge-development-dose/analysis
+
+          python3 - <<'PY'
+          import csv, json
+          from collections import defaultdict
+          from pathlib import Path
+
+          root=Path("build/gauge-development-dose")
+          rows=list(csv.DictReader((root/"records.csv").open()))
+          print("GAUGE_DOSE_RECORDS",len(rows))
+          print("GAUGE_DOSE_PAIRS",len({r["paired_key"] for r in rows}))
+
+          methods=sorted({r["method"] for r in rows})
+          levels=defaultdict(lambda: defaultdict(lambda: {"n":0,"correct":0,"resolved":0}))
+          for r in rows:
+              if r["trial_family"]!="dose_response":
+                  continue
+              # Notes contain baseline/proposal factors, while physical_delta is the
+              # signed factor difference. Absolute value is the relative E dose.
+              dose=round(abs(float(r["physical_delta"])),6)
+              key=(r["method"],dose)
+              d=levels[key]["all"]
+              d["n"]+=1
+              d["correct"]+=int(r["decision"]==r["ground_truth"])
+              d["resolved"]+=int(r["decision"]!="unresolved")
+
+          for (method,dose), bucket in sorted(levels.items()):
+              d=bucket["all"]
+              print(
+                  "DOSE",method,dose,
+                  "n",d["n"],
+                  "correct",d["correct"],
+                  "resolved",d["resolved"],
+              )
+          print("\nMETHOD_SUMMARY")
+          print((root/"analysis/method_summary.csv").read_text())
+          print("\nDOSE_RESPONSE")
+          print((root/"analysis/dose_response.csv").read_text())
+          PY
+
+      - name: Archive combined dose evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauge-development-dose
+          path: |
+            build/gauge-development-dose/records.csv
+            build/gauge-development-dose/analysis/**
+          if-no-files-found: error
+          retention-days: 30
