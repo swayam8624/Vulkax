@@ -1673,11 +1673,16 @@ def _fit_event_time_candidate_v66(
         float(identity_cfg.get("plateau_max_speed_px_per_frame",.75))
     )
     run_indices=np.arange(aa,bb,dtype=int)
-    active=run_indices[v[run_indices]>active_threshold]
+    # A free-fall speed rises until impact.  Do not let the smoothed impact
+    # transition/plateau tail enter the quadratic fit: stop at the peak positive
+    # image speed and use later samples only for boundary detection.
+    peak_local=int(np.argmax(v[run_indices]))
+    peak_idx=int(run_indices[peak_local])
+    active=run_indices[(v[run_indices]>active_threshold)&(run_indices<=peak_idx)]
     if len(active)<6:
         return _reject(diagnostics,"too_few_accelerating_samples")
 
-    core_a=int(active[0]);core_b=int(active[-1])+1
+    core_a=int(active[0]);core_b=peak_idx+1
     core_frames=all_frames[core_a:core_b]
     core_z=(expected*raw_y)[core_a:core_b]
     core_t=core_frames/fps
