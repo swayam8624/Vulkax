@@ -94,10 +94,29 @@ A fresh V6 rescue is frozen on disjoint unused takes:
 - validation: drop_100/06-10;
 - final remains unopened: drop_150/02-10.
 
-V6 adds ball-identity constraints before the full-flight timing model. The V6
-development/validation runner has no final-download mode. A separate V6 final
-runner can request drop_150 only after the fresh validation gate passes and a
-V6-specific hash lock is created.
+V6 remains **development-only and unconfirmed**. The fresh validation
+`drop_100/06-10` has not been opened by the development-only rescue commands.
+
+Development history is retained rather than overwritten:
+- initial V6: 4/5 quality-pass, median acceleration relative error 0.4991, FAIL;
+- V6.1: 3/5 quality-pass, median error 0.6083, FAIL;
+- V6.2: implementation error first, then 3/5 quality-pass / median 0.3899, FAIL;
+- V6.3: implementation defects were found and fixed before validation;
+- V6.4: 2/5 quality-pass, zero implementation errors, median error 0.5328, FAIL.
+
+The active development revision is V6.5. It retains ball identity and the global
+top-bottom spatial scale, but replaces the brittle assumption that every observed
+fragment begins at zero-velocity release. It fits
+`p(t)=a+b t+0.5 c t^2` on the moving interior with nuisance
+position/velocity, requires sufficient observed motion support, and treats
+release/impact roots as optional diagnostics rather than eligibility conditions.
+Target gravity is not used for candidate selection/ranking. Existing development/validation gates, repair
+schedule, and `|S|=2` evidence threshold are unchanged.
+
+The V6 development/validation runner has no final-download mode. A separate V6
+final runner can request `drop_150/02-10` only after fresh validation passes and
+a V6-specific hash lock is created. Until that happens, the paper has **no
+free-fall confirmation claim**.
 
 ## Remaining publication extensions
 
