@@ -1,4 +1,4 @@
-name: GAUGE development rigid-nuisance stress
+# Development rerun marker: non-degenerate rigid-alignment fixture verified in CI.\nname: GAUGE development rigid-nuisance stress
 
 on:
   pull_request:
