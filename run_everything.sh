@@ -215,6 +215,9 @@ python3 research/analysis/assemble_paper_evidence.py --self-test
 python3 research/analysis/generate_paper_assets.py --self-test
 python3 research/analysis/validate_paper_reproduction.py --self-test
 python3 research/analysis/analyze_information_frontier.py --self-test
+python3 research/scripts/fetch_public_validation_datasets.py --self-test
+python3 research/analysis/prepare_public_validation_datasets.py --self-test
+python3 research/analysis/adapt_public_validation_inputs.py --self-test
 
 stage "Configure Release + tests"
 cmake -S . -B "$BUILD_DIR"   -DCMAKE_BUILD_TYPE=Release   -DVULKAX_BUILD_TESTS=ON
