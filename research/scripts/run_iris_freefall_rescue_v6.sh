@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+trap 'rc=$?; echo "[freefall-v6] ERROR rc=$rc line=$LINENO command=$BASH_COMMAND" >&2; exit $rc' ERR
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -28,6 +29,24 @@ COMBINED="$BUILD/publication-validation/combined-freefall-v6-validation"
 
 [[ -x "$VENV/bin/python" ]] || python3 -m venv "$VENV"
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check   "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
+
+echo "[freefall-v6] preflight: compile/config/contracts/synthetic tracker"
+"$VENV/bin/python" -m py_compile   research/analysis/run_iris_freefall_validation.py   research/scripts/fetch_iris_freefall_rescue_v6.py
+"$VENV/bin/python" - "$CONFIG" <<'PY'
+import json,sys
+p=sys.argv[1]
+cfg=json.load(open(p))
+assert int(cfg.get("version",0))==6, cfg.get("version")
+assert cfg["tracker"]["revision"]=="ball_identity_v6_2", cfg["tracker"]["revision"]
+assert cfg["dataset"]["development"]["takes"]==["06","07","08","09","10"]
+assert cfg["dataset"]["validation"]["takes"]==["06","07","08","09","10"]
+assert not (set(cfg["dataset"]["prior_failed_validation"]["takes"])
+            & set(cfg["dataset"]["validation"]["takes"]))
+print("VALID V6.2 config preflight")
+PY
+"$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --self-test
+"$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --self-test-video
+echo "[freefall-v6] preflight PASS"
 
 if [[ -d "$DEV" ]]; then
   STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
