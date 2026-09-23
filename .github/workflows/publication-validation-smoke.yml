@@ -49,7 +49,8 @@ jobs:
             research/analysis/generate_controlled_validation_plan.py \
             research/analysis/freeze_publication_validation.py \
             research/analysis/plan_validation_sample_size.py \
-            research/analysis/analyze_transaction_utility.py
+            research/analysis/analyze_transaction_utility.py \
+            research/analysis/assemble_paper_evidence.py
 
       - name: Script self-tests
         run: |
@@ -58,6 +59,12 @@ jobs:
           python3 research/analysis/generate_controlled_validation_plan.py --self-test
           python3 research/analysis/freeze_publication_validation.py --self-test
           python3 research/analysis/plan_validation_sample_size.py --out /tmp/sample-size.json
+          python3 research/analysis/assemble_paper_evidence.py --self-test
+
+      - name: Shell syntax
+        run: |
+          bash -n run_everything.sh
+          bash -n research/scripts/run_publication_validation.sh
 
       - name: End-to-end standardized analysis fixture
         run: |
