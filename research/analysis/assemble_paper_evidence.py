@@ -68,6 +68,8 @@ CANONICAL = [
     ("research/benchmarks/IRIS_PENDULUM_PROSPECTIVE_VALIDATION_PROTOCOL_2026-09-23.md", "canonical/iris-pendulum-validation-protocol", True),
     ("research/status/GAUGE_PROSPECTIVE_VALIDATION_RESULT_2026-09-23.md", "canonical/gauge-prospective-validation-result", True),
     ("research/status/IRIS_PENDULUM_PROSPECTIVE_VALIDATION_RESULT_2026-09-23.md", "canonical/iris-pendulum-validation-result", True),
+    ("research/status/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.md", "canonical/iris-pendulum-final-test-result", True),
+    ("research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json", "canonical/iris-pendulum-final-test-json", True),
     ("research/literature/VALIDATION_RELATED_WORK_MAP_2026-09-23.md", "canonical/validation-related-work-map", True),
     ("docs/PAPER_EVIDENCE_REPRODUCTION.md", "canonical/reproduction-guide", True),
 ]
@@ -257,8 +259,8 @@ def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: 
         "allow_missing_gauge":allow_missing_gauge,
         "complete":complete,
         "missing_required":missing,
-        "scientific_disposition":"research_program_frozen_information_limit_result",
-        "claim_guard":"D2/D3/D4V remain frozen negative; the fresh force-compliance channel improves signal but remains unresolved; GAUGE is retrospective only.",
+        "scientific_disposition":"mixed_falsification_plus_locked_real_video_confirmation",
+        "claim_guard":"D2/D3/D4V remain frozen negative; GAUGE prospective validation is information-limited; the locked IRIS pendulum final test provides narrow positive real-video confirmation for the finite-amplitude period probe versus its matched small-angle baseline. Do not generalize that result to every physical channel or treat 220 rows as 220 independent physical experiments.",
         "artifacts":artifacts,
     }
     (out/"manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n")
@@ -280,8 +282,9 @@ def assemble(repo_root: Path, build_root: Path, out: Path, allow_missing_gauge: 
         "- D2: frozen negative validation\n"
         "- D3: negative adaptive-order discovery\n"
         "- D4V: negative repair-veto discovery\n"
-        "- GAUGE: retrospective mechanism-channel contradiction\n"
-        "- D5: replay infrastructure exists, but no fresh positive measured confirmation is claimed\n\n"
+        "- GAUGE: retrospective contradiction plus prospective information-limit result\n"
+        "- IRIS pendulum: locked 10-video final test, finite-amplitude probe 90/110 correct vs small-angle 40/110\n"
+        "- IRIS final evidence: 220 confirmatory rows from 10 physical video units; preserve clustering\n\n"
         "## Layout\n\n"
         "- canonical/ — committed protocols, result ledgers, claim guards and limitations\n"
         "- generated/ — fresh outputs from the current machine/run\n"
