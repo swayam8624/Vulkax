@@ -47,6 +47,42 @@ Revision 2 is frozen before validation:
 The failed v1 development result remains part of the audit trail. It is not
 relabelled as validation evidence.
 
+## Second development failure and tracker revision 3
+
+Tracker revision 2 was then executed on the same development split
+`drop_50/{02,03,04,05}`. It still failed the predeclared gate:
+
+- quality-pass videos: 2/4;
+- median direct acceleration relative error: 0.36057242713824783;
+- truth-control accuracy: 0.0;
+- placebo false-assertion rate: 0.0;
+- directional score sign rate: 1.0;
+- development gate: FAIL.
+
+No free-fall validation analysis followed this failure and no final-test video was
+opened.
+
+Revision 3 is therefore another development-only redesign, frozen before validation.
+It replaces whole-mask centroiding with compact moving-component tracking and
+requires an explicit physical sequence:
+
+1. stationary top plateau;
+2. monotone accelerating traversal;
+3. stationary bottom plateau.
+
+Candidate traversals are ranked by internal consistency with
+`t(p)=t0+T*sqrt(p)`, plus quadratic trajectory-shape and plateau-stability
+residuals. The target value of `g` is **not** used to select among candidates.
+The independently measured drop height remains a known geometric input.
+
+Revision 3 quality requirements:
+- >=80% monotone consistency;
+- timing-fit RMS <=2.5 frames;
+- normalized quadratic trajectory-shape RMS <=0.10;
+- combined top/bottom plateau MAD <=0.12 of travel span.
+
+The global candidate schedule and `|S|=2` decision rule remain unchanged.
+
 ## Physical observable
 
 A deterministic static-camera tracker extracts the vertical trajectory of the ball.
