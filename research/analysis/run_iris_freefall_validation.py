@@ -129,6 +129,7 @@ def validate_selector_config(identity_cfg):
         "plateau_min_frames":int(cfg.get("plateau_min_frames",4)),
         "plateau_max_gap_frames":int(cfg.get("plateau_max_gap_frames",24)),
         "plateau_max_x_delta_px":float(cfg.get("plateau_max_x_delta_px",45.0)),
+        "plateau_overlap_frames":int(cfg.get("plateau_overlap_frames",6)),
         "event_edge_fraction":float(cfg.get("event_edge_fraction",0.03)),
     }
 
@@ -1095,6 +1096,7 @@ def choose_ballistic_track_v64(tracks,fps,minimum_interval_frames=12,identity_cf
     expected=float(selector_cfg["expected_sign"])
     max_gap=int(selector_cfg["plateau_max_gap_frames"])
     max_x=float(selector_cfg["plateau_max_x_delta_px"])
+    overlap=int(selector_cfg["plateau_overlap_frames"])
     edge=float(selector_cfg["event_edge_fraction"])
     candidates=[]
     rejection_counts={}
@@ -1118,14 +1120,16 @@ def choose_ballistic_track_v64(tracks,fps,minimum_interval_frames=12,identity_cf
 
             prior=[
                 p for p in plateaus
-                if p["frame_end"]<=f0+2
+                if p["frame_start"]<=f0
+                and p["frame_end"]<=f0+overlap
                 and f0-p["frame_end"]<=max_gap
                 and abs(p["x"]-xm)<=max_x
                 and expected*p["y"]<=z0+12.0
             ]
             post=[
                 p for p in plateaus
-                if p["frame_start"]>=f1-2
+                if p["frame_end"]>=f1
+                and p["frame_start"]>=f1-overlap
                 and p["frame_start"]-f1<=max_gap
                 and abs(p["x"]-xm)<=max_x
                 and expected*p["y"]>=z1-12.0
@@ -1486,6 +1490,7 @@ def self_test_video():
             "plateau_min_frames":4,
             "plateau_max_gap_frames":24,
             "plateau_max_x_delta_px":45.0,
+            "plateau_overlap_frames":6,
             "event_edge_fraction":0.03,
         }
         ident=extract(
