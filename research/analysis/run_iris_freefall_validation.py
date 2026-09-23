@@ -1491,6 +1491,12 @@ def _fit_constant_acceleration_fragment_v65(
         "global_progress_start":float(np.min(p)),
         "global_progress_end":float(np.max(p)),
         "normalized_acceleration_s2":float(c0),
+        "normalized_fit_a":float(a0),
+        "normalized_fit_b":float(b0),
+        "duration_10_90_s":float(
+            _increasing_quadratic_root(a0,b0,c0,.90)
+            - _increasing_quadratic_root(a0,b0,c0,.10)
+        ),
         "acceleration_stability":float(acc_stability),
         "event_extrapolation_frames":float(extrap_frames),
         "release_plateau_track":-1,
@@ -1583,6 +1589,9 @@ def choose_ballistic_track_v65(tracks,fps,minimum_interval_frames=12,identity_cf
             "envelope_source_track":int(source_track),
             "envelope_source_chunk":int(source_chunk),
             "normalized_acceleration_s2":float(q["normalized_acceleration_s2"]),
+            "normalized_fit_a":float(q["normalized_fit_a"]),
+            "normalized_fit_b":float(q["normalized_fit_b"]),
+            "duration_10_90_s":float(q["duration_10_90_s"]),
             "acceleration_stability":float(q["acceleration_stability"]),
             "event_extrapolation_frames":float(q["event_extrapolation_frames"]),
             "release_plateau_track":-1,
@@ -1705,7 +1714,9 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "monotone_fraction":float(chosen["monotone_fraction"]),
         "forward_fraction":float(chosen["monotone_fraction"]),
         "selected_direction_sign":float(chosen["sign"]),
-        "duration_10_90_s":float(T*(math.sqrt(.90)-math.sqrt(.10))),
+        "duration_10_90_s":float(
+            chosen.get("duration_10_90_s",T*(math.sqrt(.90)-math.sqrt(.10)))
+        ),
         "release_time_s_absolute":t0,
         "track_id":chosen["track_id"],
         "release_speed_ratio":float(chosen["release_speed_ratio"]),
@@ -2028,7 +2039,12 @@ def main():
                 qq=dict(q)
                 qq["scene"]=m["scene"]
                 qq["split"]=a.split
-                qq["direct_acceleration_m_s2"]=2.0*height/(float(q["full_fall_time_s"])**2)
+                qq["release_rest_acceleration_m_s2"]=2.0*height/(float(q["full_fall_time_s"])**2)
+                qq["direct_acceleration_m_s2"]=(
+                    float(q["normalized_acceleration_s2"])*height
+                    if q.get("normalized_acceleration_s2","") not in ("",None)
+                    else qq["release_rest_acceleration_m_s2"]
+                )
                 qq["acceleration_relative_error"]=abs(qq["direct_acceleration_m_s2"]-G)/G
                 candidate_audit_rows.append(qq)
             checks={
@@ -2053,6 +2069,7 @@ def main():
             takes.append({"scene":m["scene"],"quality_ok":qok,"quality_reject_reason":reject,
                           "direct_acceleration_m_s2":tr["direct_acceleration_m_s2"],
                           "trajectory_acceleration_m_s2":tr["trajectory_acceleration_m_s2"],
+                          "release_rest_acceleration_m_s2":tr["release_rest_acceleration_m_s2"],
                           "acceleration_relative_error":abs(tr["direct_acceleration_m_s2"]-G)/G,
                           "active_frames":tr["active_frames"],
                           "observed_fragment_frames":tr["observed_fragment_frames"],
@@ -2132,9 +2149,10 @@ def main():
                 "median_solidity","median_circle_fill","median_axis_ratio","radius_cv","area_cv",
                 "aspect_log_median","envelope_track_count","envelope_source_track",
                 "envelope_source_chunk","normalized_acceleration_s2",
+                "normalized_fit_a","normalized_fit_b","duration_10_90_s",
                 "acceleration_stability","event_extrapolation_frames",
                 "release_plateau_track","impact_plateau_track",
-                "direct_acceleration_m_s2",
+                "direct_acceleration_m_s2","release_rest_acceleration_m_s2",
                 "acceleration_relative_error"]
         with (out/"candidate_audit.csv").open("w",newline="",encoding="utf-8") as f:
             w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
