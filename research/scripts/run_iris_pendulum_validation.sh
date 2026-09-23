@@ -87,6 +87,11 @@ echo "[iris-pendulum] development passed; opening pendulum_45 validation takes"
   --split validation \
   --require-development-summary "$DEV_OUT/summary.json"
 
+"$VENV/bin/python" research/analysis/analyze_iris_pendulum_validation.py \
+  --records "$VAL_OUT/validation_records.csv" \
+  --take-summary "$VAL_OUT/take_summary.csv" \
+  --out "$VAL_OUT/forensics"
+
 EXTRA_ARGS=(
   --extra "$VAL_OUT/validation_records.csv"
 )

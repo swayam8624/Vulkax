@@ -65,6 +65,7 @@ CANONICAL = [
     ("research/benchmarks/REAL_MEASURED_VALIDATION_PROTOCOL_2026-09-23.md", "canonical/measured-validation-protocol", True),
     ("research/benchmarks/IRIS_PENDULUM_PROSPECTIVE_VALIDATION_PROTOCOL_2026-09-23.md", "canonical/iris-pendulum-validation-protocol", True),
     ("research/status/GAUGE_PROSPECTIVE_VALIDATION_RESULT_2026-09-23.md", "canonical/gauge-prospective-validation-result", True),
+    ("research/status/IRIS_PENDULUM_PROSPECTIVE_VALIDATION_RESULT_2026-09-23.md", "canonical/iris-pendulum-validation-result", True),
     ("research/literature/VALIDATION_RELATED_WORK_MAP_2026-09-23.md", "canonical/validation-related-work-map", True),
     ("docs/PAPER_EVIDENCE_REPRODUCTION.md", "canonical/reproduction-guide", True),
 ]
@@ -119,6 +120,9 @@ GENERATED = [
     ("publication-validation/iris-pendulum-development/summary.json", "generated/iris-pendulum-development-summary", False),
     ("publication-validation/iris-pendulum-validation/summary.json", "generated/iris-pendulum-validation-summary", False),
     ("publication-validation/iris-pendulum-validation/validation_records.csv", "generated/iris-pendulum-validation-records", False),
+    ("publication-validation/iris-pendulum-validation/forensics/summary.json", "generated/iris-pendulum-validation-forensics", False),
+    ("publication-validation/iris-pendulum-validation/forensics/per_factor.csv", "generated/iris-pendulum-validation-per-factor", False),
+    ("publication-validation/iris-pendulum-validation/forensics/paired_comparison.csv", "generated/iris-pendulum-validation-paired-comparison", False),
     ("publication-validation/combined-iris-validation/analysis/summary.json", "generated/combined-iris-validation-summary", False),
 ]
 
