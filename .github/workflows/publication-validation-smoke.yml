@@ -306,6 +306,9 @@ jobs:
                   "timing="+r["timing_fit_rms_frames"],
                   "g="+r["direct_acceleration_m_s2"],
                   "gerr="+r["acceleration_relative_error"],
+                  "depth_proxy="+r.get("depth_proxy",""),
+                  "depth_span="+r.get("depth_proxy_relative_span",""),
+                  "impact_reversal="+r.get("depth_impact_reversal",""),
               )
           PY
 
