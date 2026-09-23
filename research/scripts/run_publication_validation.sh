@@ -171,12 +171,15 @@ print("=== Reality Probe publication-validation summary ===")
 print("records:", summary["record_count"])
 print("datasets:", summary["dataset_count"])
 print("methods:", summary["method_count"])
-print("confirmatory records:", summary["confirmatory_record_count"])
+print("final-test confirmatory records:", summary["confirmatory_record_count"])
+print("prospective validation-stage records:", summary["prospective_validation_record_count"])
 print("historical diagnostic records:", summary["retrospective_or_followon_record_count"])
-if summary["confirmatory_record_count"] == 0:
-    print("STATUS: diagnostic only; no new prospective validation evidence has been supplied.")
+if summary["confirmatory_record_count"] > 0:
+    print("STATUS: locked final-test confirmatory records are present.")
+elif summary["prospective_validation_record_count"] > 0:
+    print("STATUS: prospective validation-stage evidence is present; final-test confirmation has not been opened.")
 else:
-    print("STATUS: prospective records present; interpret by split/evidence_class and lock status.")
+    print("STATUS: historical/development evidence only; no prospective validation split is present.")
 print("outputs:", root)
 public_manifest = root / "public-data/world_manifest.csv"
 if public_manifest.is_file():
