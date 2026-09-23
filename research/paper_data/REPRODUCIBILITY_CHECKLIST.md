@@ -205,3 +205,20 @@ execution and may not be claimed from old data.
 - [ ] execute free-fall development/validation gate and record outcomes
 - [ ] if validation passes, execute the nine-video locked free-fall final test
 - [ ] update manuscript claims from actual hardening outputs, including failures
+
+
+### IRIS free-fall V5 failure and V6 rescue
+- [x] preserve V5 development/validation outputs without overwrite
+- [x] record V5 held-out validation failure as permanent nonconfirmatory evidence
+- [x] freeze fresh V6 development split drop_50/06..10
+- [x] freeze fresh V6 validation split drop_100/06..10
+- [x] prove fresh validation does not overlap failed V5 validation
+- [x] add ball-identity constraints before timing inference
+- [x] synthetic circular-ball vs rectangular-parabola distractor regression
+- [x] keep repair schedule and |S|=2 threshold unchanged
+- [x] V6 development/validation downloader has no final-test mode
+- [x] add V6-specific final lock and separate final downloader
+- [ ] execute V6 fresh development gate
+- [ ] execute V6 fresh validation gate
+- [ ] if V6 validation passes, execute lock-gated drop_150/02..10 final test
+- [ ] record V6 result (positive or negative) in canonical result ledger
