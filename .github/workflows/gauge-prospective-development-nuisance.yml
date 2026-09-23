@@ -1,0 +1,93 @@
+name: GAUGE development rigid-nuisance stress
+
+on:
+  pull_request:
+    paths:
+      - "research/analysis/gauge_prospective_gate.py"
+      - "research/scripts/run_gauge_prospective_gate.sh"
+      - ".github/workflows/gauge-prospective-development-nuisance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gauge-development-nuisance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nuisance-shards:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run combined rigid-nuisance shard
+        run: |
+          bash research/scripts/run_gauge_prospective_gate.sh \
+            --split development \
+            --profile truth \
+            --mode pilot \
+            --build-dir build \
+            --shard-index "${{ matrix.shard }}" \
+            --shard-count 8 \
+            --verification-rotation-deg 20 \
+            --verification-translation-m 0.025 \
+            --out "build/gauge-nuisance-shard-${{ matrix.shard }}"
+
+      - name: Archive nuisance shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauge-development-nuisance-shard-${{ matrix.shard }}
+          path: |
+            build/gauge-nuisance-shard-${{ matrix.shard }}/records_development_truth_pilot.csv
+            build/gauge-nuisance-shard-${{ matrix.shard }}/summary_development_truth_pilot.json
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    needs: nuisance-shards
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download nuisance shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gauge-development-nuisance-shard-*
+          path: build/gauge-nuisance-shards
+
+      - name: Aggregate nuisance stress
+        run: |
+          ARGS=()
+          while IFS= read -r f; do ARGS+=(--extra "$f"); done < <(
+            find build/gauge-nuisance-shards -name 'records_development_truth_pilot.csv' -type f | sort
+          )
+          if [[ "${#ARGS[@]}" -ne 16 ]]; then
+            echo "expected 8 record files / 16 normalize args, got ${#ARGS[@]}" >&2
+            exit 1
+          fi
+          mkdir -p build/gauge-development-nuisance
+          python3 research/analysis/normalize_publication_validation.py \
+            "${ARGS[@]}" \
+            --out build/gauge-development-nuisance/records.csv
+          python3 research/analysis/analyze_publication_validation.py \
+            --records build/gauge-development-nuisance/records.csv \
+            --protocol research/validation/protocol_v1.json \
+            --out build/gauge-development-nuisance/analysis
+          echo "METHOD_SUMMARY"
+          cat build/gauge-development-nuisance/analysis/method_summary.csv
+
+      - name: Archive combined nuisance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauge-development-nuisance
+          path: |
+            build/gauge-development-nuisance/records.csv
+            build/gauge-development-nuisance/analysis/**
+          if-no-files-found: error
+          retention-days: 30
