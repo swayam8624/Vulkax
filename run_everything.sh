@@ -203,7 +203,10 @@ python3 -m py_compile   scripts/validate_evidence_registry.py   scripts/audit_re
   research/analysis/generate_controlled_validation_plan.py \
   research/analysis/freeze_publication_validation.py \
   research/analysis/plan_validation_sample_size.py \
-  research/analysis/analyze_transaction_utility.py
+  research/analysis/analyze_transaction_utility.py \
+  research/analysis/prepare_public_validation_datasets.py \
+  research/analysis/adapt_public_validation_inputs.py \
+  research/scripts/fetch_public_validation_datasets.py
 
 python3 research/analysis/dcs_confirmatory_replay.py --self-test
 python3 research/analysis/export_dcs_spatial_map.py --self-test
