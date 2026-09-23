@@ -13,6 +13,7 @@ on:
       - "research/analysis/prepare_public_validation_datasets.py"
       - "research/analysis/adapt_public_validation_inputs.py"
       - "research/analysis/run_gauge_prospective_validation.py"
+      - "research/analysis/analyze_gauge_validation_failure.py"
       - "research/scripts/run_gauge_prospective_validation.sh"
       - "research/analysis/assemble_paper_evidence.py"
       - "run_everything.sh"
@@ -67,6 +68,7 @@ jobs:
             research/analysis/prepare_public_validation_datasets.py \
             research/analysis/adapt_public_validation_inputs.py \
             research/analysis/run_gauge_prospective_validation.py \
+            research/analysis/analyze_gauge_validation_failure.py \
             research/scripts/fetch_public_validation_datasets.py
 
       - name: Script self-tests
