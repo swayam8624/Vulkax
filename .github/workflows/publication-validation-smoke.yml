@@ -25,6 +25,10 @@ on:
       - "research/analysis/assemble_paper_evidence.py"
       - "run_everything.sh"
       - "research/paper_data/**"
+      - "research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json"
+      - "research/status/**"
+      - "research/literature/CLAIM_GUARD.md"
+      - "docs/PUBLICATION_VALIDATION.md"
       - ".github/workflows/publication-validation-smoke.yml"
   push:
     branches: ["main"]
@@ -61,6 +65,7 @@ jobs:
               "research/validation/protocol_v1.json",
               "research/validation/record_schema_v1.json",
               "research/validation/iris_pendulum_final_test_v1.json",
+              "research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json",
           ):
               json.load(open(path))
               print("VALID", path)
