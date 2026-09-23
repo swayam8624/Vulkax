@@ -135,6 +135,15 @@ def check_lock(path: Path) -> None:
 def self_test() -> None:
     assert REQUIRED_REPO_FILES[2].name == "iris_pendulum_final_test_v1.json"
     assert EXPECTED_READINESS == "validation_supports_freeze_without_retuning"
+    missing = [str(p) for p in REQUIRED_REPO_FILES if not p.is_file()]
+    if missing:
+        raise AssertionError("missing frozen repo input(s): " + ", ".join(missing))
+    config = json.loads(REQUIRED_REPO_FILES[2].read_text(encoding="utf-8"))
+    assert config["decision"]["threshold_abs_z"] == 2.0
+    assert config["dataset"]["setting"] == "pendulum_90"
+    assert config["dataset"]["expected_take_count"] == 10
+    assert config["validation_freeze_basis"]["readiness"] == EXPECTED_READINESS
+    assert config["final_test_policy"]["no_threshold_retuning"] is True
     print("VALID IRIS final-freeze wrapper self-test")
 
 
