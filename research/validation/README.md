@@ -56,7 +56,7 @@ Core profile:
 - GAUGE: 60 foam trials across stretching, compression and shearing;
 - IRIS: 24 videos covering every class/setting combination with one repeated take;
 - RGBench: representative grasp/fold/fling captures from `green_tshirt`,
-  `grey_pleat_skirt`, and `white_shirt`, plus required meshes/reference data.
+  `grey_pleat_skirt`, and `white_shirt`, plus required garment meshes.
 
 Every download is revision-pinned and SHA-256 indexed. The prepared campaign writes:
 
