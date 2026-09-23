@@ -33,7 +33,7 @@ on:
       - "src/tools/iris_metal_preprocess.mm"
       - "research/scripts/run_iris_freefall_blind_validation.sh"
       - "research/scripts/run_iris_freefall_rescue_v6.sh"
-      - "research/scripts/run_iris_freefall_v66_take_smoke.sh"
+      - "research/scripts/run_iris_freefall_v67_take_smoke.sh"
       - "research/scripts/run_iris_freefall_final_test.sh"
       - "research/scripts/run_iris_freefall_v6_final_test.sh"
       - "research/scripts/fetch_iris_freefall_v6_final.py"
@@ -214,7 +214,7 @@ jobs:
           bash -n research/scripts/manage_public_data_storage.sh
           bash -n research/scripts/run_iris_freefall_blind_validation.sh
           bash -n research/scripts/run_iris_freefall_rescue_v6.sh
-          bash -n research/scripts/run_iris_freefall_v66_take_smoke.sh
+          bash -n research/scripts/run_iris_freefall_v67_take_smoke.sh
           bash -n research/scripts/run_iris_freefall_final_test.sh
           bash -n research/scripts/run_iris_freefall_rescue_v6.sh
           bash -n research/scripts/run_iris_freefall_v6_final_test.sh
