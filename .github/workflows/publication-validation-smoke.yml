@@ -82,6 +82,7 @@ jobs:
           python3 research/scripts/fetch_public_validation_datasets.py --self-test
           python3 research/analysis/prepare_public_validation_datasets.py --self-test
           python3 research/analysis/adapt_public_validation_inputs.py --self-test
+          python3 research/analysis/analyze_gauge_validation_failure.py --self-test
 
       - name: Shell syntax
         run: |
