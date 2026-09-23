@@ -2768,7 +2768,7 @@ def main():
     mm=manifests(a.adapted_root,a.split,cfg)
     expected=len(cfg["dataset"][a.split]["takes"])
     if len(mm)!=expected:raise SystemExit(f"expected {expected} frozen scenes, got {len(mm)}")
-    rows=[];takes=[];fails=[];failure_details=[];candidate_audit_rows=[]
+    rows=[];takes=[];fails=[];failure_details=[];candidate_audit_rows=[];track_debug_rows=[]
     setting=cfg["dataset"][a.split]["setting"]
     expected_height=float(cfg["physics"]["drop_heights_m"][setting])
     tg=cfg["tracker"]
