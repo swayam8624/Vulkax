@@ -1,0 +1,78 @@
+name: Publication validation smoke
+
+on:
+  pull_request:
+    paths:
+      - "research/validation/**"
+      - "research/analysis/*publication_validation.py"
+      - "research/analysis/plan_validation_sample_size.py"
+      - "research/analysis/analyze_transaction_utility.py"
+      - "research/scripts/run_publication_validation.sh"
+      - ".github/workflows/publication-validation-smoke.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "research/validation/**"
+      - "research/analysis/*publication_validation.py"
+      - "research/analysis/plan_validation_sample_size.py"
+      - "research/analysis/analyze_transaction_utility.py"
+      - "research/scripts/run_publication_validation.sh"
+      - ".github/workflows/publication-validation-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate protocol JSON
+        run: |
+          python3 - <<'PY'
+          import json
+          for path in (
+              "research/validation/protocol_v1.json",
+              "research/validation/record_schema_v1.json",
+          ):
+              json.load(open(path))
+              print("VALID", path)
+          PY
+
+      - name: Compile validation scripts
+        run: |
+          python3 -m py_compile \
+            research/analysis/normalize_publication_validation.py \
+            research/analysis/analyze_publication_validation.py \
+            research/analysis/generate_controlled_validation_plan.py \
+            research/analysis/freeze_publication_validation.py \
+            research/analysis/plan_validation_sample_size.py \
+            research/analysis/analyze_transaction_utility.py
+
+      - name: Script self-tests
+        run: |
+          python3 research/analysis/normalize_publication_validation.py --self-test
+          python3 research/analysis/analyze_publication_validation.py --self-test
+          python3 research/analysis/generate_controlled_validation_plan.py --self-test
+          python3 research/analysis/freeze_publication_validation.py --self-test
+          python3 research/analysis/plan_validation_sample_size.py --out /tmp/sample-size.json
+
+      - name: End-to-end standardized analysis fixture
+        run: |
+          mkdir -p /tmp/pv
+          cat > /tmp/pv/records.csv <<'CSV'
+          record_version,trial_id,paired_key,dataset,scene,split,evidence_class,confirmatory,trial_family,ground_truth,method,score,decision,decision_threshold,confidence,physical_delta,target_error_delta,measurement_noise_sigma,pose_noise_sigma,missing_fraction,channel_dependence,negative_control,seed,source_artifact,notes
+          1,a1,p1,toy,s1,development,test,false,truth_control,support,m,2.4,support,2,,0.1,-0.2,,,,,false,0,fixture,
+          1,a2,p2,toy,s2,development,test,false,truth_control,veto,m,-2.4,veto,2,,-0.1,0.2,,,,,false,0,fixture,
+          1,a3,p3,toy,s3,development,test,false,placebo,unresolved,m,0.2,unresolved,2,,0.0,0.0,,,,,true,0,fixture,
+          CSV
+          python3 research/analysis/normalize_publication_validation.py \
+            --extra /tmp/pv/records.csv --out /tmp/pv/normalized.csv
+          python3 research/analysis/analyze_publication_validation.py \
+            --records /tmp/pv/normalized.csv --bootstrap-reps 100 --out /tmp/pv/analysis
+          python3 research/analysis/analyze_transaction_utility.py \
+            --records /tmp/pv/normalized.csv --out /tmp/pv/analysis/transaction_utility.csv
+          test -s /tmp/pv/analysis/summary.json
+          test -s /tmp/pv/analysis/method_summary.csv
