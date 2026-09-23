@@ -165,7 +165,6 @@ def rgbench_patterns(profile: str, repo_files: list[str]) -> list[str] | None:
                 )
             # Select exactly one capture/action before any benchmark result is seen.
             patterns.append(candidates[0] + "/**")
-            patterns.append(f"reference_results/{garment}/{action}/**")
 
         want = normalize_token(garment)
         mesh_roots = sorted({
