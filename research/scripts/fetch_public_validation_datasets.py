@@ -145,7 +145,7 @@ def capture_dirs(repo_files: list[str], garment: str) -> dict[str, list[str]]:
 def rgbench_patterns(profile: str, repo_files: list[str]) -> list[str] | None:
     if profile == "full":
         return None
-    common = ["README.md", "LICENSE*", "DATA_LICENSE*", "reference_results/**"]
+    common = ["README.md", "LICENSE*", "DATA_LICENSE*"]
     if profile == "smoke":
         return common + [
             "green_tshirt/green_tshirt_grasp_2025-07-19-19-14-58/**",
@@ -164,6 +164,7 @@ def rgbench_patterns(profile: str, repo_files: list[str]) -> list[str] | None:
                 )
             # Select exactly one capture/action before any benchmark result is seen.
             patterns.append(candidates[0] + "/**")
+            patterns.append(f"reference_results/{garment}/{action}/**")
 
         want = normalize_token(garment)
         mesh_roots = sorted({
@@ -183,7 +184,9 @@ def rgbench_patterns(profile: str, repo_files: list[str]) -> list[str] | None:
 def materialized_files(root: Path) -> list[Path]:
     return sorted(
         p for p in root.rglob("*")
-        if p.is_file() and ".cache/huggingface" not in p.as_posix()
+        if p.is_file()
+        and ".cache/huggingface" not in p.as_posix()
+        and p.name != "vulkax_download_manifest.json"
     )
 
 
