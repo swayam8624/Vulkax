@@ -12,6 +12,8 @@ on:
       - "research/scripts/fetch_public_validation_datasets.py"
       - "research/analysis/prepare_public_validation_datasets.py"
       - "research/analysis/adapt_public_validation_inputs.py"
+      - "research/analysis/run_gauge_prospective_validation.py"
+      - "research/scripts/run_gauge_prospective_validation.sh"
       - "research/analysis/assemble_paper_evidence.py"
       - "run_everything.sh"
       - "research/paper_data/**"
@@ -64,6 +66,7 @@ jobs:
             research/analysis/assemble_paper_evidence.py \
             research/analysis/prepare_public_validation_datasets.py \
             research/analysis/adapt_public_validation_inputs.py \
+            research/analysis/run_gauge_prospective_validation.py \
             research/scripts/fetch_public_validation_datasets.py
 
       - name: Script self-tests
@@ -83,6 +86,7 @@ jobs:
           bash -n run_everything.sh
           bash -n research/scripts/run_publication_validation.sh
           bash -n research/scripts/prepare_public_validation_data.sh
+          bash -n research/scripts/run_gauge_prospective_validation.sh
 
       - name: Live public dataset catalog check
         run: |
