@@ -58,8 +58,12 @@ def validate_gate():
     s=json.loads(p.read_text())
     if s.get("split")!="validation" or not s.get("gate_pass"):
         raise RuntimeError("V6 fresh validation gate did not pass")
-    if s.get("tracker_revision")!="ball_identity_v6":
-        raise RuntimeError("V6 tracker revision mismatch")
+    cfg=json.loads(CONFIG.read_text())
+    expected_tracker=cfg["tracker"]["revision"]
+    if s.get("tracker_revision")!=expected_tracker:
+        raise RuntimeError(
+            f"V6 tracker revision mismatch: {s.get('tracker_revision')} != {expected_tracker}"
+        )
     if int(s.get("version",0))!=6:
         raise RuntimeError("V6 summary version mismatch")
     if s.get("take01_forbidden") is not True:
