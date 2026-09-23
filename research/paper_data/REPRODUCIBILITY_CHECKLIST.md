@@ -126,7 +126,7 @@ execution and may not be claimed from old data.
 - [ ] execute measurement-noise, pose-noise, and missing-observation sweeps
 - [ ] execute proposal/probe channel-dependence sweep
 - [x] ingest GAUGE prospective validation-stage records into the common schema
-- [ ] ingest IRIS pendulum validation-stage records into the common schema
+- [x] ingest IRIS pendulum validation-stage records into the common schema
 - [ ] ingest RGBench validation-stage records into the common schema
 - [ ] freeze a final-test world manifest before opening its labels
 - [ ] execute final-test campaign without threshold retuning
@@ -149,6 +149,6 @@ execution and may not be claimed from old data.
 - [x] one-frame uncertainty floor and |z|=2 rule fixed
 - [x] development quality gate implemented
 - [x] synthetic-video tracker regression added to CI
-- [ ] development gate executed on 10 real takes
-- [ ] 45-degree validation executed on 10 real takes
+- [x] development gate executed on 10 real takes (10/10 quality-pass; median rope-length relative error 4.23%)
+- [x] 45-degree validation executed on 10 real takes (10/10 quality-pass; median rope-length relative error 2.43%)
 - [ ] 90-degree final-test repeats opened only after lock
