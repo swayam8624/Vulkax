@@ -5,6 +5,7 @@ on:
     paths:
       - "research/validation/**"
       - "research/analysis/*publication_validation.py"
+      - "research/analysis/gauge_prospective_gate.py"
       - "research/analysis/plan_validation_sample_size.py"
       - "research/analysis/analyze_transaction_utility.py"
       - "research/scripts/run_publication_validation.sh"
@@ -64,7 +65,8 @@ jobs:
             research/analysis/assemble_paper_evidence.py \
             research/analysis/prepare_public_validation_datasets.py \
             research/analysis/adapt_public_validation_inputs.py \
-            research/scripts/fetch_public_validation_datasets.py
+            research/scripts/fetch_public_validation_datasets.py \
+            research/analysis/gauge_prospective_gate.py
 
       - name: Script self-tests
         run: |
@@ -77,6 +79,7 @@ jobs:
           python3 research/scripts/fetch_public_validation_datasets.py --self-test
           python3 research/analysis/prepare_public_validation_datasets.py --self-test
           python3 research/analysis/adapt_public_validation_inputs.py --self-test
+          python3 research/analysis/gauge_prospective_gate.py --self-test
 
       - name: Shell syntax
         run: |
