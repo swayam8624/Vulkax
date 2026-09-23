@@ -238,6 +238,65 @@ jobs:
           python3 research/analysis/run_iris_freefall_validation.py --self-test-video
 
 
+      - name: IRIS V6.5 one-take live development probe
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 -m pip install --quiet "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
+          rm -rf /tmp/iris-v65-one
+          mkdir -p /tmp/iris-v65-one
+          python3 - <<'PY'
+          import json
+          src="research/validation/iris_freefall_rescue_v6.json"
+          dst="/tmp/iris-v65-one/config.json"
+          cfg=json.load(open(src))
+          cfg["dataset"]["development"]["takes"]=["07"]
+          cfg["development_gate"]["minimum_quality_videos"]=1
+          json.dump(cfg,open(dst,"w"),indent=2)
+          PY
+          python3 research/scripts/fetch_iris_freefall_rescue_v6.py \
+            --data-root /tmp/iris-v65-one/public-datasets \
+            --config /tmp/iris-v65-one/config.json \
+            --phase development
+          python3 research/analysis/prepare_public_validation_datasets.py \
+            --root /tmp/iris-v65-one/public-datasets \
+            --out /tmp/iris-v65-one/public-data
+          python3 research/analysis/adapt_public_validation_inputs.py \
+            --repo-root . \
+            --data-root /tmp/iris-v65-one/public-datasets \
+            --prepared-root /tmp/iris-v65-one/public-data
+          set +e
+          python3 research/analysis/run_iris_freefall_validation.py \
+            --adapted-root /tmp/iris-v65-one/public-data/adapted \
+            --config /tmp/iris-v65-one/config.json \
+            --split development \
+            --out /tmp/iris-v65-one/result
+          rc=$?
+          set -e
+          echo "analyzer_rc=$rc"
+          cat /tmp/iris-v65-one/result/summary.json
+          python3 - <<'PY'
+          import csv
+          p="/tmp/iris-v65-one/result/candidate_audit.csv"
+          rows=list(csv.DictReader(open(p)))
+          for r in rows[:12]:
+              print(
+                  "AUDIT",
+                  "rank="+r["event_rank"],
+                  "selected="+r["selected"],
+                  "track="+r["track_id"],
+                  "pspan="+r["global_progress_span"],
+                  "T="+r["full_fall_time_s"],
+                  "norm_a="+r["normalized_acceleration_s2"],
+                  "a_stab="+r["acceleration_stability"],
+                  "release="+r["release_speed_ratio"],
+                  "roots="+r["roots_complete"],
+                  "shape="+r["trajectory_shape_rms_fraction"],
+                  "timing="+r["timing_fit_rms_frames"],
+                  "g="+r["direct_acceleration_m_s2"],
+                  "gerr="+r["acceleration_relative_error"],
+              )
+          PY
+
       - name: End-to-end standardized analysis fixture
         run: |
           mkdir -p /tmp/pv
