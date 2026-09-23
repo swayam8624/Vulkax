@@ -83,10 +83,21 @@ promoted into result claims. It includes:
 - evidence-driven measured-video rewrite-gating visuals;
 - a separately frozen non-pendulum IRIS free-fall replication.
 
-The free-fall campaign explicitly forbids all take-01 videos. Development uses
-drop_50/02-05, validation uses drop_100/02-05, and its nine-video final set is
-drop_150/02-10. The final downloader cannot request those nine videos until the
-free-fall validation gate passes and a domain-specific lock is created.
+The first free-fall campaign explicitly forbade all take-01 videos. Its V5 method
+passed development on drop_50/02-05 but **failed held-out validation** on
+drop_100/02-05 (3/4 quality-pass, median acceleration relative error 2.2237,
+truth-control 0.0, placebo FAR 0.0, directional sign 0.0). That validation is now
+permanently nonconfirmatory.
+
+A fresh V6 rescue is frozen on disjoint unused takes:
+- development: drop_50/06-10;
+- validation: drop_100/06-10;
+- final remains unopened: drop_150/02-10.
+
+V6 adds ball-identity constraints before the full-flight timing model. The V6
+development/validation runner has no final-download mode. A separate V6 final
+runner can request drop_150 only after the fresh validation gate passes and a
+V6-specific hash lock is created.
 
 ## Remaining publication extensions
 
