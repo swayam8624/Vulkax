@@ -56,6 +56,11 @@ CANONICAL = [
     ("research/paper_data/EXPERIMENT_MATRIX.csv", "canonical/experiment-matrix", True),
     ("research/paper_data/ABLATION_MATRIX.md", "canonical/ablation-matrix", True),
     ("research/paper_data/REPRODUCIBILITY_CHECKLIST.md", "canonical/reproducibility-checklist", True),
+    ("research/validation/protocol_v1.json", "canonical/publication-validation-protocol", True),
+    ("research/validation/record_schema_v1.json", "canonical/publication-validation-schema", True),
+    ("research/validation/README.md", "canonical/publication-validation-guide", True),
+    ("research/benchmarks/REAL_MEASURED_VALIDATION_PROTOCOL_2026-09-23.md", "canonical/measured-validation-protocol", True),
+    ("research/literature/VALIDATION_RELATED_WORK_MAP_2026-09-23.md", "canonical/validation-related-work-map", True),
     ("docs/PAPER_EVIDENCE_REPRODUCTION.md", "canonical/reproduction-guide", True),
 ]
 
@@ -91,6 +96,13 @@ GENERATED = [
     ("gauge-effective-span/effective_span.csv", "generated/gauge-effective-span-table", False),
     ("gauge-dcs-retrospective/summary.json", "generated/gauge-retrospective-summary", True),
     ("gauge-dcs-retrospective/per_trial.csv", "generated/gauge-retrospective-per-trial", True),
+    ("publication-validation/records.csv", "generated/publication-validation-records", True),
+    ("publication-validation/analysis/summary.json", "generated/publication-validation-summary", True),
+    ("publication-validation/analysis/method_summary.csv", "generated/publication-validation-method-summary", True),
+    ("publication-validation/analysis/risk_coverage.csv", "generated/publication-validation-risk-coverage", True),
+    ("publication-validation/analysis/failure_cases.csv", "generated/publication-validation-failures", True),
+    ("publication-validation/analysis/transaction_utility.csv", "generated/publication-validation-transaction-utility", True),
+    ("publication-validation/sample_size_plan.json", "generated/publication-validation-sample-size", True),
 ]
 
 def sha256(path: Path) -> str:
