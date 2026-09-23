@@ -12,6 +12,8 @@ GAUGE_ROOT=""
 OUT=""
 FINAL_LOCK=""
 MAX_WORLDS=""
+SHARD_INDEX="0"
+SHARD_COUNT="1"
 
 usage() {
   cat <<'EOF'
@@ -26,6 +28,8 @@ Options:
   --out DIR
   --final-lock JSON      Required for final_test
   --max-worlds N         Debug/smoke limit only
+  --shard-index N        Deterministic world shard index (default: 0)
+  --shard-count N        Deterministic world shard count (default: 1)
 EOF
 }
 
@@ -39,6 +43,8 @@ while [[ $# -gt 0 ]]; do
     --out) OUT="$2"; shift 2 ;;
     --final-lock) FINAL_LOCK="$2"; shift 2 ;;
     --max-worlds) MAX_WORLDS="$2"; shift 2 ;;
+    --shard-index) SHARD_INDEX="$2"; shift 2 ;;
+    --shard-count) SHARD_COUNT="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -85,6 +91,8 @@ RUN_ARGS=(
   --split "$SPLIT"
   --profile "$PROFILE"
   --mode "$MODE"
+  --shard-index "$SHARD_INDEX"
+  --shard-count "$SHARD_COUNT"
 )
 if [[ -n "$FINAL_LOCK" ]]; then
   RUN_ARGS+=(--final-lock "$FINAL_LOCK")
