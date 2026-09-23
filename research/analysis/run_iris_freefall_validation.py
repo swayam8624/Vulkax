@@ -116,6 +116,17 @@ def validate_selector_config(identity_cfg):
             q=int(cfg[key])
             if not (0<=q<=255):
                 raise ContractError(f"{key} must be in [0,255], got {q!r}")
+    for key in ("minimum_ball_hue","maximum_ball_hue"):
+        if key in cfg:
+            q=int(cfg[key])
+            if not (0<=q<=179):
+                raise ContractError(f"{key} must be in [0,179], got {q!r}")
+    if "maximum_color_components_per_frame" in cfg:
+        q=int(cfg["maximum_color_components_per_frame"])
+        if not (1<=q<=64):
+            raise ContractError(
+                f"maximum_color_components_per_frame must be in [1,64], got {q!r}"
+            )
     return frac
 
 def read_csv(p):
@@ -216,40 +227,51 @@ def extract_components(diff_crop,threshold,cv2,x0,y0):
 
 
 def extract_saturated_components(frame_resized,cv2,x0,y0,x1,y1,cfg):
-    """Detect the distinctive saturated ball appearance without using physics truth.
+    """Detect the distinctive orange/saturated ball appearance.
 
-    IRIS dropping_ball uses the same colored soccer ball across takes. We use only
-    saturation/value and geometric compactness; no target g, drop height, or
-    validation labels enter this measurement cue.
+    This is a class-semantic image measurement cue only. It never receives target
+    gravity, drop height, repair labels, or validation outcomes.
     """
     cfg=cfg or {}
     min_sat=int(cfg.get("minimum_ball_saturation",80))
     min_val=int(cfg.get("minimum_ball_value",55))
+    hue_min=int(cfg.get("minimum_ball_hue",0))
+    hue_max=int(cfg.get("maximum_ball_hue",35))
+    max_components=max(1,int(cfg.get("maximum_color_components_per_frame",8)))
+
     roi=frame_resized[y0:y1,x0:x1]
     if roi.size==0:return []
     hsv=cv2.cvtColor(roi,cv2.COLOR_BGR2HSV)
-    sat=hsv[:,:,1];val=hsv[:,:,2]
-    mm=((sat>=min_sat)&(val>=min_val)).astype(np.uint8)*255
+    hue=hsv[:,:,0];sat=hsv[:,:,1];val=hsv[:,:,2]
+    if hue_min<=hue_max:
+        hue_ok=(hue>=hue_min)&(hue<=hue_max)
+    else:
+        hue_ok=(hue>=hue_min)|(hue<=hue_max)
+    mm=(hue_ok&(sat>=min_sat)&(val>=min_val)).astype(np.uint8)*255
+
+    # Fill the black/white panels of the soccer-ball texture while preserving one
+    # compact connected object. Morphology is independent of any physics truth.
     mm=cv2.morphologyEx(
         mm,cv2.MORPH_CLOSE,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(9,9))
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(11,11))
     )
     mm=cv2.morphologyEx(
         mm,cv2.MORPH_OPEN,
         cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
     )
+
     nlab,labels,stats,cent=cv2.connectedComponentsWithStats(mm,connectivity=8)
     roi_area=max(1,roi.shape[0]*roi.shape[1])
     out=[]
     for lab in range(1,nlab):
         area=int(stats[lab,cv2.CC_STAT_AREA])
         bw=int(stats[lab,cv2.CC_STAT_WIDTH]);bh=int(stats[lab,cv2.CC_STAT_HEIGHT])
-        if area<10 or area>.05*roi_area or bw<=0 or bh<=0:continue
+        if area<8 or area>.03*roi_area or bw<=0 or bh<=0:continue
         aspect=bw/bh
-        if not (.25<=aspect<=4.0):continue
+        if not (.30<=aspect<=3.3):continue
         fill=area/max(1,bw*bh)
         if fill<.10:continue
-        cx,cy=cent[lab]
+
         component_mask=(labels==lab).astype(np.uint8)*255
         contours,_=cv2.findContours(
             component_mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE
@@ -262,6 +284,7 @@ def extract_saturated_components(frame_resized,cv2,x0,y0,x1,y1,cfg):
         hull=cv2.convexHull(contour) if contour is not None and len(contour)>=3 else None
         hull_area=float(cv2.contourArea(hull)) if hull is not None else 0.0
         solidity=float(np.clip(contour_area/max(hull_area,1e-9),0.0,1.0))
+
         if contour is not None and len(contour)>=3:
             (_, _),radius=cv2.minEnclosingCircle(contour)
             circle_area=math.pi*float(radius)*float(radius)
@@ -271,9 +294,18 @@ def extract_saturated_components(frame_resized,cv2,x0,y0,x1,y1,cfg):
             axis_ratio=(min(rw,rh)/max(rw,rh)) if max(rw,rh)>1e-9 else 0.0
         else:
             radius=0.0;circle_fill=0.0;axis_ratio=0.0
-        mean_sat=float(np.mean(sat[labels==lab]))
-        mean_val=float(np.mean(val[labels==lab]))
+
+        cx,cy=cent[lab]
+        lab_mask=(labels==lab)
+        mean_sat=float(np.mean(sat[lab_mask]))
+        mean_val=float(np.mean(val[lab_mask]))
         compact=fill/math.sqrt(max(area,1))
+        visual_score=(
+            (mean_sat/255.0)
+            *(0.15+0.85*circularity)
+            *(0.15+0.85*circle_fill)
+            *(0.15+0.85*float(np.clip(axis_ratio,0.0,1.0)))
+        )
         out.append({
             "x":float(cx+x0),"y":float(cy+y0),"area":area,
             "contour_area":contour_area,
@@ -284,12 +316,21 @@ def extract_saturated_components(frame_resized,cv2,x0,y0,x1,y1,cfg):
             "axis_ratio":float(np.clip(axis_ratio,0.0,1.0)),
             "radius":float(radius),
             "aspect_log_abs":float(abs(math.log(max(aspect,1e-9)))),
-            "appearance_score":mean_sat*(compact+.02),
+            "appearance_score":float(visual_score*255.0+compact),
             "mean_saturation":mean_sat,
             "mean_value":mean_val,
+            "visual_score":float(visual_score),
             "source":"color",
         })
-    return out
+
+    # Bound temporal-association complexity and make selection deterministic.
+    out.sort(
+        key=lambda q:(
+            -q["visual_score"],-q["circle_fill"],-q["circularity"],
+            q["x"],q["y"]
+        )
+    )
+    return out[:max_components]
 
 def build_temporal_tracks(frame_candidates,fps):
     """Associate compact moving components through time with short-gap recovery.
@@ -698,7 +739,8 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         frame_candidates.append(extract_components(crop,q,cv2,x0,yy0))
         color_frame_candidates.append(
             extract_saturated_components(
-                resized,cv2,x0,yy0,x1,y1,tracker_config or {}
+                resized,cv2,0,0,resized.shape[1],resized.shape[0],
+                tracker_config or {}
             )
         )
         i+=1
@@ -766,6 +808,9 @@ def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=
         "x_drift_fraction":float(chosen["x_drift_fraction"]),
         "gap_penalty":float(chosen["gap_penalty"]),
         "candidate_track_count":len(tracks),
+        "motion_track_count":len(motion_tracks),
+        "color_track_count":len(color_tracks),
+        "selected_track_source":chosen.get("track_source","motion"),
         "interval_frames":int(chosen["interval_frames"]),
         "detected_frames":int(chosen["detected_frames"]),
         "detected_fraction":float(chosen["detected_window_fraction"]),
@@ -1027,6 +1072,9 @@ def main():
                           "x_drift_fraction":tr["x_drift_fraction"],
                           "gap_penalty":tr["gap_penalty"],
                           "candidate_track_count":tr["candidate_track_count"],
+                          "motion_track_count":tr["motion_track_count"],
+                          "color_track_count":tr["color_track_count"],
+                          "selected_track_source":tr["selected_track_source"],
                           "interval_frames":tr["interval_frames"],
                           "detected_frames":tr["detected_frames"],
                           "detected_fraction":tr["detected_fraction"],
@@ -1142,6 +1190,9 @@ def main():
               "X_DRIFT",t["x_drift_fraction"],
               "GAP",t["gap_penalty"],
               "TRACKS",t["candidate_track_count"],
+              "MOTION_TRACKS",t["motion_track_count"],
+              "COLOR_TRACKS",t["color_track_count"],
+              "SOURCE",t["selected_track_source"],
               "INTERVAL_FRAMES",t["interval_frames"],
               "DETECTED_FRAMES",t["detected_frames"],
               "DETECTED_FRACTION",t["detected_fraction"],
