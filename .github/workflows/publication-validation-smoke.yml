@@ -312,49 +312,53 @@ jobs:
       - name: Package IRIS one-take visual diagnostics
         if: always()
         run: |
-          if [ -f /tmp/iris-v65-one/public-datasets/iris/Dropping_ball/drop_50/07.mp4 ]; then
-            mkdir -p /tmp/iris-v65-one/debug
-            python3 - <<'PY'
-            import cv2, pathlib, numpy as np, shutil
-            root=pathlib.Path("/tmp/iris-v65-one")
-            video=root/"public-datasets/iris/Dropping_ball/drop_50/07.mp4"
-            out=root/"debug"
-            cap=cv2.VideoCapture(str(video))
-            fps=float(cap.get(cv2.CAP_PROP_FPS))
-            n=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            def read_frame(idx):
-                cap.set(cv2.CAP_PROP_POS_FRAMES,int(idx))
-                ok,fr=cap.read()
-                if not ok:
-                    return None
-                h,w=fr.shape[:2]
-                scale=320.0/w
-                fr=cv2.resize(fr,(320,int(round(h*scale))),interpolation=cv2.INTER_AREA)
-                cv2.putText(fr,f"f={idx} t={idx/fps:.3f}s",(8,22),
-                            cv2.FONT_HERSHEY_SIMPLEX,.55,(0,255,0),1,cv2.LINE_AA)
-                return fr
-            def sheet(indices,name,cols=5):
-                ims=[read_frame(i) for i in indices]
-                ims=[x for x in ims if x is not None]
-                if not ims: return
-                h=max(x.shape[0] for x in ims); ww=max(x.shape[1] for x in ims)
-                rows=(len(ims)+cols-1)//cols
-                canvas=np.zeros((rows*h,cols*ww,3),np.uint8)
-                for k,im in enumerate(ims):
-                    r,c=divmod(k,cols);canvas[r*h:r*h+im.shape[0],c*ww:c*ww+im.shape[1]]=im
-                cv2.imwrite(str(out/name),canvas)
-            # Overview of the complete analyzed five-second prefix.
-            maxf=min(n-1,int(round(fps*5.0))-1)
-            sheet(np.linspace(0,maxf,25,dtype=int),"overview_0_5s.jpg",5)
-            # Dense view around the first 1.5 seconds, where the selected event lives.
-            sheet(range(0,min(n,int(round(fps*1.5))),3),"dense_0_1p5s.jpg",6)
-            cap.release()
-            for name in ("summary.json","candidate_audit.csv","take_summary.csv","failure_details.json"):
-                src=root/"result"/name
-                if src.exists(): shutil.copy2(src,out/name)
-            print("DEBUG_DIR",out)
-            PY
-          fi
+          mkdir -p /tmp/iris-v65-one/debug
+          python3 - <<'PY'
+          import cv2, pathlib, numpy as np, shutil
+          root=pathlib.Path("/tmp/iris-v65-one")
+          video=root/"public-datasets/iris/Dropping_ball/drop_50/07.mp4"
+          out=root/"debug"
+          if not video.is_file():
+              raise SystemExit("diagnostic video missing")
+          cap=cv2.VideoCapture(str(video))
+          fps=float(cap.get(cv2.CAP_PROP_FPS))
+          n=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+          def read_frame(idx):
+              cap.set(cv2.CAP_PROP_POS_FRAMES,int(idx))
+              ok,fr=cap.read()
+              if not ok:
+                  return None
+              h,w=fr.shape[:2]
+              scale=320.0/w
+              fr=cv2.resize(fr,(320,int(round(h*scale))),interpolation=cv2.INTER_AREA)
+              cv2.putText(fr,f"f={idx} t={idx/fps:.3f}s",(8,22),
+                          cv2.FONT_HERSHEY_SIMPLEX,.55,(0,255,0),1,cv2.LINE_AA)
+              return fr
+          def sheet(indices,name,cols=5):
+              ims=[read_frame(i) for i in indices]
+              ims=[x for x in ims if x is not None]
+              if not ims:
+                  return
+              h=max(x.shape[0] for x in ims); ww=max(x.shape[1] for x in ims)
+              rows=(len(ims)+cols-1)//cols
+              canvas=np.zeros((rows*h,cols*ww,3),np.uint8)
+              for k,im in enumerate(ims):
+                  r,c=divmod(k,cols)
+                  canvas[r*h:r*h+im.shape[0],c*ww:c*ww+im.shape[1]]=im
+              cv2.imwrite(str(out/name),canvas)
+          maxf=min(n-1,int(round(fps*5.0))-1)
+          sheet(np.linspace(0,maxf,25,dtype=int),"overview_0_5s.jpg",5)
+          sheet(range(0,min(n,int(round(fps*1.5))),3),"dense_0_1p5s.jpg",6)
+          cap.release()
+          for name in ("summary.json","candidate_audit.csv","take_summary.csv","failure_details.json"):
+              src=root/"result"/name
+              if src.exists():
+                  shutil.copy2(src,out/name)
+          params=root/"public-datasets/iris/parameters.json"
+          if params.exists():
+              shutil.copy2(params,out/"parameters.json")
+          print("DEBUG_DIR",out)
+          PY
 
       - uses: actions/upload-artifact@v4
         if: always()
