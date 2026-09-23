@@ -1945,7 +1945,347 @@ def choose_ballistic_track(tracks,fps,minimum_interval_frames=12,identity_cfg=No
         identity_cfg=cfg
     )
 
+def _v66_orange_ball_observation(frame,width,cv2,cfg):
+    """Return one robust IRIS orange-ball scale observation from a BGR frame.
+
+    The development videos use the same high-saturation orange/black soccer ball.
+    We segment the orange shell rather than foreground-motion area so hands and
+    later floor motion do not redefine the apparent ball scale.  This is an
+    experiment-specific object tracker, not a gravity calibration.
+    """
+    h0,w0=frame.shape[:2]
+    scale=float(width)/max(float(w0),1.0)
+    q=cv2.resize(
+        frame,(int(width),max(1,int(round(h0*scale)))),
+        interpolation=cv2.INTER_AREA
+    ) if w0!=width else frame
+    hsv=cv2.cvtColor(q,cv2.COLOR_BGR2HSV)
+    hmin=int(cfg.get("v66_ball_hue_min",3))
+    hmax=int(cfg.get("v66_ball_hue_max",30))
+    smin=int(cfg.get("v66_ball_saturation_min",140))
+    vmin=int(cfg.get("v66_ball_value_min",50))
+    if hmin<=hmax:
+        mask=((hsv[:,:,0]>=hmin)&(hsv[:,:,0]<=hmax)
+              &(hsv[:,:,1]>=smin)&(hsv[:,:,2]>=vmin)).astype(np.uint8)*255
+    else:
+        mask=(((hsv[:,:,0]>=hmin)|(hsv[:,:,0]<=hmax))
+              &(hsv[:,:,1]>=smin)&(hsv[:,:,2]>=vmin)).astype(np.uint8)*255
+    k=cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
+    mask=cv2.morphologyEx(mask,cv2.MORPH_OPEN,k)
+    mask=cv2.morphologyEx(mask,cv2.MORPH_CLOSE,k)
+
+    nlab,labels,stats,cent=cv2.connectedComponentsWithStats(mask,connectivity=8)
+    candidates=[]
+    frame_area=max(1,q.shape[0]*q.shape[1])
+    min_area=max(40,int(cfg.get("v66_ball_min_component_area",80)))
+    max_area=float(cfg.get("v66_ball_max_frame_fraction",0.20))*frame_area
+    for lab in range(1,nlab):
+        pix=int(stats[lab,cv2.CC_STAT_AREA])
+        bw=int(stats[lab,cv2.CC_STAT_WIDTH]);bh=int(stats[lab,cv2.CC_STAT_HEIGHT])
+        if pix<min_area or pix>max_area or bw<=0 or bh<=0:
+            continue
+        component=(labels==lab).astype(np.uint8)*255
+        contours,_=cv2.findContours(component,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
+        if not contours:
+            continue
+        contour=max(contours,key=cv2.contourArea)
+        ca=float(cv2.contourArea(contour))
+        per=float(cv2.arcLength(contour,True))
+        if ca<=1.0 or per<=1e-9:
+            continue
+        circ=float(np.clip(4.0*math.pi*ca/(per*per),0.0,1.0))
+        hull=cv2.convexHull(contour)
+        ha=float(cv2.contourArea(hull))
+        solidity=float(np.clip(ca/max(ha,1e-9),0.0,1.0))
+        (cx_circle,cy_circle),rad=cv2.minEnclosingCircle(hull)
+        circle_fill=float(np.clip(ca/max(math.pi*rad*rad,1e-9),0.0,1.0))
+        rect=cv2.minAreaRect(hull);rw,rh=map(float,rect[1])
+        axis=(min(rw,rh)/max(rw,rh)) if max(rw,rh)>1e-9 else 0.0
+        cx,cy=map(float,cent[lab])
+        # Favor the large compact saturated shell.  No temporal or gravity target
+        # appears here; later continuity is checked at the event level.
+        score=float(pix)*(0.45+0.20*circ+0.20*solidity+0.15*axis)
+        candidates.append({
+            "score":score,"x":cx,"y":cy,"area":float(pix),
+            "contour_area":ca,"radius":float(rad),
+            "circularity":circ,"solidity":solidity,
+            "circle_fill":circle_fill,"axis_ratio":float(np.clip(axis,0.0,1.0)),
+        })
+    if not candidates:
+        return None
+    return max(candidates,key=lambda z:z["score"])
+
+
+def extract_perspective_depth_v66(
+        video,drop_height,width=640,max_seconds=5.0,
+        minimum_interval_frames=12,tracker_config=None):
+    """IRIS V6.6 overhead free-fall estimator.
+
+    The ball is held near the overhead camera, released, falls along camera depth,
+    hits the horizontal surface, and bounces.  Apparent projected area A therefore
+    supplies a perspective depth proxy q=1/sqrt(A).  We use the initial held
+    plateau as q=0 progress, the *first* post-release depth maximum as impact, and
+    fit t=t0+T*sqrt(p).  The measured drop height converts T to acceleration only
+    after event selection.  The reference gravity value is never consulted.
+    """
+    cfg=tracker_config or {}
+    cv2=import_cv()
+    cap=cv2.VideoCapture(str(video))
+    if not cap.isOpened():
+        raise RuntimeError(f"cannot open {video}")
+    fps=float(cap.get(cv2.CAP_PROP_FPS))
+    frames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    n=min(frames,max(120,int(round(fps*max_seconds))))
+    obs=[]
+    shape_hw=None
+    for fi in range(n):
+        ok,fr=cap.read()
+        if not ok:
+            break
+        if shape_hw is None:
+            h0,w0=fr.shape[:2]
+            shape_hw=(max(1,int(round(h0*float(width)/max(w0,1)))),int(width))
+        z=_v66_orange_ball_observation(fr,width,cv2,cfg)
+        if z is not None:
+            z=dict(z);z["frame"]=fi;obs.append(z)
+    cap.release()
+    if len(obs)<minimum_interval_frames+6:
+        raise TrackSelectionError(
+            f"V6.6 orange-ball detector has too few observations: {len(obs)}"
+        )
+
+    fr=np.asarray([z["frame"] for z in obs],int)
+    area=np.asarray([z["area"] for z in obs],float)
+    xx=np.asarray([z["x"] for z in obs],float)
+    yy=np.asarray([z["y"] for z in obs],float)
+    radii=np.asarray([z["radius"] for z in obs],float)
+    # Work on a dense frame grid so a brief segmentation dropout does not move
+    # the inferred release/impact times.
+    dense=np.arange(int(fr[0]),int(fr[-1])+1,dtype=int)
+    max_gap=int(cfg.get("v66_max_interpolation_gap_frames",3))
+    gaps=np.diff(fr)
+    if len(gaps) and int(np.max(gaps))>max_gap+1:
+        # Keep the first continuous observation epoch; the real release occurs in
+        # the opening epoch and later reacquisitions are bounce/reset evidence.
+        cut=np.where(gaps>max_gap+1)[0]
+        if len(cut):
+            end=int(cut[0]+1)
+            obs=obs[:end]
+            fr=np.asarray([z["frame"] for z in obs],int)
+            area=np.asarray([z["area"] for z in obs],float)
+            xx=np.asarray([z["x"] for z in obs],float)
+            yy=np.asarray([z["y"] for z in obs],float)
+            radii=np.asarray([z["radius"] for z in obs],float)
+            dense=np.arange(int(fr[0]),int(fr[-1])+1,dtype=int)
+    if len(dense)<minimum_interval_frames+6:
+        raise TrackSelectionError("V6.6 first observation epoch is too short")
+
+    ad=np.interp(dense,fr,area)
+    xd=np.interp(dense,fr,xx)
+    yd=np.interp(dense,fr,yy)
+    rd=np.interp(dense,fr,radii)
+    smooth_n=int(cfg.get("v66_depth_smoothing_frames",3))
+    if smooth_n%2==0:
+        smooth_n+=1
+    area_s=np.maximum(smooth1(ad,max(1,smooth_n)),1.0)
+    depth=smooth1(1.0/np.sqrt(area_s),max(1,smooth_n))
+    times=dense/fps
+
+    seed_seconds=float(cfg.get("v66_release_seed_seconds",0.25))
+    seed_hi=int(np.searchsorted(dense,int(round(seed_seconds*fps)),side="right"))
+    seed_hi=max(4,min(seed_hi,len(dense)))
+    seed=depth[:seed_hi]
+    q0=float(np.median(seed))
+    seed_mad=1.4826*float(np.median(np.abs(seed-q0)))
+    release_threshold=max(
+        float(cfg.get("v66_release_relative_threshold",0.010))*abs(q0),
+        float(cfg.get("v66_release_mad_multiplier",3.0))*seed_mad,
+    )
+    sustain=max(2,int(cfg.get("v66_release_sustain_frames",2)))
+    release_idx=None
+    for i in range(seed_hi,len(depth)-sustain+1):
+        if np.all(depth[i:i+sustain] > q0+release_threshold):
+            release_idx=i
+            break
+    if release_idx is None:
+        raise TrackSelectionError("V6.6 did not find first sustained depth release")
+
+    min_event=max(8,int(cfg.get("v66_min_observed_event_frames",8)))
+    max_event=max(min_event+2,int(round(float(cfg.get("maximum_depth_event_seconds",0.75))*fps)))
+    reversal_n=max(2,int(cfg.get("depth_impact_reversal_frames",4)))
+    reversal_fraction=float(cfg.get("v66_minimum_impact_reversal_fraction",0.03))
+    impact_idx=None
+    impact_reversal=0.0
+    stop=min(len(depth)-reversal_n-1,release_idx+max_event)
+    for j in range(release_idx+min_event-1,stop+1):
+        local=depth[max(release_idx,j-2):min(len(depth),j+3)]
+        span=float(depth[j]-q0)
+        if span<=0:
+            continue
+        post=depth[j+1:j+1+reversal_n]
+        reversal=float((depth[j]-np.median(post))/max(span,1e-12))
+        if depth[j]>=float(np.max(local))-1e-12 and reversal>=reversal_fraction:
+            impact_idx=j
+            impact_reversal=reversal
+            break
+    if impact_idx is None:
+        raise TrackSelectionError("V6.6 did not find first post-release impact reversal")
+
+    span=float(depth[impact_idx]-q0)
+    rel_span=span/max(abs(q0),1e-12)
+    if rel_span<float(cfg.get("minimum_depth_proxy_relative_span",0.055)):
+        raise TrackSelectionError(
+            f"V6.6 perspective depth span too small: relative={rel_span:.6f}"
+        )
+
+    # Include a few pre-threshold points so t0 is inferred from the physical
+    # plateau transition rather than from an arbitrary threshold crossing.
+    fit_lo=max(0,release_idx-int(cfg.get("v66_release_preframes",4)))
+    ids=np.arange(fit_lo,impact_idx+1,dtype=int)
+    p=(depth[ids]-q0)/span
+    admissible=np.isfinite(p)&(p>=-0.08)&(p<=1.04)
+    ids=ids[admissible];p=p[admissible]
+    if len(ids)<minimum_interval_frames:
+        raise TrackSelectionError(
+            f"V6.6 release->impact support too short: {len(ids)} frames"
+        )
+    p=np.clip(p,0.0,1.0)
+    moving=p>=float(cfg.get("v66_min_fit_progress",0.005))
+    if int(np.sum(moving))<8:
+        raise TrackSelectionError("V6.6 has too few moving depth samples")
+    fit_ids=ids[moving];fit_p=p[moving];fit_t=times[fit_ids]
+
+    A=np.column_stack([np.ones(len(fit_t)),np.sqrt(fit_p)])
+    coef=np.linalg.lstsq(A,fit_t,rcond=None)[0]
+    t0=float(coef[0]);T=float(coef[1])
+    if not math.isfinite(T) or T<=0.0 or T>1.25:
+        raise TrackSelectionError(f"V6.6 invalid inferred fall duration: {T}")
+    inferred_frames=T*fps
+    if inferred_frames+1e-9<minimum_interval_frames:
+        raise TrackSelectionError(
+            f"V6.6 inferred fall is shorter than minimum: {inferred_frames:.3f}"
+        )
+
+    pred_t=A@coef
+    timing=float(np.sqrt(np.mean((fit_t-pred_t)**2))*fps)
+    if timing>float(cfg.get("maximum_global_timing_fit_rms_frames",2.5)):
+        raise TrackSelectionError(f"V6.6 timing residual too large: {timing:.3f}")
+    model=np.square(np.clip((fit_t-t0)/T,0.0,1.0))
+    shape=float(np.sqrt(np.mean((fit_p-model)**2)))
+    if shape>float(cfg.get("maximum_trajectory_shape_rms_fraction",0.10)):
+        raise TrackSelectionError(f"V6.6 trajectory shape residual too large: {shape:.4f}")
+
+    impact_time=t0+T
+    impact_miss=abs(impact_time-float(times[impact_idx]))*fps
+    if impact_miss>float(cfg.get("maximum_depth_impact_miss_frames",4.5)):
+        raise TrackSelectionError(f"V6.6 fitted impact misses reversal by {impact_miss:.3f} frames")
+
+    event_frames=dense[ids]
+    det_set=set(map(int,fr.tolist()))
+    detected=sum(int(ff) in det_set for ff in event_frames)
+    detected_fraction=detected/max(1,len(event_frames))
+    if detected_fraction<float(cfg.get("minimum_detected_fraction",0.50)):
+        raise TrackSelectionError(
+            f"V6.6 event detection fraction too low: {detected_fraction:.3f}"
+        )
+    event_x=xd[ids]
+    event_r=rd[ids]
+    ball_diam=max(2.0*float(np.median(event_r)),1e-9)
+    xdrift=float(np.ptp(event_x))/ball_diam
+    if xdrift>float(cfg.get("maximum_depth_lateral_diameters",1.25)):
+        raise TrackSelectionError(f"V6.6 lateral drift too large: {xdrift:.3f} diameters")
+
+    # Identity/shape diagnostics use observations nearest the selected event.
+    chosen_obs=[z for z in obs if int(event_frames[0])<=int(z["frame"])<=int(event_frames[-1])]
+    circ=np.asarray([z["circularity"] for z in chosen_obs],float)
+    sol=np.asarray([z["solidity"] for z in chosen_obs],float)
+    cf=np.asarray([z["circle_fill"] for z in chosen_obs],float)
+    ax=np.asarray([z["axis_ratio"] for z in chosen_obs],float)
+    rr=np.asarray([z["radius"] for z in chosen_obs],float)
+    aa=np.asarray([z["area"] for z in chosen_obs],float)
+    mc=float(np.median(circ));ms=float(np.median(sol));mf=float(np.median(cf));ma=float(np.median(ax))
+    rcv=float(np.std(rr)/max(np.mean(rr),1e-9))
+    acv=float(np.std(aa)/max(np.mean(aa),1e-9))
+    identity=(.28*mc+.22*mf+.18*ms+.17*ma+.15*max(0.0,1.0-min(rcv,1.0)))
+    monotone=float(np.mean(np.diff(p)>=-.025)) if len(p)>1 else 1.0
+    gap_penalty=float(np.mean(np.maximum(np.diff(fr)-1,0))) if len(fr)>1 else 0.0
+
+    progress_full=(depth-q0)/span
+    position_m=np.clip(progress_full[ids],0.0,1.0)*drop_height
+    rel_times=times[ids]-t0
+    release_rest_ghat=2.0*drop_height/(T*T)
+    X=np.column_stack([np.ones(len(rel_times)),rel_times,.5*rel_times*rel_times])
+    trajectory_coef=np.linalg.lstsq(X,position_m,rcond=None)[0]
+    trajectory_g=float(trajectory_coef[2])
+    eqr_top=math.sqrt(max(float(np.median(area_s[:seed_hi])),1.0)/math.pi)
+    eqr_bottom=math.sqrt(max(float(area_s[impact_idx]),1.0)/math.pi)
+    radius_span=max(abs(eqr_top-eqr_bottom),1e-6)
+
+    audit=[{
+        "event_rank":1,"selected":True,"track_id":0,"sign":1.0,
+        "t0_s":t0,"local_span_px":radius_span,"spatial_envelope_px":radius_span,
+        "relative_span":1.0,"global_progress_span":float(np.ptp(p)),
+        "raw_global_progress_span":float(np.ptp(p)),
+        "global_progress_start":float(np.min(p)),"global_progress_end":float(np.max(p)),
+        "full_fall_time_s":T,"interval_frames":int(round(inferred_frames)),
+        "observed_fragment_frames":int(len(ids)),
+        "inferred_full_fall_frames":float(inferred_frames),
+        "detected_frames":int(detected),"detected_fraction":float(detected_fraction),
+        "timing_fit_rms_frames":timing,"trajectory_shape_rms_fraction":shape,
+        "release_speed_ratio":0.0,"x_drift_fraction":xdrift,
+        "gap_penalty":gap_penalty,"identity_score":identity,
+        "median_circularity":mc,"median_solidity":ms,"median_circle_fill":mf,
+        "median_axis_ratio":ma,"radius_cv":rcv,"area_cv":acv,
+        "aspect_log_median":0.0,"envelope_source_track":0,"envelope_source_chunk":0,
+        "normalized_acceleration_s2":float(2.0/(T*T)),
+        "normalized_fit_a":0.0,"normalized_fit_b":0.0,
+        "duration_10_90_s":float(T*(math.sqrt(.90)-math.sqrt(.10))),
+        "roots_complete":1.0,"acceleration_stability":float(seed_mad/max(span,1e-12)),
+        "event_extrapolation_frames":float(impact_miss),
+        "release_plateau_track":0,"impact_plateau_track":0,
+        "depth_proxy":"orange_component_area",
+        "depth_proxy_relative_span":float(rel_span),
+        "depth_impact_reversal":float(impact_reversal),
+    }]
+
+    return {
+        "fps":fps,
+        "valid_fraction":float(len(obs)/max(1,n)),
+        "span_px":float(radius_span),"one_pixel_m":drop_height/radius_span,
+        "active_frames":int(len(ids)),
+        "times":rel_times,"position_m":position_m,
+        "direct_acceleration_m_s2":release_rest_ghat,
+        "trajectory_acceleration_m_s2":trajectory_g,
+        "release_rest_acceleration_m_s2":release_rest_ghat,
+        "full_fall_time_s":T,"timing_fit_rms_frames":timing,
+        "trajectory_shape_rms_fraction":shape,
+        "plateau_relative_mad":float(seed_mad/max(span,1e-12)),
+        "monotone_fraction":monotone,"forward_fraction":monotone,
+        "selected_direction_sign":1.0,
+        "duration_10_90_s":float(T*(math.sqrt(.90)-math.sqrt(.10))),
+        "release_time_s_absolute":t0,"track_id":0,"release_speed_ratio":0.0,
+        "x_drift_fraction":xdrift,"gap_penalty":gap_penalty,
+        "candidate_track_count":1,"interval_frames":int(round(inferred_frames)),
+        "observed_fragment_frames":int(len(ids)),
+        "inferred_full_fall_frames":float(inferred_frames),
+        "detected_frames":int(detected),"detected_fraction":float(detected_fraction),
+        "identity_score":identity,"median_circularity":mc,"median_solidity":ms,
+        "median_circle_fill":mf,"median_axis_ratio":ma,
+        "radius_cv":rcv,"area_cv":acv,"aspect_log_median":0.0,
+        "edge_trim_left":0,"edge_trim_right":0,
+        "acceleration_stability":float(seed_mad/max(span,1e-12)),
+        "roots_complete":True,"candidate_audit":audit,
+        "roi":[0,0,int(width),int(shape_hw[0] if shape_hw else width)],
+    }
+
+
 def extract(video,drop_height,width=640,max_seconds=5.0,minimum_interval_frames=12,tracker_config=None):
+    if tracker_config and tracker_config.get("revision")=="ball_identity_v6_6_depth":
+        return extract_perspective_depth_v66(
+            video,drop_height,width=width,max_seconds=max_seconds,
+            minimum_interval_frames=minimum_interval_frames,
+            tracker_config=tracker_config
+        )
     cv2=import_cv();cap=cv2.VideoCapture(str(video))
     if not cap.isOpened():raise RuntimeError(f"cannot open {video}")
     fps=float(cap.get(cv2.CAP_PROP_FPS));frames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
