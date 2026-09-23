@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Blind IRIS free-fall validation on development/validation/final partitions.
 
-Development revisions 1-4 (2026-09-23):
+Development revisions 1-5 (2026-09-23):
 The first development run exposed a segmentation/calibration failure: the old
 tracker chose the longest occupancy run between global position quantiles, which
 can select slow reset/handling motion rather than the actual ballistic descent.
@@ -10,12 +10,13 @@ No validation or final free-fall result was analyzed before this redesign.
 Revision 2 improved event selection but still failed development (2/4 quality
 pass; 36.06% median acceleration error). Revision 3 then over-constrained the
 event with plateau/shape gates and produced 0/4 quality-pass videos. Revision 4
-uses temporally associated compact-object tracks and a direct release-from-rest
-quadratic image model. Candidate ranking uses only fit residual, release-speed
-consistency, verticality, continuity and span; the target acceleration is not used.
-The independently measured drop height is used only to convert the selected image
-trajectory into physical units. The verification score remains
-candidate-vs-baseline trajectory residual with the global |S|=2 decision rule.
+built temporal tracks, but all four selected intervals failed the existing
+active-frame gate and the short-fragment/full-height mismatch inflated gravity.
+Revision 5 therefore forbids arbitrary subsegments, allows only small edge trims,
+requires the existing minimum interval duration before physical calibration, and
+ranks complete coherent flights ahead of tiny low-residual fragments. The target
+acceleration remains absent from selection. The independently measured drop height
+is bound only to the accepted full-flight interval.
 """
 from __future__ import annotations
 import argparse,csv,json,math,pathlib,statistics,subprocess,tempfile
@@ -89,34 +90,38 @@ def extract_components(diff_crop,threshold,cv2,x0,y0):
     return out
 
 def build_temporal_tracks(frame_candidates,fps):
-    """Associate compact moving components through time.
+    """Associate compact moving components through time with short-gap recovery.
 
-    Association uses only image continuity/compactness. No physical truth or target
-    acceleration appears here.
+    A 0.5 m free-fall lasts only ~0.3 s, so losing two or three detections can
+    fragment the physical event. V5 allows short gaps while keeping a
+    constant-velocity image prediction and component-scale gate. No physical truth
+    or target acceleration enters association.
     """
     active=[];finished=[];next_id=0
-    max_gap=2
+    max_gap=5
     for frame_idx,cands in enumerate(frame_candidates):
-        # Predict each active track from its last two observations.
         unmatched=set(range(len(cands)))
         proposals=[]
         for ti,tr in enumerate(active):
+            last=tr["pts"][-1]
             if len(tr["pts"])>=2:
-                p0=tr["pts"][-2];p1=tr["pts"][-1]
-                vx=p1["x"]-p0["x"];vy=p1["y"]-p0["y"]
+                p0=tr["pts"][-2];p1=last
+                df=max(1,p1["frame"]-p0["frame"])
+                vx=(p1["x"]-p0["x"])/df
+                vy=(p1["y"]-p0["y"])/df
             else:vx=vy=0.0
-            predx=tr["pts"][-1]["x"]+vx
-            predy=tr["pts"][-1]["y"]+vy
-            last_area=tr["pts"][-1]["area"]
+            gap=max(1,frame_idx-last["frame"])
+            predx=last["x"]+vx*gap
+            predy=last["y"]+vy*gap
+            last_area=last["area"]
             for ci,cc in enumerate(cands):
                 dx=cc["x"]-predx;dy=cc["y"]-predy
                 dist=math.hypot(dx,dy)
                 area_ratio=max(cc["area"],last_area)/max(1,min(cc["area"],last_area))
-                # Allow fast vertical motion but reject implausible teleports/scale jumps.
-                gate=max(18.0,4.5+2.2*abs(vy))
-                if dist>gate or area_ratio>4.0:continue
-                horiz=abs(cc["x"]-tr["pts"][-1]["x"])
-                cost=dist+0.35*horiz+3.0*abs(math.log(area_ratio))-0.002*cc["appearance_score"]
+                gate=max(22.0,7.0*gap+2.8*abs(vy)*gap)
+                if dist>gate or area_ratio>4.5:continue
+                horiz=abs(cc["x"]-last["x"])
+                cost=(dist/gap)+0.25*(horiz/gap)+2.5*abs(math.log(area_ratio))-0.002*cc["appearance_score"]
                 proposals.append((cost,ti,ci))
         assigned_tracks=set();assigned_cands=set()
         for cost,ti,ci in sorted(proposals):
@@ -138,42 +143,51 @@ def build_temporal_tracks(frame_candidates,fps):
         if len(tr["pts"])>=6:finished.append(tr)
     return finished
 
-def fit_release_quadratic(track,fps):
-    """Find best contiguous release-from-rest-like segment on one image track.
+def fit_release_quadratic(track,fps,minimum_interval_frames=12):
+    """Fit a near-full coherent track as release-from-rest motion.
 
-    We fit y(t)=a+b*t+c*t^2 and require acceleration-dominated motion. Candidate
-    ranking is based on normalized image residual, continuity, verticality and
-    release-speed consistency—not the true value of g.
+    V4 searched arbitrary subsegments and therefore preferred tiny, near-perfect
+    quadratic fragments. V5 only permits the whole contiguous track chunk, with at
+    most two edge detections trimmed for segmentation noise. The selected physical
+    interval must satisfy the existing minimum-active-frame duration before the
+    independently measured drop height can be bound to it.
     """
     pts=track["pts"]
     frames=np.asarray([p["frame"] for p in pts],int)
     xx=np.asarray([p["x"] for p in pts],float)
     yy=np.asarray([p["y"] for p in pts],float)
     best=None
-    # Split at temporal gaps so interpolation never bridges unrelated motion.
+
+    # Split only at gaps larger than the tracker's explicit recovery allowance.
     cuts=[0]
     for i in range(1,len(frames)):
-        if frames[i]-frames[i-1]>2:cuts.append(i)
+        if frames[i]-frames[i-1]>5:cuts.append(i)
     cuts.append(len(frames))
+
     for aa,bb in zip(cuts,cuts[1:]):
         if bb-aa<8:continue
-        fr=frames[aa:bb];x=xx[aa:bb];y=yy[aa:bb]
-        # Evaluate both vertical directions and all plausible release/end subsegments.
-        for sign in (1.0,-1.0):
-            p=sign*y
-            n=len(p)
-            for i0 in range(0,max(1,n-7)):
-                for i1 in range(i0+7,n):
-                    fs=fr[i0:i1+1]
-                    if fs[-1]-fs[0] > int(round(1.2*fps)):break
-                    if fs[-1]-fs[0] < max(6,int(round(.10*fps))):continue
-                    q=p[i0:i1+1];qx=x[i0:i1+1]
-                    t=(fs-fs[0])/fps
+        fr0=frames[aa:bb];x0=xx[aa:bb];y0=yy[aa:bb]
+        # Edge trimming only. No arbitrary interior cherry-picking.
+        for trim_l in range(0,min(3,max(1,len(fr0)-7))):
+            for trim_r in range(0,min(3,max(1,len(fr0)-trim_l-7))):
+                hi=len(fr0)-trim_r if trim_r else len(fr0)
+                fr=fr0[trim_l:hi];x=x0[trim_l:hi];y=y0[trim_l:hi]
+                if len(fr)<8:continue
+                interval_frames=int(fr[-1]-fr[0]+1)
+                if interval_frames<minimum_interval_frames:continue
+                if interval_frames>int(round(1.25*fps)):continue
+                detected_fraction=len(fr)/max(1,interval_frames)
+                if detected_fraction<.55:continue
+
+                for sign in (1.0,-1.0):
+                    q=sign*y
+                    t=(fr-fr[0])/fps
                     span=float(q[-1]-q[0])
-                    if span<15.0:continue
+                    if span<18.0:continue
                     d=np.diff(q)
-                    monotone=float(np.mean(d>=-1.0))
+                    monotone=float(np.mean(d>=-1.5))
                     if monotone<.78:continue
+
                     X=np.column_stack([np.ones(len(t)),t,t*t])
                     coef=np.linalg.lstsq(X,q,rcond=None)[0]
                     pred=X@coef
@@ -183,42 +197,51 @@ def fit_release_quadratic(track,fps):
                     duration=float(t[-1])
                     accel_term=2.0*c*duration
                     release_ratio=abs(b)/max(abs(accel_term),1e-9)
-                    if release_ratio>0.65:continue
-                    x_drift=float(np.percentile(qx,95)-np.percentile(qx,5))/max(span,1e-9)
+                    if release_ratio>.65:continue
+                    x_drift=float(np.percentile(x,95)-np.percentile(x,5))/max(span,1e-9)
                     if x_drift>.45:continue
-                    # The fitted release time may lie slightly before the first tracked frame.
+
                     release_offset=-b/(2.0*c)
-                    if release_offset < -0.20 or release_offset > 0.10:continue
+                    if release_offset<-.25 or release_offset>.12:continue
                     t_release=release_offset
                     y_release=a+b*t_release+c*t_release*t_release
                     y_end=float(pred[-1])
                     fit_span=y_end-y_release
-                    if fit_span<12.0:continue
-                    # Require the segment to end while motion is still fast, so a slow reset
-                    # cannot masquerade as free fall.
+                    if fit_span<15.0:continue
                     v_end=b+2.0*c*duration
                     if v_end<=0:continue
-                    # Rank without g: quadratic fit quality first, then release consistency,
-                    # verticality, temporal continuity and span.
-                    gaps=np.diff(fs)
-                    gap_penalty=float(np.mean(np.maximum(gaps-1,0)))
-                    rank=(residual,release_ratio,x_drift,gap_penalty,-fit_span,-len(t))
+
+                    gaps=np.diff(fr)
+                    gap_penalty=float(np.mean(np.maximum(gaps-1,0))) if len(gaps) else 0.0
+                    # Prefer the fullest coherent flight first; fit residual only
+                    # decides between similarly complete candidates. This prevents
+                    # a short pristine fragment from beating the physical event.
+                    rank=(-interval_frames,-fit_span,-detected_fraction,
+                          residual,release_ratio,x_drift,gap_penalty)
                     cand={
-                        "rank":rank,"track_id":track["id"],"frames":fs,"x":qx,"y_signed":q,
-                        "sign":sign,"coef":coef,"pred":pred,"residual_fraction":residual,
-                        "release_speed_ratio":release_ratio,"x_drift_fraction":x_drift,
-                        "monotone_fraction":monotone,"release_time_offset_s":release_offset,
-                        "duration_s":duration,"fit_span_px":fit_span,"v_end_px_s":v_end,
-                        "start_frame":int(fs[0]),"end_frame":int(fs[-1]),
-                        "gap_penalty":gap_penalty
+                        "rank":rank,"track_id":track["id"],"frames":fr,"x":x,
+                        "y_signed":q,"sign":sign,"coef":coef,"pred":pred,
+                        "residual_fraction":residual,
+                        "release_speed_ratio":release_ratio,
+                        "x_drift_fraction":x_drift,
+                        "monotone_fraction":monotone,
+                        "release_time_offset_s":release_offset,
+                        "duration_s":duration,"fit_span_px":fit_span,
+                        "v_end_px_s":v_end,"start_frame":int(fr[0]),
+                        "end_frame":int(fr[-1]),"gap_penalty":gap_penalty,
+                        "interval_frames":interval_frames,
+                        "detected_frames":len(fr),
+                        "detected_fraction":detected_fraction,
+                        "edge_trim_left":trim_l,
+                        "edge_trim_right":trim_r,
                     }
                     if best is None or cand["rank"]<best["rank"]:best=cand
     return best
 
-def choose_ballistic_track(tracks,fps):
+def choose_ballistic_track(tracks,fps,minimum_interval_frames=12):
     candidates=[]
     for tr in tracks:
-        q=fit_release_quadratic(tr,fps)
+        q=fit_release_quadratic(tr,fps,minimum_interval_frames=minimum_interval_frames)
         if q is not None:candidates.append(q)
     if not candidates:raise RuntimeError("no temporally consistent release-from-rest track found")
     return min(candidates,key=lambda q:q["rank"])
@@ -263,7 +286,7 @@ def extract(video,drop_height,width=640,max_seconds=5.0):
 
     tracks=build_temporal_tracks(frame_candidates,fps)
     if not tracks:raise RuntimeError("no compact temporal motion tracks")
-    chosen=choose_ballistic_track(tracks,fps)
+    chosen=choose_ballistic_track(tracks,fps,minimum_interval_frames=12)
 
     fs=np.asarray(chosen["frames"],int)
     t_abs=fs/fps
@@ -314,6 +337,11 @@ def extract(video,drop_height,width=640,max_seconds=5.0):
         "x_drift_fraction":chosen["x_drift_fraction"],
         "gap_penalty":chosen["gap_penalty"],
         "candidate_track_count":len(tracks),
+        "interval_frames":int(chosen["interval_frames"]),
+        "detected_frames":int(chosen["detected_frames"]),
+        "detected_fraction":float(chosen["detected_fraction"]),
+        "edge_trim_left":int(chosen["edge_trim_left"]),
+        "edge_trim_right":int(chosen["edge_trim_right"]),
         "roi":[int(x0),int(yy0),int(x1-x0),int(y1-yy0)]
     }
 
@@ -409,11 +437,11 @@ def main():
     if a.split=="validation":
         d=json.loads(a.require_development_summary.read_text()) if a.require_development_summary else {}
         if not d.get("gate_pass"):raise SystemExit("development gate failed/missing")
-        if d.get("tracker_revision")!="temporal_ballistic_v4":raise SystemExit("development tracker revision mismatch")
+        if d.get("tracker_revision")!="full_flight_v5":raise SystemExit("development tracker revision mismatch")
     if a.split=="final_test":
         v=json.loads(a.require_validation_summary.read_text()) if a.require_validation_summary else {}
         if not v.get("gate_pass"):raise SystemExit("validation gate failed/missing")
-        if v.get("tracker_revision")!="temporal_ballistic_v4":raise SystemExit("validation tracker revision mismatch")
+        if v.get("tracker_revision")!="full_flight_v5":raise SystemExit("validation tracker revision mismatch")
         if not a.lock:raise SystemExit("final_test requires lock")
         subprocess.run(["python3","research/analysis/freeze_iris_freefall_final_test.py","--check",str(a.lock)],check=True)
     out=a.out or pathlib.Path(f"build/publication-validation/iris-freefall-{a.split}")
@@ -449,6 +477,11 @@ def main():
                           "x_drift_fraction":tr["x_drift_fraction"],
                           "gap_penalty":tr["gap_penalty"],
                           "candidate_track_count":tr["candidate_track_count"],
+                          "interval_frames":tr["interval_frames"],
+                          "detected_frames":tr["detected_frames"],
+                          "detected_fraction":tr["detected_fraction"],
+                          "edge_trim_left":tr["edge_trim_left"],
+                          "edge_trim_right":tr["edge_trim_right"],
                           "monotone_fraction":tr["monotone_fraction"]})
             if not qok:continue
             for name,fac,truth,family,neg in cases():
@@ -463,7 +496,7 @@ def main():
                      "physical_delta":math.log(g1/g0),"target_error_delta":abs(math.log(g1/G))-abs(math.log(g0/G)),
                      "measurement_noise_sigma":tr["one_pixel_m"],"pose_noise_sigma":"","missing_fraction":1-tr["valid_fraction"],
                      "channel_dependence":0.0,"negative_control":str(neg).lower(),"seed":0,"source_artifact":str(pkg),
-                     "notes":f"factor={fac}; drop_height_m={height}; tracker=temporal_ballistic_v4; standardized evidence score; take01 forbidden"})
+                     "notes":f"factor={fac}; drop_height_m={height}; tracker=full_flight_v5; standardized evidence score; take01 forbidden"})
         except Exception as e:fails.append({"scene":m["scene"],"error":f"{type(e).__name__}: {e}"})
     out.mkdir(parents=True,exist_ok=True)
     if rows:
@@ -487,12 +520,12 @@ def main():
     elif a.split=="validation":
         vg=cfg["validation_gate"];gate=quality>=vg["minimum_quality_videos"] and tc>=vg["minimum_truth_control_accuracy"] and pfar<=vg["placebo_false_assertion_rate"] and sign>=vg["minimum_direction_sign_rate"]
     else:gate=True
-    summary={"schema":"vulkax.iris_freefall_blind_result","version":4,"tracker_revision":"temporal_ballistic_v4",
+    summary={"schema":"vulkax.iris_freefall_blind_result","version":5,"tracker_revision":"full_flight_v5",
       "split":a.split,"expected_videos":expected,"quality_pass_videos":quality,"failures":fails,
       "median_acceleration_relative_error":median_err,"records":len(rows),"truth_control_accuracy":tc,
       "placebo_false_assertion_rate":pfar,"direction_sign_rate":sign,"gate_pass":gate,
       "take01_forbidden":True,
-      "claim_guard":"Different equation-family replication; tracker revision 4 was fixed using development only after v1/v2/v3 development failures. Gravity estimation itself is not novel."}
+      "claim_guard":"Different equation-family replication; tracker revision 5 was fixed using development only after v1/v2/v3/v4 development failures. Gravity estimation itself is not novel."}
     (out/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
     print("VALID IRIS free-fall",a.split)
     for t in takes:
@@ -504,7 +537,10 @@ def main():
               "RELEASE_RATIO",t["release_speed_ratio"],
               "X_DRIFT",t["x_drift_fraction"],
               "GAP",t["gap_penalty"],
-              "TRACKS",t["candidate_track_count"])
+              "TRACKS",t["candidate_track_count"],
+              "INTERVAL_FRAMES",t["interval_frames"],
+              "DETECTED_FRAMES",t["detected_frames"],
+              "DETECTED_FRACTION",t["detected_fraction"])
     for e in fails:
         print("TAKE_FAIL",e["scene"],e["error"])
     for k,v in summary.items():
