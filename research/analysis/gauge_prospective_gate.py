@@ -164,8 +164,9 @@ def factor_key(factor: float) -> str:
 
 
 def load_material(root: Path, task: str, material: str) -> tuple[Path, dict]:
-    metadata_task = TASKS[task]
-    metadata_path = root / "metadata" / f"{metadata_task}.json"
+    # fetch_gauge_foam_subset.py preserves the data-task spelling locally:
+    # upstream metadata "foam compressing.json" -> local "foam compression.json".
+    metadata_path = root / "metadata" / f"{task}.json"
     md = json.loads(metadata_path.read_text(encoding="utf-8"))
     mat = dict(md["assets"]["foam"]["material"][material])
     return metadata_path, mat
@@ -362,6 +363,16 @@ def self_test() -> None:
         assert veto < 0.0
         assert placebo == 0.0
     assert SPLIT_TRIALS["final_test"] == (8, 9, 10)
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "metadata").mkdir()
+        payload = {"assets": {"foam": {"material": {"soft": {"young": 123.0}}}}}
+        (root / "metadata" / "foam compression.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+        path, mat = load_material(root, "foam compression", "soft")
+        assert path.name == "foam compression.json"
+        assert float(mat["young"]) == 123.0
     print("VALID GAUGE prospective-gate self-test")
 
 
