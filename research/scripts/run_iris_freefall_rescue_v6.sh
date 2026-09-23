@@ -63,6 +63,7 @@ python3 research/analysis/prepare_public_validation_datasets.py   --root "$DATA"
 python3 research/analysis/adapt_public_validation_inputs.py   --repo-root . --data-root "$DATA" --prepared-root "$PUBLIC"
 
 echo "[freefall-v6] analyzing development split"
+trap - ERR
 set +e
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py \
   --adapted-root "$PUBLIC/adapted" \
@@ -71,6 +72,7 @@ set +e
   --out "$DEV"
 DEV_RC=$?
 set -e
+trap 'rc=$?; echo "[freefall-v6] ERROR rc=$rc line=$LINENO command=$BASH_COMMAND" >&2; exit $rc' ERR
 
 if [[ ! -s "$DEV/summary.json" ]]; then
   echo "[freefall-v6] ERROR: analyzer exited rc=$DEV_RC without summary.json" >&2
