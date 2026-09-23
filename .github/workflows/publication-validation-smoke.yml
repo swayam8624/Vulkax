@@ -11,6 +11,7 @@ on:
       - "research/scripts/prepare_public_validation_data.sh"
       - "research/scripts/fetch_public_validation_datasets.py"
       - "research/analysis/prepare_public_validation_datasets.py"
+      - "research/analysis/adapt_public_validation_inputs.py"
       - "research/analysis/assemble_paper_evidence.py"
       - "run_everything.sh"
       - "research/paper_data/**"
@@ -23,6 +24,10 @@ on:
       - "research/analysis/plan_validation_sample_size.py"
       - "research/analysis/analyze_transaction_utility.py"
       - "research/scripts/run_publication_validation.sh"
+      - "research/scripts/prepare_public_validation_data.sh"
+      - "research/scripts/fetch_public_validation_datasets.py"
+      - "research/analysis/prepare_public_validation_datasets.py"
+      - "research/analysis/adapt_public_validation_inputs.py"
       - ".github/workflows/publication-validation-smoke.yml"
   workflow_dispatch:
 
@@ -58,6 +63,7 @@ jobs:
             research/analysis/analyze_transaction_utility.py \
             research/analysis/assemble_paper_evidence.py \
             research/analysis/prepare_public_validation_datasets.py \
+            research/analysis/adapt_public_validation_inputs.py \
             research/scripts/fetch_public_validation_datasets.py
 
       - name: Script self-tests
