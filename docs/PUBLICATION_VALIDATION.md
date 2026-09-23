@@ -182,8 +182,8 @@ fast path:
 
 ```text
 AVFoundation / hardware video decode where available
-→ Metal full-resolution corruption
 → Metal 640px resize + grayscale
+→ Metal corruption in the exact analysis space
 → raw grayscale frames
 → unchanged centroid / FFT / evidence scoring
 ```
