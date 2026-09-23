@@ -37,12 +37,13 @@ import json,sys
 p=sys.argv[1]
 cfg=json.load(open(p))
 assert int(cfg.get("version",0))==6, cfg.get("version")
-assert cfg["tracker"]["revision"]=="ball_identity_v6_4", cfg["tracker"]["revision"]
+rev=cfg["tracker"]["revision"]
+assert isinstance(rev,str) and rev.startswith("ball_identity_v6_"), rev
 assert cfg["dataset"]["development"]["takes"]==["06","07","08","09","10"]
 assert cfg["dataset"]["validation"]["takes"]==["06","07","08","09","10"]
 assert not (set(cfg["dataset"]["prior_failed_validation"]["takes"])
             & set(cfg["dataset"]["validation"]["takes"]))
-print("VALID V6.4 config preflight")
+print("VALID",cfg["tracker"]["revision"],"config preflight")
 PY
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --self-test
 "$VENV/bin/python" research/analysis/run_iris_freefall_validation.py --self-test-video
@@ -98,14 +99,16 @@ print_candidate_audit() {
     echo "[freefall-v6] candidate audit unavailable (no candidate rows)"
     return 0
   fi
-  "$VENV/bin/python" - "$DEV/candidate_audit.csv" <<'PY'
-import csv,sys
+  "$VENV/bin/python" - "$DEV/candidate_audit.csv" "$CONFIG" <<'PY'
+import csv,json,sys
 from collections import defaultdict
 rows=list(csv.DictReader(open(sys.argv[1],newline="",encoding="utf-8")))
+cfg=json.load(open(sys.argv[2],encoding="utf-8"))
+revision=cfg["tracker"]["revision"]
 by=defaultdict(list)
 for r in rows:
     by[r["scene"]].append(r)
-print("\n=== V6.4 DEVELOPMENT CANDIDATE AUDIT ===")
+print(f"\n=== {revision} DEVELOPMENT CANDIDATE AUDIT ===")
 for scene in sorted(by):
     q=sorted(by[scene],key=lambda r:int(r["event_rank"]))[:6]
     print(scene)
@@ -122,7 +125,11 @@ for scene in sorted(by):
           f" timing={float(r['timing_fit_rms_frames']):.3f}"
           f" shape={float(r['trajectory_shape_rms_fraction']):.3f}"
           f" identity={float(r['identity_score']):.3f}"
-          f" g_rel_err={float(r['acceleration_relative_error']):.3f}"
+          + (f" a_stab={float(r['acceleration_stability']):.3f}"
+             if r.get("acceleration_stability","") not in ("",None) else "")
+          + (f" roots={r['roots_complete']}"
+             if r.get("roots_complete","") not in ("",None) else "")
+          + f" g_rel_err={float(r['acceleration_relative_error']):.3f}"
         )
 PY
 }
