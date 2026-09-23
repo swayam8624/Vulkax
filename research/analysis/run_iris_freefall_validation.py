@@ -2057,7 +2057,6 @@ def extract_perspective_depth_v66(
     fr=np.asarray([z["frame"] for z in obs],int)
     area=np.asarray([z["area"] for z in obs],float)
     xx=np.asarray([z["x"] for z in obs],float)
-    yy=np.asarray([z["y"] for z in obs],float)
     radii=np.asarray([z["radius"] for z in obs],float)
     # Work on a dense frame grid so a brief segmentation dropout does not move
     # the inferred release/impact times.
@@ -2074,7 +2073,6 @@ def extract_perspective_depth_v66(
             fr=np.asarray([z["frame"] for z in obs],int)
             area=np.asarray([z["area"] for z in obs],float)
             xx=np.asarray([z["x"] for z in obs],float)
-            yy=np.asarray([z["y"] for z in obs],float)
             radii=np.asarray([z["radius"] for z in obs],float)
             dense=np.arange(int(fr[0]),int(fr[-1])+1,dtype=int)
     if len(dense)<minimum_interval_frames+6:
