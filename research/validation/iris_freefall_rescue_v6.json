@@ -100,7 +100,7 @@
   },
   "validation_gate": {
     "minimum_quality_videos": 4,
-    "maximum_median_acceleration_relative_error": 0.35,
+    "maximum_median_acceleration_relative_error": 0.2,
     "minimum_truth_control_accuracy": 0.75,
     "placebo_false_assertion_rate": 0,
     "minimum_direction_sign_rate": 0.9
