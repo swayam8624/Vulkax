@@ -28,7 +28,7 @@ Profiles:
          - GAUGE: 60 foam trials (stretch/compression/shear; soft+hard)
          - IRIS: 24 videos, one take from all 24 physical settings
          - RGBench: one grasp/fold/fling capture for each of
-           green_tshirt, grey_pleat_skirt, white_shirt + meshes/reference data
+           green_tshirt, grey_pleat_skirt, white_shirt + required meshes
   full   Complete public releases. This is multi-gigabyte.
 EOF
 }
