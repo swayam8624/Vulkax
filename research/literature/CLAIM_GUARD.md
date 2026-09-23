@@ -198,3 +198,27 @@ The broader paper-level interpretation may now state that verification success i
 **information/channel dependent**: the tested DCS and GAUGE regimes can remain
 non-identifying, while a better-matched physical observable can produce useful
 locked decisions on a fresh real-video regime.
+
+
+## Post-final reviewer-hardening guard — 2026-09-23
+
+The reviewer-hardening campaign is explicitly **post-final** relative to the locked
+IRIS pendulum confirmation. It may:
+- add stronger baselines;
+- test GT-hidden proposal generation;
+- quantify corruption/dependence/measurement-uncertainty robustness;
+- add a newly frozen blind non-pendulum domain;
+- narrow claims when failures appear.
+
+It may not:
+- replace the locked pendulum final result with a retuned method;
+- silently change |score|=2 and call the modified result confirmatory;
+- remove failed corruption conditions;
+- reinterpret post-final analyses as if they were part of the original final lock;
+- call upstream IRIS parameter-recovery baselines verification baselines on the
+  SUPPORT/VETO/UNRESOLVED task;
+- claim the second blind free-fall final test before its exact final videos are
+  downloaded under a valid domain-specific lock.
+
+Paper prose should use **standardized evidence score** unless a score is actually
+shown to have a standard-normal sampling distribution.
