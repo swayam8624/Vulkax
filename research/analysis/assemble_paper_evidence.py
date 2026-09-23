@@ -58,6 +58,7 @@ CANONICAL = [
     ("research/paper_data/REPRODUCIBILITY_CHECKLIST.md", "canonical/reproducibility-checklist", True),
     ("research/validation/protocol_v1.json", "canonical/publication-validation-protocol", True),
     ("research/validation/record_schema_v1.json", "canonical/publication-validation-schema", True),
+    ("research/validation/iris_pendulum_final_test_v1.json", "canonical/iris-pendulum-final-test-config", True),
     ("research/validation/README.md", "canonical/publication-validation-guide", True),
     ("research/validation/DATASET_ADAPTER_CONTRACT.md", "canonical/publication-validation-adapter-contract", True),
     ("research/validation/world_manifest.example.csv", "canonical/publication-validation-manifest-template", True),
@@ -124,6 +125,11 @@ GENERATED = [
     ("publication-validation/iris-pendulum-validation/forensics/per_factor.csv", "generated/iris-pendulum-validation-per-factor", False),
     ("publication-validation/iris-pendulum-validation/forensics/paired_comparison.csv", "generated/iris-pendulum-validation-paired-comparison", False),
     ("publication-validation/combined-iris-validation/analysis/summary.json", "generated/combined-iris-validation-summary", False),
+    ("publication-validation/iris-pendulum-final-lock.json", "generated/iris-pendulum-final-lock", False),
+    ("publication-validation/iris-pendulum-final-test/final_summary.json", "generated/iris-pendulum-final-summary", False),
+    ("publication-validation/iris-pendulum-final-test/final_per_factor.csv", "generated/iris-pendulum-final-per-factor", False),
+    ("publication-validation/iris-pendulum-final-test/validation_records.csv", "generated/iris-pendulum-final-records", False),
+    ("publication-validation/combined-iris-final/analysis/summary.json", "generated/combined-iris-final-summary", False),
 ]
 
 def sha256(path: Path) -> str:
