@@ -134,6 +134,20 @@ selection.
 The next execution must use `--development-only`. Even if the gate passes, the
 runner stops before requesting `drop_100/06..10`.
 
+## V6.2 implementation reliability patch
+
+The first development-only V6.2 execution hit a software contract error before any
+candidate was selected: a short track caused `fit_full_flight_progress()` to
+return `None`, while its caller required a list.
+
+This run is not scientific evidence. Fresh validation remained unopened.
+
+The V6.2 scientific selector is unchanged. The implementation now has total
+producer/consumer contracts, candidate schema and finite-value validation,
+controlled no-candidate errors, saved tracebacks for unexpected failures, archived
+prior outputs, and a mandatory compile/config/contract/synthetic-video preflight in
+the runner.
+
 For each eligible object track:
 
 1. use the track's full observed vertical travel to define normalized progress
