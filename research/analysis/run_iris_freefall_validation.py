@@ -890,12 +890,28 @@ def choose_ballistic_track_v63(tracks,fps,minimum_interval_frames=12,identity_cf
     top,bottom,envelope_px=_global_envelope_from_chunks(chunks)
     candidates=[]
     rejection_counts={}
+    chunk_diagnostics=[]
     for chunk in chunks:
         if selector_cfg["expected_sign"]>0:
             gp=(np.asarray(chunk["y"],float)-top)/envelope_px
         else:
             gp=(bottom-np.asarray(chunk["y"],float))/envelope_px
-        for aa,bb in _monotone_runs(gp):
+        runs=_monotone_runs(gp)
+        chunk_diagnostics.append({
+            "track_id":chunk["track_id"],
+            "chunk_id":chunk["chunk_id"],
+            "frames":len(chunk["frames"]),
+            "frame_start":int(chunk["frames"][0]),
+            "frame_end":int(chunk["frames"][-1]),
+            "y_start":float(chunk["y"][0]),
+            "y_end":float(chunk["y"][-1]),
+            "progress_start":float(gp[0]),
+            "progress_end":float(gp[-1]),
+            "progress_delta":float(gp[-1]-gp[0]),
+            "monotone_fraction":float(np.mean(np.diff(gp)>=-.02)) if len(gp)>1 else 0.0,
+            "runs":[[int(a),int(b)] for a,b in runs],
+        })
+        for aa,bb in runs:
             q=_fit_global_fragment(
                 chunk,aa,bb,top,bottom,envelope_px,fps,selector_cfg,
                 minimum_interval_frames,diagnostics=rejection_counts
@@ -906,7 +922,8 @@ def choose_ballistic_track_v63(tracks,fps,minimum_interval_frames=12,identity_cf
         raise TrackSelectionError(
             "no gravity-direction ball fragment survived V6.3 global calibration; "
             f"chunks={len(chunks)} envelope_px={envelope_px:.3f} "
-            f"rejects={json.dumps(rejection_counts,sort_keys=True)}"
+            f"rejects={json.dumps(rejection_counts,sort_keys=True)} "
+            f"chunk_diagnostics={json.dumps(chunk_diagnostics,sort_keys=True)}"
         )
 
     def rank(q):
