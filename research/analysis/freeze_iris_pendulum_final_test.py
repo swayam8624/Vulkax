@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import importlib.metadata
 
 REQUIRED_REPO_FILES = [
     Path("research/validation/protocol_v1.json"),
@@ -27,13 +28,48 @@ REQUIRED_REPO_FILES = [
     Path("research/scripts/run_iris_pendulum_final_test.sh"),
 ]
 
+RUNTIME_MANIFEST = Path("build/publication-validation/iris-pendulum-runtime.json")
+
 REQUIRED_VALIDATION_ARTIFACTS = [
     Path("build/publication-validation/iris-pendulum-validation/validation_records.csv"),
     Path("build/publication-validation/iris-pendulum-validation/take_summary.csv"),
     Path("build/publication-validation/iris-pendulum-validation/forensics/summary.json"),
+    RUNTIME_MANIFEST,
 ]
 
 EXPECTED_READINESS = "validation_supports_freeze_without_retuning"
+
+
+def runtime_snapshot() -> dict:
+    return {
+        "python": sys.version.split()[0],
+        "numpy": importlib.metadata.version("numpy"),
+        "opencv_python_headless": importlib.metadata.version("opencv-python-headless"),
+        "huggingface_hub": importlib.metadata.version("huggingface_hub"),
+    }
+
+
+def write_runtime_manifest(path: Path) -> dict:
+    data = {
+        "schema": "vulkax.iris_pendulum_runtime",
+        "version": 1,
+        "packages": runtime_snapshot(),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return data
+
+
+def check_runtime_manifest(path: Path) -> None:
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    frozen = json.loads(path.read_text(encoding="utf-8"))
+    current = runtime_snapshot()
+    if frozen.get("packages") != current:
+        raise RuntimeError(
+            "IRIS runtime mismatch: "
+            f"frozen={frozen.get('packages')} current={current}"
+        )
 
 
 def validate_readiness(path: Path) -> dict:
@@ -56,8 +92,11 @@ def validate_readiness(path: Path) -> dict:
 
 
 def run_freeze(out: Path, require_clean: bool) -> None:
-    readiness_path = REQUIRED_VALIDATION_ARTIFACTS[-1]
+    readiness_path = Path(
+        "build/publication-validation/iris-pendulum-validation/forensics/summary.json"
+    )
     validate_readiness(readiness_path)
+    write_runtime_manifest(RUNTIME_MANIFEST)
 
     missing = [str(p) for p in REQUIRED_REPO_FILES + REQUIRED_VALIDATION_ARTIFACTS if not p.is_file()]
     if missing:
@@ -111,6 +150,7 @@ def check_lock(path: Path) -> None:
         raise RuntimeError("unexpected IRIS freeze readiness marker")
 
     validate_readiness(Path(lock["validation_forensic"]))
+    check_runtime_manifest(RUNTIME_MANIFEST)
     subprocess.run(
         [
             sys.executable,
@@ -144,6 +184,8 @@ def self_test() -> None:
     assert config["dataset"]["expected_take_count"] == 10
     assert config["validation_freeze_basis"]["readiness"] == EXPECTED_READINESS
     assert config["final_test_policy"]["no_threshold_retuning"] is True
+    # Runtime packages are intentionally not required in the generic CI self-test;
+    # the actual final runner creates/checks this snapshot inside its venv.
     print("VALID IRIS final-freeze wrapper self-test")
 
 
