@@ -106,8 +106,11 @@ generated.
 - **R29 — numerical-error strength:** manuscript keeps numerical claims empirical
   where convergence does not justify stronger theory.
 - **R35 — reproducibility:** data revisions, frozen result ledgers, exact commands,
-  hashes, and replay tooling exist. Final closure waits on the independent CI replay
-  of the locked pendulum campaign.
+  hashes, and replay tooling exist. Independent Ubuntu replay reproduces the frozen
+  development and validation readiness stages, but final closure still waits on an
+  exact replay of the locked `pendulum_90` final result. Historical freeze/runtime
+  path assumptions are treated as reproducibility engineering, not as grounds to
+  retune the method.
 
 ### Closed by completed post-final execution
 
