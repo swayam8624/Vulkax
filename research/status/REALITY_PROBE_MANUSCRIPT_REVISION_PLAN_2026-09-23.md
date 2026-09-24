@@ -220,7 +220,7 @@ an identical acronym.
 
 Plan the manuscript around a small set of explanatory visuals:
 
-1. transaction diagram: propose -> independently probe -> support/veto/unresolved
+1. transaction diagram: propose -> separately reserved verification probe -> support/veto/unresolved
    -> commit/rollback/abstain;
 2. one concrete captured-world worked example with physical units;
 3. information-boundary ladder showing why early channels remained unresolved;
@@ -228,8 +228,8 @@ Plan the manuscript around a small set of explanatory visuals:
    physics;
 5. risk/coverage or score distribution at the video-cluster level;
 6. reviewer-hardening robustness figure;
-7. second-domain free-fall figure only if the fresh validation/final protocol
-   survives without post-validation tuning.
+7. second-domain free-fall failure figure showing the untouched validation miss,
+   with the unopened final split and retrospective-rescue boundary explicit.
 
 Tables must report physical-unit counts separately from row counts.
 
@@ -248,6 +248,18 @@ The manuscript may currently argue:
   5/5 low-level quality passes, with 111.7% median acceleration relative error;
 - verification effectiveness is channel/information dependent, and failed lanes
   can be retired rather than post-hoc rescued.
+- post-final video-cluster statistics show the primary method ahead on 10/10
+  physical videos (two-sided exact sign-test p=0.001953125);
+- stronger post-final comparators do not recover the locked result (45.45%
+  direct finite-amplitude residual; 9.09% damped nonlinear ODE residual);
+- a GT-hidden post-final proposal experiment produces 10 ordinary-improving
+  proposals (8 deceptive, 2 physically better) and the reserved verifier is
+  correct on all 10 after proposal hash closure;
+- canonical labels remain stable through the recorded ±2 sigma rope-length
+  uncertainty interval;
+- the full corruption sweep preserves the clean result under the tested noise,
+  blur, frame duplication/drop, occlusion, and crop conditions, while exposing
+  temporal downsampling as a limitation (63.64% at 30 fps; 45.45% at 15 fps).
 
 It may not claim:
 
@@ -261,7 +273,14 @@ It may not claim:
 
 ## 14. Revision order
 
-When the evidence campaign is closed, revise in this order:
+**Status 2026-09-24:** the evidence campaign is closed for this manuscript pass.
+The structural rewrite, claim table, related-work/novelty boundary, clustered
+statistics, stronger baselines, GT-hidden proposal analysis, robustness
+limitations, and disclosure pass have now been integrated. The remaining work is
+submission-format polish and artifact/repository hygiene rather than method
+retuning.
+
+The completed revision order was:
 
 1. freeze final claim table from repository evidence;
 2. rewrite abstract;
