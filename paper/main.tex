@@ -99,6 +99,8 @@ Physical inference is limited by what the observations can distinguish. Structur
 
 Reality Probe does not introduce a new identifiability theory or experiment-design criterion. It uses the same information question at the level of a proposed rewrite: after the candidate is fixed, does the reserved experiment separate it from the baseline by enough margin to justify a decision? The frozen unresolved outcomes in our experiments are therefore evidence about the available channel, not merely failed optimization runs.
 
+Abstention also has a long history. Classical reject-option analysis characterizes the trade-off between recognition error and rejection \citep{chow1970reject}, while modern selective prediction learns or calibrates rejection mechanisms to control predictive risk and coverage \citep{geifman2019selectivenet}. Reality Probe does not claim abstention as a new decision-theory primitive. UNRESOLVED is the rewrite transaction's explicit record that a reserved physical experiment failed to separate the baseline and candidate by the declared evidence margin.
+
 \subsection{Simulation credibility and measured physical fidelity}\label{simulation-credibility-and-measured-physical-fidelity}
 
 Verification, validation, uncertainty quantification, and intended-use credibility are established parts of computational modeling \citep{oberkampf2007pcmm}. Digital-twin research also considers how simulated counterfactuals should be validated \citep{laudy2026digitaltwin}. Reality Probe adopts that credibility discipline for an individual physical rewrite in a persistent captured world. Its scope is narrower than general model certification: the system records whether a specific candidate is supported, vetoed, or left unresolved by a reserved physical channel.
