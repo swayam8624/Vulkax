@@ -1,9 +1,10 @@
 # Reality Probe — Next Manuscript Revision Plan
 
 **Frozen planning date:** 2026-09-23  
-**Scope:** future manuscript pass only; do not rewrite the manuscript until the
-current reviewer-hardening/free-fall evidence lane is closed or explicitly
-abandoned.
+**Scope:** manuscript evidence/structure plan. The free-fall evidence lane is now
+closed as a preserved negative result (2026-09-24), so the structural manuscript
+revision is authorized. The positive measured claim is the repository-locked IRIS
+pendulum result; the free-fall lane must remain negative and nonconfirmatory.
 
 This plan consolidates the current reviewer red-team, validation evidence, and
 external faculty feedback. It is intentionally stricter than a normal editing
@@ -237,12 +238,16 @@ Tables must report physical-unit counts separately from row counts.
 The manuscript may currently argue:
 
 - observational improvement does not by itself certify physical improvement;
-- a separate verification transaction can explicitly abstain;
+- a separate rewrite-verification transaction can explicitly support, veto, or abstain;
 - some tested channels are information-limited under a frozen threshold;
+- changing the physical evidence channel can materially change observability;
 - on the locked 10-video IRIS pendulum final set, the finite-amplitude probe
   produced 90/110 correct controlled decisions vs 40/110 for the matched
   small-angle baseline, with 10/10 placebo abstentions;
-- verification effectiveness is channel/information dependent.
+- the second-domain IRIS free-fall attempt failed untouched validation despite
+  5/5 low-level quality passes, with 111.7% median acceleration relative error;
+- verification effectiveness is channel/information dependent, and failed lanes
+  can be retired rather than post-hoc rescued.
 
 It may not claim:
 
@@ -251,7 +256,8 @@ It may not claim:
 - 220 independent experiments;
 - cloth/material/collision generality from pendulum evidence;
 - that DCS/moment cancellation itself is new mathematics;
-- free-fall confirmation before fresh validation and final lock both pass.
+- successful free-fall confirmation or use of the unopened drop_150 final split;
+- that retrospective V6.7 rescue diagnostics are confirmatory evidence.
 
 ## 14. Revision order
 
