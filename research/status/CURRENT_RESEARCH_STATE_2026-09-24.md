@@ -149,12 +149,17 @@ A cross-platform GitHub Actions replay is maintained as a reproducibility audit.
 On Ubuntu/current dependencies, the frozen development and validation stages
 reproduce through the original validation-readiness gate with 10/10 quality-pass
 videos in each split, 100% truth-control/placebo/large-effect correctness, and
-dose-direction sign rate 1.0. The remaining final-test replay is still an
-engineering audit of the historical freeze/runtime path assumptions; it has not
-yet completed the exact locked-result assertion. This audit is not allowed to
-change the frozen result. The original 2026-09-23 Mac/Metal execution remains the
-canonical post-final secondary evidence until an independent final replay closes
-R35.
+dose-direction sign rate 1.0. The replay also completed the reserved 10-video
+`pendulum_90` final campaign. All discrete locked outcomes reproduced exactly:
+10/10 quality-pass videos; primary 90/110 correct; baseline 40/110 correct;
+primary SUPPORT 40/50, VETO 40/50, placebo UNRESOLVED 10/10; paired counts
+50 primary-only wins, 0 baseline-only wins, and 60 ties. The continuous median
+period-inferred length relative error was 0.1679383811 on Ubuntu versus
+0.1681086451 in the locked Mac/Metal ledger, an absolute difference of about
+0.0001703 (roughly 0.10% relative). The exact scalar-equality assertion therefore
+failed, while the decision-level result reproduced. This audit is not allowed to
+change the frozen result. R35 is closed at the decision/result level with a small
+cross-platform floating/numerical drift explicitly retained as a limitation.
 
 ## Repository disposition
 
