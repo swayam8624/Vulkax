@@ -550,7 +550,7 @@ Broader constitutive families and contact regimes are also needed to test whethe
 
 \section{Reproducibility and Implementation Notes}\label{reproducibility-and-implementation-notes}
 
-The repository separates scientific freezes by experiment rather than treating the manuscript date as a single global lock. The core DCS scientific state is recorded at commit \path{a9da8c0aa868}. The locked IRIS pendulum final test uses commit \path{9e56f06145b8a56dd26c1c81e064ed9b185c77d7}; the failed V6.6 free-fall validation uses commit \path{78818c3bfd87c0f0f802f6c04f06389f1fc807d2}. The public IRIS data revision for both measured protocols is \path{c253822f55431ca80ef2084de4bc5e79d1a488f1}.
+The repository separates scientific freezes by experiment rather than treating the manuscript date as a single global lock. The core DCS scientific state is recorded at commit \texttt{a9da8c0aa868}. The locked IRIS pendulum final test uses commit \texttt{9e56f06145b8}; the failed V6.6 free-fall validation uses commit \texttt{78818c3bfd87}. The public IRIS data revision is \texttt{c253822f5543}. Full immutable identifiers are retained in the machine-readable result ledgers and provenance manifests.
 
 Machine-readable JSON/CSV ledgers store the reported outcomes, while SHA-256 manifests bind result files and evidence packages to their recorded content. The one-command research runners build the relevant code, materialize pinned public data, execute frozen stages in order, regenerate deterministic figures/tables, and record compiler, system, and GPU provenance. The paper reads numerical claims from those ledgers rather than from rounded labels in figures.
 
