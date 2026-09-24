@@ -1,0 +1,118 @@
+{
+  "schema": "vulkax.iris_freefall_v67_retrospective_closure",
+  "version": 1,
+  "date": "2026-09-24",
+  "status": "closed_negative_result",
+  "scope": {
+    "dataset": "rasulkhanbayov/IRIS",
+    "revision": "c253822f55431ca80ef2084de4bc5e79d1a488f1",
+    "development": "drop_50/06..10",
+    "failed_validation": "drop_100/06..10",
+    "final_test": "drop_150/02..10",
+    "final_test_status": "UNOPENED_DO_NOT_USE"
+  },
+  "v66_confirmatory_history": {
+    "lock_commit": "78818c3bfd87c0f0f802f6c04f06389f1fc807d2",
+    "development": {
+      "gate_pass": true,
+      "quality_pass_videos": 4,
+      "expected_videos": 5,
+      "median_acceleration_relative_error": 0.08045682433114187
+    },
+    "validation": {
+      "gate_pass": false,
+      "quality_pass_videos": 5,
+      "expected_videos": 5,
+      "median_acceleration_relative_error": 1.1172184254050974,
+      "truth_control_accuracy": 0,
+      "direction_sign_rate": 0
+    }
+  },
+  "retrospective_diagnosis": {
+    "central_failure": "V6.6 often selected a partial visible ballistic event on drop_100 and then bound the full known 1 m drop height to that shorter interval.",
+    "duration_signature": {
+      "development_median_T_fraction_of_truth": 1.0428852141960574,
+      "failed_validation_median_T_fraction_of_truth": 0.6872538280573361,
+      "failed_validation_median_truth_height_fraction_for_selected_T": 0.47231782417946255
+    }
+  },
+  "falsified_rescue_families": [
+    {
+      "family": "global_or_chunk_spatial_scale",
+      "result": "failed",
+      "validation_median_global_scale_g_relative_error": 0.4372027928372801,
+      "validation_median_chunk_scale_g_relative_error": 0.3503083337606652,
+      "development_median_global_scale_g_relative_error": 0.5291035824238461,
+      "development_median_chunk_scale_g_relative_error": 0.413279880776811
+    },
+    {
+      "family": "stationary_release_impact_endpoint_scale",
+      "result": "failed",
+      "development_median_g_relative_error": 0.19669472629506518,
+      "validation_median_g_relative_error": 0.530169546991944,
+      "validation_max_g_relative_error": 2.2930432704276975,
+      "validation_anchor_coverage": "4/5"
+    },
+    {
+      "family": "fragmented_track_stitching",
+      "result": "failed",
+      "stitched_selected_total": 0,
+      "validation_median_g_relative_error": 1.11721842540509,
+      "development_median_g_relative_error": 0.0804568243311436
+    },
+    {
+      "family": "resolution_association_ranking_campaign",
+      "result": "failed",
+      "variants_tested": 16,
+      "best_retrospective_method": "w640_stock_earliest_release",
+      "best_development_median_g_relative_error": 0.419591014644096,
+      "best_validation_median_g_relative_error": 1.11721842540509,
+      "baseline": "w640_stock_shape",
+      "baseline_development_median_g_relative_error": 0.0804568243311436,
+      "baseline_validation_median_g_relative_error": 1.11721842540509,
+      "conclusion": "Neither higher resolution, longer-gap association, nor alternate target-free event ranking repaired validation generalization."
+    },
+    {
+      "family": "bidirectional_full_track_hold_to_hold",
+      "result": "failed",
+      "ci_commit": "ded0492b2731cb21af5bd1ac59f24fc5f9ffaead",
+      "ci_run_id": 35958587913,
+      "validation_candidate_coverage": "2/5",
+      "takes": {
+        "10": {
+          "candidates": 0
+        },
+        "06": {
+          "candidates": 2,
+          "best_target_free_policy_timing_relative_error": 0.541,
+          "best_reported_oracle_curvature_relative_error": 0.306
+        },
+        "07": {
+          "candidates": 0
+        },
+        "08": {
+          "candidates": 1,
+          "timing_relative_error": 0.283,
+          "curvature_relative_error": 0.141
+        },
+        "09": {
+          "candidates": 0
+        }
+      },
+      "conclusion": "Observable stationary-hold semantics are not robust enough to recover a full physical drop across validation takes."
+    }
+  ],
+  "scientific_disposition": {
+    "v66": "failed prospective validation",
+    "v67": "retrospective rescue families exhausted without a robust target-free generalizing estimator",
+    "drop_100_status": "permanently retrospective/nonconfirmatory",
+    "drop_150_status": "remain unopened; do not spend final-test evidence on this abandoned rescue family",
+    "paper_use": [
+      "Report V6 free-fall replication as a negative/limitation result if relevant.",
+      "Do not claim successful gravity recovery from this IRIS free-fall protocol.",
+      "Do not use retrospective V6.7 diagnostics as confirmatory evidence.",
+      "Do not present gravity estimation itself as a Reality Probe novelty."
+    ],
+    "next_project_action": "Stop free-fall rescue work and return effort to the validated/core Reality Probe experiments and manuscript claims."
+  }
+}
