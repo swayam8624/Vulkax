@@ -750,6 +750,42 @@ rewrite is interrogated through a physical observable whose information matches
 the distinction being tested, the same SUPPORT/VETO/UNRESOLVED transaction can
 produce useful decisions on fresh measured video.
 
+\subsection{Post-final hardening of the pendulum result}\label{post-final-pendulum-hardening}
+
+After the locked final test was complete, we ran secondary analyses that are not
+allowed to change its decisions. Treating the physical video rather than the
+nested case row as the experimental unit, the finite-amplitude probe has higher
+per-video accuracy than the small-angle baseline on all 10 videos (10--0, no
+ties; two-sided exact sign-test \(p=0.001953125\)). Two stronger post-final
+comparators also fail to explain the locked result: a direct finite-amplitude
+period-residual rule reaches 45.45\% strict three-way accuracy, while a damped
+nonlinear ODE residual reaches 9.09\%, compared with the locked probe's 81.82\%.
+In paired case accounting, the locked probe is uniquely correct on 40 cases
+relative to the direct residual and on 80 relative to the damped ODE; neither
+post-final comparator is uniquely correct on any case.
+
+We also remove the manually scheduled candidate factors in a separate
+ground-truth-hidden transaction. Baseline and candidate estimates are produced
+from early video windows, ordinary improvement is checked on a later holdout,
+and the blind proposal artifact is SHA-256 closed before ground truth is joined.
+All 10 generated proposals improve the ordinary holdout; 8 are physically worse
+and 2 are physically better, and the reserved final-window verifier classifies
+all 10 correctly. Canonical labels remain unchanged over the recorded
+rope-length uncertainty intervals through \(\pm2\sigma\). A post-final
+proposal/probe overlap sweep also remains correct for every tested overlap, from
+disjoint windows through full overlap; this diagnoses temporal-window
+dependence but does not make same-video evidence an independent sensor modality.
+
+Finally, a full Metal corruption sweep processes 180 condition-video runs with
+zero failed videos and reproduces the clean locked decision vector on all 10
+videos. The 81.82\% clean accuracy is unchanged under the tested additive noise
+(up to 30 intensity levels), Gaussian blur (kernel 15), frame duplication/drop
+(up to 50\%), central occlusion (up to 30\%), and crop (up to 10\%). Temporal
+downsampling is the clear boundary: strict accuracy falls to 63.64\% at
+30~fps and 45.45\% at 15~fps, although placebo abstention remains 100\%.
+These tests are post-final stress analyses, not new confirmation, and the
+temporal-resolution failure is retained as a limitation.
+
 \subsection{Second-domain IRIS free-fall failure}\label{second-domain-iris-free-fall-failure}
 
 We also attempted a second, different equation-family replication on IRIS
