@@ -35,6 +35,17 @@ jobs:
           ln -s "$GITHUB_WORKSPACE/build" /tmp/vulkax-iris-lock/build
           cd /tmp/vulkax-iris-lock
 
+          # The symlink is replay plumbing, not repository state. Ignore only
+          # this untracked path locally so the frozen --require-clean guard
+          # still checks every tracked file exactly as originally intended.
+          EXCLUDE_FILE="$(git rev-parse --git-path info/exclude)"
+          printf '\n/build\n' >> "$EXCLUDE_FILE"
+          test -z "$(git status --porcelain)" || {
+            echo "STOP: frozen worktree is dirty before replay"
+            git status --short
+            exit 1
+          }
+
           # The symlink is CI plumbing, not repository state. Hide only this
           # untracked path from the frozen --require-clean guard.
           printf '/build\n' >> "$(git rev-parse --git-path info/exclude)"
