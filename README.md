@@ -35,7 +35,7 @@ The final research outcome is not that every candidate repair can be certified. 
 
 The evidence ladder is deliberately mixed. DCS and known-force compliance expose information limits in frozen synthetic experiments. A repository-locked IRIS pendulum final test then supplies a positive measured result: the finite-amplitude probe makes 90/110 controlled decisions correctly across 10 fresh videos, versus 40/110 for the matched small-angle diagnostic baseline, with all 10 placebo cases left unresolved. A separately frozen IRIS free-fall replication subsequently fails untouched validation with 111.7% median acceleration relative error despite 5/5 low-level quality passes. That failure is retained, and its designated final split remains unopened.
 
-The locked results remain reproducible. Reviewer-facing post-final analyses strengthen statistics, baselines, proposal realism, uncertainty, and robustness without replacing the frozen decisions.
+The locked results remain reproducible. Reviewer-facing post-final analyses strengthen statistics, baselines, proposal realism, uncertainty, and robustness without replacing the frozen decisions. The completed full-profile Mac/Metal hardening run treats the 10 physical videos as the inferential units, gives a 10--0 paired video advantage over the small-angle baseline (exact two-sided sign-test p=0.001953125), verifies all 10 GT-hidden ordinary-improving proposals correctly after proposal hash closure, and exposes temporal downsampling as the main tested robustness boundary: 63.64% accuracy at 30 fps and 45.45% at 15 fps.
 
 ## Publication-validation extension
 
@@ -475,6 +475,7 @@ The completed project does not claim that:
 - the 110 pendulum case rows are independent physical experiments;
 - the same-video pendulum verification channel is an independent sensor modality;
 - the failed free-fall lane provides positive confirmation;
+- the pendulum verifier is invariant to arbitrary temporal downsampling or camera acquisition conditions;
 - GAUGE is fresh confirmatory evidence;
 - fitted DOT parameters are true material measurements;
 - the Stanford Bunny used in visualization is the benchmark geometry;
@@ -584,6 +585,8 @@ Installation notes are in [INSTALL_0_90.md](docs/INSTALL_0_90.md). Performance m
 | Paper-data map | [research/paper_data/README.md](research/paper_data/README.md) |
 | Force-compliance result | [ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md](research/results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md) |
 | Locked IRIS pendulum final result | [IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json](research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json) |
+| Post-final IRIS reviewer hardening | [IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.md](research/results/IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.md) |
+| Machine-readable post-final hardening ledger | [IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.json](research/results/IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.json) |
 | Failed free-fall validation | [IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json](research/results/IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json) |
 | Free-fall retrospective closure | [IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json](research/results/IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json) |
 | Novelty / claim positioning | [REALITY_PROBE_NOVELTY_MAP_2026-09-24.md](research/status/REALITY_PROBE_NOVELTY_MAP_2026-09-24.md) |
