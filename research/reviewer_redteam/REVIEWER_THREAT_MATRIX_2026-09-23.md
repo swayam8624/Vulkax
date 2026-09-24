@@ -109,22 +109,72 @@ generated.
   hashes, and replay tooling exist. Final closure waits on the independent CI replay
   of the locked pendulum campaign.
 
-### Execution-dependent threats still open
+### Closed by completed post-final execution
 
-- **R09 / R10 / R11 / R32:** stronger direct and nonlinear/damped baselines.
-- **R13:** cluster-correct bootstrap and paired video-level inference.
-- **R17:** truth-measurement uncertainty sensitivity.
-- **R24 / R25 / R26:** GT-hidden proposal -> ordinary-improvement -> verification
-  transaction and naturally generated proposal analysis.
-- **R27:** post-final corruption robustness.
-- **R31 / R34:** consolidated information/computation/system-cost reporting.
-- **R03:** reviewer-facing end-to-end rewrite decision demo must be generated from
-  frozen/post-final evidence rather than merely existing as code.
-- **R20 / R33:** broader counterfactual-utility and ablation coverage remain scoped
-  manuscript limitations unless the post-final campaign directly supplies them.
+The full post-final pendulum hardening battery was already executed on
+2026-09-23 on the original Apple-silicon/macOS environment at repository
+commit `3aa0fb14e98956ddf6e3a8a7388347c9a2ba278d`. The canonical result
+ledger is now
+`research/results/IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.json`
+with a human-readable companion Markdown file.
 
-The current authoritative execution gate for the open post-final items is the
-repository workflow **Reality Probe post-final reviewer hardening replay**. It first
-reconstructs the original locked IRIS validation/final chain and requires exact
-agreement with the committed final summary before any secondary analysis is
-accepted.
+- **R03 — reviewer-facing end-to-end measured rewrite decision:** closed for the
+  post-final pendulum lane by the GT-hidden proposal -> ordinary holdout ->
+  reserved verification transaction and generated storyboard.
+- **R07 — official IRIS context:** closed as a contextual benchmark-positioning
+  item. Pinned upstream IRIS parameter-recovery tables are fetched and retained
+  with an explicit task-mismatch guard; they are not represented as matched
+  SUPPORT/VETO/UNRESOLVED baselines.
+- **R09 / R10 / R11 / R32 — stronger baselines / damping:** closed for the
+  pendulum study. A direct finite-amplitude residual reaches 45.45% strict
+  accuracy and a damped nonlinear ODE residual reaches 9.09%, versus 81.82% for
+  the locked probe. The locked probe is uniquely correct on 40 and 80 cases,
+  respectively; neither comparator is uniquely correct on any case.
+- **R13 — statistical dependence / pseudoreplication:** closed for the reported
+  pendulum final set. The physical video is the inferential unit. The primary
+  method is better on 10/10 videos, the baseline on 0/10, with no ties and a
+  two-sided exact sign-test p=0.001953125. Video-level bootstrap summaries are
+  retained as secondary descriptive intervals.
+- **R17 — measured ground-truth uncertainty:** closed for the available IRIS
+  rope-length uncertainty metadata. Canonical labels are stable on 110/110 cases
+  through both ±1 sigma and ±2 sigma intervals.
+- **R24 / R25 / R26 — ground-truth leakage / manually chosen proposals /
+  transaction realism:** closed for a separate post-final GT-hidden experiment.
+  The proposal artifact is written and SHA-256 closed before truth join; all 10
+  generated candidates improve the ordinary holdout, 8 are physically worse and
+  2 are physically better, and the reserved verifier is correct on all 10.
+- **R27 — corruption robustness:** closed as an empirical robustness study, with
+  an explicit failure boundary. A full Metal sweep covers 180 condition-video
+  runs with zero failed videos and 10/10 clean-equivalence. Tested noise, blur,
+  frame duplication/drop, occlusion, and crop preserve 81.82% accuracy. Temporal
+  downsampling does not: 30 fps gives 63.64%, 15 fps gives 45.45%. Placebo
+  abstention remains 100%.
+- **R28 — tracker robustness:** substantially closed for the tested image
+  corruptions, but bounded by the observed frame-rate sensitivity and the failed
+  free-fall domain. It must not be generalized to arbitrary cameras, motion
+  regimes, or temporal sampling.
+
+### Still partial / scoped limitations after hardening
+
+- **R20 — counterfactual usefulness:** strengthened by the GT-hidden natural
+  proposal transaction, but broad usefulness across unrelated edit classes is
+  still outside the evidence.
+- **R31 — wall-clock/system cost:** the full Metal robustness sweep reports
+  694.05 s for 180 condition-video runs, but the paper does not yet provide a
+  complete end-to-end cost model for every Reality Probe subsystem.
+- **R33 — component ablation:** the paper now contains channel, baseline,
+  dependence, uncertainty, and corruption analyses; it still does not contain a
+  complete factorial ablation of every systems component.
+- **R34 — system advantage over simpler pipelines:** stronger scientific
+  comparators are quantified, but the systems-level cost/complexity tradeoff is
+  not established as a universal advantage.
+- **R02 / R08 / R12 / R21 — domain breadth:** remains a true limitation. The
+  second real-video equation family, IRIS free-fall, failed untouched validation.
+  This negative result is retained rather than converted into a positive
+  generalization claim.
+
+The completed post-final evidence is secondary only. It strengthens the locked
+pendulum result but does not replace or retune it. Cross-platform CI replays are
+reproducibility checks; they are not allowed to redefine the already frozen
+measured result.
+
