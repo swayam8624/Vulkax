@@ -99,3 +99,7 @@ print("\n=== REVIEWER HARDENING COMPLETE (post-final analyses) ===")
 print("manifest:",out)
 print("Locked IRIS result remains unchanged.")
 PY
+
+"$VENV/bin/python" research/analysis/summarize_iris_postfinal_hardening.py \
+  --build-dir "$BUILD" \
+  --out "$BUILD/publication-validation/iris-pendulum-postfinal-hardening-summary.json"
