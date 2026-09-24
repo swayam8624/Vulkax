@@ -54,3 +54,77 @@ Do not call the hardening campaign complete until:
 6. R03 end-to-end graphics/captured-world decision demo exists;
 7. R04/R19 novelty map explicitly distinguishes rewrite-level verification from generic VVUQ;
 8. all resulting claims are reflected in the claim guard without rewriting the locked IRIS result.
+
+
+## Closure status — 2026-09-24
+
+This status is evidence-based. A threat is not marked closed merely because tooling
+exists; execution-dependent items remain open until their post-final outputs are
+generated.
+
+### Closed by committed evidence / manuscript changes
+
+- **R01 / R36 — contribution and narrative:** manuscript now follows one causal
+  sequence: deceptive rewrite -> weak/information-poor probes -> changed physical
+  channel -> locked IRIS pendulum success -> preserved GAUGE/free-fall failures.
+- **R04 / R19 — VVUQ / digital-twin novelty:** explicit novelty map scopes the
+  contribution to the rewrite-level SUPPORT/VETO/UNRESOLVED transaction rather
+  than generic verification, validation, UQ, identifiability, or credibility.
+- **R06 — IRIS positioning:** IRIS is used as measured inverse-physics / validation
+  context and a public data source; pendulum/free-fall equations are not claimed
+  as novel estimators.
+- **R14 — score semantics:** manuscript uses "standardized evidence score" rather
+  than claiming a standard-normal z statistic.
+- **R18 — terminology:** code verification, empirical validation, frozen
+  confirmatory evidence, retrospective evidence, and post-final diagnostics are
+  kept as separate evidence classes.
+- **R22 — preregistration wording:** "preregistered" overclaim removed; experiments
+  are described as repository-frozen before final-data access.
+- **R23 — contaminated take-01:** locked IRIS pendulum final result excludes all
+  take-01 media.
+- **R30 — GAUGE interpretation:** retrospective GAUGE is a channel/model-adequacy
+  diagnostic; a separate frozen prospective GAUGE validation failure is now
+  surfaced explicitly rather than presented as success.
+- **R36 — evidence consistency:** README, results index, novelty map, both manuscript
+  sources, and claim plan now agree on the locked pendulum success, prospective
+  GAUGE failure, and failed IRIS free-fall validation.
+
+### Partially closed / bounded by preserved negative evidence
+
+- **R02 / R08 / R12 / R21 — second real-video domain:** a separately frozen IRIS
+  free-fall domain was attempted. Development passed, untouched validation then
+  failed badly (111.7% median acceleration relative error on 5/5 quality-pass
+  videos). The failure is retained and the designated final split remains unopened.
+  This is valid cross-domain falsification evidence, but it is not a second positive
+  final-domain confirmation.
+- **R15 — threshold sensitivity:** the frozen |score|=2 rule remains primary and a
+  secondary threshold sweep is reported without redefining the decision policy.
+  A full calibration argument remains secondary rather than a new primary claim.
+- **R28 — tracker/general-camera scope:** the failed free-fall lane exposes a real
+  event/scale/tracking limitation and is now part of the stated scope. Broader
+  camera/pose stress remains an optional extension, not evidence already claimed.
+- **R29 — numerical-error strength:** manuscript keeps numerical claims empirical
+  where convergence does not justify stronger theory.
+- **R35 — reproducibility:** data revisions, frozen result ledgers, exact commands,
+  hashes, and replay tooling exist. Final closure waits on the independent CI replay
+  of the locked pendulum campaign.
+
+### Execution-dependent threats still open
+
+- **R09 / R10 / R11 / R32:** stronger direct and nonlinear/damped baselines.
+- **R13:** cluster-correct bootstrap and paired video-level inference.
+- **R17:** truth-measurement uncertainty sensitivity.
+- **R24 / R25 / R26:** GT-hidden proposal -> ordinary-improvement -> verification
+  transaction and naturally generated proposal analysis.
+- **R27:** post-final corruption robustness.
+- **R31 / R34:** consolidated information/computation/system-cost reporting.
+- **R03:** reviewer-facing end-to-end rewrite decision demo must be generated from
+  frozen/post-final evidence rather than merely existing as code.
+- **R20 / R33:** broader counterfactual-utility and ablation coverage remain scoped
+  manuscript limitations unless the post-final campaign directly supplies them.
+
+The current authoritative execution gate for the open post-final items is the
+repository workflow **Reality Probe post-final reviewer hardening replay**. It first
+reconstructs the original locked IRIS validation/final chain and requires exact
+agreement with the committed final summary before any secondary analysis is
+accepted.
