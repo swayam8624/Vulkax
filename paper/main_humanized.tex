@@ -113,6 +113,8 @@ Verification, validation, uncertainty quantification, and intended-use credibili
 
 GAUGE is a recent measurement-grounded benchmark for physical fidelity across simulation engines and video world models, spanning rigid, cable, textile, and volumetric-deformation tasks \citep{wang2026gauge}. We use its public foam-shearing subset only for a retrospective channel-contradiction analysis. Because that conflict was already visible in the data, we do not treat it as fresh prospective confirmation.
 
+A separate repository-frozen GAUGE validation lane uses previously untouched foam stretching and compression repeats 5--7. Across 12 measured validation worlds, the temporal annihilating witness makes 0/12 correct SUPPORT decisions and 0/12 correct VETO decisions while correctly leaving 12/12 placebo cases UNRESOLVED at the frozen decision magnitude. Final repeats 8--10 remain unopened. We keep this as prospective validation-stage evidence of insufficient directional coverage rather than changing the threshold after seeing the result.
+
 \subsection{Measured deformable
 tracking}\label{measured-deformable-tracking}
 
@@ -259,6 +261,7 @@ D2 & 16 worlds & 0/16 & Median standardized separation 0.041578. \\
 D3 & 6 worlds & 0/6 & Median adaptive separation 0.0588583; lower numerical floor does not recover observability. \\
 D4V & 36 repairs & 0/36 & 14 deceptive and 22 beneficial; matched verification channels also have zero resolved coverage. \\
 GAUGE & 10 trials & -- & Retrospective measured channel contradiction; longitudinal endpoint preferred in 9/10 held-out repeats. \\
+GAUGE validation & 12 measured worlds / 36 cases & gate fail & Frozen stretching/compression validation: 0/12 correct SUPPORT, 0/12 correct VETO, and 12/12 correct UNRESOLVED placebo decisions; final repeats 8--10 remain unopened. \\
 OFC & 36 repairs & 0/36 & 12 deceptive and 24 beneficial; known-force compliance increases evidence scale but not coverage. \\
 IRIS pendulum & 10 videos / 110 cases & 90/110 correct & Locked final set; 40/50 correct SUPPORT, 40/50 correct VETO, and 10/10 correct UNRESOLVED placebo decisions. \\
 IRIS free-fall & 5 validation videos & gate fail & Fresh second-domain validation passes 5/5 low-level quality checks but has 111.7\% median acceleration relative error; final split remains unopened. \\
