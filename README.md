@@ -29,11 +29,13 @@ commit: a9da8c0aa8689ebeea0d84baf95a74907659a837
 
 The `main` branch contains later documentation and visualization work, but the scientific claims, thresholds, experiment labels, result ledgers, and evidence packages remain tied to the frozen snapshot.
 
-The final research outcome is not that every candidate repair can be certified. The project instead establishes a more specific result:
+The final research outcome is not that every candidate repair can be certified. The evidence now supports a more specific, conditional result:
 
-> A repair can improve ordinary observational agreement while making an untouched physical target worse. Mechanism-selective counterfactual probes can reveal much stronger evidence about that mismatch, but the tested regime remains information-limited and does not justify a prospective certification claim.
+> A repair can improve ordinary observational agreement while making an untouched physical target worse. Reality Probe treats acceptance of that repair as a separate SUPPORT / VETO / UNRESOLVED transaction. Whether that transaction is useful depends on the physical information carried by the verification channel.
 
-The frozen result remains reproducible, but publication readiness now also depends on the separate reviewer-facing validation campaign: controlled SUPPORT/VETO/UNRESOLVED trials, null controls, robustness/dependence sweeps, multi-dataset evidence, and prospective measured confirmation where feasible.
+The evidence ladder is deliberately mixed. DCS and known-force compliance expose information limits in frozen synthetic experiments. A repository-locked IRIS pendulum final test then supplies a positive measured result: the finite-amplitude probe makes 90/110 controlled decisions correctly across 10 fresh videos, versus 40/110 for the matched small-angle diagnostic baseline, with all 10 placebo cases left unresolved. A separately frozen IRIS free-fall replication subsequently fails untouched validation with 111.7% median acceleration relative error despite 5/5 low-level quality passes. That failure is retained, and its designated final split remains unopened.
+
+The locked results remain reproducible. Reviewer-facing post-final analyses strengthen statistics, baselines, proposal realism, uncertainty, and robustness without replacing the frozen decisions.
 
 ## Publication-validation extension
 
@@ -48,9 +50,11 @@ Key entrypoint:
 bash research/scripts/run_publication_validation.sh --diagnostic
 ```
 
-Planned new evidence is tracked separately from completed evidence; unexecuted
-placebo, dose-response, robustness, dependence, multi-dataset, and measured trials
-are never represented as results.
+Completed evidence and post-final diagnostic evidence are tracked separately.
+The locked IRIS pendulum final result is never rewritten by later clustered,
+baseline, uncertainty, proposal, dependence, or robustness analyses. The failed
+free-fall validation is likewise preserved as a negative result rather than
+recycled into confirmation.
 
 ## Explainer video
 
@@ -307,13 +311,29 @@ The exploratory retrospective exact sign-test for the longitudinal channel gave 
 
 This result is kept explicitly retrospective because the metric conflict was already known before DCS was designed. It is evidence of a real channel contradiction, not fresh prospective confirmation.
 
-### Confirmatory infrastructure and the stop rule
+### Locked measured confirmation and the stop rule
 
-The generic confirmatory replay path was also completed. It includes frozen-stencil enforcement, no-fit replay semantics, support, veto, and unresolved outcomes, together with direct nominal-versus-refined numerical witness uncertainty.
+The generic confirmatory replay path includes frozen no-fit semantics, SUPPORT,
+VETO, and UNRESOLVED outcomes, together with explicit uncertainty accounting.
+The publication-validation extension then froze a separate real-video IRIS
+pendulum protocol before opening the designated final media.
 
-A fresh measured prospective confirmation was intentionally not consumed for this paper after the prerequisite advancement gates failed. This was a research stop rule, not missing implementation. Spending a fresh confirmatory dataset after the method had already failed its frozen prerequisites would have weakened the experimental separation between discovery and confirmation.
+On 10 fresh `pendulum_90` videos, all 10 passed quality control. The
+finite-amplitude period probe made 90/110 controlled decisions correctly
+(81.82%), while the matched small-angle diagnostic baseline made 40/110
+(36.36%). The primary probe was correct on 40/50 SUPPORT cases, 40/50 VETO
+cases, and 10/10 UNRESOLVED placebo cases. Those 110 rows are nested controlled
+cases inside 10 physical videos, not 110 independent physical experiments.
 
-The final paper therefore keeps four evidence classes distinct: implemented confirmatory infrastructure, retrospective measured GAUGE evidence, fresh synthetic orthogonal-information evidence, and future measured prospective confirmation under a separately frozen protocol.
+A second frozen equation-family replication on IRIS free-fall did not confirm
+the result. Its untouched `drop_100/06..10` validation set passed low-level
+quality on 5/5 videos but failed the physical recovery gate with 111.7% median
+acceleration relative error. Retrospective rescue diagnostics were unable to
+produce a robust target-free estimator, so that lane was closed and
+`drop_150` remains unopened.
+
+The stop rule is therefore active in both directions: successful locked evidence
+is preserved as successful, and failed locked evidence is preserved as failed.
 
 ### Spatial localization and export
 
@@ -352,21 +372,40 @@ This changed the interpretation of the project. The main limitation was no longe
 
 ## Final scientific result
 
-The completed research program supports the following conclusions.
+The completed evidence supports a conditional systems claim rather than a
+universal verifier.
 
-First, deceptive physical repair is a real failure mode in the tested captured-world setting. Ordinary held-out improvement can disagree with an untouched physical target.
+First, deceptive physical repair is a real failure mode in the tested
+captured-world setting: ordinary held-out improvement can disagree with an
+untouched physical target.
 
-Second, mechanism-sensitive counterfactual evidence can expose structure that ordinary observation does not reveal.
+Second, probe mathematics alone is not enough. Frozen DCS experiments can
+expose mechanism-sensitive structure while still providing too little
+standardized separation for a decision.
 
-Third, the tested DCS formulations do not provide a validated prospective repair verifier. Their standardized separation remains too small in the frozen discovery and validation regimes.
+Third, changing the physical information channel matters. Known-force
+compliance raises the median standardized evidence magnitude by **11.46x** on
+fresh synthetic truth worlds, although all 36 proposals remain below the frozen
+decision magnitude.
 
-Fourth, a genuinely orthogonal known-force channel provides much stronger evidence than the tested kinematic DCS channel, with an 11.46x median gain on the fresh experiment.
+Fourth, a better-matched physical observable can produce useful measured-video
+decisions. On the locked 10-video IRIS pendulum final set, the finite-amplitude
+probe makes **90/110** controlled decisions correctly versus **40/110** for the
+matched small-angle diagnostic baseline, with **10/10** placebo cases left
+UNRESOLVED.
 
-Finally, stronger evidence is not the same as sufficient evidence. The best force result reached an absolute z of 1.31911 against the frozen decision magnitude of 2, so the correct system outcome remained unresolved.
+Finally, that success is not universal. The frozen IRIS free-fall replication
+fails untouched validation with **111.7% median acceleration relative error**.
+The failure is preserved, the validation split is permanently retrospective,
+and the designated final split remains unopened.
 
-The research therefore ends with an information-limit result:
+The resulting claim is:
 
-> Physical verification is constrained by the information available in the experiment. A verifier should refuse to certify a repair when the evidence does not support the claim.
+> Reality Probe provides an evidence-governed transaction for individual
+> physical rewrites. When the separately reserved verification channel contains
+> discriminating information, it can support or veto a rewrite; when it does
+> not, the system should remain unresolved or retire the verification lane
+> rather than manufacture certification.
 
 ## Frozen result summary
 
@@ -378,6 +417,8 @@ The research therefore ends with an information-limit result:
 | D4V repair proposals | 36 proposals, 14 deceptive, 22 beneficial, 0% resolved coverage |
 | GAUGE retrospective | ordinary and marker channels favored overlap 10/10; longitudinal channel favored endpoint 9/10 |
 | Fresh force-compliance study | 36 proposals, 12 deceptive, 24 beneficial, 11.46x median signal gain, 0 resolved |
+| Locked IRIS pendulum final | 10/10 quality-pass videos; finite-amplitude probe 90/110 correct vs small-angle baseline 40/110; 10/10 placebo abstentions |
+| IRIS free-fall validation | 5/5 quality-pass videos but 111.7% median acceleration relative error; validation failed and final split remains unopened |
 
 For the fresh force-compliance study:
 
@@ -412,6 +453,9 @@ The final repository includes:
 - matched baseline experiments;
 - GAUGE retrospective analysis;
 - fresh orthogonal force-compliance evaluation;
+- repository-locked IRIS pendulum final-test pipeline and result ledger;
+- preserved failed IRIS free-fall validation and retrospective closure ledger;
+- post-final clustered-statistics, baseline, proposal, uncertainty, dependence, and robustness tooling;
 - confirmatory replay infrastructure with frozen no-fit semantics;
 - spatial dark-field localization and PLY export;
 - deterministic paper figures and tables;
@@ -426,6 +470,10 @@ The completed project does not claim that:
 - DCS is a universal physical correctness certificate;
 - DCS outperforms every matched raw or Fisher-style baseline;
 - the tested force-compliance channel provides useful prospective repair-veto coverage at the frozen threshold;
+- finite-amplitude pendulum physics or gravity estimation is itself novel;
+- the 110 pendulum case rows are independent physical experiments;
+- the same-video pendulum verification channel is an independent sensor modality;
+- the failed free-fall lane provides positive confirmation;
 - GAUGE is fresh confirmatory evidence;
 - fitted DOT parameters are true material measurements;
 - the Stanford Bunny used in visualization is the benchmark geometry;
@@ -533,6 +581,10 @@ Installation notes are in [INSTALL_0_90.md](docs/INSTALL_0_90.md). Performance m
 | Research result index | [research/results/README.md](research/results/README.md) |
 | Paper-data map | [research/paper_data/README.md](research/paper_data/README.md) |
 | Force-compliance result | [ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md](research/results/ORTHOGONAL_FORCE_COMPLIANCE_RESULT_2026-09-21.md) |
+| Locked IRIS pendulum final result | [IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json](research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json) |
+| Failed free-fall validation | [IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json](research/results/IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json) |
+| Free-fall retrospective closure | [IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json](research/results/IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json) |
+| Novelty / claim positioning | [REALITY_PROBE_NOVELTY_MAP_2026-09-24.md](research/status/REALITY_PROBE_NOVELTY_MAP_2026-09-24.md) |
 | DCS benchmark summary | [DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md](research/results/DCS_FINAL_BENCHMARK_SUMMARY_2026-09-20.md) |
 | Information frontier | [DCS_INFORMATION_FRONTIER_2026-09-20.md](research/results/DCS_INFORMATION_FRONTIER_2026-09-20.md) |
 | Claim boundaries | [CLAIM_GUARD.md](research/literature/CLAIM_GUARD.md) |
@@ -559,9 +611,14 @@ The scientific freeze is immutable, the research evidence is reproducible, the n
 
 VULKAX and the Reality Probe research program have reached their intended endpoint for this study.
 
-The systems work is complete. The experiments are complete. The final negative and positive findings are frozen. The evidence package, figures, visual explainer, documentation, and reproduction path are in place.
+The systems baseline and the primary experimental sequence are complete. The
+locked positive and negative findings are preserved, including the successful
+IRIS pendulum final test and the failed IRIS free-fall validation. Post-final
+reviewer hardening is secondary analysis only; it cannot replace those frozen
+results.
 
-The project now moves from research execution to manuscript preparation.
+The project is now in manuscript hardening, evidence packaging, and repository
+cleanup rather than open-ended method rescue.
 
 
 ## License and third-party material
