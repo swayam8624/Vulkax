@@ -145,12 +145,16 @@ Major results:
 
 These analyses are secondary only and do not replace the locked final result.
 
-A cross-platform GitHub Actions replay was also added as a reproducibility audit.
-Current Ubuntu/current-dependency reconstruction is not bit-identical to the
-original local freeze environment and exposed historical runtime/path assumptions.
-That CI work is therefore treated as a reproducibility-engineering task, not as a
-license to change the frozen result. The original 2026-09-23 Mac/Metal hardening
-execution remains the canonical post-final secondary evidence.
+A cross-platform GitHub Actions replay is maintained as a reproducibility audit.
+On Ubuntu/current dependencies, the frozen development and validation stages
+reproduce through the original validation-readiness gate with 10/10 quality-pass
+videos in each split, 100% truth-control/placebo/large-effect correctness, and
+dose-direction sign rate 1.0. The remaining final-test replay is still an
+engineering audit of the historical freeze/runtime path assumptions; it has not
+yet completed the exact locked-result assertion. This audit is not allowed to
+change the frozen result. The original 2026-09-23 Mac/Metal execution remains the
+canonical post-final secondary evidence until an independent final replay closes
+R35.
 
 ## Repository disposition
 
@@ -160,8 +164,9 @@ execution remains the canonical post-final secondary evidence.
 - The old GAUGE prospective PR is closed with its frozen validation failure
   preserved in the repository.
 - Seven temporary V6.7 free-fall matrix/campaign workflows have been pruned.
-- The research branch remains a pure fast-forward descendant of `main`; no
-  scientific history rewrite is required to land it.
+- `main` contains the publication-facing scientific state. Temporary
+  reproducibility-audit commits are isolated on the research branch and are not
+  required for the scientific result.
 
 ## Submission boundary
 
