@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: manuscript-build-main
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -71,4 +75,6 @@ jobs:
             exit 0
           fi
           git commit -m "paper: compile final PDF and DOCX [skip ci]"
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
