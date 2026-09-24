@@ -57,7 +57,7 @@ simulation credibility already provides mature tools for analyzing
 related ambiguity \citep{wang2026identifiability,asadi2025oed,oberkampf2007pcmm,laudy2026digitaltwin}. Our focus is narrower
 and operational: the object being judged is a \emph{requested physical
 rewrite} of a persistent captured world, and the verifier must decide
-whether independent evidence supports the rewrite, contradicts it, or is
+whether separately reserved evidence supports the rewrite, contradicts it, or is
 insufficient to decide.
 
 \begin{figure*}[t]
@@ -172,7 +172,7 @@ that high-quality visual representations can support physical inference
 and simulation. Reality Probe does not claim novelty for
 Gaussian-plus-MPM simulation, parameter fitting, or differentiable
 inverse physics. We instead ask whether a proposed physical rewrite is
-independently supported once an optimizer has already produced an
+supported by a verification channel once an optimizer has already produced an
 observational improvement.
 
 Differentiable simulation systems such as ChainQueen and DiffTaichi
@@ -237,7 +237,7 @@ Let \(M\) denote an executable captured world and let \(R_{0}\) and
 realization. We distinguish three data roles: fitting evidence used to
 calibrate or propose a rewrite, ordinary held-out evidence used to
 measure generalization within the same observation family, and an
-untouched target or independent physical intervention used only after
+untouched target or separately reserved physical intervention used only after
 the repair is proposed.
 
 Let \(L_{obs}(R)\) be the ordinary held-out loss and \(L_{target}(R)\)
@@ -250,7 +250,7 @@ Model-form inadequacy, parameter compensation, transfer choice, boundary
 assumptions, and numerical artifacts can all create observationally
 plausible but physically different worlds.
 
-A verification channel produces an error \(e(R,Y)\) against independent
+A verification channel produces an error \(e(R,Y)\) against reserved verification
 evidence \(Y\) and an uncertainty scale \(\sigma\). We use the signed
 progress statistic
 
@@ -275,7 +275,7 @@ captured bundle provides appearance-linked state, particle state,
 observations, uncertainty sidecars, and provenance. The implementation
 calibrates a candidate physical model using the fitting split, evaluates
 ordinary held-out error, proposes a local or model-level rewrite, and
-only then evaluates independent counterfactual evidence. If the
+only then evaluates separately reserved counterfactual evidence. If the
 verification channel produces support, the system may commit the
 rewrite; if it produces veto, the rewrite is rejected; if evidence is
 unresolved, the system refuses certification rather than forcing a
@@ -290,7 +290,7 @@ back. The three-way scientific distinction is retained in the evidence record
 even though the storage transaction is binary.
 
 The verification transaction is deliberately sequential: proposal
-generation is completed before the independent physical probe is
+generation is completed before the separately reserved physical probe is
 evaluated, and the resulting evidence may support, veto, or leave the
 rewrite unresolved. This ordering prevents the confirmatory channel from
 silently becoming part of the proposal objective.
@@ -897,7 +897,7 @@ emphasizes which counterfactual claims are supported by observable
 validation data \citep{laudy2026digitaltwin}. Reality Probe should therefore be read as
 an application-specific mechanism rather than a replacement for those
 frameworks. Its scope is a physically editable captured world where a
-candidate rewrite is proposed and an independent intervention is used to
+candidate rewrite is proposed and a separately defined verification intervention is used to
 decide whether the rewrite should be committed.
 
 \subsection{Limitations}\label{limitations}
