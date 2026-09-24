@@ -1,0 +1,55 @@
+name: IRIS V6.7 Retrospective Campaign
+
+on:
+  push:
+    branches:
+      - research/iris-freefall-v67-scale-aware
+    paths:
+      - research/scripts/run_iris_freefall_v67_research_campaign.py
+      - .github/workflows/iris-v67-campaign.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout V6.7 research branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install analysis dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install             "numpy>=1.26,<3"             "opencv-python-headless>=4.10,<5"             "huggingface_hub>=0.34,<2"
+
+      - name: Materialize spent IRIS development evidence
+        run: |
+          python research/scripts/fetch_iris_freefall_rescue_v6.py             --data-root build/public-datasets             --config research/validation/iris_freefall_rescue_v6.json             --phase development
+
+      - name: Materialize spent IRIS failed-validation evidence
+        run: |
+          python research/scripts/fetch_iris_freefall_rescue_v6.py             --data-root build/public-datasets             --config research/validation/iris_freefall_rescue_v6.json             --phase validation
+
+      - name: Run one-shot V6.7 retrospective campaign
+        run: |
+          python research/scripts/run_iris_freefall_v67_research_campaign.py             --data-root build/public-datasets             --widths 640 960 1280             --out-dir build/v67-campaign | tee build/v67-campaign.log
+
+      - name: Upload V6.7 campaign evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iris-v67-retrospective-campaign
+          path: |
+            build/v67-campaign/**
+            build/v67-campaign.log
+          if-no-files-found: warn
+          retention-days: 30
