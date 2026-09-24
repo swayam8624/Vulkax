@@ -91,10 +91,9 @@ measured rope-length uncertainty intervals:
 
 ## Proposal/probe dependence sweep
 
-The blind proposal uses the first 40% of each video. The verification window is
-then moved to produce overlap (hoin{0,0.25,0.5,0.75,1}).
+The blind proposal uses the first 40% of each video. The verification window is then moved to produce overlap \(\rho \in \{0,0.25,0.5,0.75,1\}\).
 
-| (ho) | n videos | Strict accuracy | Coverage | Median absolute score |
+| $\rho$ | n videos | Strict accuracy | Coverage | Median absolute score |
 |---:|---:|---:|---:|---:|
 | 0.00 | 10 | 1.0 | 1.0 | 18.0780843 |
 | 0.25 | 10 | 1.0 | 1.0 | 18.0780843 |
