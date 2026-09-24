@@ -35,6 +35,11 @@ jobs:
           ln -s "$GITHUB_WORKSPACE/build" /tmp/vulkax-iris-lock/build
           cd /tmp/vulkax-iris-lock
 
+          # The symlink is CI plumbing, not repository state. Hide only this
+          # untracked path from the frozen --require-clean guard.
+          printf '/build\n' >> "$(git rev-parse --git-path info/exclude)"
+          test -z "$(git status --porcelain)"
+
           python3 -m venv "$GITHUB_WORKSPACE/build/.venv-bootstrap"
           "$GITHUB_WORKSPACE/build/.venv-bootstrap/bin/python" -m pip install --quiet \
             "huggingface_hub>=0.34,<2" \
