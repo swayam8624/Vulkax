@@ -1,0 +1,78 @@
+name: IRIS V6.7 Seeded Event Oracle Matrix
+
+on:
+  push:
+    branches:
+      - research/iris-freefall-v67-scale-aware
+    paths:
+      - .github/workflows/iris-v67-seeded-oracle-matrix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  oracle:
+    strategy:
+      fail-fast: false
+      matrix:
+        take: ["06","07","08","09","10"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: |
+          python -m pip install --quiet             "numpy>=1.26,<3"             "opencv-python-headless>=4.10,<5"             "huggingface_hub>=0.34,<2"
+      - name: Fetch spent validation
+        run: |
+          python research/scripts/fetch_iris_freefall_rescue_v6.py             --data-root build/public-datasets             --config research/validation/iris_freefall_rescue_v6.json             --phase validation
+      - name: Seeded event oracle for take
+        env:
+          TAKE: ${{ matrix.take }}
+        run: |
+          python - <<'PY'
+          import importlib.util,json,math,os,pathlib
+          import numpy as np
+          p=pathlib.Path("research/scripts/diagnose_iris_freefall_v67_seeded_track.py")
+          s=importlib.util.spec_from_file_location("m",p)
+          m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+          mod=m.load(m.ANALYZER,"a");diag=m.load(m.TRACK_DIAG,"d")
+          cfgj=json.loads(pathlib.Path("research/validation/iris_freefall_rescue_v6.json").read_text())
+          cfg=dict(cfgj["tracker"]); take=os.environ["TAKE"]; setting="drop_100"; h=1.0
+          video=pathlib.Path("build/public-datasets/iris/Dropping_ball")/setting/f"{take}.mp4"
+          fps,tracks=diag.build_tracks(mod,video,cfg)
+          tr,seed,kind=m.choose_seed(mod,tracks,fps,cfg)
+          fps2,frames=m.load_gray_frames(mod,video,640,float(cfg.get("max_seconds",5.0)))
+          centers,scores,half=m.bidirectional_track(
+              mod,frames,int(seed["frame"]),float(seed["x"]),float(seed["y"]),
+              float(seed.get("radius",max(seed.get("w",8),seed.get("h",8))/2)))
+          cands=m.event_candidates(centers,scores,fps2,float(cfg.get("expected_image_gravity_sign",1.0)))
+          truthT=math.sqrt(2*h/m.G)
+          def err(q):
+              g=2*h/(float(q["T"])**2)
+              return abs(g-m.G)/m.G
+          if not cands:
+              print("RESULT",take,"candidates=0");raise SystemExit(0)
+          oracle=min(cands,key=err)
+          policies={
+            "current":m.select_event(cands),
+            "longest":min(cands,key=lambda q:(-q["T"],q["shape"],q["hold_frac"])),
+            "earliest_release":min(cands,key=lambda q:(q["t0_frame"],q["shape"],-q["T"])),
+            "largest_span":min(cands,key=lambda q:(-q["span_px"],q["shape"],q["hold_frac"])),
+            "hold_then_long":min(cands,key=lambda q:(q["hold_frac"],q["release_jump"],-q["T"],q["shape"])),
+            "terminal_then_long":min(cands,key=lambda q:(-q["terminal"],-q["T"],q["shape"])),
+          }
+          print("RESULT",take,"tracked",int(np.sum(np.isfinite(centers[:,1]))),"candidates",len(cands),
+                "ORACLE_T",oracle["T"],"ORACLE_RATIO",oracle["T"]/truthT,
+                "ORACLE_ERR",err(oracle),"ORACLE_EVENT",oracle["s"],oracle["e"],
+                "ORACLE_SHAPE",oracle["shape"])
+          for name,q in policies.items():
+              print("POLICY",take,name,"T",q["T"],"ratio",q["T"]/truthT,
+                    "err",err(q),"event",q["s"],q["e"],
+                    "shape",q["shape"],"hold",q["hold_frac"],
+                    "terminal",q["terminal"],"span",q["span_px"])
+          PY
