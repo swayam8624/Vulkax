@@ -510,128 +510,71 @@ The interpretation supported by this sequence is that verification quality depen
 
 \section{Discussion}\label{discussion}
 
-\subsection{What is established}\label{what-is-established}
+\subsection{Why the channels behave differently}\label{why-the-channels-behave-differently}
 
-Four conclusions survive the full sequence. First, a rewrite can improve ordinary observations while worsening an untouched physical target. Second, a mechanism-sensitive probe can be implemented correctly and still carry too little information for a reliable decision. Third, changing the interrogation can matter dramatically: known-force compliance raises the synthetic evidence scale, and the locked finite-amplitude pendulum observable produces useful SUPPORT/VETO/UNRESOLVED decisions on fresh real video. Fourth, that success is not automatically transferable. The frozen free-fall replication passes development and then fails untouched validation.
+The synthetic sequence rules out a simple implementation explanation for the weak DCS results. D1 shows that the code path can produce strong rejection when the contrast is deliberately present. D2 and D3 show that moment cancellation and numerical refinement can remain well behaved while standardized separation stays far below the decision magnitude. D4V extends that observation to actual ordinary-improving proposals.
 
-That is narrower than a claim of universal physical correctness, but it is more operationally honest. A persistent captured-world system can keep fitting, verification, and unresolved evidence separate; it can commit or veto when a matched channel supplies enough evidence, and it can abstain or retire a lane when the experiment itself is inadequate.
+Changing the physical question has a larger effect than refining the original witness. Known-force compliance increases median evidence magnitude by 11.46\(\times\) on fresh synthetic worlds. The pendulum experiment goes further: a physical observable tied directly to the governing period relation produces useful decisions on fresh measured video. The free-fall lane then shows the opposite boundary. A locally plausible event detector passes development but fails when the observed interval no longer corresponds reliably to the full physical drop.
 
-\subsection{Relation to identifiability and experiment
-design}\label{relation-to-identifiability-and-experiment-design}
+The evidence is therefore consistent with an information-matching explanation: verification works when the measured response is sensitive to the distinction between candidate worlds and is linked to the physical quantity being judged. The experiments do not prove that information content is the only limiting factor. They show that changing the evidence channel can matter more than numerical refinement, and that development success alone does not establish that the required physical correspondence will survive a new regime.
 
-The force result fits the broader experimental-design principle that model discrimination depends on what is excited and what is measured \citep{asadi2025oed,wang2026identifiability}. We are not introducing that principle. What the experiments expose is its consequence inside a rewrite workflow: verification can fail even when every candidate looks plausible because the experiment does not separate them strongly enough. In that situation the system should not simply pick the highest score. It should collect more informative evidence or remain unresolved.
+\subsection{Relation to identifiability, experiment design, and simulation credibility}\label{relation-to-identifiability-and-experiment-design}
 
-\subsection{Relation to simulation verification and digital
-twins}\label{relation-to-simulation-verification-and-digital-twins}
+Identifiability asks whether observations contain enough information to determine a model; experiment design asks which intervention or measurement makes competing models easier to distinguish \citep{wang2026identifiability,asadi2025oed}. Reality Probe operates one level closer to the rewrite transaction. It assumes that a candidate already exists and asks whether reserved physical evidence supports committing that candidate.
 
-Simulation-credibility frameworks already distinguish code verification, solution verification, model validation, and uncertainty \citep{oberkampf2007pcmm}. Digital-twin validation similarly asks which counterfactual claims are actually supported by observable validation data \citep{laudy2026digitaltwin}. Reality Probe sits underneath that broader view as an application-specific mechanism. Its scope is a captured world that can be physically edited, where a proposed rewrite is tested through a separately defined verification intervention or observable before commit.
+That view also fits established verification and validation practice \citep{oberkampf2007pcmm,laudy2026digitaltwin}. A model can be numerically stable and observationally accurate in one regime while remaining unsupported for a different intended use. The SUPPORT/VETO/UNRESOLVED rule makes that distinction explicit for individual captured-world rewrites. UNRESOLVED is therefore a statement about available evidence, not a generic confidence score attached after the fact.
 
 \subsection{Limitations}\label{limitations}
 
-The limitations are not bookkeeping details; several of them define the boundary of the claim.
+The strongest measured positive result comes from one IRIS \texttt{pendulum\_90} regime and ten physical videos. The 110 controlled case rows are nested within those videos, so the physical sample size is ten. Post-final clustering handles that dependence explicitly, but the result still does not establish broad transfer across different pendulum lengths, cameras, motion amplitudes, or acquisition settings.
 
-\begin{itemize}
-\item
-  \textbf{Fresh prospective force evidence is synthetic.} The orthogonal
-  force-compliance experiment uses controlled MPM truth worlds rather
-  than a measured force-sensor setup. A real prospective force
-  experiment is required for a stronger measured-world claim.
-\item
-  \textbf{GAUGE is retrospective.} The measured channel contradiction
-  motivates the problem and demonstrates that different observables can
-  disagree, but it is not an untouched prospective test of DCS or force
-  compliance.
-\item
-  \textbf{The positive measured result is one physical regime.} The
-  locked IRIS pendulum result contains 10 fresh videos from one
-  \texttt{pendulum\_90} regime. The controlled case rows are nested inside
-  those videos and cannot be treated as independent physical experiments.
-\item
-  \textbf{Pendulum verification is temporally resolution-sensitive.}
-  In the full post-final corruption sweep, tested noise, blur, frame
-  duplication/drop, occlusion, and crop preserve the clean 81.82\%
-  strict accuracy, but temporal downsampling reduces it to 63.64\% at
-  30~fps and 45.45\% at 15~fps. Placebo abstention remains 100\%.
-  We therefore do not claim robustness to arbitrary acquisition frame
-  rates or temporal sampling.
-\item
-  \textbf{The second real-video domain fails.} The frozen IRIS free-fall
-  replication passes low-level tracking quality on all five validation
-  videos but misses the physical recovery target badly, with 111.7\%
-  median acceleration relative error. We retain that failure, keep the
-  validation split retrospective, and leave the final split unopened.
-\item
-  \textbf{The physical regime is limited.} The principal experiments use
-  a fixed deformable MPM setup and selected APIC/PIC candidate families.
-  Generalization across constitutive families, contact regimes, and
-  solvers is not established.
-\item
-  \textbf{The decision magnitude is operational.} The value 2 is frozen
-  before evaluation and prevents post-hoc threshold tuning, but it is
-  not a universal law for all physical verification tasks. A post-hoc
-  robustness audit uses the frozen per-proposal ledger: force compliance
-  has 14/36 crossings at $\tau=1$ (6 support and 8 veto), while both
-  fresh channels have zero crossings for every $\tau\ge1.5$.
-\item
-  \textbf{DCS synthesis is heuristic.} Lower-moment annihilation is
-  exact up to tolerance, but the projected maximin search is not
-  globally optimal.
-\item
-  \textbf{The response-jet interpretation is operational.} The
-  implementation estimates order of contact from validated witnesses; it
-  does not reconstruct a complete symbolic Taylor tensor.
-\item
-  \textbf{The selected hero case is post hoc.} It is chosen
-  deterministically for explanation and does not influence thresholds,
-  aggregate statistics, or the standardized-evidence result.
-\item
-  \textbf{Spatial residuals are explanatory.} Solver-driven residual
-  fields localize response disagreement but are not themselves the DCS
-  decision statistic.
-\item
-  \textbf{Measured DOT parameters are model-conditioned.} The DOT
-  benchmark lacks stress-free state, loads, thickness, mass, and
-  constitutive ground truth for C2; fitted material values are therefore
-  not presented as true cloth properties.
-\end{itemize}
+Temporal resolution is a concrete acquisition limit. The post-final corruption suite preserves 81.82\% strict accuracy under the tested noise, blur, frame duplication/drop, occlusion, and crop settings, but accuracy falls to 63.64\% at 30 fps and 45.45\% at 15 fps. Placebo abstention remains 100\%. A deployment claim therefore requires an acquisition rate high enough to preserve the period information used by the probe.
 
-\subsection{Future work}\label{future-work}
+The orthogonal force-compliance experiment is synthetic. It shows that changing the physical channel can increase standardized separation on fresh truth worlds, but it does not establish measured-world force-sensor verification. The GAUGE shearing result is retrospective, and the separately frozen GAUGE validation lane has zero directional decision coverage at the primary threshold.
 
-The next useful experiment is not another tuning pass on the frozen DCS, force-compliance, or failed free-fall partitions. It is a separately frozen measured study whose physical observable is chosen before final data access and is plausibly matched to the rewrite being tested. Independent force sensing, calibrated excitation, modal or frequency-domain response, broader constitutive families, and intervention-specific sensing are natural directions. Whatever comes next should keep proposal generation blind to the confirmatory channel, preserve a SUPPORT/VETO/UNRESOLVED rule declared before the confirming measurements are examined, and leave failed domains failed instead of recycling them into confirmation.
+The free-fall result is a failed second-domain replication. Low-level tracking quality passes on all five validation videos, yet physical recovery fails badly. The post-validation diagnostics suggest a partial-flight/full-height mismatch, but that explanation remains a retrospective diagnosis rather than a validated correction. The unopened \texttt{drop\_150} split is deliberately preserved.
 
-\section{Reproducibility and Implementation
-Notes}\label{reproducibility-and-implementation-notes}
+Several method-level assumptions also remain. The primary synthetic experiments use one deformable MPM regime and selected APIC/PIC families. The DCS witness search is deterministic but heuristic because the projected maximin problem is non-convex. The decision magnitude 2 is an operational repository-frozen rule, not a universal physical credibility threshold. DOT C2 fitted material values are model-conditioned because the dataset does not provide the state and loading information required for unique constitutive identification.
 
-The repository records the 2026-09-21 scientific freeze at commit \texttt{a9da8c0aa868}. The one-command runner builds and tests the code, executes the staged experiments, regenerates deterministic figures and tables, validates frozen numerical values, records compiler/system/GPU provenance, and assembles a SHA-256-indexed evidence archive. Paper conclusions are read from machine-readable JSON ledgers rather than reverse-engineered from rounded labels in figures.
+Proposal and verification windows in the pendulum study come from the same physical video. The post-final overlap sweep shows that the tested GT-hidden decisions are stable from disjoint to fully overlapping temporal windows, but this does not make the channels independent sensor modalities. A future experiment with separately instrumented physical sensing would provide a stronger independence claim.
 
-The core DCS code is kept separate from the experiment drivers. It includes arbitrary-order lower-moment validation, signed-response application, finite-amplitude counterfactual cumulants, standardized discrepancies, uncertainty propagation, active stencil synthesis, witness-space numerical refinement, and spatial localization. The orthogonal force protocol and fresh synthetic truth worlds are versioned independently of D2/D3/D4V. That separation is there for a practical reason: a negative gate should not disappear because the same data were quietly retuned.
+Finally, the repository records exact data revisions, lock commits, hashes, result ledgers, and replay scripts. An independent Ubuntu replay has reproduced the frozen pendulum development and validation readiness stages. At the time of this manuscript revision, the exact Linux replay of the locked final \texttt{pendulum\_90} result remains a reproducibility-engineering audit; the canonical locked result is the original repository-recorded execution.
+
+\subsection{What should be tested next}\label{future-work}
+
+The next experiment should change the measured information before it changes the threshold. A useful measured follow-on would apply a calibrated external force or excitation, record that response with a sensor channel that is separate from the proposal evidence, freeze the intervention and uncertainty model before final data access, and retain the same three-way decision semantics.
+
+Broader constitutive families and contact regimes are also needed to test whether the rewrite transaction survives beyond the current MPM setting. Modal or frequency-domain excitation is especially relevant when ordinary trajectories are weakly informative because it can expose different response structure without relying on a larger post-hoc decision margin. Any new protocol should preserve failed validation splits as failed evidence rather than recycling them into development.
+
+\section{Reproducibility and Implementation Notes}\label{reproducibility-and-implementation-notes}
+
+The repository separates scientific freezes by experiment rather than treating the manuscript date as a single global lock. The core DCS scientific state is recorded at commit \texttt{a9da8c0aa868}. The locked IRIS pendulum final test uses commit \texttt{9e56f06145b8a56dd26c1c81e064ed9b185c77d7}; the failed V6.6 free-fall validation uses commit \texttt{78818c3bfd87c0f0f802f6c04f06389f1fc807d2}. The public IRIS data revision for both measured protocols is \texttt{c253822f55431ca80ef2084de4bc5e79d1a488f1}.
+
+Machine-readable JSON/CSV ledgers store the reported outcomes, while SHA-256 manifests bind result files and evidence packages to their recorded content. The one-command research runners build the relevant code, materialize pinned public data, execute frozen stages in order, regenerate deterministic figures/tables, and record compiler, system, and GPU provenance. The paper reads numerical claims from those ledgers rather than from rounded labels in figures.
+
+The C++20 implementation contains nonlinear MPM replay, APIC/PIC transfer variants, finite-difference and adjoint influence paths, arbitrary-order lower-moment checks, signed-response application, finite-amplitude interaction contrasts, uncertainty propagation, active witness synthesis, witness-space numerical refinement, spatial localization, and commit/rollback bookkeeping. Experiment drivers and frozen protocol files are kept separate from the core implementation so that a failed gate can remain frozen without silently changing the underlying method.
+
+The locked pendulum result is based on ten physical videos. The result ledger explicitly records 90/110 primary correct cases, 40/110 small-angle-baseline correct cases, 40/50 SUPPORT, 40/50 VETO, and 10/10 UNRESOLVED placebo correctness for the primary probe. Post-final hardening is stored in a separate ledger and cannot replace the final-test record.
+
+Cross-platform replay is treated as a reproducibility audit rather than a source of new evidence. The Ubuntu/current-dependency replay has reproduced the frozen development and validation stages through the original readiness gate. Historical worktree/path assumptions exposed by the final replay are documented as engineering issues; they are not used to retune the tracker, candidate schedule, threshold, or final result.
 
 \paragraph{Generative-AI-assisted research workflow.}
-OpenAI ChatGPT was used during research for code drafting and debugging,
-experiment-orchestration and analysis scripts, visualization/manuscript tooling,
-and manuscript revision. AI-generated material was not treated as empirical
-evidence. Experimental partitions, thresholds, executed outputs, numerical
-claims were checked against committed research artifacts, and cited sources
-were checked against publication records before inclusion in the manuscript.
+OpenAI ChatGPT was used for code drafting and debugging, experiment orchestration and analysis scripts, visualization/manuscript tooling, and manuscript revision. AI-generated text or code was never treated as empirical evidence. Numerical claims were checked against committed result artifacts, experimental partitions and thresholds were frozen in repository state where stated, and cited sources were checked against publication records before inclusion.
 
-Paper visualizations are generated deterministically. Solver-driven surfaces may use an explicit display magnification so that micrometer-scale motion is visible, but the reported numbers are never scaled. The Stanford Bunny appears only as a visualization carrier where noted and still requires its source attribution; it is not benchmark geometry. The mathematical explainer uses the actual solver body and does not depend on the bunny.
+Paper visualizations are generated deterministically from committed trajectories or result ledgers. Solver-driven surfaces may use an explicitly stated display magnification so that small motion is visible; reported quantitative values remain unscaled. The Stanford Bunny is used only as a visualization carrier where identified and contributes no benchmark result.
 
 \section{Conclusion}\label{conclusion}
 
-Better observation fit is not the same thing as better physics. Across the controlled repair populations, some ordinary-improving rewrites make an untouched physical target worse. Reality Probe turns that mismatch into an explicit evidence transaction, with DCS as one tested mechanism-selective probe rather than the framework itself. The negative D2/D3/D4V sequence shows that a valid probe can still be information-poor; the force-compliance experiment shows that changing the physical channel can raise the evidence scale by 11.46$\times$ without yet crossing the frozen decision boundary. The locked IRIS pendulum result provides the positive measured case: 90/110 correct controlled decisions versus 40/110 for the matched small-angle baseline across 10 fresh videos, with all 10 placebo cases correctly left unresolved. The subsequent free-fall replication then fails untouched validation and stays failed. Taken together, the evidence supports a conditional systems claim rather than a universal verifier: when a physical channel is well matched to the requested rewrite, Reality Probe can support or veto; when it is not, the right behavior is to remain unresolved or retire that verification lane.
+Reality Probe begins from a practical failure mode: a physical rewrite can improve ordinary held-out observations and still make an untouched physical behavior worse. The experiments show that the quality of the verification decision depends strongly on the physical information supplied after the proposal is fixed.
+
+DCS provides a useful falsification example. It succeeds on a constructed control, remains numerically well behaved, and still produces little prospective separation in the tested synthetic regimes. Known-force compliance increases median standardized evidence by 11.46\(\times\) without clearing the frozen decision boundary. On fresh IRIS pendulum video, a finite-amplitude period probe produces 90/110 correct nested controlled decisions across ten videos, compared with 40/110 for the small-angle diagnostic baseline, while preserving all ten placebo abstentions. The frozen free-fall transfer test then fails validation with 111.7\% median acceleration relative error and remains failed.
+
+The evidence supports a conditional systems claim. A captured-world rewrite should be committed only when a reserved physical channel separates it from the baseline strongly enough under the declared uncertainty model. When the channel is weak, the system should remain unresolved. When a protocol fails untouched validation, the appropriate action is to retire or redesign that verification lane rather than manufacture a positive result by retuning after the fact.
 
 \section*{Acknowledgments}
 
 \textbf{Generative AI disclosure.}
-OpenAI ChatGPT was used as a research and writing assistant during the
-development of this work, including drafting and revising manuscript
-text, generating and debugging code, assisting with experiment
-orchestration and analysis scripts, preparing tables, figures, and
-visualization/manuscript tooling, and manuscript formatting. The author
-reviewed the generated material, validated the reported experiments and
-numerical evidence against the frozen research artifacts, checked the
-references used in the manuscript, and takes responsibility for the
-final content of the work.
+OpenAI ChatGPT was used as a research and writing assistant during development of this work, including drafting and revising manuscript text, generating and debugging code, assisting with experiment orchestration and analysis scripts, preparing tables and figures, and manuscript formatting. The author reviewed the generated material, validated reported experiments and numerical evidence against the frozen research artifacts, checked the references used in the manuscript, and takes responsibility for the final content.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}
