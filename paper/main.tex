@@ -237,14 +237,15 @@ The final synthetic verification stage (D4V) starts from 36 edits that all impro
 \centering
 \caption{Ordinary-improving synthetic proposal populations. The two populations are separate and are not pooled.}
 \label{tab:populations}
-\begin{tabular}{lrrr}
+\small
+\begin{tabularx}{\linewidth}{@{}Xccc@{}}
 \toprule
-Population & Physically regressive & Beneficial & Resolved at \(|z|\ge2\) \\
+Population & Regressive & Beneficial & Resolved \\
 \midrule
 D4V & 14 & 22 & 0/36 \\
 Fresh force study & 12 & 24 & 0/36 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \subsection{Measured-system checks}\label{measured-engineering-and-gauge-protocols}
@@ -367,18 +368,19 @@ All ten locked \texttt{pendulum\_90} videos pass quality control. The finite-amp
 
 \begin{table}[t]
 \centering
-\caption{Locked IRIS pendulum result. Case rows are nested within ten physical videos.}
+\caption{Locked IRIS pendulum result. Primary denotes the finite-amplitude probe; case rows are nested within ten physical videos.}
 \label{tab:iris-pendulum}
-\begin{tabular}{lcc}
+\small
+\begin{tabularx}{\linewidth}{@{}Xcc@{}}
 \toprule
-Outcome & Finite-amplitude probe & Small-angle baseline \\
+Outcome & Primary & Small-angle \\
 \midrule
 Overall correct & 90/110 & 40/110 \\
 SUPPORT correct & 40/50 & 0/50 \\
 VETO correct & 40/50 & 30/50 \\
 UNRESOLVED placebo & 10/10 & 10/10 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 The physical video, not the case row, is the independent unit. The primary probe beats the baseline on all ten videos; an exact two-sided sign test over those ten paired video outcomes gives \(p=0.001953125\). Two stronger post-final residual baselines also remain below the locked primary result.
