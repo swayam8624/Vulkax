@@ -578,6 +578,7 @@ Installation notes are in [INSTALL_0_90.md](docs/INSTALL_0_90.md). Performance m
 | Need | Document |
 |---|---|
 | Final research summary | [VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md](research/results/VULKAX_FINAL_RESEARCH_SUMMARY_2026-09-21.md) |
+| Current publication-facing research state | [CURRENT_RESEARCH_STATE_2026-09-24.md](research/status/CURRENT_RESEARCH_STATE_2026-09-24.md) |
 | Final result ledger | [VULKAX_FINAL_RESULTS_2026-09-21.json](research/results/VULKAX_FINAL_RESULTS_2026-09-21.json) |
 | Research result index | [research/results/README.md](research/results/README.md) |
 | Paper-data map | [research/paper_data/README.md](research/paper_data/README.md) |
