@@ -51,6 +51,7 @@ Generated paper assets:
 - [D3 witness-space/adaptive-order discovery](../status/DCS_D3_RESULT_2026-09-20.md)
 - [D4V repair-veto discovery](../status/DCS_D4V_RESULT_2026-09-20.md)
 - [GAUGE retrospective](../status/DCS_GAUGE_RETROSPECTIVE_RESULT_2026-09-20.md)
+- [GAUGE prospective validation failure](../status/GAUGE_PROSPECTIVE_VALIDATION_RESULT_2026-09-23.md)
 - [Locked IRIS pendulum final result](IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json)
 - [Failed IRIS free-fall validation](IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json)
 - [Free-fall negative-result closure](IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json)
