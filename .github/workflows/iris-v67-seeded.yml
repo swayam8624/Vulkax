@@ -1,0 +1,42 @@
+name: IRIS V6.7 Seeded Tracker
+
+on:
+  push:
+    branches:
+      - research/iris-freefall-v67-scale-aware
+    paths:
+      - research/scripts/diagnose_iris_freefall_v67_seeded_track.py
+      - .github/workflows/iris-v67-seeded.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seeded:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: |
+          python -m pip install --quiet             "numpy>=1.26,<3"             "opencv-python-headless>=4.10,<5"             "huggingface_hub>=0.34,<2"
+      - name: Fetch spent development
+        run: |
+          python research/scripts/fetch_iris_freefall_rescue_v6.py             --data-root build/public-datasets             --config research/validation/iris_freefall_rescue_v6.json             --phase development
+      - name: Fetch spent validation
+        run: |
+          python research/scripts/fetch_iris_freefall_rescue_v6.py             --data-root build/public-datasets             --config research/validation/iris_freefall_rescue_v6.json             --phase validation
+      - name: Run seeded trajectory diagnostic
+        run: |
+          python research/scripts/diagnose_iris_freefall_v67_seeded_track.py             --data-root build/public-datasets             --width 640 | tee build/v67-seeded.log
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iris-v67-seeded
+          path: build/v67-seeded.log
+          if-no-files-found: warn
