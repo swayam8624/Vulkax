@@ -115,28 +115,42 @@ The paper now explicitly contains:
 
 ## Reviewer-hardening state
 
-Implemented post-final tooling exists for:
-- cluster-correct video-level bootstrap/statistics;
-- direct finite-amplitude and nonlinear/damped baselines;
-- GT-hidden proposal -> verification analysis;
-- measured-truth uncertainty sensitivity;
-- proposal/probe overlap dependence;
-- video corruption robustness;
-- reviewer-facing deterministic figures/demo.
+The post-final pendulum reviewer-hardening battery was already executed on
+2026-09-23 on the original Apple-silicon/macOS environment at repository commit
+`3aa0fb14e98956ddf6e3a8a7388347c9a2ba278d`, using the full Metal robustness
+profile.
 
-These analyses are secondary only and must not replace the locked IRIS final
-result.
+Canonical secondary-result ledgers:
 
-The authoritative execution gate is the GitHub Actions workflow:
+- `research/results/IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.json`
+- `research/results/IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.md`
 
-**Reality Probe post-final reviewer hardening replay**
+Major results:
 
-It reconstructs the original frozen IRIS validation -> lock -> final-test chain
-from the historical code commit, requires exact agreement with the committed
-locked final summary, and only then executes post-final hardening analyses.
+- physical-video clustered comparison: primary better on 10/10 videos, baseline
+  better on 0/10, no ties; two-sided exact sign-test p=0.001953125;
+- stronger post-final comparators: direct finite-amplitude residual 45.45%
+  strict accuracy, damped nonlinear ODE residual 9.09%, locked probe 81.82%;
+- GT-hidden proposals: 10/10 ordinary-improving proposals, 8 physically worse
+  and 2 physically better, verifier correct on all 10 after proposal SHA closure;
+- measured rope-length uncertainty: 110/110 canonical labels stable through both
+  ±1 sigma and ±2 sigma intervals;
+- proposal/probe overlap diagnostic: 10/10 correct across rho=0 through rho=1;
+- full corruption robustness: 180 condition-video runs, zero failed videos,
+  10/10 clean Metal equivalence;
+- tested noise, blur, frame duplication/drop, occlusion, and crop preserve the
+  locked 81.82% accuracy;
+- temporal-resolution boundary: 63.64% at 30 fps and 45.45% at 15 fps, with
+  placebo abstention remaining 100%.
 
-At the time this state ledger is written, that replay is still an execution gate;
-no post-final numerical result is promoted here until the workflow completes.
+These analyses are secondary only and do not replace the locked final result.
+
+A cross-platform GitHub Actions replay was also added as a reproducibility audit.
+Current Ubuntu/current-dependency reconstruction is not bit-identical to the
+original local freeze environment and exposed historical runtime/path assumptions.
+That CI work is therefore treated as a reproducibility-engineering task, not as a
+license to change the frozen result. The original 2026-09-23 Mac/Metal hardening
+execution remains the canonical post-final secondary evidence.
 
 ## Repository disposition
 
