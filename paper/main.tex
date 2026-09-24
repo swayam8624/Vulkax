@@ -41,7 +41,7 @@ A scene reconstructed from video may later be physically edited: stiffness, damp
 
 Suppose a cloth has been reconstructed from video and assigned a simulated stiffness. A later optimization pass proposes a new stiffness because it lowers trajectory error on held-out frames. If the system simply overwrites the old value, it is treating better fit as evidence of better physics. Those are different claims. The new parameter may reproduce the recorded motion more closely and still respond worse when the cloth is pulled, struck, or loaded in a way that was never part of fitting.
 
-This problem appears whenever a reconstructed scene is expected to remain physically editable. By a \emph{video-reconstructed world}, we mean a scene model recovered from observations that stores geometry or appearance together with state or parameters used by a simulator. Physics-aware radiance fields, Gaussian representations, and differentiable simulators increasingly support this combination of reconstruction, parameter estimation, and interaction synthesis \citep{li2023pacnerf,xie2024physgaussian,zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs,hu2019chainqueen,hu2020difftaichi}. Once such a model persists beyond the fitting run, every physical parameter change becomes a state-management decision: should the system keep the old model or commit the new one?
+This problem appears whenever a reconstructed scene is expected to remain physically editable. By a \emph{video-reconstructed world}, we mean a scene model recovered from observations that stores geometry or appearance together with state or parameters used by a simulator. Physics-aware radiance fields, Gaussian representations, and differentiable simulators combine reconstruction, parameter estimation, and interaction synthesis \citep{li2023pacnerf,xie2024physgaussian,zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs,hu2019chainqueen,hu2020difftaichi}. Once such a model persists beyond the fitting run, every physical parameter change becomes a state-management decision: should the system keep the old model or commit the new one?
 
 Inverse physics usually answers a different question: which parameters best explain the observations used for estimation? Structural identifiability asks whether those observations can determine the parameters at all, and experiment design asks which measurements make competing models easier to distinguish \citep{wang2026identifiability,asadi2025oed}. Verification and validation ask whether a computational model is credible for an intended use \citep{oberkampf2007pcmm,laudy2026digitaltwin}. The missing systems step is the acceptance decision for one concrete physical edit after an optimizer has proposed it. A persistent scene needs a way to say: \emph{this change is physically supported}, \emph{this change is contradicted}, or \emph{the available test does not tell us enough}.
 
@@ -108,7 +108,7 @@ Let \(M_0\) be the current physical model stored in a video-reconstructed world 
 \begin{itemize}[leftmargin=*]
 \item \textbf{fitting evidence}, which may change model parameters or generate \(M_1\);
 \item \textbf{ordinary held-out evidence}, which measures generalization within the same observation family used for fitting; and
-\item \textbf{reserved physical evidence}, which is withheld from candidate selection and used only to decide whether \(M_1\) should replace \(M_0\).
+\item \textbf{reserved physical evidence}, which is withheld from proposal selection and used only to decide whether \(M_1\) should replace \(M_0\).
 \end{itemize}
 
 Let \(L_{\mathrm{obs}}(M)\) denote ordinary held-out error and \(L_{\mathrm{phys}}(M)\) error on an untouched physical target, with lower values preferred. A \emph{fit-improving physical regression} occurs when
@@ -199,7 +199,7 @@ which removes contributions attributable to lower-order subsets of intervention 
 
 The acceptance score is only useful if the uncertainty denominator refers to the same physical quantity as the numerator. We therefore track measurement uncertainty, variation across repeated observations, and numerical sensitivity to solver resolution. Signed DCS combinations propagate independent measurement and repeat variance through the squared weight gain \(\sum_i w_i^2\). Numerical error can be correlated across intervention points, so the refinement experiments measure the same witness at nominal and finer solver resolution instead of assuming independence.
 
-For candidate selection, active DCS synthesis searches the nullspace of the lower-moment constraints and evaluates deterministic projected directions. The resulting maximin search is non-convex, so we treat the selected witness as a reproducible heuristic and make no global-optimality claim.
+For witness selection, active DCS synthesis searches the nullspace of the lower-moment constraints and evaluates deterministic projected directions. The resulting maximin search is non-convex, so we treat the selected witness as a reproducible heuristic and make no global-optimality claim.
 
 The important systems property is independent of the particular probe: the same acceptance interface can consume a DCS witness, a force-compliance response, a pendulum period residual, or another reserved physical measurement. What changes is the information carried by \(Y\), not the semantics of SUPPORT, VETO, and UNRESOLVED.
 
@@ -219,7 +219,7 @@ Synthetic contrast study (D1--D4V) & controlled, frozen synthetic & Can a mechan
 DOT C2 \citep{li2025dot} & measured engineering check & Does the full capture--fit--edit--verify--rollback path operate on measured deformable motion? \\
 GAUGE \citep{wang2026gauge} & retrospective + frozen measured validation & Can ordinary and mechanism-sensitive channels disagree, and does the frozen witness resolve new measured cases? \\
 Known-force compliance & fresh synthetic & Does changing the physical question increase separability under the same decision rule? \\
-IRIS pendulum \citep{khanbayov2026iris} & locked measured final & Can a dynamics-matched test verify candidate edits on fresh video? \\
+IRIS pendulum \citep{khanbayov2026iris} & locked measured final & Can a dynamics-matched test verify proposed edits on fresh video? \\
 IRIS free-fall \citep{khanbayov2026iris} & frozen measured validation & Does the approach transfer to a second equation family without retuning? \\
 \bottomrule
 \end{tabularx}
@@ -308,7 +308,7 @@ The same decision magnitude \(\tau=2\) is used for DCS and force compliance. Num
 
 The positive measured test uses the IRIS \texttt{pendulum\_90} setting. Before the ten final videos are opened, the tracker, proposal schedule, physical probe, and decision rule are frozen. The primary test uses the finite-amplitude pendulum period relation; the diagnostic baseline uses the small-angle approximation. Each physical video produces 11 controlled SUPPORT/VETO/UNRESOLVED cases, giving 110 nested case rows across ten videos.
 
-A separate free-fall protocol tests transfer to another equation family. Development uses \texttt{drop\_50/06..10}; validation uses untouched \texttt{drop\_100/06..10}. The designated final set \texttt{drop\_150/02..10} is opened only if validation passes. Thresholds, tracker logic, candidate selection, and scene membership are frozen before validation.
+A separate free-fall protocol tests transfer to another equation family. Development uses \texttt{drop\_50/06..10}; validation uses untouched \texttt{drop\_100/06..10}. The designated final set \texttt{drop\_150/02..10} is opened only if validation passes. Thresholds, tracker logic, proposal selection, and scene membership are frozen before validation.
 
 Post-final pendulum analyses are kept separate from the locked result. They cluster by physical video, compare additional residual models, generate proposals without ground-truth access, vary proposal/probe overlap, propagate rope-length uncertainty, and stress the video pipeline under corruption and temporal downsampling.
 
@@ -316,15 +316,15 @@ Post-final pendulum analyses are kept separate from the locked result. They clus
 
 \subsection{Better fit is not a physical acceptance test}\label{deceptive-repair-is-a-distinct-failure-mode}
 
-Fit-improving physical regressions occur in both controlled proposal populations. Fourteen of 36 D4V candidates and 12 of 36 fresh force-study candidates improve ordinary held-out error while worsening an untouched physical target. These fractions describe the constructed test populations; they are not prevalence estimates.
+Fit-improving physical regressions occur in both controlled proposal populations. Fourteen of 36 D4V edits and 12 of 36 fresh force-study edits improve ordinary held-out error while worsening an untouched physical target. These fractions describe the constructed test populations; they are not prevalence estimates.
 
 The consequence is more important than the count. A pipeline that commits an edit because held-out trajectory error improved would accept physically worse states in these examples. Figure~\ref{fig:deceptive-repair} shows one case in which ordinary error falls by 14.93\% while untouched-target error rises by 9.03\%.
 
 \subsection{Probe sophistication cannot compensate for an uninformative experiment}\label{the-dcs-hypothesis-is-falsified-as-a-general-prospective-verifier}
 
-DCS passes the constructed control: all 64 deliberately regressive candidates are rejected. That result verifies the implementation and confirms that signed intervention contrasts can expose a strong difference when one is present.
+DCS passes the constructed control: all 64 deliberately regressive parameter changes are rejected. That result verifies the implementation and confirms that signed intervention contrasts can expose a strong difference when one is present.
 
-The frozen synthetic evaluations tell a different story. On unseen truth worlds, DCS remains far below the acceptance margin. Numerical refinement reduces solver discrepancy but does not materially increase separation. In the D4V candidate population, DCS, raw bundles, pair-specific raw responses, Fisher/Jacobian selection, and maximum-motion selection all resolve 0/36 candidates at \(|z|\ge2\). DCS is therefore neither uniquely failing nor uniquely superior: the kinematic experiment itself does not provide enough evidence for the acceptance decision.
+The frozen synthetic evaluations tell a different story. On unseen truth worlds, DCS remains far below the acceptance margin. Numerical refinement reduces solver discrepancy but does not materially increase separation. In the D4V proposal population, DCS, raw bundles, pair-specific raw responses, Fisher/Jacobian selection, and maximum-motion selection all resolve 0/36 proposals at \(|z|\ge2\). DCS is therefore neither uniquely failing nor uniquely superior: the kinematic experiment itself does not provide enough evidence for the acceptance decision.
 
 GAUGE shows the same distinction on measured data. In the retrospective shearing study, ordinary marker error prefers the finite-overlap model, while the longitudinal mechanism channel prefers the endpoint model in 9/10 held-out repeats. In the separately frozen validation study, the raw truth direction is correct but the witness signal is tiny relative to repeat and numerical variability; directional SUPPORT/VETO coverage is 0/24, while all 12 placebo cases correctly remain UNRESOLVED.
 
@@ -340,7 +340,7 @@ Quantity & DCS & Force compliance \\
 \midrule
 Median \(|z|\) & 0.0488 & 0.5586 \\
 Maximum \(|z|\) & 0.1728 & 1.3191 \\
-Resolved candidates & 0/36 & 0/36 \\
+Resolved proposals & 0/36 & 0/36 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -383,7 +383,7 @@ UNRESOLVED placebo & 10/10 & 10/10 \\
 
 The physical video, not the case row, is the independent unit. The primary probe beats the baseline on all ten videos; an exact two-sided sign test over those ten paired video outcomes gives \(p=0.001953125\). Two stronger post-final residual baselines also remain below the locked primary result.
 
-The success is not an artifact of manually scheduled candidate factors. In a post-final GT-hidden test, proposals are generated from an early video segment and committed to a hash before ground truth is joined; all ten ordinary-improving proposals are then classified correctly on reserved evidence. The decision also remains stable when proposal and probe windows are varied from disjoint to fully overlapping, although both windows still come from the same sensor stream.
+The success is not an artifact of manually scheduled parameter factors. In a post-final GT-hidden test, proposals are generated from an early video segment and committed to a hash before ground truth is joined; all ten ordinary-improving proposals are then classified correctly on reserved evidence. The decision also remains stable when proposal and probe windows are varied from disjoint to fully overlapping, although both windows still come from the same sensor stream.
 
 Robustness tests identify a concrete acquisition boundary. Noise, blur, modest frame duplication/drop, central occlusion, and crop perturbations preserve the locked 81.82\% accuracy in the tested ranges. Temporal downsampling does not: accuracy falls to 63.64\% at 30 fps and 45.45\% at 15 fps. The verifier therefore depends on preserving the temporal information required by the pendulum observable.
 
@@ -446,7 +446,7 @@ OpenAI ChatGPT was used for code drafting and debugging, experiment orchestratio
 
 \section{Conclusion}\label{conclusion}
 
-A physically editable scene has two separate problems: estimating a better model and deciding whether that model should replace the one already stored. This paper focuses on the second problem. Reality Probe places a reserved physical test between proposal and commit, so a candidate can be accepted, rejected, or left pending when the experiment is not informative enough.
+A physically editable scene has two separate problems: estimating a better model and deciding whether that model should replace the one already stored. This paper focuses on the second problem. Reality Probe places a reserved physical test between proposal and commit, so a proposal can be accepted, rejected, or left pending when the experiment is not informative enough.
 
 The experiments show why that separation matters. Better held-out fit can coincide with worse physical behavior. Numerically correct probes can still fail because the chosen observation does not distinguish the competing models. Changing the experiment can increase separability far more than refining the same estimator. A dynamics-matched pendulum test succeeds on fresh measured video, while a separately frozen free-fall protocol fails validation and is stopped; the validation set is not recycled into development.
 
