@@ -101,7 +101,7 @@ jobs:
               "files":files,
           }
           (root/"vulkax_download_manifest.json").write_text(
-              json.dumps(manifest,indent=2,sort_keys=True)+"\\n"
+              json.dumps(manifest,indent=2,sort_keys=True)
           )
           print("VALID pinned final-media download",len(files),total)
           PY
@@ -135,7 +135,7 @@ jobs:
               "schema":"vulkax.public_dataset_truth_index",
               "version":1,
               "datasets":{"iris":truth},
-          },indent=2,sort_keys=True)+"\\n")
+          },indent=2,sort_keys=True))
           print("VALID IRIS-only historical preparation",len(rows))
           PY
 
