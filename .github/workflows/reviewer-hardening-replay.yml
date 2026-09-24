@@ -33,18 +33,9 @@ jobs:
 
           cd /tmp/vulkax-iris-lock
 
-          python3 -m venv "$GITHUB_WORKSPACE/build/.venv-bootstrap"
-          "$GITHUB_WORKSPACE/build/.venv-bootstrap/bin/python" -m pip install --quiet \
-            "huggingface_hub>=0.34,<2" \
-            "numpy>=1.26,<3" \
-            "opencv-python-headless>=4.10,<5"
-
-          "$GITHUB_WORKSPACE/build/.venv-bootstrap/bin/python" \
-            research/scripts/fetch_public_validation_datasets.py \
-            --root "$GITHUB_WORKSPACE/build/public-datasets" \
-            --profile smoke \
-            --datasets gauge rgbench
-
+          # The frozen pendulum runner is self-contained: it creates the exact
+          # lightweight runtime and fetches only IRIS pendulum_20/45 here.
+          # GAUGE/RGBench are intentionally not downloaded for this replay.
           bash research/scripts/run_iris_pendulum_validation.sh \
             --build-dir "$GITHUB_WORKSPACE/build" \
             --venv "$GITHUB_WORKSPACE/build/.venv-iris-pendulum" \
