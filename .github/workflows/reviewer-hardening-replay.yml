@@ -1,0 +1,104 @@
+name: Reality Probe post-final reviewer hardening replay
+
+on:
+  push:
+    branches:
+      - research/iris-freefall-v67-scale-aware
+    paths:
+      - .github/workflows/reviewer-hardening-replay.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay-and-harden:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv ffmpeg
+
+      - name: Reconstruct locked IRIS pendulum final campaign
+        run: |
+          set -Eeuo pipefail
+          LOCK_SHA=9e56f06145b8a56dd26c1c81e064ed9b185c77d7
+          git worktree add --detach /tmp/vulkax-iris-lock "$LOCK_SHA"
+
+          cd /tmp/vulkax-iris-lock
+          python3 -m venv "$GITHUB_WORKSPACE/build/.venv-bootstrap"
+          "$GITHUB_WORKSPACE/build/.venv-bootstrap/bin/python" -m pip install --quiet             "huggingface_hub>=0.34,<2" "numpy>=1.26,<3" "opencv-python-headless>=4.10,<5"
+
+          "$GITHUB_WORKSPACE/build/.venv-bootstrap/bin/python"             research/scripts/fetch_public_validation_datasets.py             --root "$GITHUB_WORKSPACE/build/public-datasets"             --profile smoke             --datasets gauge rgbench
+
+          bash research/scripts/run_iris_pendulum_final_test.sh             --build-dir "$GITHUB_WORKSPACE/build"             --venv "$GITHUB_WORKSPACE/build/.venv-iris-pendulum"
+
+      - name: Verify replay matches committed locked result
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          locked=json.loads(Path("research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json").read_text())
+          replay=json.loads(Path("build/publication-validation/iris-pendulum-final-test/final_summary.json").read_text())
+          assert replay["take_count"] == locked["dataset"]["takes"], (replay["take_count"], locked["dataset"]["takes"])
+          assert replay["quality_pass_take_count"] == locked["dataset"]["quality_pass_takes"]
+          assert abs(replay["median_period_inferred_length_relative_error"] - locked["physical_recovery"]["median_period_inferred_length_relative_error"]) < 1e-12
+          assert replay["primary"]["method"] == locked["primary"]["method"]
+          assert replay["primary"]["correct"] == locked["primary"]["correct"]
+          assert replay["primary"]["total"] == locked["primary"]["total"]
+          assert abs(replay["primary"]["strict_accuracy"] - locked["primary"]["strict_accuracy"]) < 1e-12
+          assert replay["baseline"]["method"] == locked["baseline"]["method"]
+          assert replay["baseline"]["correct"] == locked["baseline"]["correct"]
+          assert replay["baseline"]["total"] == locked["baseline"]["total"]
+          assert replay["paired_primary_only_correct"] == locked["paired"]["primary_only_correct"]
+          assert replay["paired_baseline_only_correct"] == locked["paired"]["baseline_only_correct"]
+          assert replay["paired_ties"] == locked["paired"]["ties"]
+          print("VALID exact locked-result replay")
+          PY
+
+      - name: Run post-final reviewer hardening
+        run: |
+          bash research/scripts/run_postfinal_reviewer_hardening.sh             --build-dir build             --profile quick             --no-video
+
+      - name: Print hardening summaries
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          paths=[
+            "build/publication-validation/iris-pendulum-final-test/clustered_statistics/summary.json",
+            "build/publication-validation/iris-pendulum-postfinal-baselines/summary.json",
+            "build/publication-validation/iris-pendulum-postfinal-proposals/summary.json",
+            "build/publication-validation/iris-pendulum-postfinal-truth-uncertainty/summary.json",
+            "build/publication-validation/iris-pendulum-postfinal-dependence/summary.json",
+            "build/publication-validation/iris-pendulum-postfinal-robustness/summary.json",
+            "build/publication-validation/iris-official-reference/manifest.json",
+            "build/publication-validation/reviewer-hardening-manifest.json",
+          ]
+          for p in paths:
+            q=Path(p)
+            print("\n===== HARDENING_SUMMARY",p,"=====")
+            print(q.read_text())
+          PY
+
+      - name: Upload hardening evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: reality-probe-postfinal-hardening-${{ github.sha }}
+          path: |
+            build/publication-validation/iris-pendulum-final-test
+            build/publication-validation/iris-pendulum-postfinal-baselines
+            build/publication-validation/iris-pendulum-postfinal-proposals
+            build/publication-validation/iris-pendulum-postfinal-truth-uncertainty
+            build/publication-validation/iris-pendulum-postfinal-dependence
+            build/publication-validation/iris-pendulum-postfinal-robustness
+            build/publication-validation/iris-official-reference
+            build/publication-validation/reviewer-hardening-manifest.json
+            build/visualization/reviewer-hardening
+          if-no-files-found: error
+          retention-days: 30
