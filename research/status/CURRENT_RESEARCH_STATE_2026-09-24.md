@@ -102,8 +102,10 @@ Both:
 - `paper/main.tex`
 - `paper/main_humanized.tex`
 
-contain the same current scientific claims and compile successfully under the
-branch-only ACM/LaTeX manuscript check after the 2026-09-24 evidence revision.
+contain the same current scientific claims and are synchronized byte-for-byte.
+The rewritten ACM/TOG manuscript has passed the dedicated LaTeX/evidence guard,
+including citation/reference resolution and the final horizontal-overflow audit,
+and is now the canonical manuscript on `main`.
 
 The paper now explicitly contains:
 - DCS/OFC information-boundary results;
@@ -144,6 +146,11 @@ Major results:
   placebo abstention remaining 100%.
 
 These analyses are secondary only and do not replace the locked final result.
+
+Canonical replay ledgers:
+
+- `research/results/IRIS_PENDULUM_LINUX_REPLAY_RESULT_2026-09-24.json`
+- `research/results/IRIS_PENDULUM_LINUX_REPLAY_RESULT_2026-09-24.md`
 
 A cross-platform GitHub Actions replay is maintained as a reproducibility audit.
 On Ubuntu/current dependencies, the frozen development and validation stages
