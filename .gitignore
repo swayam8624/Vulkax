@@ -14,3 +14,21 @@ compile_commands.json
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Local Python environments / download caches
+.venv/
+.venv-*/
+venv/
+env/
+.huggingface/
+hf-cache/
+
+# Local-only downloaded datasets outside the canonical build/ tree
+datasets/
+downloads/
+public-datasets/
+publication-validation/
+
+# Partial downloader artifacts
+*.part
+*.download
