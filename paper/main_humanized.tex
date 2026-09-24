@@ -38,7 +38,7 @@ Captured scenes are starting to behave less like static reconstructions and more
 
 A growing class of systems attaches physical state directly to visual scene representations, allowing captured objects to be simulated, edited, and tested under interactions that were never observed during capture. Physics-aware neural fields and Gaussian representations have made this practical for dynamic reconstruction, material inference, and interaction synthesis \citep{li2023pacnerf,xie2024physgaussian,zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs}. Once a scene can be rewritten physically, however, fitting is no longer the whole problem. The harder question is what should count as evidence that a rewrite is actually better, rather than merely better at matching the observations on which it was judged.
 
-That question is difficult because inverse physical models are often underdetermined by the observations we can collect. Different parameters, transfer schemes, boundary assumptions, numerical settings, or constitutive approximations may explain nearly the same visible motion and then disagree elsewhere. Structural identifiability, optimal experimental design, model discrepancy, and simulation credibility all address parts of this ambiguity \citep{wang2026identifiability,asadi2025oed,oberkampf2007pcmm,laudy2026digitaltwin}. We use those ideas as context rather than claiming them as new. Our narrower concern is operational: a persistent captured world has been given a requested physical rewrite, and the system must decide whether an independent experiment supports it, contradicts it, or simply fails to say enough.
+That question is difficult because inverse physical models are often underdetermined by the observations we can collect. Different parameters, transfer schemes, boundary assumptions, numerical settings, or constitutive approximations may explain nearly the same visible motion and then disagree elsewhere. Structural identifiability, optimal experimental design, model discrepancy, and simulation credibility all address parts of this ambiguity \citep{wang2026identifiability,asadi2025oed,oberkampf2007pcmm,laudy2026digitaltwin}. We use those ideas as context rather than claiming them as new. Our narrower concern is operational: a persistent captured world has been given a requested physical rewrite, and the system must decide whether a separately reserved verification experiment supports it, contradicts it, or simply fails to say enough.
 
 \begin{figure*}[t]
 \centering
@@ -97,7 +97,7 @@ The thread running through the paper is simple: a captured world can fit its obs
 \subsection{Physics-aware scene representations and inverse
 physics}\label{physics-aware-scene-representations-and-inverse-physics}
 
-PAC-NeRF couples continuum simulation to a neural radiance field for joint geometry and physical-parameter estimation from multi-view video \citep{li2023pacnerf}. PhysGaussian brings Material Point Method (MPM) dynamics directly into 3D Gaussian primitives \citep{xie2024physgaussian}, and later work has pushed physics-aware visual representations toward material initialization and refinement, interaction synthesis, and monocular or multi-material inverse physics \citep{zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs}. These systems establish that visual representations can carry enough structure for physical inference and simulation. We do not claim Gaussian-plus-MPM simulation, parameter fitting, or differentiable inverse physics as contributions. Our question begins one step later: once an optimizer has already produced an observationally better physical rewrite, what independent evidence justifies accepting it?
+PAC-NeRF couples continuum simulation to a neural radiance field for joint geometry and physical-parameter estimation from multi-view video \citep{li2023pacnerf}. PhysGaussian brings Material Point Method (MPM) dynamics directly into 3D Gaussian primitives \citep{xie2024physgaussian}, and later work has pushed physics-aware visual representations toward material initialization and refinement, interaction synthesis, and monocular or multi-material inverse physics \citep{zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs}. These systems establish that visual representations can carry enough structure for physical inference and simulation. We do not claim Gaussian-plus-MPM simulation, parameter fitting, or differentiable inverse physics as contributions. Our question begins one step later: once an optimizer has already produced an observationally better physical rewrite, what separately reserved verification evidence justifies accepting it?
 
 Differentiable simulators such as ChainQueen and DiffTaichi provide much of the infrastructure needed for gradient-based physical optimization \citep{hu2019chainqueen,hu2020difftaichi}. Finite differences, adjoint sensitivity, APIC/MPM replay, and material calibration play the same supporting role in our implementation. They are machinery we rely on, not novelty claims.
 
@@ -120,7 +120,7 @@ We also exercise the captured-world pipeline on sequence C2 from the DOT deforma
 
 \section{Problem Formulation}\label{problem-formulation}
 
-Let \(M\) denote an executable captured world and \(R_{0}\), \(R_{1}\) the baseline and proposed repaired physical realizations. The experiments keep three evidence roles separate. Fitting evidence is used to calibrate or propose a rewrite. Ordinary held-out evidence checks generalization within the same observation family. An untouched target, or an independent physical intervention, is reserved until after the repair has been proposed.
+Let \(M\) denote an executable captured world and \(R_{0}\), \(R_{1}\) the baseline and proposed repaired physical realizations. The experiments keep three evidence roles separate. Fitting evidence is used to calibrate or propose a rewrite. Ordinary held-out evidence checks generalization within the same observation family. An untouched target, or a separately reserved physical intervention, is reserved until after the repair has been proposed.
 
 Let \(L_{obs}(R)\) be the ordinary held-out loss and \(L_{target}(R)\)
 be an independent physical target. We define a deceptive repair by
@@ -129,7 +129,7 @@ be an independent physical target. We define a deceptive repair by
 
 The definition intentionally says nothing about the cause of the mismatch. Model-form error, parameter compensation, transfer choice, boundary assumptions, and numerical artifacts can all produce worlds that look similarly plausible under the observations and diverge under another physical test.
 
-A verification channel produces an error \(e(R,Y)\) against independent
+A verification channel produces an error \(e(R,Y)\) against reserved verification
 evidence \(Y\) and an uncertainty scale \(\sigma\). We use the signed
 progress statistic
 
@@ -146,7 +146,7 @@ The magnitude 2 is a decision reference fixed before the fresh evaluation, not a
 \subsection{Captured-world rewrite and verification
 pipeline}\label{captured-world-rewrite-and-verification-pipeline}
 
-Reality Probe keeps proposal generation and verification as separate stages. A captured bundle contains appearance-linked state, particle state, observations, uncertainty sidecars, and provenance. The fitting split is used to calibrate a candidate model; ordinary held-out error is measured; a local or model-level rewrite is proposed; only then is independent counterfactual evidence evaluated. Support can permit a commit, veto rejects the rewrite, and unresolved leaves the candidate unverified. The system does not convert weak evidence into a binary answer merely because a downstream transaction wants one.
+Reality Probe keeps proposal generation and verification as separate stages. A captured bundle contains appearance-linked state, particle state, observations, uncertainty sidecars, and provenance. The fitting split is used to calibrate a candidate model; ordinary held-out error is measured; a local or model-level rewrite is proposed; only then is separately reserved counterfactual evidence evaluated. Support can permit a commit, veto rejects the rewrite, and unresolved leaves the candidate unverified. The system does not convert weak evidence into a binary answer merely because a downstream transaction wants one.
 
 
 The evidence layer deliberately has three outcomes, while the lower-level
@@ -156,7 +156,7 @@ map to a rejected/non-commit transaction, and any tentative mutation is rolled
 back. The three-way scientific distinction is retained in the evidence record
 even though the storage transaction is binary.
 
-That ordering is more than bookkeeping. The proposal has to be complete before the confirmatory physical probe is evaluated. Otherwise the verification channel can quietly leak into the proposal objective and stop being independent evidence.
+That ordering is more than bookkeeping. The proposal has to be complete before the confirmatory physical probe is evaluated. Otherwise the verification channel can quietly leak into the proposal objective and stop being genuinely held-out verification evidence.
 
 The research implementation is C++20. It includes nonlinear MPM replay, APIC/PIC transfer variants, finite-difference and adjoint influence paths, deterministic experiment drivers, frozen JSON/CSV result ledgers, and SHA-256-indexed evidence packages. Metal and Vulkan render paths are useful for integration and presentation, but none of the quantitative paper claims depends on native rendering.
 
