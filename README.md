@@ -416,6 +416,7 @@ The resulting claim is:
 | D3 adaptive-order study | 6 truth worlds, 0 resolved, median adaptive separation 0.0588583 |
 | D4V repair proposals | 36 proposals, 14 deceptive, 22 beneficial, 0% resolved coverage |
 | GAUGE retrospective | ordinary and marker channels favored overlap 10/10; longitudinal channel favored endpoint 9/10 |
+| GAUGE prospective validation | 12 measured worlds; 0/12 correct SUPPORT, 0/12 correct VETO, 12/12 correct placebo abstentions; final repeats unopened |
 | Fresh force-compliance study | 36 proposals, 12 deceptive, 24 beneficial, 11.46x median signal gain, 0 resolved |
 | Locked IRIS pendulum final | 10/10 quality-pass videos; finite-amplitude probe 90/110 correct vs small-angle baseline 40/110; 10/10 placebo abstentions |
 | IRIS free-fall validation | 5/5 quality-pass videos but 111.7% median acceleration relative error; validation failed and final split remains unopened |
