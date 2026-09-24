@@ -1,0 +1,358 @@
+{
+  "schema": "vulkax.iris_pendulum_postfinal_reviewer_hardening_result",
+  "version": 1,
+  "executed_at": "2026-09-23",
+  "integrated_at": "2026-09-24",
+  "evidence_class": "post_final_secondary_analysis",
+  "source": {
+    "repository_commit": "3aa0fb14e98956ddf6e3a8a7388347c9a2ba278d",
+    "command": "bash research/scripts/run_postfinal_reviewer_hardening.sh --profile full --with-freefall-validation",
+    "host": "Apple Silicon macOS",
+    "robustness_backend": "metal",
+    "transcript": "Pasted text(20260923-084210).txt",
+    "note": "The pendulum reviewer-hardening analyses and deterministic visuals completed before the optional free-fall add-on. The overall shell command later stopped because the then-current free-fall development gate failed; that does not invalidate the already-completed pendulum outputs."
+  },
+  "locked_result_guard": {
+    "locked_result_path": "research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json",
+    "physical_video_units": 10,
+    "locked_primary_accuracy": 0.8181818181818182,
+    "locked_baseline_accuracy": 0.36363636363636365,
+    "post_final_replaces_locked_result": false,
+    "claim_guard": "Secondary/post-final analyses may qualify or contextualize the locked result, but never replace, retune, or relabel it."
+  },
+  "clustered_statistics": {
+    "physical_video_units": 10,
+    "bootstrap_replicates": 10000,
+    "primary_accuracy": {
+      "estimate": 0.8181818181818181,
+      "ci95": [
+        0.8181818181818181,
+        0.8181818181818181
+      ]
+    },
+    "baseline_accuracy": {
+      "estimate": 0.36363636363636365,
+      "ci95": [
+        0.36363636363636365,
+        0.36363636363636365
+      ]
+    },
+    "difference": {
+      "estimate": 0.4545454545454546,
+      "ci95": [
+        0.4545454545454546,
+        0.4545454545454546
+      ]
+    },
+    "paired_video_sign_test": {
+      "primary_better_videos": 10,
+      "baseline_better_videos": 0,
+      "ties": 0,
+      "two_sided_exact_p": 0.001953125,
+      "unit": "physical_video"
+    },
+    "interpretation_guard": "The ten physical videos are the resampling/inference units; the nested case rows are not treated as independent experiments."
+  },
+  "strong_postfinal_baselines": {
+    "damped_nonlinear_ode_residual": {
+      "n": 110,
+      "strict_accuracy": 0.09090909090909091,
+      "support_accuracy": 0,
+      "veto_accuracy": 0,
+      "placebo_accuracy": 1,
+      "locked_primary_only_correct": 80,
+      "baseline_only_correct": 0,
+      "ties": 30
+    },
+    "direct_finite_amplitude_period_residual": {
+      "n": 110,
+      "strict_accuracy": 0.45454545454545453,
+      "support_accuracy": 0.4,
+      "veto_accuracy": 0.4,
+      "placebo_accuracy": 1,
+      "locked_primary_only_correct": 40,
+      "baseline_only_correct": 0,
+      "ties": 70
+    },
+    "interpretation_guard": "Post-final comparators only; they are not allowed to replace the locked primary result."
+  },
+  "gt_hidden_proposal_gate": {
+    "physical_video_units": 10,
+    "blind_proposal_sha256": "00e78c7755dec7f40a34cb1eaff0685ece5b8be79b78185778a441a76fb37834",
+    "ordinary_improving_proposals": 10,
+    "ordinary_improving_physically_better": 2,
+    "ordinary_improving_physically_worse_deceptive": 8,
+    "verifier_correct_on_ordinary_improving": 10,
+    "verifier_accuracy_on_ordinary_improving": 1,
+    "proposal_ground_truth_hidden_until_after_hash": true,
+    "interpretation_guard": "Post-final GT-hidden proposal experiment; does not replace the locked final result."
+  },
+  "truth_uncertainty": [
+    {
+      "sigma_multiplier": 1,
+      "cases": 110,
+      "label_stable": 110,
+      "label_stable_rate": 1
+    },
+    {
+      "sigma_multiplier": 2,
+      "cases": 110,
+      "label_stable": 110,
+      "label_stable_rate": 1
+    }
+  ],
+  "proposal_probe_dependence": [
+    {
+      "rho": 0,
+      "n": 10,
+      "strict_accuracy": 1,
+      "coverage": 1,
+      "median_abs_score": 18.078084342030287
+    },
+    {
+      "rho": 0.25,
+      "n": 10,
+      "strict_accuracy": 1,
+      "coverage": 1,
+      "median_abs_score": 18.078084342030287
+    },
+    {
+      "rho": 0.5,
+      "n": 10,
+      "strict_accuracy": 1,
+      "coverage": 1,
+      "median_abs_score": 17.933184189358947
+    },
+    {
+      "rho": 0.75,
+      "n": 10,
+      "strict_accuracy": 1,
+      "coverage": 1,
+      "median_abs_score": 17.234106214705275
+    },
+    {
+      "rho": 1,
+      "n": 10,
+      "strict_accuracy": 1,
+      "coverage": 1,
+      "median_abs_score": 16.20688997753742
+    }
+  ],
+  "corruption_robustness": {
+    "profile": "full",
+    "backend": "metal",
+    "elapsed_seconds": 694.0507455829938,
+    "failures": 0,
+    "metal_clean_equivalence": {
+      "videos_checked": 10,
+      "all_passed": true
+    },
+    "conditions": [
+      {
+        "condition": "clean",
+        "value": 0,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "noise",
+        "value": 5,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "noise",
+        "value": 15,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "noise",
+        "value": 30,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "blur",
+        "value": 3,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "blur",
+        "value": 7,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "blur",
+        "value": 15,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "frame_drop",
+        "value": 0.1,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "frame_drop",
+        "value": 0.25,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "frame_drop",
+        "value": 0.5,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "fps",
+        "value": 30,
+        "records": 110,
+        "strict_accuracy": 0.6363636363636364,
+        "support_accuracy": 0.6,
+        "veto_accuracy": 0.6,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "fps",
+        "value": 15,
+        "records": 110,
+        "strict_accuracy": 0.45454545454545453,
+        "support_accuracy": 0.4,
+        "veto_accuracy": 0.4,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "occlusion",
+        "value": 0.05,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "occlusion",
+        "value": 0.15,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "occlusion",
+        "value": 0.3,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "crop",
+        "value": 0.02,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "crop",
+        "value": 0.05,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      },
+      {
+        "condition": "crop",
+        "value": 0.1,
+        "records": 110,
+        "strict_accuracy": 0.8181818181818182,
+        "support_accuracy": 0.8,
+        "veto_accuracy": 0.8,
+        "placebo_accuracy": 1,
+        "failed_videos": 0
+      }
+    ],
+    "interpretation": "Noise, blur, frame duplication/drop, tested occlusion, and tested crop preserve the locked decision accuracy in this post-final stress suite. Temporal downsampling is the observed failure mode: accuracy falls at 30 fps and further at 15 fps while placebo abstention remains intact."
+  },
+  "deterministic_visuals": [
+    "build/visualization/reviewer-hardening/fig_postfinal_strong_baselines.svg",
+    "build/visualization/reviewer-hardening/fig_postfinal_clustered_videos.svg",
+    "build/visualization/reviewer-hardening/fig_postfinal_robustness.svg",
+    "build/visualization/reviewer-hardening/fig_gt_hidden_proposal_gate.svg",
+    "build/visualization/reviewer-hardening/fig_gt_hidden_rewrite_storyboard.png"
+  ],
+  "optional_freefall_addon": {
+    "ran_after_pendulum_hardening": true,
+    "then_current_development_result": {
+      "expected_videos": 4,
+      "quality_pass_videos": 4,
+      "median_acceleration_relative_error": 0.9856055698673896,
+      "records": 88,
+      "truth_control_accuracy": 1,
+      "placebo_false_assertion_rate": 0,
+      "direction_sign_rate": 1,
+      "gate_pass": false,
+      "take01_forbidden": true
+    },
+    "runner_exit": "development gate failed",
+    "superseded_for_paper_freefall_claims_by": "later frozen V6.6 development/pass and untouched validation/failure protocol",
+    "interpretation_guard": "Do not use this older free-fall add-on as the canonical free-fall result."
+  }
+}
