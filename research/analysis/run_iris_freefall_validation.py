@@ -1773,6 +1773,7 @@ def _evaluate_prefix_v66(chunk,s,e,fps,cfg):
         "roots_complete":1.0,
         "acceleration_stability":float(acc_stability),
         "event_extrapolation_frames":float(max(0.0,-release_tau*fps)),
+        "release_phase":float(release_phase),
         "release_plateau_track":-1,"impact_plateau_track":-1,
         "impact_frame":int(fr[-1]),
         "post_impact_first_frame":int(frames[e]) if e<len(frames) else -1,
@@ -1826,7 +1827,7 @@ def choose_ballistic_track_v66(tracks,fps,minimum_interval_frames=12,identity_cf
         return (
             float(q["trajectory_shape_rms_fraction"]),
             float(q.get("acceleration_stability",0.0)),
-            abs(float(q.get("normalized_fit_b",0.0))),
+            abs(float(q.get("release_phase",0.0))),
             float(q["x_drift_fraction"]),
             -float(q.get("impact_persistent_samples",0)),
             -float(q["identity_score"]),
@@ -1885,6 +1886,7 @@ def choose_ballistic_track_v66(tracks,fps,minimum_interval_frames=12,identity_cf
             "event_extrapolation_frames":float(
                 q.get("event_extrapolation_frames",0.0)
             ),
+            "release_phase":float(q.get("release_phase",0.0)),
             "release_plateau_track":-1,"impact_plateau_track":-1,
         })
     return chosen,audit
