@@ -15,13 +15,15 @@ Publication-validation evidence extended through **2026-09-24**.
 8. [Locked IRIS pendulum final result](IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json)
 9. [Post-final IRIS reviewer hardening](IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.md)
 10. [Machine-readable post-final hardening ledger](IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.json)
-11. [Failed IRIS free-fall validation](IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json)
-12. [IRIS free-fall retrospective closure](IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json)
-13. [Reality Probe novelty map](../status/REALITY_PROBE_NOVELTY_MAP_2026-09-24.md)
-14. [Paper-data map](../paper_data/README.md)
-15. [Current publication-facing research state](../status/CURRENT_RESEARCH_STATE_2026-09-24.md)
-16. [Frozen 2026-09-21 research state](../status/CURRENT_RESEARCH_STATE_2026-09-21.md)
-17. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
+11. [Independent Ubuntu pendulum replay](IRIS_PENDULUM_LINUX_REPLAY_RESULT_2026-09-24.md)
+12. [Machine-readable Ubuntu replay ledger](IRIS_PENDULUM_LINUX_REPLAY_RESULT_2026-09-24.json)
+13. [Failed IRIS free-fall validation](IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json)
+14. [IRIS free-fall retrospective closure](IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json)
+15. [Reality Probe novelty map](../status/REALITY_PROBE_NOVELTY_MAP_2026-09-24.md)
+16. [Paper-data map](../paper_data/README.md)
+17. [Current publication-facing research state](../status/CURRENT_RESEARCH_STATE_2026-09-24.md)
+18. [Frozen 2026-09-21 research state](../status/CURRENT_RESEARCH_STATE_2026-09-21.md)
+19. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
 
 ## Reproduce everything
 
@@ -57,6 +59,7 @@ Generated paper assets:
 - [GAUGE prospective validation failure](../status/GAUGE_PROSPECTIVE_VALIDATION_RESULT_2026-09-23.md)
 - [Locked IRIS pendulum final result](IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json)
 - [Post-final IRIS reviewer hardening](IRIS_PENDULUM_POSTFINAL_REVIEWER_HARDENING_2026-09-23.md) — secondary analysis only; does not replace the locked final result.
+- [Independent Ubuntu pendulum replay](IRIS_PENDULUM_LINUX_REPLAY_RESULT_2026-09-24.md) — decision-level result reproduced exactly; small continuous scalar drift retained as a cross-platform numerical limitation.
 - [Failed IRIS free-fall validation](IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json)
 - [Free-fall negative-result closure](IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json)
 
