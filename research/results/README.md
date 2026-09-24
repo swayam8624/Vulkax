@@ -1,6 +1,7 @@
 # Vulkax Research Results Index
 
-Canonical research state date: **2026-09-21**
+Canonical research snapshot: **2026-09-21**  
+Publication-validation evidence extended through **2026-09-24**.
 
 ## Start here
 
@@ -11,9 +12,13 @@ Canonical research state date: **2026-09-21**
 5. [Machine-readable benchmark table](DCS_FINAL_BENCHMARK_TABLE_2026-09-20.csv)
 6. [Machine-readable DCS result ledger](DCS_FINAL_RESULTS_2026-09-20.json)
 7. [Post-hoc information frontier](DCS_INFORMATION_FRONTIER_2026-09-20.md)
-8. [Paper-data map](../paper_data/README.md)
-9. [Current research state](../status/CURRENT_RESEARCH_STATE_2026-09-21.md)
-10. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
+8. [Locked IRIS pendulum final result](IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json)
+9. [Failed IRIS free-fall validation](IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json)
+10. [IRIS free-fall retrospective closure](IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json)
+11. [Reality Probe novelty map](../status/REALITY_PROBE_NOVELTY_MAP_2026-09-24.md)
+12. [Paper-data map](../paper_data/README.md)
+13. [Current research state](../status/CURRENT_RESEARCH_STATE_2026-09-21.md)
+14. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
 
 ## Reproduce everything
 
@@ -46,6 +51,9 @@ Generated paper assets:
 - [D3 witness-space/adaptive-order discovery](../status/DCS_D3_RESULT_2026-09-20.md)
 - [D4V repair-veto discovery](../status/DCS_D4V_RESULT_2026-09-20.md)
 - [GAUGE retrospective](../status/DCS_GAUGE_RETROSPECTIVE_RESULT_2026-09-20.md)
+- [Locked IRIS pendulum final result](IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json)
+- [Failed IRIS free-fall validation](IRIS_FREEFALL_V6_VALIDATION_RESULT_2026-09-24.json)
+- [Free-fall negative-result closure](IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json)
 
 ## Protocols
 
@@ -76,19 +84,39 @@ Every generated figure has a source CSV.
 The repository distinguishes:
 
 - **implementation correctness** — D0/D1 and CI;
-- **controlled synthetic evidence** — D2/D3/D4V;
+- **controlled synthetic evidence** — D2/D3/D4V and known-force compliance;
 - **retrospective measured evidence** — GAUGE;
-- **fresh confirmatory evidence** — D5, not yet executed.
+- **locked fresh measured evidence** — the 10-video IRIS pendulum final test;
+- **failed fresh measured validation** — IRIS free-fall `drop_100/06..10`;
+- **post-final secondary analysis** — clustered statistics, stronger baselines,
+  GT-hidden proposals, truth uncertainty, channel dependence, and robustness.
 
-Do not use implementation success or retrospective GAUGE analysis as a substitute
-for fresh prospective confirmation.
+Do not use implementation success, retrospective GAUGE analysis, or post-final
+diagnostics as substitutes for the locked final results. The failed free-fall
+validation remains failed, and its unopened final split must not be consumed to
+rescue the method.
 
 ## Current disposition
 
-DCS is fully implemented but is **not** a validated flagship verifier.
+DCS is fully implemented but is **not** a validated universal verifier.
 
-The strongest current synthetic result is an information-gradient rather than a successful verifier: D4V contains 14 deceptive repairs with 0% resolved coverage, and a separately preregistered known-force compliance channel raises median |z| by 11.46× on fresh truth worlds but still reaches only 1.319 at best against the frozen |z|=2 decision reference.
+The strongest synthetic result is an information gradient rather than a successful
+decision rule: D4V contains 14 deceptive repairs with 0% resolved coverage, and a
+separately repository-frozen known-force compliance channel raises median |z| by
+11.46× on fresh truth worlds but still reaches only 1.319 at best against the
+frozen |z|=2 decision reference.
 
-The strongest measured retrospective observation is the GAUGE channel conflict:
-ordinary/marker evidence favors the finite-overlap repair while the longitudinal
-mechanism channel favors the original endpoint model in 9/10 held-out repeats.
+The strongest locked measured positive result is the IRIS pendulum final set:
+10/10 quality-pass videos, 90/110 correct controlled decisions for the
+finite-amplitude probe versus 40/110 for the matched small-angle diagnostic
+baseline, and 10/10 placebo cases left unresolved. These are 110 nested controlled
+cases across 10 physical videos, not 110 independent experiments.
+
+The second measured domain is a preserved failure: IRIS free-fall passes low-level
+quality on 5/5 untouched validation videos but has 111.7% median acceleration
+relative error. That validation split is permanently retrospective and the
+designated final split remains unopened.
+
+The resulting Reality Probe claim is conditional: rewrite verification depends on
+whether the separately reserved physical channel contains discriminating
+information for the requested rewrite.
