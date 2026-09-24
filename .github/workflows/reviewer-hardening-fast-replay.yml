@@ -45,27 +45,101 @@ jobs:
 
           "$VENV/bin/python" - <<'PY'
           from huggingface_hub import snapshot_download
-          import os
-          root=os.path.join(os.environ["GITHUB_WORKSPACE"],"build","public-datasets","iris")
+          from pathlib import Path
+          import hashlib, json, os
+
+          root=Path(os.environ["GITHUB_WORKSPACE"])/"build"/"public-datasets"/"iris"
           snapshot_download(
               repo_id="rasulkhanbayov/IRIS",
               repo_type="dataset",
               revision="c253822f55431ca80ef2084de4bc5e79d1a488f1",
-              local_dir=root,
+              local_dir=str(root),
               allow_patterns=[
                   "README.md",
                   "parameters.json",
                   "Pendulum/pendulum_90/*.mp4",
               ],
           )
-          print("VALID pinned final-media download")
+
+          def sha256(p):
+              h=hashlib.sha256()
+              with p.open("rb") as fh:
+                  for q in iter(lambda:fh.read(1<<20),b""):
+                      h.update(q)
+              return h.hexdigest()
+
+          files=[]
+          total=0
+          for p in sorted(root.rglob("*")):
+              if not p.is_file() or ".cache/huggingface" in p.as_posix():
+                  continue
+              if p.name=="vulkax_download_manifest.json":
+                  continue
+              n=p.stat().st_size
+              total+=n
+              files.append({
+                  "path":p.relative_to(root).as_posix(),
+                  "bytes":n,
+                  "sha256":sha256(p),
+              })
+          manifest={
+              "schema":"vulkax.public_dataset_download",
+              "version":1,
+              "dataset":"iris",
+              "repo_id":"rasulkhanbayov/IRIS",
+              "revision":"c253822f55431ca80ef2084de4bc5e79d1a488f1",
+              "license":"CC-BY-NC-4.0",
+              "citation_url":"https://huggingface.co/datasets/rasulkhanbayov/IRIS",
+              "profile":"postfinal-fast-reproduction",
+              "requested_patterns":[
+                  "README.md",
+                  "parameters.json",
+                  "Pendulum/pendulum_90/*.mp4",
+              ],
+              "file_count":len(files),
+              "total_bytes":total,
+              "files":files,
+          }
+          (root/"vulkax_download_manifest.json").write_text(
+              json.dumps(manifest,indent=2,sort_keys=True)+"\\n"
+          )
+          print("VALID pinned final-media download",len(files),total)
           PY
 
           cd "$HIST"
-          python3 research/analysis/prepare_public_validation_datasets.py \
-            --root "$DATA" \
-            --out "$PUBLIC"
-          python3 research/analysis/adapt_public_validation_inputs.py \
+
+          # Historical generic preparation requires unrelated datasets. For this
+          # post-final reproduction, materialize exactly the historical IRIS rows
+          # and truth index, then run the unmodified historical IRIS adapter.
+          "$VENV/bin/python" - "$DATA" "$PUBLIC" <<'PY'
+          import json, sys
+          from pathlib import Path
+
+          sys.path.insert(0,str(Path.cwd()/"research"/"analysis"))
+          import prepare_public_validation_datasets as p
+
+          root=Path(sys.argv[1])
+          out=Path(sys.argv[2])
+          rows,truth=p.iris_rows(root)
+          rows=sorted(rows,key=lambda r:(r["dataset"],r["scene"]))
+          if len(rows)!=10:
+              raise SystemExit(f"expected 10 IRIS final rows, got {len(rows)}")
+          if any(r["split"]!="final_test" for r in rows):
+              raise SystemExit("IRIS-only reproduction contains non-final rows")
+
+          world=[{k:r[k] for k in p.WORLD_FIELDS} for r in rows]
+          out.mkdir(parents=True,exist_ok=True)
+          p.write_csv(out/"dataset_inventory.csv",p.INVENTORY_FIELDS,rows)
+          p.write_csv(out/"world_manifest.csv",p.WORLD_FIELDS,world)
+          (out/"dataset_truth_index.json").write_text(json.dumps({
+              "schema":"vulkax.public_dataset_truth_index",
+              "version":1,
+              "datasets":{"iris":truth},
+          },indent=2,sort_keys=True)+"\\n")
+          print("VALID IRIS-only historical preparation",len(rows))
+          PY
+
+          "$VENV/bin/python" research/analysis/adapt_public_validation_inputs.py \
             --repo-root . \
             --data-root "$DATA" \
             --prepared-root "$PUBLIC"
