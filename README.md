@@ -597,7 +597,7 @@ Installation notes are in [INSTALL_0_90.md](docs/INSTALL_0_90.md). Performance m
 
 ## Final repository state
 
-The normal working branch set is intentionally small:
+The canonical long-lived branches are:
 
 ```text
 main
@@ -605,9 +605,15 @@ release/1.0.0
 legacy/studio-v1-2026-08-10
 ```
 
-Historical experimental endpoints were preserved before branch cleanup. Open pull requests and issues were brought to zero during the final repository pass.
+Historical experiment and validation branches are still retained on GitHub for
+provenance; they are non-canonical and should not be treated as active research
+lanes. The obsolete pull requests have been closed and open pull requests/issues
+are zero. Temporary V6.7 matrix/campaign workflows were removed after the
+free-fall lane was closed.
 
-The scientific freeze is immutable, the research evidence is reproducible, the negative results remain visible, and the visualization layer is derived from the frozen data rather than used to redefine it.
+The scientific freezes are immutable, negative results remain visible, and the
+visualization/manuscript layers are derived from frozen or explicitly post-final
+evidence rather than used to redefine it.
 
 ## Project completion
 
