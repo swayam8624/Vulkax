@@ -296,7 +296,7 @@ DOT C2 \citep{li2025dot} & public measured trajectories & End-to-end captured-wo
 GAUGE \citep{wang2026gauge} & public measured benchmark & Retrospective shearing contradiction and a separately frozen stretching/compression validation lane. & The shearing study is retrospective; the validation lane is a failed validation-stage result, not final confirmation. \\
 IRIS \citep{khanbayov2026iris} & public measured benchmark & Locked pendulum confirmation and a separately frozen free-fall validation attempt. & The 110 pendulum cases are nested in 10 videos; the free-fall lane fails validation and its final split remains unopened. \\
 D2/D3/D4V + OFC & controlled synthetic & Known-ground-truth falsification, pair-specific rewrite evaluation, and a frozen change of physical evidence channel. & Controlled evidence, not measured-world force-sensor validation. \\
-Stanford Bunny visual suite & visualization carrier & Solver-driven deformation, force direction, mechanism fingerprints, and residual fields. & Visualization only; it contributes no benchmark result. \\
+Stanford Bunny visual suite & visualization carrier & Solver-driven deformation, force direction, mechanism fingerprints, and residual fields. & Visualization only; it is not benchmark geometry and contributes no benchmark result. \\
 \bottomrule
 \end{tabularx}
 \end{table*}
@@ -360,11 +360,11 @@ Rewrite verification & nonlinear pass; oracle fail; rollback \\
 \label{fig:dot-c2-heldout}
 \end{figure}
 
-GAUGE contributes two distinct measured protocols. The retrospective foam-shearing analysis compares ordinary face/marker error with a longitudinal mechanism channel over ten held-out repeats. The prospective lane is frozen separately on foam stretching and compression, soft and hard materials, and repeats 5--7. That validation partition contains 12 measured worlds and three predeclared cases per world: SUPPORT, VETO, and placebo/UNRESOLVED. Repeats 8--10 are reserved as final media and remain unopened after the validation gate fails.
+GAUGE contributes two distinct measured protocols. GAUGE is retrospective in the foam-shearing analysis, which compares ordinary face/marker error with a longitudinal mechanism channel over ten held-out repeats. The prospective lane is frozen separately on foam stretching and compression, soft and hard materials, and repeats 5--7. That validation partition contains 12 measured worlds and three predeclared cases per world: SUPPORT, VETO, and placebo/UNRESOLVED. Repeats 8--10 are reserved as final media and remain unopened after the validation gate fails.
 
 \subsection{Fresh orthogonal force-compliance protocol}\label{fresh-orthogonal-force-compliance-study}
 
-The force-compliance experiment changes the verification channel while keeping proposal generation fixed. It evaluates 36 fresh synthetic proposals, of which 12 are deceptive and 24 beneficial on the untouched target. Fresh DCS and force compliance share the same decision magnitude \(\tau=2\).
+The force-compliance experiment changes the verification channel while keeping proposal generation fixed. Fresh prospective force evidence is synthetic in this study; no measured force-sensor verification claim is made. It evaluates 36 fresh synthetic proposals, of which 12 are deceptive and 24 beneficial on the untouched target. Fresh DCS and force compliance share the same decision magnitude \(\tau=2\).
 
 The advancement gate is frozen before execution. It requires at least four deceptive repairs, at least 30\% resolved force coverage, at least 50\% veto recall on deceptive repairs, at most 25\% false-veto rate on beneficial repairs, force coverage greater than DCS coverage, a higher force median \(|z|\), and finite numerical comparisons for every proposal. A later threshold sweep is post hoc and cannot redefine this gate.
 
