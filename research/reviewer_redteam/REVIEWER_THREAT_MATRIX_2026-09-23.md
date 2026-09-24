@@ -105,12 +105,16 @@ generated.
   camera/pose stress remains an optional extension, not evidence already claimed.
 - **R29 — numerical-error strength:** manuscript keeps numerical claims empirical
   where convergence does not justify stronger theory.
-- **R35 — reproducibility:** data revisions, frozen result ledgers, exact commands,
-  hashes, and replay tooling exist. Independent Ubuntu replay reproduces the frozen
-  development and validation readiness stages, but final closure still waits on an
-  exact replay of the locked `pendulum_90` final result. Historical freeze/runtime
-  path assumptions are treated as reproducibility engineering, not as grounds to
-  retune the method.
+- **R35 — reproducibility:** decision-level closure achieved. Independent
+  Ubuntu replay reproduces the frozen development and validation readiness stages
+  and completes the locked `pendulum_90` final campaign with the same discrete
+  headline result: 10/10 quality-pass videos, 90/110 primary versus 40/110
+  baseline correct decisions, 40/50 SUPPORT, 40/50 VETO, 10/10 placebo
+  UNRESOLVED, and paired counts 50/0/60. The continuous median length-relative
+  error differs slightly (0.1679383811 Ubuntu versus 0.1681086451 locked
+  Mac/Metal; about 0.10% relative drift), so bit/numeric identity is not claimed.
+  The replay is a reproducibility audit and does not retune or replace the frozen
+  result.
 
 ### Closed by completed post-final execution
 
