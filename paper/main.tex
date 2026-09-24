@@ -28,8 +28,8 @@
 \keywords{captured worlds, inverse physics, physical verification, counterfactual simulation, material point method, uncertainty, experiment design, Gaussian splatting}
 \begin{document}
 \begin{abstract}
-Captured scenes are increasingly used as executable worlds whose physical parameters can be fitted, edited, and replayed. A lower held-out observation error, however, does not by itself establish that a physical edit is more correct. We study this failure mode as deceptive physical repair: a candidate rewrite improves ordinary held-out agreement while worsening an untouched physical target. We introduce Reality Probe, an evidence-governed verification framework that separates proposal generation from independent physical evidence and permits support, veto, or unresolved outcomes. Reality Probe is the framework; Dark-Field Counterfactual Spectroscopy (DCS) is one mechanism-selective instrument tested within it. DCS constructs signed intervention contrasts that cancel lower-order common response and evaluates the residual under measurement, repeat, and numerical uncertainty. A staged falsification program shows that DCS succeeds on constructed controls but does not provide useful prospective repair-verification coverage in frozen validation: D2 resolves 0/16 truth worlds, D3 resolves 0/6, and D4V resolves 0/36 ordinary-improving repair proposals, including 14 deceptive repairs. We then freeze a new known-force compliance experiment on fresh synthetic truth worlds. This orthogonal physical channel increases median standardized evidence magnitude from 0.0488 to 0.5586, an 11.46$\times$ gain, yet its maximum magnitude is 1.3191 against the frozen decision magnitude of 2, leaving all 36 proposals unresolved. A retrospective measured GAUGE study independently exhibits channel disagreement. These results support a narrower conclusion than a universal verifier: physical verification in the tested captured-world regimes can be information-limited, and a trustworthy system should refuse certification when the available interventions do not provide sufficient discriminating evidence.
-\end{abstract}
+Captured scenes are increasingly used as executable worlds whose physical parameters can be fitted, edited, and replayed. Lower observation error, however, does not by itself establish that a physical rewrite is more correct. We introduce Reality Probe, an evidence-governed rewrite-verification framework that separates proposal generation from a distinct verification channel and permits SUPPORT, VETO, or UNRESOLVED outcomes. A staged falsification program first shows why this separation matters: Dark-Field Counterfactual Spectroscopy (DCS), a mechanism-selective intervention contrast used inside the framework, succeeds on constructed controls but provides zero resolved coverage in several frozen synthetic regimes. Replacing the kinematic probe with known-force compliance raises median standardized evidence magnitude by 11.46$\times$, yet still leaves all 36 fresh synthetic repair proposals unresolved at the frozen decision magnitude. We then test a better-matched real-video physical observable on a repository-locked IRIS pendulum final set of 10 videos. The finite-amplitude period probe makes 90/110 controlled decisions correctly versus 40/110 for the matched small-angle baseline, including 40/50 correct SUPPORT cases, 40/50 correct VETO cases, and 10/10 correct UNRESOLVED placebo cases. A second-domain IRIS free-fall replication subsequently fails untouched validation: all five videos pass low-level quality checks, but the median acceleration relative error is 111.7\%, so that lane is retained as a negative result and its final split remains unopened. Reality Probe therefore does not provide universal physical certification; its effectiveness depends on whether the verification channel contains discriminating information for the requested rewrite, and the correct system action can be to abstain.
+\end{abstract>
 \maketitle
 \pagestyle{plain}
 \thispagestyle{plain}
@@ -125,27 +125,29 @@ is a solved prospective verifier. Instead, this work contributes:
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \item
-  \textbf{Deceptive physical repair.} We formalize and experimentally
-  instantiate the failure mode in which ordinary held-out fit improves
-  while an untouched physical target worsens.
+  \textbf{Rewrite-level verification contract.} We formalize deceptive
+  physical repair and develop an evidence-governed transaction that
+  separates proposal generation from a distinct verification channel,
+  carries explicit uncertainty, and preserves SUPPORT, VETO, or
+  UNRESOLVED outcomes rather than forcing a binary verdict.
 \item
-  \textbf{Reality Probe.} We develop an evidence-governed
-  rewrite-verification architecture that separates proposal generation
-  from confirmatory physical intervention, carries explicit measurement,
-  repeat, and numerical uncertainty, and preserves support, veto, or
-  unresolved outcomes rather than forcing a binary verdict.
-\item
-  \textbf{Prospective falsification of the stronger DCS hypothesis.} We show that
+  \textbf{Information-boundary falsification ladder.} We show that
   lower-order-annihilating intervention contrasts can succeed on a
   constructed control yet fail to provide useful prospective
-  discrimination in frozen realistic regimes; this negative result is
-  retained rather than retuned away.
+  discrimination in frozen regimes, and that changing to known-force
+  compliance raises median standardized evidence by 11.46$\times$
+  without crossing the unchanged decision boundary.
 \item
-  \textbf{Orthogonal physical-evidence experiment.} On fresh truth
-  worlds, changing the physical interrogation from kinematic
-  counterfactuals to known-force compliance raises median standardized
-  evidence by 11.46$\times$ under the unchanged decision rule, while
-  still remaining insufficient for certification.
+  \textbf{Repository-locked real-video confirmation.} On 10 fresh IRIS
+  pendulum videos, a finite-amplitude period probe yields 90/110 correct
+  controlled decisions versus 40/110 for the matched small-angle
+  baseline, with all 10 placebo cases correctly left unresolved.
+\item
+  \textbf{Preserved second-domain failure.} An untouched IRIS free-fall
+  validation set passes low-level tracking quality on 5/5 videos but
+  fails the physical recovery gate with 111.7\% median acceleration
+  relative error. We retain this failure and leave the designated final
+  split unopened instead of retuning the method on confirmatory data.
 \end{enumerate}
 
 The central conclusion is therefore about evidence, not optimism: a
@@ -436,6 +438,8 @@ D3 & 6 worlds & 0/6 & Median adaptive separation 0.0588583; lower numerical floo
 D4V & 36 repairs & 0/36 & 14 deceptive and 22 beneficial; matched verification channels also have zero resolved coverage. \\
 GAUGE & 10 trials & -- & Retrospective measured channel contradiction; longitudinal endpoint preferred in 9/10 held-out repeats. \\
 OFC & 36 repairs & 0/36 & 12 deceptive and 24 beneficial; known-force compliance increases evidence scale but not coverage. \\
+IRIS pendulum & 10 videos / 110 cases & 90/110 correct & Locked final set; finite-amplitude probe gives 40/50 correct SUPPORT, 40/50 correct VETO, and 10/10 correct UNRESOLVED placebo decisions. \\
+IRIS free-fall & 5 validation videos & gate fail & Fresh second-domain validation has 5/5 quality-pass videos but 111.7\% median acceleration relative error; final split remains unopened. \\
 \bottomrule
 \end{tabularx}
 \end{table*}
@@ -709,6 +713,59 @@ fails the coverage and recall requirements. The result is therefore
 retained as a negative gate with a strong standardized-evidence increase,
 not relabeled as a successful verifier.
 
+\subsection{Locked IRIS pendulum confirmation}\label{locked-iris-pendulum-confirmation}
+
+The synthetic ladder establishes that verification quality is controlled by
+the information channel, but it does not by itself provide measured-world
+confirmation. We therefore froze a real-video pendulum protocol before opening
+the designated final media. The final set contains 10 IRIS
+\texttt{pendulum\_90} videos, all of which pass the quality gate. The primary
+probe uses the finite-amplitude pendulum period relation; the matched diagnostic
+baseline uses the small-angle approximation. The proposal/candidate schedule,
+decision magnitude, tracker, and final-test media are fixed by repository state
+before the final run.
+
+Across the 110 controlled cases on those 10 physical videos, the finite-amplitude
+probe makes 90 decisions correctly (81.82\%), compared with 40/110 (36.36\%)
+for the small-angle baseline. The primary probe is correct on 40/50 SUPPORT
+cases and 40/50 VETO cases, and it leaves all 10 placebo cases UNRESOLVED as
+intended. In paired comparison, the primary probe is correct when the baseline
+is not on 50 cases; the reverse occurs on zero cases, with 60 ties. These
+110 rows are repeated controlled cases nested inside 10 physical videos and are
+not 110 independent experiments. The locked physical-recovery diagnostic has a
+median period-inferred length relative error of 16.81\%.
+
+This result does not show that finite-amplitude pendulum physics is new, nor that
+Reality Probe is universally reliable. It shows that, when the requested
+rewrite is interrogated through a physical observable whose information matches
+the distinction being tested, the same SUPPORT/VETO/UNRESOLVED transaction can
+produce useful decisions on fresh measured video.
+
+\subsection{Second-domain IRIS free-fall failure}\label{second-domain-iris-free-fall-failure}
+
+We also attempted a second, different equation-family replication on IRIS
+dropping-ball video. The V6.6 selector was frozen after passing its development
+gate on \texttt{drop\_50}: 4/5 quality-pass videos, zero implementation errors,
+and 8.05\% median acceleration relative error. We then opened the untouched
+\texttt{drop\_100/06..10} validation split without changing the selector.
+
+The prospective result failed decisively. All 5/5 validation videos pass the
+low-level quality checks, but the median acceleration relative error is 111.7\%;
+the truth-control accuracy and direction-sign rate are both 0 under the frozen
+decision logic. Post-validation diagnosis shows that the selector often bound
+the full known drop height to a shorter partial ballistic interval. Retrospective
+rescue experiments with alternative event ranking, higher image resolution,
+longer association, track stitching, global/chunk scale, stationary endpoint
+scale, and bidirectional hold-to-hold reconstruction did not recover a robust
+target-free estimator across the spent development and validation evidence.
+
+We therefore close this lane as a negative result. The failed
+\texttt{drop\_100} split is permanently retrospective, no rescue result is
+treated as confirmatory evidence, and the designated \texttt{drop\_150} final
+split remains unopened. The failure reinforces rather than weakens the paper's
+central boundary: a verification transaction is only as useful as the physical
+information actually available to it.
+
 \section{Results and Analysis}\label{results-and-analysis}
 
 \subsection{Deceptive repair is a distinct failure
@@ -799,19 +856,23 @@ support deployment-level verification.
 
 \subsection{What is established}\label{what-is-established}
 
-The experiments support three linked conclusions. First, observationally
+The experiments support four linked conclusions. First, observationally
 improving physical repairs can be deceptive with respect to an untouched
 target. Second, mechanism-sensitive verification signals can remain too
 weak to support a reliable repair decision even when their numerical
-implementation is stable. Third, changing to a genuinely different
-physical channel can substantially increase observability without
-necessarily making the evidence sufficient for certification.
+implementation is stable. Third, changing the physical information channel
+can materially change observability: known-force compliance raises the
+synthetic evidence scale, and the locked finite-amplitude pendulum observable
+produces useful SUPPORT/VETO/UNRESOLVED decisions on fresh real video. Fourth,
+that success does not automatically transfer across domains: the frozen
+free-fall replication fails untouched validation despite passing its
+development gate.
 
-These conclusions are narrower than a universal physical-correctness
-claim, but they are operational. A persistent captured-world system can
-preserve the distinction between fitting, verification, and unresolved
-evidence, and it can refuse a requested rewrite without treating refusal
-as a pipeline failure.
+These conclusions are narrower than a universal physical-correctness claim,
+but they are operational. A persistent captured-world system can preserve
+the distinction between fitting, verification, and unresolved evidence,
+can commit or veto a rewrite when a matched channel provides sufficient
+evidence, and can refuse or retire a verification lane when it does not.
 
 \subsection{Relation to identifiability and experiment
 design}\label{relation-to-identifiability-and-experiment-design}
@@ -855,6 +916,17 @@ The main limitations are substantive.
   disagree, but it is not an untouched prospective test of DCS or force
   compliance.
 \item
+  \textbf{Measured positive evidence currently comes from one physical
+  regime.} The locked IRIS pendulum result contains 10 fresh videos from
+  one \texttt{pendulum\_90} regime. Controlled case rows are nested within
+  those videos and must not be treated as independent physical experiments.
+\item
+  \textbf{The second real-video domain failed.} The frozen IRIS free-fall
+  replication fails untouched validation with 111.7\% median acceleration
+  relative error despite 5/5 low-level quality passes. That failure is
+  retained, its validation split is permanently retrospective, and the
+  designated final split remains unopened.
+\item
   \textbf{The physical regime is limited.} The principal experiments use
   a fixed deformable MPM setup and selected APIC/PIC candidate families.
   Generalization across constitutive families, contact regimes, and
@@ -891,14 +963,16 @@ The main limitations are substantive.
 
 \subsection{Future work}\label{future-work}
 
-The most direct next step is not another retuning of the frozen DCS or
-force partitions. It is a separately frozen measured experiment with an
-independent force sensor or another calibrated excitation that
-materially changes the available physical information. Modal or
-frequency-domain excitation, richer constitutive families, and
+The most direct next step is not another retuning of the frozen DCS,
+force-compliance, or failed free-fall partitions. It is a separately frozen
+measured experiment whose physical observable is selected before final data
+access and whose information content is plausibly matched to the rewrite being
+tested. Independent force sensing, calibrated excitation, modal or
+frequency-domain response, richer constitutive families, and
 intervention-specific sensor design are plausible directions. Any such
-experiment should keep proposal generation blind to the confirmatory
-channel and should preserve a predeclared support/veto/unresolved rule.
+experiment should keep proposal generation blind to the confirmatory channel,
+preserve a predeclared SUPPORT/VETO/UNRESOLVED rule, and retain failed domains
+without recycling them into confirmatory evidence.
 
 \section{Reproducibility and Implementation
 Notes}\label{reproducibility-and-implementation-notes}
@@ -939,19 +1013,24 @@ not require the bunny.
 
 \section{Conclusion}\label{conclusion}
 
-A physically editable captured world should not equate better
-observation fit with better physics. Across controlled repair
-populations, we find ordinary-improving repairs that worsen an untouched
-physical target. Reality Probe provides the evidence-governed transaction around such
-repairs; DCS is one tested mechanism-selective instrument inside it.
-Frozen D2, D3, and D4V experiments do not support a claim that DCS is a
-general prospective verifier. A separately
-frozen known-force compliance channel increases median standardized
-evidence by 11.46x on fresh synthetic truth worlds, yet still leaves every
-proposal below the decision magnitude. The resulting lesson is practical: in the tested regimes, physical
-verification can be constrained by the information supplied by the experiment,
-and a trustworthy system should explicitly refuse certification when that
-evidence is insufficient.
+A physically editable captured world should not equate better observation fit
+with better physics. Across controlled repair populations, we find
+ordinary-improving rewrites that worsen an untouched physical target. Reality
+Probe provides the evidence-governed transaction around such rewrites; DCS is
+one tested mechanism-selective instrument inside it rather than the contribution
+by itself. Frozen D2, D3, and D4V experiments show that a mathematically valid
+probe can still be information-poor, while known-force compliance shows that
+changing the physical channel can raise the evidence scale by 11.46$\times$
+without yet reaching the decision boundary. On a repository-locked set of 10
+fresh IRIS pendulum videos, a better-matched finite-amplitude observable yields
+90/110 correct controlled decisions versus 40/110 for the matched small-angle
+baseline and preserves all 10 placebo abstentions. The subsequent free-fall
+replication fails untouched validation and is retained as a negative result
+rather than rescued by post-validation tuning. The practical conclusion is
+therefore conditional: verification can support or veto a physical rewrite when
+the available experiment carries the right information, and a trustworthy
+system should remain unresolved---or retire the verification lane---when it does
+not.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}
