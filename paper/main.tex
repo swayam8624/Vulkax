@@ -966,6 +966,14 @@ The main limitations are substantive.
   one \texttt{pendulum\_90} regime. Controlled case rows are nested within
   those videos and must not be treated as independent physical experiments.
 \item
+  \textbf{Pendulum verification is temporally resolution-sensitive.}
+  In the full post-final corruption sweep, tested noise, blur, frame
+  duplication/drop, occlusion, and crop preserve the clean 81.82\%
+  strict accuracy, but temporal downsampling reduces it to 63.64\% at
+  30~fps and 45.45\% at 15~fps. Placebo abstention remains 100\%.
+  We therefore do not claim robustness to arbitrary acquisition frame
+  rates or temporal sampling.
+\item
   \textbf{The second real-video domain failed.} The frozen IRIS free-fall
   replication fails untouched validation with 111.7\% median acceleration
   relative error despite 5/5 low-level quality passes. That failure is
