@@ -135,6 +135,14 @@ for scene in sorted(by):
              if r.get("acceleration_stability","") not in ("",None) else "")
           + (f" roots={r['roots_complete']}"
              if r.get("roots_complete","") not in ("",None) else "")
+          + (f" impact={r['impact_frame']}"
+             if r.get("impact_frame","") not in ("",None) else "")
+          + (f" innov={float(r['impact_innovation_sigma']):.2f}"
+             if r.get("impact_innovation_sigma","") not in ("",None) else "")
+          + (f" cont={float(r['post_impact_continuation_ratio']):.2f}"
+             if r.get("post_impact_continuation_ratio","") not in ("",None) else "")
+          + (f" pdir={float(r['post_impact_positive_fraction']):.2f}"
+             if r.get("post_impact_positive_fraction","") not in ("",None) else "")
           + f" g_rel_err={float(r['acceleration_relative_error']):.3f}"
         )
 PY
