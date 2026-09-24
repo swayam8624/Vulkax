@@ -1,0 +1,66 @@
+{
+  "schema": "vulkax.iris_pendulum_linux_replay_result",
+  "version": 1,
+  "date": "2026-09-24",
+  "evidence_class": "cross_platform_reproducibility_audit",
+  "source_locked_result": "research/results/IRIS_PENDULUM_FINAL_TEST_RESULT_2026-09-23.json",
+  "github_actions": {
+    "run_id": 35982677687,
+    "job_id": 107578051311,
+    "runner": "ubuntu-latest",
+    "conclusion": "failure",
+    "failure_stage": "exact locked-result scalar equality assertion"
+  },
+  "frozen_protocol": {
+    "lock_commit": "9e56f06145b8a56dd26c1c81e064ed9b185c77d7",
+    "dataset_repo": "rasulkhanbayov/IRIS",
+    "dataset_revision": "c253822f55431ca80ef2084de4bc5e79d1a488f1",
+    "setting": "pendulum_90"
+  },
+  "replay": {
+    "takes": 10,
+    "quality_pass_takes": 10,
+    "primary": {
+      "method": "finite_amplitude_period_probe",
+      "correct": 90,
+      "total": 110,
+      "support_correct": 40,
+      "support_total": 50,
+      "veto_correct": 40,
+      "veto_total": 50,
+      "unresolved_correct": 10,
+      "unresolved_total": 10,
+      "strict_accuracy": 0.8181818181818182
+    },
+    "baseline": {
+      "method": "small_angle_period_baseline",
+      "correct": 40,
+      "total": 110,
+      "support_correct": 0,
+      "support_total": 50,
+      "veto_correct": 30,
+      "veto_total": 50,
+      "unresolved_correct": 10,
+      "unresolved_total": 10,
+      "strict_accuracy": 0.36363636363636365
+    },
+    "paired": {
+      "primary_only_correct": 50,
+      "baseline_only_correct": 0,
+      "ties": 60
+    },
+    "median_period_inferred_length_relative_error": 0.16793838106989228
+  },
+  "locked_reference": {
+    "median_period_inferred_length_relative_error": 0.16810864509359352
+  },
+  "comparison": {
+    "discrete_outcomes_match": true,
+    "continuous_scalar_exact_match": false,
+    "absolute_length_error_difference": 0.00017026402370123872,
+    "relative_length_error_difference_fraction": 0.0010128213430454168,
+    "relative_length_error_difference_percent": 0.10128213430454168
+  },
+  "disposition": "decision_level_reproduced_with_small_cross_platform_continuous_scalar_drift",
+  "claim_guard": "This replay is a reproducibility audit. It does not replace, retune, or redefine the frozen 2026-09-23 locked result. Exact bit/numeric identity across platforms is not claimed."
+}
