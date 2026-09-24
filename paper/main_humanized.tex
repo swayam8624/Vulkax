@@ -383,47 +383,130 @@ The free-fall lane tests a different equation family with a separately frozen pr
 
 \section{Results and Analysis}\label{results-and-analysis}
 
-\subsection{Deceptive repair is a distinct failure
-mode}\label{deceptive-repair-is-a-distinct-failure-mode}
+\subsection{Ordinary improvement can hide physical degradation}\label{deceptive-repair-is-a-distinct-failure-mode}
 
-D4V and the fresh synthetic OFC population both show why ordinary held-out improvement is not enough. D4V contains 14 deceptive repairs among 36 ordinary-improving proposals; fresh synthetic OFC contains 12 among 36. Those fractions should not be read as a universal deception rate. They serve a more modest purpose: under controlled candidate-generation pipelines, the failure mode exists often enough that a verification rule based only on observation fit cannot ignore it.
+The deceptive-repair condition appears in both controlled ordinary-improving populations. D4V contains 14 deceptive repairs among 36 proposals; the fresh force-compliance population contains 12 among 36. These fractions describe the constructed candidate populations and should not be interpreted as a universal deception rate. Their role is narrower: an approval rule based only on ordinary held-out improvement would accept candidates that are worse on an untouched physical target.
 
-\subsection{The stronger DCS hypothesis is not supported in the tested
-regime}\label{the-dcs-hypothesis-is-falsified-as-a-general-prospective-verifier}
+Figure~\ref{fig:deceptive-repair} shows one such case. The candidate lowers ordinary held-out error by 14.93\% while increasing untouched-target error by 9.03\%. The measured observation is the disagreement between those two evaluation channels. The interpretation is that ordinary held-out fit alone is insufficient for deciding whether this physical rewrite should be committed.
 
-D1 shows that dark-field rejection can be strong when the experiment is deliberately constructed around that distinction. The strength does not survive the prospective stages. D2 and D3 stay far below the decision magnitude, DCS does not beat the matched ranking baselines, and D4V resolves none of the repair proposals. We treat that as a central result, not an embarrassing corner case. It rules out the stronger story that mechanism-selective cancellation by itself is enough for repair certification in the regime we tested.
+\subsection{DCS succeeds in the control and remains information-poor prospectively}\label{the-dcs-hypothesis-is-falsified-as-a-general-prospective-verifier}
 
-The D3 refinement result sharpens this point. Lowering the numerical floor in witness space by several-fold barely changes standardized separation. Whatever is limiting the original witness, it is not simply coarse solver discretization.
+D1 confirms that the implementation can express a strong dark-field rejection: all 64 constructed deceptive repairs improve the ordinary criterion and all 64 are rejected by DCS. Median ordinary improvement is 60.88\%, and the median witness-degradation ratio is 9.375.
 
-\subsection{Orthogonal physical information changes the evidence
-scale}\label{orthogonal-physical-information-changes-the-evidence-scale}
+The prospective stages are much weaker. In D2 discovery, ranking agreement is 95.83\% for raw maximin, 87.50\% for Fisher/Jacobian selection, 75.00\% for the same-cost raw bundle, 66.67\% for maximum motion, 62.50\% for DCS order-2 maximin, and 45.83\% for random selection. DCS is therefore not the strongest matched ranking method in that comparison. On the 16 frozen D2 truth worlds, no witness reaches the decision magnitude; median standardized separation is 0.041578. Median numerical RMS is \(6.469\times10^{-6}\) m and the maximum moment residual is \(3.886\times10^{-16}\). The cancellation algebra is numerically well behaved while the physical alternatives remain weakly separated.
+
+D3 tests whether solver refinement recovers the missing separation. Adaptive selection chooses order 2 on all six fresh worlds, and the median standardized separation is 0.0588583. Refinement lowers median numerical RMS from \(8.435\times10^{-7}\) m for order 2 to \(2.153\times10^{-7}\) m for order 3, yet no world is resolved. Ranking agreement remains modest: Fisher 61.11\%, raw bundle 58.33\%, maximum motion 58.33\%, pair-aware raw 55.56\%, adaptive DCS 52.78\%, and order-3 DCS 47.22\%.
+
+This separates numerical accuracy from physical observability. The refined witness is numerically cleaner, but the evidence available to distinguish the candidate worlds barely changes.
+
+D4V reaches the same decision-level outcome on ordinary-improving proposals. DCS, raw bundle, pair-specific raw, Fisher, and maximum-motion verification all have 0/36 resolved coverage at \(|z|\ge2\). The post-hoc information-frontier calculation quantifies the remaining gap: median DCS magnitude is 0.05024, corresponding to roughly 39.8\(\times\) median amplification to reach magnitude 2 if the uncertainty scale were unchanged. This number is a diagnostic of missing evidence, not a revised threshold.
+
+\subsection{Measured GAUGE channels disagree and remain below the frozen decision scale}\label{measured-gauge-results}
+
+The retrospective GAUGE shearing analysis shows a measured channel contradiction. Ordinary face-plus-marker metrics prefer the finite-overlap candidate in all ten repeats, and marker dark-field agrees. The longitudinal mechanism channel prefers the endpoint model in 9/10 repeats. Median marker error is 0.002428 m for endpoint and 0.001709 m for overlap, whereas median longitudinal error is 0.003131 for endpoint and 0.005584 for overlap. A post-hoc exact two-sided sign test on the longitudinal direction gives \(p=0.02148\).
+
+\begin{table}[t]
+\centering
+\caption{Retrospective GAUGE shearing comparison. Lower error is better. The sign test is post hoc.}
+\label{tab:gauge}
+\begin{tabular}{lcc}
+\toprule
+Metric & Endpoint & Overlap \\
+\midrule
+Median marker error (m) & 0.002428 & 0.001709 \\
+Median longitudinal error & 0.003131 & 0.005584 \\
+Longitudinal held-out wins & 9/10 & 1/10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The separately frozen GAUGE validation lane provides a prospective measured failure. Across 12 stretching/compression worlds, the temporal annihilating witness makes 0/12 correct SUPPORT decisions and 0/12 correct VETO decisions, while all 12 placebo cases remain UNRESOLVED. Saved-output forensics show correct raw truth ordering on every directional case. The median raw signal is only 0.00277 times the repeat variability and 0.1179 times the nominal-versus-refined numerical discrepancy. The evidence therefore points to an information-limited channel under the frozen probe rather than a reversal of the underlying truth ordering. Repeats 8--10 remain unopened.
+
+\subsection{Known-force compliance changes the evidence scale but does not clear the gate}\label{orthogonal-physical-information-changes-the-evidence-scale}
+
+Fresh DCS on the orthogonal-information population has median \(|z|=0.04877\) and maximum \(|z|=0.17279\). Known-force compliance raises the median to 0.55863 and the maximum to 1.31911. The aggregate median-magnitude ratio is 11.455\(\times\).
+
+\begin{table}[t]
+\centering
+\caption{Fresh synthetic force-compliance results under the common frozen decision magnitude.}
+\label{tab:ofc}
+\begin{tabular}{lcc}
+\toprule
+Quantity & DCS & Force compliance \\
+\midrule
+Median \(|z|\) & 0.04877 & 0.55863 \\
+Maximum \(|z|\) & 0.17279 & 1.31911 \\
+Resolved coverage & 0/36 & 0/36 \\
+Median factor to \(|z|=2\) & 41.01\(\times\) & 3.58\(\times\) \\
+Best-case factor to \(|z|=2\) & 11.57\(\times\) & 1.52\(\times\) \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}
 \centering
 \includegraphics[width=\linewidth]{../docs/readme_assets/10_signal_gain.png}
-\caption{Fresh known-force compliance raises the median standardized
-signal by 11.46x relative to fresh DCS without changing the frozen
-decision rule.}
+\caption{Fresh known-force compliance raises median standardized evidence magnitude by 11.46\(\times\) relative to fresh DCS under the same decision rule.}
+\label{fig:signal-gain}
 \end{figure}
 
-The force-compliance experiment shifts the evidence scale in a way the earlier numerical refinements did not. Median standardized magnitude rises to 0.5586, roughly an order of magnitude above the fresh DCS median. Nothing about the decision rule or scoring definition changes; the difference comes from asking a physically different question. We take this as strong evidence that observability is experiment-dependent, while stopping short of claiming that information content is the only factor limiting verification.
+The evidence scale changes substantially, but the frozen advancement gate still fails. Force compliance resolves 0/36 proposals, so resolved coverage and deceptive-repair veto recall do not meet their required minima. The population-size, beneficial false-veto, median-signal, and numerical-comparison conditions pass. The observation is therefore precise: this physical channel carries more discriminating information than fresh DCS, but the measured separation remains insufficient for a SUPPORT/VETO decision at \(\tau=2\).
+
+A post-hoc threshold sweep checks how quickly that conclusion changes as the decision magnitude is relaxed. Fresh DCS has no crossing even at \(\tau=1\). Force compliance resolves 14/36 proposals at \(\tau=1\): six SUPPORT and eight VETO. Five of the 12 deceptive repairs are vetoed, giving 41.7\% recall, and three of the 24 beneficial repairs are falsely vetoed, giving 12.5\% false-veto rate. At \(\tau=1.5\) and above, coverage returns to 0/36. The sweep describes the score distribution; it does not redefine the prospectively frozen policy.
+
+\begin{table}[t]
+\centering
+\caption{Post-hoc threshold sensitivity from the frozen per-proposal ledger. The \(\tau=2\) row is the repository-frozen primary rule.}
+\label{tab:threshold-sensitivity}
+\begin{tabular}{lcc}
+\toprule
+Decision magnitude \(\tau\) & DCS crossings & Force crossings \\
+\midrule
+1.0 & 0/36 & 14/36 \\
+1.5 & 0/36 & 0/36 \\
+2.0 & 0/36 & 0/36 \\
+2.5 & 0/36 & 0/36 \\
+3.0 & 0/36 & 0/36 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}
 \centering
 \includegraphics[width=\linewidth]{../docs/readme_assets/11_information_limit.png}
-\caption{Information-limit summary from the frozen fresh synthetic orthogonal-information experiment. Known-force compliance increases
-standardized evidence substantially, but the strongest case remains
-below the frozen decision magnitude.}
+\caption{Information-frontier view of the fresh synthetic experiment. Force compliance moves the evidence closer to the frozen decision magnitude, but even the strongest proposal remains below it.}
+\label{fig:information-limit}
 \end{figure}
 
-This is why the choice of physical question matters. Kinematic observations may be perfectly adequate for proposing a plausible repair and still be poor at distinguishing that repair from alternatives. A force-controlled test introduces a different constraint on the candidate worlds; in these experiments, that extra constraint is visibly more informative.
+\subsection{The locked pendulum test provides a measured positive case}\label{locked-iris-pendulum-confirmation}
 
-\subsection{Stronger evidence is not sufficient
-evidence}\label{stronger-evidence-is-not-sufficient-evidence}
+All ten final \texttt{pendulum\_90} videos pass the quality gate. Across the 110 controlled cases nested within those videos, the finite-amplitude probe makes 90 decisions correctly (81.82\%). The small-angle diagnostic baseline makes 40/110 correctly (36.36\%). The primary probe is correct on 40/50 SUPPORT cases, 40/50 VETO cases, and all 10 UNRESOLVED placebo cases. In the paired case table, the primary probe is correct when the baseline is not on 50 cases; the reverse occurs on zero cases, with 60 ties. The locked physical-recovery diagnostic has 16.81\% median relative error in period-inferred pendulum length.
 
-The largest magnitude in the fresh synthetic force population is \(|z|=1.31911\), still below the frozen decision boundary. The visualized case has signed force progress \(z=-1.31811\): it moves strongly toward veto but does not reach it. Reality Probe therefore leaves the repair unresolved. We prefer that outcome to lowering the threshold after seeing the partition or pretending that an intermediate score is a definitive physical verdict.
+The physical video is the correct inference unit. A post-final clustered analysis therefore resamples the ten videos rather than the 110 nested rows. Per-video strict accuracies are identical across the ten final videos, giving primary accuracy 0.8182, baseline accuracy 0.3636, and a difference of 0.4545 in every video-level bootstrap resample. More directly, the primary probe beats the baseline on 10/10 videos with no ties; the exact two-sided sign-test value is \(p=0.001953125\).
 
-The information-frontier view also prevents a misleading all-or-nothing summary. DCS and force compliance both have 0\% resolved coverage at \(\tau=2\), but they are not equally informative. Their evidence magnitudes, and therefore their remaining distance to the decision boundary, are very different. That difference gives a quantitative direction for future intervention and sensor design even though the present experiment does not justify deployment-level certification.
+Two additional post-final residual comparators do not explain away the locked result. A direct finite-amplitude period residual reaches 45.45\% strict three-way accuracy, and a damped nonlinear ODE residual reaches 9.09\%; both retain 100\% placebo accuracy. Relative to the direct residual, the locked primary is uniquely correct on 40 cases and the comparator on zero. Relative to the damped ODE residual, the corresponding counts are 80 and zero. These are secondary comparisons and do not replace the locked primary-baseline result.
+
+The GT-hidden post-final proposal test removes the manually scheduled candidate factors. For each video, an early segment generates the proposal and a later segment evaluates ordinary improvement. The blind proposal file is hashed before ground truth is joined. All ten proposals improve the ordinary holdout; eight are physically worse and two are physically better. The reserved final-window verifier classifies all ten correctly. Varying proposal/probe overlap from \(\rho=0\) to \(\rho=1\) leaves these ten post-final decisions correct throughout, with median absolute score decreasing from 18.08 to 16.21. This tests dependence on temporal partition choice; it does not make two windows from the same video independent sensor modalities.
+
+Recorded rope-length uncertainty also leaves the controlled truth labels unchanged: all 110 labels remain stable at both \(\pm1\sigma\) and \(\pm2\sigma\). The full corruption suite runs 180 condition-video combinations with no failed videos. The clean Metal path reproduces the locked decision vector on all ten videos. Tested noise, blur, frame duplication/drop, central occlusion, and crop levels preserve 81.82\% strict accuracy. Temporal downsampling exposes the clear boundary: accuracy falls to 63.64\% at 30 fps and 45.45\% at 15 fps, while placebo accuracy remains 100\%.
+
+The measured observation is therefore specific but useful. A pendulum-specific observable supports accurate SUPPORT/VETO decisions on fresh video under the locked protocol, while the post-final stress tests identify temporal resolution as an acquisition constraint.
+
+\subsection{The free-fall transfer test fails validation}\label{second-domain-iris-free-fall-failure}
+
+V6.6 passes its \texttt{drop\_50} development gate before validation is opened: 4/5 videos pass quality, there are zero implementation errors, and median acceleration relative error is 8.05\%. Take 07 is excluded because no causal release-to-terminal-impact event survives the frozen selector.
+
+The untouched \texttt{drop\_100/06..10} validation split then fails. All five videos pass the low-level quality checks, but median acceleration relative error is 111.7\%. Truth-control accuracy is 0 and direction-sign rate is 0 under the frozen logic. The selected intervals imply approximately 15.0--19.4 frames of full-fall time, whereas a 1 m release-from-rest fall at \(g=9.80665\) m/s\(^2\) is about 27.1 frames at 60 fps.
+
+That discrepancy motivates a post-validation hypothesis: the selector is often finding a locally ballistic partial interval and then assigning the full known 1 m height to it. Retrospective diagnostics support the partial-flight signature but do not produce a valid repair. Global/chunk scaling, stationary endpoint anchors, fragmented-track stitching, 16 resolution/association/ranking variants, and bidirectional hold-to-hold reconstruction all fail to produce a robust target-free estimator across the spent development and validation evidence.
+
+The frozen protocol determines the disposition. \texttt{drop\_100} is permanently retrospective, the rescue analyses remain diagnostic, and \texttt{drop\_150/02..10} stays unopened. This second domain therefore contributes a boundary result, not a second success.
+
+\subsection{The sequence isolates an information problem}\label{stronger-evidence-is-not-sufficient-evidence}
+
+Across the full program, implementation validity, evidence magnitude, and decision sufficiency separate cleanly. DCS can be numerically well behaved while far below the decision scale. A different physical channel can increase standardized evidence by more than an order of magnitude and still remain unresolved. A pendulum-specific observable can cross the decision boundary reliably on fresh measured video. A free-fall estimator that appears adequate in development can fail untouched validation.
+
+The interpretation supported by this sequence is that verification quality depends on the information supplied by the experiment, not only on the estimator applied afterward. Reality Probe makes that dependency visible because weak evidence stays unresolved and failed validation remains failed.
 
 \section{Discussion}\label{discussion}
 
