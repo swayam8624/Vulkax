@@ -17,8 +17,9 @@ Publication-validation evidence extended through **2026-09-24**.
 10. [IRIS free-fall retrospective closure](IRIS_FREEFALL_V67_RETROSPECTIVE_CLOSURE_2026-09-24.json)
 11. [Reality Probe novelty map](../status/REALITY_PROBE_NOVELTY_MAP_2026-09-24.md)
 12. [Paper-data map](../paper_data/README.md)
-13. [Current research state](../status/CURRENT_RESEARCH_STATE_2026-09-21.md)
-14. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
+13. [Current publication-facing research state](../status/CURRENT_RESEARCH_STATE_2026-09-24.md)
+14. [Frozen 2026-09-21 research state](../status/CURRENT_RESEARCH_STATE_2026-09-21.md)
+15. [Implementation completion](../status/DCS_IMPLEMENTATION_COMPLETE_2026-09-20.md)
 
 ## Reproduce everything
 
