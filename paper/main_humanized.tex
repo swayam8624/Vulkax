@@ -250,89 +250,76 @@ The numerator is positive when the candidate matches the truth response better t
 
 \section{Experimental Program}\label{experimental-program}
 
-The experiments are grouped by what they are allowed to establish: implementation sanity, frozen validation, discovery analysis, retrospective measured evidence, and fresh follow-on evidence. Table~\ref{tab:stages} gives the central outcomes.
+The experiments are organized by evidence role because the same numerical outcome means different things depending on when the data were seen. Constructed controls test whether an implementation can express the intended behavior. Frozen validation tests a protocol after its choices have been fixed. Retrospective measured analyses diagnose already-observed behavior. Locked final tests use media reserved until the protocol has passed its earlier gates. Post-final analyses may probe robustness or alternative explanations, but they cannot replace the locked result.
 
-Main experimental stages. ``Crosses frozen boundary'' means that the
-standardized evidence reaches the predeclared support/veto magnitude;
-zero crossings do not imply that an experiment produced no scientific
-information.
+Table~\ref{tab:stages} summarizes this evidence ladder. Here, resolved refers to the frozen SUPPORT/VETO rule. An unresolved experiment can still reveal how much information is missing or which source of uncertainty dominates.
 
 \begin{table*}[t]
 \centering
-\caption{Main experimental stages. ``Resolved'' refers to the frozen support/veto decision rule, not whether the scientific question was informative.}
+\caption{Experimental stages and evidence classes. Detailed numerical outcomes are reported in Sec.~\ref{results-and-analysis}.}
 \label{tab:stages}
-\begin{tabularx}{\textwidth}{l r r X}
+\begin{tabularx}{\textwidth}{l l r X}
 \toprule
-Stage & Population & Crosses frozen boundary & Main outcome \\
+Stage & Evidence class & Population & Purpose \\
 \midrule
-D1 & 64 repairs & 64/64 & Constructed positive control; median ordinary improvement 60.88\%, median witness degradation ratio 9.375. \\
-D2 & 16 worlds & 0/16 & Median standardized separation 0.041578. \\
-D3 & 6 worlds & 0/6 & Median adaptive separation 0.0588583; lower numerical floor does not recover observability. \\
-D4V & 36 repairs & 0/36 & 14 deceptive and 22 beneficial; matched verification channels also have zero resolved coverage. \\
-GAUGE & 10 trials & -- & Retrospective measured channel contradiction; longitudinal endpoint preferred in 9/10 held-out repeats. \\
-GAUGE validation & 12 measured worlds / 36 cases & gate fail & Frozen stretching/compression validation: 0/12 correct SUPPORT, 0/12 correct VETO, and 12/12 correct UNRESOLVED placebo decisions; final repeats 8--10 remain unopened. \\
-OFC & 36 repairs & 0/36 & 12 deceptive and 24 beneficial; known-force compliance increases evidence scale but not coverage. \\
-IRIS pendulum & 10 videos / 110 cases & 90/110 correct & Locked final set; 40/50 correct SUPPORT, 40/50 correct VETO, and 10/10 correct UNRESOLVED placebo decisions. \\
-IRIS free-fall & 5 validation videos & gate fail & Fresh second-domain validation passes 5/5 low-level quality checks but has 111.7\% median acceleration relative error; final split remains unopened. \\
+D1 & constructed synthetic control & 64 repairs & Check that the DCS path can reject a deliberately strong deceptive repair. \\
+D2 & frozen synthetic validation & 16 truth worlds & Test whether the selected witness reaches the fixed decision margin on unseen truth worlds. \\
+D3 & fresh synthetic refinement & 6 truth worlds & Separate numerical-resolution limits from physical observability limits. \\
+D4V & frozen synthetic repair population & 36 repairs & Evaluate pair-specific verification on ordinary-improving proposals. \\
+DOT C2 & measured engineering check & 225 correspondence points & Exercise capture, fitting, held-out replay, rewrite, verification, rollback, and visualization on measured deformable motion. \\
+GAUGE shearing & retrospective measured analysis & 10 held-out repeats & Test whether ordinary and mechanism-sensitive channels can disagree on the same measured motion. \\
+GAUGE validation & frozen measured validation & 12 measured worlds / 36 cases & Test directional SUPPORT/VETO coverage on previously untouched stretching/compression repeats. \\
+OFC & fresh synthetic orthogonal channel & 36 repairs & Ask whether a different physical interrogation changes the evidence scale under the same decision magnitude. \\
+IRIS pendulum & repository-locked measured final & 10 videos / 110 nested cases & Evaluate a matched physical observable on fresh final media. \\
+IRIS free-fall & frozen measured validation & 5 validation videos & Test transfer to a second equation family without retuning on validation. \\
 \bottomrule
 \end{tabularx}
 \end{table*}
 
+\subsection{Evidence surfaces and benchmark roles}\label{graphics-facing-benchmark-and-visual-evidence-coverage}
 
-\subsection{Graphics-facing benchmark and visual evidence coverage}
-\label{graphics-facing-benchmark-and-visual-evidence-coverage}
-
-A graphics submission needs recognizable benchmark evidence and inspectable visual consequences, not only an internal systems ledger. We therefore make the evidence surface explicit rather than asking the reader to infer it from the implementation. Table~\ref{tab:graphics-evidence} separates public measured datasets, controlled synthetic evaluation, and visualization-only geometry. This classification does not change any experimental gate or elevate retrospective evidence into prospective confirmation.
+The quantitative evidence comes from frozen JSON/CSV ledgers and measured dataset adapters. Figures expose the physical consequences of those experiments but do not create a second source of quantitative truth. Table~\ref{tab:graphics-evidence} makes the role of each source explicit.
 
 \begin{table*}[t]
 \centering
-\caption{Graphics-facing evidence coverage. Public measured benchmarks are kept distinct from controlled synthetic partitions and from visualization-only geometry.}
+\caption{Evidence coverage. Public measured benchmarks are separated from controlled synthetic partitions and visualization-only geometry.}
 \label{tab:graphics-evidence}
 \begin{tabularx}{\textwidth}{l l X X}
 \toprule
 Source & Evidence class & What it contributes & Claim boundary \\
 \midrule
-DOT C2 \citep{li2025dot} & Public measured trajectories & End-to-end captured-world ingestion, fit/held-out replay, local rewrite, and rollback on measured motion. & Stress-free state, loads, thickness, mass, and constitutive ground truth are not supplied; fitted material values remain model-conditioned. \\
-GAUGE foam shearing \citep{wang2026gauge} & Public measured benchmark & Ten held-out repeats for a measured channel-contradiction analysis. & Retrospective/post-hoc evidence only; it is not fresh prospective confirmation of DCS. \\
-D2/D3/D4V + OFC & Frozen controlled synthetic & Known-ground-truth falsification, pair-specific repair evaluation, and orthogonal force-compliance observability under a frozen decision rule. & Controlled evidence, not a measured-world benchmark. \\
-Stanford Bunny visual suite & Public geometry visualization carrier & Solver-driven deformation, force direction, mechanism fingerprints, and residual fields for qualitative inspection. & Visualization only; the bunny is not benchmark geometry and contributes no quantitative result. \\
+DOT C2 \citep{li2025dot} & public measured trajectories & End-to-end captured-world ingestion, fit/held-out replay, local rewrite, verification, rollback, and measured-motion visualization. & Stress-free state, loads, thickness, mass, and constitutive ground truth are absent; fitted material values remain model-conditioned. \\
+GAUGE \citep{wang2026gauge} & public measured benchmark & Retrospective shearing contradiction and a separately frozen stretching/compression validation lane. & The shearing study is retrospective; the validation lane is a failed validation-stage result, not final confirmation. \\
+IRIS \citep{khanbayov2026iris} & public measured benchmark & Locked pendulum confirmation and a separately frozen free-fall validation attempt. & The 110 pendulum cases are nested in 10 videos; the free-fall lane fails validation and its final split remains unopened. \\
+D2/D3/D4V + OFC & controlled synthetic & Known-ground-truth falsification, pair-specific rewrite evaluation, and a frozen change of physical evidence channel. & Controlled evidence, not measured-world force-sensor validation. \\
+Stanford Bunny visual suite & visualization carrier & Solver-driven deformation, force direction, mechanism fingerprints, and residual fields. & Visualization only; it contributes no benchmark result. \\
 \bottomrule
 \end{tabularx}
 \end{table*}
 
-The paper's deceptive-repair, same-probe, force-fingerprint, residual-field, signal-gain, and information-limit panels are generated from committed solver trajectories or frozen result ledgers. They are intended to show what the tested physical differences look like, while the numerical conclusions continue to come from the JSON/CSV evidence records. In other words, the visual layer exposes the consequence of the experiments without becoming a second, informal source of truth.
+The deceptive-repair, same-probe, force-fingerprint, residual-field, signal-gain, and information-limit panels are generated from committed solver trajectories or frozen result ledgers. Display magnification is disclosed where used; numerical values are computed from the unscaled simulation outputs.
 
-\subsection{D1: constructed positive
-control}\label{d1-constructed-positive-control}
+\subsection{Synthetic falsification ladder}\label{synthetic-falsification-ladder}
 
-D1 is a deliberately constructed sanity check. All 64 proposed repairs improve the ordinary criterion and are deceptive by construction, and DCS rejects all 64. Median ordinary observation improvement is 60.88\%, while the median witness-degradation ratio is 9.375. This tells us that the execution path can express the intended rejection when the signal is built into the experiment. It does not tell us that the same behavior will generalize prospectively.
+\paragraph{D1: constructed control.}
+D1 deliberately builds a strong deceptive-repair signal. Its purpose is implementation sanity: if the DCS path cannot reject these 64 constructed cases, later failures are uninterpretable.
 
-\subsection{D2: active selection and frozen
-validation}\label{d2-active-selection-and-frozen-validation}
+\paragraph{D2: frozen validation.}
+Discovery compares raw maximin, Fisher/Jacobian selection, a same-cost raw bundle, maximum motion, DCS order-2 maximin, and random selection. After the discovery choice is fixed, D2 evaluates 16 unseen synthetic truth worlds under the frozen decision magnitude.
 
-The D2b discovery comparison asks a simpler ranking question before the frozen validation. Ranking agreement is 95.83\% for raw maximin, 87.50\% for Fisher/Jacobian selection, 75.00\% for the same-cost raw bundle, 66.67\% for maximum motion, 62.50\% for DCS order-2 maximin, and 45.83\% for random selection. DCS is therefore not the strongest matched ranking method in this comparison.
+\paragraph{D3: witness-space refinement.}
+D3 uses six fresh truth worlds to test a specific alternative explanation for weak D2 evidence: solver discretization or cancellation order may be hiding an otherwise useful distinction. The same signed witness is evaluated at nominal and refined resolution, and adaptive selection may choose order 2 or 3.
 
-Frozen D2 contains 16 truth worlds, and none reaches the decision magnitude. Median standardized separation is 0.041578, median numerical RMS is \(6.469\times10^{-6}\) m, and the maximum moment residual is \(3.886\times10^{-16}\). In other words, the stencil algebra is behaving numerically while the experiment is still not separating the physical alternatives strongly enough.
-
-\subsection{D3: witness-space refinement and adaptive
-order}\label{d3-witness-space-refinement-and-adaptive-order}
-
-D3 asks whether cleaner witness-space numerics or a higher mechanism order recovers useful separation. It does not. Six fresh synthetic truth worlds are evaluated; adaptive selection chooses order 2 in all six and never order 3. Median adaptive separation is 0.0588583. Refinement lowers median numerical RMS from \(8.435\times10^{-7}\) m for order 2 to \(2.153\times10^{-7}\) m for order 3, but no truth world is resolved. Ranking agreement remains modest: Fisher 61.11\%, raw bundle 58.33\%, maximum motion 58.33\%, pair-aware raw 55.56\%, adaptive DCS 52.78\%, and order-3 DCS 47.22\%.
-
-This stage is useful precisely because it separates two things that are easy to confuse. A witness can become numerically cleaner without the experiment becoming more informative about which physical world is correct.
-
-\subsection{D4V: pair-specific repair
-veto}\label{d4v-pair-specific-repair-veto}
-
-D4V starts from 36 repairs that already improve ordinary held-out error. Fourteen are deceptive on the untouched target and 22 are beneficial. Under the inherited \(|z|\ge2\) rule, DCS, the raw bundle, pair-specific raw, Fisher, and maximum-motion verification all have zero resolved coverage. The tables report these D4V counts alongside the fresh follow-on population.
+\paragraph{D4V: pair-specific rewrite verification.}
+D4V begins with 36 proposals that have already improved ordinary held-out error. The untouched physical target labels 14 as deceptive and 22 as beneficial. DCS is compared with raw-bundle, pair-specific raw, Fisher, and maximum-motion verification under the inherited \(|z|\ge2\) rule.
 
 \begin{table}[t]
 \centering
-\caption{Ordinary-improving proposal populations. D4V and fresh synthetic OFC are independently generated partitions and their counts must not be mixed.}
+\caption{Ordinary-improving synthetic proposal populations. D4V and the fresh OFC population are separate partitions and are not pooled.}
 \label{tab:populations}
 \begin{tabular}{lrrr}
 \toprule
-Population & Deceptive & Beneficial & Resolved \\
+Population & Deceptive & Beneficial & Resolved at \(|z|\ge2\) \\
 \midrule
 D4V & 14 & 22 & 0/36 \\
 Fresh OFC & 12 & 24 & 0/36 \\
@@ -340,25 +327,13 @@ Fresh OFC & 12 & 24 & 0/36 \\
 \end{tabular}
 \end{table}
 
-\begin{figure}
-\centering
-\includegraphics[width=\linewidth]{../docs/readme_assets/03_deception_map.png}
-\caption{Fresh orthogonal force-compliance proposal landscape. The
-figure shows where ordinary held-out improvement and the untouched
-physical target disagree across the fresh population.}
-\end{figure}
-A post-hoc information-frontier calculation makes the gap visible without changing the rule. D4V has median DCS magnitude 0.05024 against a frozen decision magnitude of 2, which corresponds to roughly 39.8$\times$ median signal amplification if uncertainty were otherwise unchanged. The matched channels are also far from resolved coverage. We use this only as a diagnostic of how much evidence is missing, not as a reason to alter a frozen gate.
+\subsection{Measured engineering and GAUGE protocols}\label{measured-engineering-and-gauge-protocols}
 
-\subsection{Measured-source engineering
-check}\label{measured-source-engineering-check}
-
-The full system is also run on measured DOT C2 trajectories \citep{li2025dot}. The importer keeps measured 3D correspondences separate from explicit proxies for rest state, density, thickness, mass, Gaussian photometry, and uncertainty. Fit-only calibration followed by held-out replay yields a model-conditioned effective material setting, not a claim about the true cloth properties. A proposed local material rewrite is rejected and rolled back because the complete independent derivative-verification contract is not satisfied, even though it passes the configured nonlinear linearization-error tolerance. This is useful evidence that the commit/refusal machinery behaves correctly on measured-source data, but it is not part of the central deceptive-repair result.
-
-
+The DOT C2 check uses measured 3D correspondences to exercise the full captured-world path. The importer keeps measured trajectories separate from explicit proxies for rest state, density, thickness, mass, Gaussian photometry, and uncertainty. Calibration uses only the fit split, followed by held-out replay and a local material rewrite. Because C2 does not provide constitutive ground truth, the fitted material parameters are interpreted only as effective parameters of the chosen model.
 
 \begin{table}[t]
 \centering
-\caption{Public DOT C2 measured-source engineering check. The material parameters are model-conditioned effective values, not material ground truth.}
+\caption{DOT C2 measured-source engineering check. The material parameters are model-conditioned effective values, not material ground truth.}
 \label{tab:dot-c2}
 \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X >{\raggedleft\arraybackslash}p{0.47\linewidth}@{}}
 \toprule
@@ -377,112 +352,34 @@ Rewrite verification & nonlinear pass; oracle fail; rollback \\
 \begin{figure}[t]
 \centering
 \resizebox{0.92\linewidth}{!}{\input{dot_c2_measured_heldout.tikz}}
-\caption{Held-out DOT C2 measured-versus-predicted geometry at the later validation checkpoint ($t=0.167$ s), shown in the camera-frame $x/y$ projection. Circles are measured correspondences, crosses are Vulkax predictions, and connecting segments are true-scale residuals rather than magnified arrows. Across the 90 held-out samples from both nonzero checkpoints, the 3-D RMS is 4.417 mm. This evaluates the model-conditioned captured-world replay; DOT C2 does not provide material ground truth.}
+\caption{Held-out DOT C2 measured-versus-predicted geometry at \(t=0.167\) s in the camera-frame \(x/y\) projection. Circles are measured correspondences, crosses are predictions, and connecting segments are true-scale residuals. Across the 90 held-out samples from both nonzero checkpoints, the 3-D RMS is 4.417 mm.}
 \label{fig:dot-c2-heldout}
 \end{figure}
 
-The same pinned DOT C2 source is also exercised by the native Vulkan measured-world
-showcase, which emits baseline and rollback hero views, close-ups, a comparison
-plate, and an eight-view turntable. Because the candidate rewrite is rejected, the
-final displayed state intentionally returns to the baseline state. These images are
-qualitative implementation evidence for the measured captured-world path; they are
-not additional evidence that the fitted material parameters are physically unique or
-ground-truth accurate.
+GAUGE contributes two distinct measured protocols. The retrospective foam-shearing analysis compares ordinary face/marker error with a longitudinal mechanism channel over ten held-out repeats. The prospective lane is frozen separately on foam stretching and compression, soft and hard materials, and repeats 5--7. That validation partition contains 12 measured worlds and three predeclared cases per world: SUPPORT, VETO, and placebo/UNRESOLVED. Repeats 8--10 are reserved as final media and remain unopened after the validation gate fails.
 
-\subsection{GAUGE: retrospective measured channel
-contradiction}\label{gauge-retrospective-measured-channel-contradiction}
+\subsection{Fresh orthogonal force-compliance protocol}\label{fresh-orthogonal-force-compliance-study}
 
-We examine ten held-out foam-shearing repeats from GAUGE \citep{wang2026gauge}. The committed paired-diagnostics CSV is channel-aggregated: each row reports win/loss/tie counts over these same ten repeats rather than representing a single trial. Ordinary face-plus-marker metrics prefer the finite-overlap candidate in all 10 repeats, and marker dark-field does the same. The longitudinal mechanism channel disagrees: it prefers the endpoint model in 9 of 10 repeats. Median marker error is 0.002428 m for endpoint and 0.001709 m for overlap, whereas median longitudinal error is 0.003131 for endpoint and 0.005584 for overlap. A post-hoc exact two-sided sign test on the longitudinal direction gives \(p=0.02148\).
+The force-compliance experiment changes the verification channel while keeping proposal generation fixed. It evaluates 36 fresh synthetic proposals, of which 12 are deceptive and 24 beneficial on the untouched target. Fresh DCS and force compliance share the same decision magnitude \(\tau=2\).
 
-\begin{table}[t]
+The advancement gate is frozen before execution. It requires at least four deceptive repairs, at least 30\% resolved force coverage, at least 50\% veto recall on deceptive repairs, at most 25\% false-veto rate on beneficial repairs, force coverage greater than DCS coverage, a higher force median \(|z|\), and finite numerical comparisons for every proposal. A later threshold sweep is post hoc and cannot redefine this gate.
+
+\begin{figure}
 \centering
-\caption{GAUGE retrospective channel comparison. Lower error is better. The sign test is post hoc.}
-\label{tab:gauge}
-\begin{tabular}{lcc}
-\toprule
-Metric & Endpoint & Overlap \\
-\midrule
-Median marker error (m) & 0.002428 & 0.001709 \\
-Median longitudinal error & 0.003131 & 0.005584 \\
-Longitudinal held-out wins & 9/10 & 1/10 \\
-\bottomrule
-\end{tabular}
-\end{table}
+\includegraphics[width=\linewidth]{../docs/readme_assets/03_deception_map.png}
+\caption{Fresh force-compliance proposal population. Ordinary held-out improvement and untouched-target behavior disagree for part of the population, producing both deceptive and beneficial rewrites.}
+\label{fig:deception-map}
+\end{figure}
 
-The conflict was visible before DCS was formulated, so we label it retrospective throughout. It is evidence that channels can disagree, not prospective confirmation of the later method.
+\subsection{Locked IRIS pendulum protocol and post-final analyses}\label{locked-iris-pendulum-protocol}
 
-\subsection{Fresh orthogonal force-compliance
-study}\label{fresh-orthogonal-force-compliance-study}
+The measured positive test uses IRIS \texttt{pendulum\_90}. The tracker, candidate schedule, decision magnitude, and final media are repository-frozen before the 10-video final set is opened. The primary verifier uses the finite-amplitude pendulum period relation. The matched diagnostic baseline uses the small-angle approximation. Each physical video generates 11 controlled SUPPORT/VETO/UNRESOLVED cases, for 110 nested case rows across 10 videos.
 
-The fresh synthetic force experiment produces 36 ordinary-heldout-improving proposals: 12 deceptive and 24 beneficial. Fresh DCS has median \(|z|=0.04877\) and maximum 0.17279. Force compliance moves the median to 0.55863 and the maximum to 1.31911, giving an aggregate-median ratio of 11.455. That is a large change in evidence scale, but not a boundary crossing: DCS resolves 0/36 and force compliance also resolves 0/36. The median extra amplification needed for the force channel to reach magnitude 2 is 3.58$\times$; even the best case still needs 1.52$\times$.
+Post-final analyses form a separate evidence class. They resample at the physical-video level, compare two additional pendulum residual models, generate GT-hidden proposals from early video segments, vary proposal/probe overlap, propagate recorded rope-length uncertainty, and stress the locked decision under image corruption and temporal downsampling. None of these analyses can replace or retune the locked final result.
 
+\subsection{Frozen IRIS free-fall transfer test}\label{frozen-iris-free-fall-protocol}
 
-\begin{table}[t]
-\centering
-\caption{Fresh synthetic orthogonal force-compliance results.}
-\label{tab:ofc}
-\begin{tabular}{lcc}
-\toprule
-Quantity & DCS & Force \\
-\midrule
-Median $|z|$ & 0.04877 & 0.55863 \\
-Maximum $|z|$ & 0.17279 & 1.31911 \\
-Resolved coverage & 0/36 & 0/36 \\
-Median factor to $|z|=2$ & 41.01$\times$ & 3.58$\times$ \\
-Best-case factor to $|z|=2$ & 11.57$\times$ & 1.52$\times$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Decision-threshold robustness.}
-The primary decision magnitude remains the prospectively frozen \(\tau=2\). We also inspect nearby thresholds after the fact to check whether the negative conclusion is hanging on that single number; the primary rule is not changed. Because the frozen per-proposal OFC ledger retains signed DCS and force progress scores, this sweep can be reported exactly. Fresh DCS has no support or veto crossing even at \(\tau=1\). Force compliance resolves 14/36 proposals at \(\tau=1\): 6 support and 8 veto. Five of the 12 deceptive repairs are vetoed (41.7\% recall), while 3 of 24 beneficial repairs are falsely vetoed (12.5\%). That still misses the prospectively frozen advancement target. At \(\tau=1.5\) and above, force coverage returns to 0/36. The useful point is the shape of the transition: the evidence is stronger than DCS, but the frozen population is still uncertified at the primary \(\tau=2\) rule.
-
-\begin{table}[t]
-\centering
-\caption{Threshold-robustness audit from the frozen per-proposal ledger.
-The $\tau=2$ row is the prospectively frozen primary rule; other rows are
-post-hoc sensitivity checks and do not redefine the decision policy.}
-\label{tab:threshold-sensitivity}
-\begin{tabular}{lcc}
-\toprule
-Decision magnitude $\tau$ & DCS crossings & Force crossings \\
-\midrule
-1.0 & 0/36 & 14/36 \\
-1.5 & 0/36 & 0/36 \\
-2.0 & 0/36 & 0/36 \\
-2.5 & 0/36 & 0/36 \\
-3.0 & 0/36 & 0/36 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The aggregate median-magnitude ratio is 11.455$\times$. The complete post-hoc sweep is generated from the frozen per-proposal ledger by \path{research/analysis/threshold_sensitivity_ofc.py} and stored in \path{research/paper_data/THRESHOLD_SENSITIVITY_OFC_2026-09-21.csv}.
-
-The advancement gate requires at least 30\% resolved coverage, at least 50\% veto recall over deceptive repairs, no more than 25\% false-veto rate over beneficial repairs, better coverage than DCS, higher median magnitude than DCS, and finite numerical refinement for every proposal. Force compliance passes the population-size, false-veto, median-signal, and numerical checks, but it fails coverage and recall. We keep that result as a failed gate with a strong standardized-evidence increase; we do not rename it a successful verifier.
-
-\subsection{Locked IRIS pendulum confirmation}\label{locked-iris-pendulum-confirmation}
-
-The synthetic sequence tells us that the channel matters, but it does not by itself give a measured-world success case. We therefore froze a separate real-video pendulum protocol before opening the designated final media. The final set contains 10 IRIS \texttt{pendulum\_90} videos, and all 10 pass the quality gate. The primary probe uses the finite-amplitude pendulum period relation; the matched diagnostic baseline uses the small-angle approximation. The tracker, candidate schedule, decision magnitude, and final media are fixed by repository state before the run.
-
-Across the 110 controlled cases nested inside those 10 videos, the finite-amplitude probe makes 90 decisions correctly (81.82\%). The matched small-angle baseline makes 40/110 correctly (36.36\%). The primary probe is correct on 40/50 SUPPORT cases and 40/50 VETO cases, and it leaves all 10 placebo cases UNRESOLVED as intended. In paired comparison, there are 50 cases in which the primary probe is correct and the baseline is not, zero cases with the reverse pattern, and 60 ties. Those 110 rows are repeated controlled cases, not 110 independent physical experiments. The locked physical-recovery diagnostic has 16.81\% median relative error in the period-inferred pendulum length.
-
-Nothing about the finite-amplitude pendulum equation is claimed as new. The important result is transactional: when the verification observable is physically matched to the distinction being tested, the same SUPPORT/VETO/UNRESOLVED contract can make useful decisions on fresh measured video.
-
-\subsection{Post-final hardening of the pendulum result}\label{post-final-pendulum-hardening}
-
-Once the final set was locked and evaluated, we ran a separate hardening pass that is not allowed to rewrite the result. At the correct physical unit---the video---the finite-amplitude probe beats the small-angle baseline on all 10 videos (10--0, no ties; two-sided exact sign-test \(p=0.001953125\)). We also tested two less convenient post-final alternatives. A direct finite-amplitude period residual reaches 45.45\% strict three-way accuracy and a damped nonlinear ODE residual reaches 9.09\%, versus 81.82\% for the locked probe. The locked probe is uniquely correct on 40 cases relative to the direct residual and on 80 relative to the damped ODE; neither comparator has a case on which it alone is correct.
-
-A second post-final analysis removes the manually scheduled candidate factors. Early video segments generate the baseline and candidate, a later segment decides whether the ordinary fit improved, and the blind proposal file is hashed before ground truth is joined. All 10 generated proposals improve the ordinary holdout: 8 are physically worse and 2 are physically better. The reserved final-window verifier gets all 10 right. The truth labels also remain stable for all 110 controlled cases across the recorded rope-length uncertainty interval through \(\pm2\sigma\). Sliding the proposal/verification overlap from disjoint windows to full overlap leaves this 10-proposal post-final decision set correct throughout. That is a dependence diagnostic, not a claim that two measurements from the same video are independent sensors.
-
-The full corruption run is similarly informative because it exposes a boundary rather than a blanket robustness claim. The Metal path reproduces the clean decision vector on all 10 videos, and 180 condition-video runs finish with no failed videos. Accuracy stays at 81.82\% under the tested noise, blur, frame duplication/drop, central occlusion, and crop levels. It does not stay there when temporal resolution is reduced: accuracy falls to 63.64\% at 30~fps and 45.45\% at 15~fps, while placebo abstention remains 100\%. We keep that frame-rate sensitivity as a limitation. None of these post-final analyses changes the frozen confirmation.
-
-\subsection{Second-domain IRIS free-fall failure}\label{second-domain-iris-free-fall-failure}
-
-The next real-video domain does not reproduce that success. We froze a different equation-family replication on IRIS dropping-ball video. V6.6 first passes its \texttt{drop\_50} development gate with 4/5 quality-pass videos, zero implementation errors, and 8.05\% median acceleration relative error. We then open the untouched \texttt{drop\_100/06..10} validation split without changing the selector.
-
-The validation result fails cleanly. All five videos pass the low-level quality checks, but the median acceleration relative error is 111.7\%; the frozen truth-control accuracy and direction-sign rate are both zero. Post-validation diagnosis shows that the method often treats a partial ballistic interval as if it covered the full known drop height. We then exhaust the obvious retrospective rescue families---alternate event ranking, higher resolution, longer association, track stitching, global or chunk scaling, stationary endpoint scaling, and bidirectional hold-to-hold recovery---without finding a robust target-free estimator that generalizes across the spent development and validation evidence.
-
-That lane is therefore closed. \texttt{drop\_100} is permanently retrospective, none of the rescue diagnostics is treated as confirmatory evidence, and the designated \texttt{drop\_150} final split remains unopened. This failure is part of the paper's evidence rather than something to hide: the verification transaction only helps when the physical channel actually carries the information needed for the decision.
+The free-fall lane tests a different equation family with a separately frozen protocol. Development uses \texttt{drop\_50/06..10}; validation uses untouched \texttt{drop\_100/06..10}; the designated final set is \texttt{drop\_150/02..10}. The V6.6 policy forbids threshold retuning, tracker changes, candidate changes, or scene substitution after lock. Validation is opened only after the development gate passes. A failed validation permanently removes that split from confirmatory use and prevents the final set from being opened.
 
 \section{Results and Analysis}\label{results-and-analysis}
 
