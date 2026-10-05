@@ -46,16 +46,16 @@ A reconstructed scene may outlive the capture session that created it. An animat
 
 Consider a cloth reconstructed from video. An optimizer proposes a new stiffness because it reduces trajectory error on ordinary held-out frames. Committing that value immediately would assume that better observational fit means better future physical behaviour. The proposal could instead respond worse when the cloth is pulled, struck, or loaded outside the fitting sequence. This paper addresses that gap between \emph{proposing} a physical edit and \emph{accepting} it.
 
-By a \emph{video-reconstructed world}, we mean a scene recovered from observations that stores geometry or appearance together with simulator-facing state or parameters. Physics-aware radiance fields, Gaussian representations, and differentiable simulators increasingly combine reconstruction, parameter estimation, and interaction synthesis \citep{li2023pacnerf,xie2024physgaussian,zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs,hu2019chainqueen,hu2020difftaichi}. A physical edit can therefore come from an optimizer, a scripted calibration step, an authoring interface, or a learned estimator. Reality Probe is agnostic to that proposal mechanism. It begins only after the current model (M_0) and candidate (M_1) are fixed.
+By a \emph{video-reconstructed world}, we mean a scene recovered from observations that stores geometry or appearance together with simulator-facing state or parameters. Physics-aware radiance fields, Gaussian representations, and differentiable simulators increasingly combine reconstruction, parameter estimation, and interaction synthesis \citep{li2023pacnerf,xie2024physgaussian,zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs,hu2019chainqueen,hu2020difftaichi}. A physical edit can therefore come from an optimizer, a scripted calibration step, an authoring interface, or a learned estimator. Reality Probe is agnostic to that proposal mechanism. It begins only after the current model $M_0$ and candidate $M_1$ are fixed.
 
 Inverse physics asks which parameters explain observations used for estimation. Identifiability asks whether those observations can determine the parameters, and experiment design asks which measurements best separate alternatives \citep{wang2026identifiability,asadi2025oed}. Verification and validation ask whether a computational model is credible for an intended use \citep{oberkampf2007pcmm,laudy2026digitaltwin}. Reality Probe uses ideas from these traditions at a narrower systems boundary: should one already-proposed physical edit be allowed to replace persistent scene state?
 
-Figure~\ref{fig:overview} shows the transaction. Proposal data may produce (M_1), but the reserved physical test is not opened until that proposal is fixed. The same reserved observation or intervention (Y) is then evaluated under (M_0) and (M_1), and the difference is scaled by measurement, repeat, and numerical uncertainty. SUPPORT allows the candidate to be committed; VETO preserves the current model because the reserved test contradicts the edit; UNRESOLVED also preserves the current model, but because the experiment cannot distinguish the two states strongly enough.
+Figure~\ref{fig:overview} shows the transaction. Proposal data may produce $M_1$, but the reserved physical test is not opened until that proposal is fixed. The same reserved observation or intervention $Y$ is then evaluated under $M_0$ and $M_1$, and the difference is scaled by measurement, repeat, and numerical uncertainty. SUPPORT allows the candidate to be committed; VETO preserves the current model because the reserved test contradicts the edit; UNRESOLVED also preserves the current model, but because the experiment cannot distinguish the two states strongly enough.
 
 \begin{figure*}[t]
 \centering
 \resizebox{0.98\textwidth}{!}{\input{figures/reality_probe_pipeline.tikz}}
-\caption{Reality Probe as a physical-edit transaction. A proposal may come from optimization, authoring, or another estimator. The candidate is frozen before reserved physical evidence is opened. The current and proposed models are evaluated on the same withheld physical question, uncertainty is carried into the comparison, and the transaction ends in SUPPORT, VETO, or UNRESOLVED. Only SUPPORT permits (M_1) to replace (M_0); the other outcomes preserve the current state. The diagram describes the system boundary and contains no experimental result.}
+\caption{Reality Probe as a physical-edit transaction. A proposal may come from optimization, authoring, or another estimator. The candidate is frozen before reserved physical evidence is opened. The current and proposed models are evaluated on the same withheld physical question, uncertainty is carried into the comparison, and the transaction ends in SUPPORT, VETO, or UNRESOLVED. Only SUPPORT permits $M_1$ to replace $M_0$; the other outcomes preserve the current state. The diagram describes the system boundary and contains no experimental result.}
 \label{fig:overview}
 \end{figure*}
 
@@ -122,9 +122,9 @@ Let \(M_0\) be the current physical model stored in a video-reconstructed world 
 Let \(L_{\mathrm{obs}}(M)\) denote ordinary held-out error and \(L_{\mathrm{phys}}(M)\) error on an untouched physical target, with lower values preferred. A \emph{fit-improving physical regression} occurs when
 
 \[
-L_{\mathrm{obs}}(M_1) < L_{\mathrm{obs}}(M_0)
+L_{\mathrm{obs}}$M_1$ < L_{\mathrm{obs}}$M_0$
 \quad\text{but}\quad
-L_{\mathrm{phys}}(M_1) > L_{\mathrm{phys}}(M_0).
+L_{\mathrm{phys}}$M_1$ > L_{\mathrm{phys}}$M_0$.
 \]
 
 This definition is intentionally agnostic to cause. Parameter compensation, model-form error, boundary assumptions, numerical approximations, and weakly informative observations can all produce the same evidence pattern.
