@@ -220,8 +220,26 @@ def run_audit(root: pathlib.Path) -> dict:
                     "04_same_probe.png", "06_fingerprint.png",
                     "07_residual_field.png", "10_signal_gain.png",
                     "11_information_limit.png",
-                } and asset not in text:
-                    errors.append(f"core visual not referenced by manuscript: {rel}")
+                }:
+                    # Submission packaging now copies the exact committed visual
+                    # bytes into paper/figures so the Wiley LaTeX archive is
+                    # self-contained. Accept either the historical README path or
+                    # the local submission path; the scientific asset is the same.
+                    local_asset = "figures/" + name
+                    if asset not in text and local_asset not in text:
+                        errors.append(
+                            f"core visual not referenced by manuscript: {rel}"
+                        )
+
+        for guard in (
+            "figures/dot_c2_rendered_world.jpg",
+            "fig:dot-c2-render",
+            "zero changed pixels",
+        ):
+            if guard not in text:
+                errors.append(
+                    f"measured rendered-world manuscript guard missing: {guard}"
+                )
 
 
     measured_visual_contract = {}
