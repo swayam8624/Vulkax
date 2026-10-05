@@ -9,6 +9,8 @@ on:
       - 'paper/build_word.py'
       - 'paper/main_humanized.tex'
       - 'paper/build_word_humanized.py'
+      - 'paper/dot_c2_measured_heldout.tikz'
+      - 'paper/figures/**'
       - '.github/workflows/manuscript-build.yml'
   workflow_dispatch:
 
@@ -31,9 +33,28 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            latexmk pandoc python3-pip \
+            latexmk pandoc python3-pip zip unzip \
             texlive-latex-extra texlive-fonts-extra texlive-science texlive-publishers
           python3 -m pip install --break-system-packages python-docx
+
+      - name: Validate submission-facing references
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          p = Path("paper/main.tex")
+          text = p.read_text(encoding="utf-8")
+          labels = set(re.findall(r'\\label\{((?:fig|tab):[^}]+)\}', text))
+          refs = set(re.findall(r'\\(?:ref|eqref)\{([^}]+)\}', text))
+          missing = sorted(labels - refs)
+          if missing:
+              raise SystemExit("Uncited figure/table labels: " + ", ".join(missing))
+          deps = re.findall(r'\\(?:includegraphics(?:\[[^]]*\])?|input)\{([^}]+)\}', text)
+          external = [d for d in deps if d.startswith("../")]
+          if external:
+              raise SystemExit("Submission source has parent-directory dependencies: " + ", ".join(external))
+          print(f"All {len(labels)} figure/table labels are cited; submission dependencies are local.")
+          PY
 
       - name: Compile ACM/TOG PDF
         run: |
@@ -56,12 +77,32 @@ jobs:
           cp paper/Reality_Probe_Manuscript_Prose_Edited.pdf paper/Reality_Probe_Manuscript_Final.pdf
           cp paper/Reality_Probe_Manuscript_Prose_Edited.docx paper/Reality_Probe_Manuscript_Final.docx
 
+      - name: Package CAVW LaTeX submission
+        run: |
+          cd paper
+          rm -f CAVW_Main_LaTeX.zip
+          zip -r CAVW_Main_LaTeX.zip \
+            main.tex \
+            references.bib \
+            dot_c2_measured_heldout.tikz \
+            figures
+
+      - name: Verify reviewer PDF from submission ZIP
+        run: |
+          rm -rf "$RUNNER_TEMP/cavw-reviewer-pdf"
+          mkdir -p "$RUNNER_TEMP/cavw-reviewer-pdf"
+          unzip -q paper/CAVW_Main_LaTeX.zip -d "$RUNNER_TEMP/cavw-reviewer-pdf"
+          cd "$RUNNER_TEMP/cavw-reviewer-pdf"
+          latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
+          test -s main.pdf
+          echo "Self-contained CAVW archive generated reviewer PDF successfully."
+
       - name: Record checksums
         run: |
           cd paper
           sha256sum Reality_Probe_Manuscript.pdf Reality_Probe_Manuscript.docx > MANUSCRIPT_SHA256.txt
           sha256sum Reality_Probe_Manuscript_Prose_Edited.pdf Reality_Probe_Manuscript_Prose_Edited.docx > MANUSCRIPT_PROSE_EDITED_SHA256.txt
-          sha256sum Reality_Probe_Manuscript_Final.pdf Reality_Probe_Manuscript_Final.docx > FINAL_MANUSCRIPT_SHA256.txt
+          sha256sum Reality_Probe_Manuscript_Final.pdf Reality_Probe_Manuscript_Final.docx CAVW_Main_LaTeX.zip > FINAL_MANUSCRIPT_SHA256.txt
 
       - name: Commit generated artifacts
         run: |
@@ -69,7 +110,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add paper/Reality_Probe_Manuscript.pdf paper/Reality_Probe_Manuscript.docx paper/MANUSCRIPT_SHA256.txt \
             paper/Reality_Probe_Manuscript_Prose_Edited.pdf paper/Reality_Probe_Manuscript_Prose_Edited.docx paper/MANUSCRIPT_PROSE_EDITED_SHA256.txt \
-            paper/Reality_Probe_Manuscript_Final.pdf paper/Reality_Probe_Manuscript_Final.docx paper/FINAL_MANUSCRIPT_SHA256.txt
+            paper/Reality_Probe_Manuscript_Final.pdf paper/Reality_Probe_Manuscript_Final.docx paper/CAVW_Main_LaTeX.zip paper/FINAL_MANUSCRIPT_SHA256.txt
           if git diff --cached --quiet; then
             echo "Generated manuscript artifacts are unchanged."
             exit 0

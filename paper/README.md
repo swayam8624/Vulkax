@@ -50,7 +50,7 @@ This directory contains the paper-facing manuscript for the Vulkax research prog
 ## Canonical manuscript
 
 - `main.tex` — review-hardened full internal manuscript.
-- Paper-facing title: **Reality Probe: Information-Limited Physical Verification of Captured Worlds**.
+- Paper-facing title: **Reality Probe: Verifying Physical Edits in Video-Reconstructed Worlds**.
 - Repository/system codename: **Vulkax**.
 
 ## Scientific freeze
@@ -102,13 +102,16 @@ The exact sweep is stored in
 This diagnostic does not replace or weaken the frozen tau=2 primary decision rule and
 was not used to retune the preregistered advancement gate.
 
-## Remaining submission engineering
+## CAVW submission engineering
 
-The research story and full manuscript source are present. Remaining work is
-submission engineering: compile/format audit, bibliography verification, printed-scale
-figure typography review, anonymous supplementary export, and venue-specific checks.
+The 2026-10-05 revision closes the CAVW editorial return items in the repository:
+all manuscript figures and tables are cited from the prose, all figure dependencies
+are local to `paper/`, and CI compiles a reviewer PDF from the exact self-contained
+`CAVW_Main_LaTeX.zip` archive. The manuscript also contains explicit ethics, data
+availability, funding, conflict-of-interest, permissions, and generative-AI
+declarations.
 
-A genuinely new prospective measured-force experiment would strengthen the paper, but
-it is new research. It must use a separately frozen protocol and must not be presented
-as part of the existing 2026-09-21 scientific freeze.
+A genuinely new prospective measured-force experiment could strengthen a later
+revision, but it would be new research. It must use a separately frozen protocol and
+must not be presented as part of the existing 2026-09-21 scientific freeze.
 \nThe manuscript now also contains `dot_c2_measured_heldout.tikz`, a vector quantitative visual generated from the successful DOT C2 benchmark artifact. It plots the later held-out checkpoint as measured correspondences versus model predictions with true-scale residual segments; the caption retains the 90-sample 3-D held-out RMS and the no-material-ground-truth boundary.\n\n

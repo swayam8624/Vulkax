@@ -10,6 +10,7 @@
 \usepackage{booktabs,array,tabularx,multirow}
 \usepackage{graphicx}
 \usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
 \usepackage{xcolor}
 \usepackage{microtype}
 \usepackage{siunitx}
@@ -30,7 +31,9 @@
 \keywords{video-reconstructed worlds, physical editing, inverse physics, physical verification, uncertainty, experiment design, Gaussian splatting}
 \begin{document}
 \begin{abstract}
-A scene reconstructed from video may later be physically edited: stiffness, damping, or other parameters are changed and the updated model is simulated under new interactions. A lower held-out fitting error does not guarantee that such an edit improves the physics that matters after deployment or authoring. Reality Probe addresses this acceptance problem by testing a proposed physical state against measurements withheld from fitting and returning SUPPORT, VETO, or UNRESOLVED before the state is committed. Across controlled and measured studies, the main finding is that verification quality depends on the information carried by the physical test; numerically sound probes can remain uninformative, while a dynamics-matched test can separate competing models. On a locked 10-video IRIS pendulum evaluation, the matched probe reaches 81.8\% decision accuracy versus 36.4\% for a small-angle baseline; a separately frozen free-fall protocol fails untouched validation and is not promoted to final testing. Reality Probe therefore turns physical editing from fit-and-commit into fit, test, then commit, making unsupported state changes explicit instead of silently folding them into the reconstructed world.
+A video-reconstructed world can carry physical parameters such as stiffness, damping, or gravity that are later changed by an optimizer or authoring operation. A candidate edit may fit recorded motion better and still make the world respond less faithfully to a new physical interaction. Reality Probe treats that edit as provisional: after the candidate is fixed, a physical observation or intervention withheld from proposal generation is evaluated against both the current and proposed models. The result is SUPPORT, VETO, or UNRESOLVED, so weak evidence cannot silently overwrite persistent physical state.
+
+The experiments show that the usefulness of this gate depends on the information in the physical test. Controlled studies contain edits that improve ordinary held-out fit while worsening an untouched physical target, and several numerically stable probes remain too weak to distinguish the competing models. On ten previously unopened videos from the IRIS pendulum benchmark, a finite-amplitude period test reaches 90/110 correct decisions (81.8\%), compared with 40/110 (36.4\%) for the common small-angle period approximation; all ten placebo cases remain UNRESOLVED. A separately predefined free-fall transfer protocol then fails untouched validation, so its final split remains unopened. Reality Probe therefore provides an evidence-gated commit transaction rather than a universal verifier: fit proposes the edit, a reserved physical test judges it, and unsupported changes remain uncommitted.
 \end{abstract}
 
 \maketitle
@@ -39,44 +42,46 @@ A scene reconstructed from video may later be physically edited: stiffness, damp
 
 \section{Introduction}\label{introduction}
 
-Suppose a cloth has been reconstructed from video and assigned a simulated stiffness. A later optimization pass proposes a new stiffness because it lowers trajectory error on held-out frames. If the system simply overwrites the old value, it is treating better fit as evidence of better physics. Those are different claims. The new parameter may reproduce the recorded motion more closely and still respond worse when the cloth is pulled, struck, or loaded in a way that was never part of fitting.
+A reconstructed scene may outlive the capture session that created it. An animation or authoring system may change material stiffness; a digital twin may recalibrate damping; a robotics world model may update contact or compliance. In each case the scene already contains persistent physical state, and a new parameter value is a proposed state transition rather than merely another number produced by an optimizer.
 
-This problem appears whenever a reconstructed scene is expected to remain physically editable. By a \emph{video-reconstructed world}, we mean a scene model recovered from observations that stores geometry or appearance together with state or parameters used by a simulator. Physics-aware radiance fields, Gaussian representations, and differentiable simulators combine reconstruction, parameter estimation, and interaction synthesis \citep{li2023pacnerf,xie2024physgaussian,zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs,hu2019chainqueen,hu2020difftaichi}. Once such a model persists beyond the fitting run, every physical parameter change becomes a state-management decision: should the system keep the old model or commit the new one?
+Consider a cloth reconstructed from video. An optimizer proposes a new stiffness because it reduces trajectory error on ordinary held-out frames. Committing that value immediately would assume that better observational fit means better future physical behaviour. The proposal could instead respond worse when the cloth is pulled, struck, or loaded outside the fitting sequence. This paper addresses that gap between \emph{proposing} a physical edit and \emph{accepting} it.
 
-Inverse physics usually answers a different question: which parameters best explain the observations used for estimation? Structural identifiability asks whether those observations can determine the parameters at all, and experiment design asks which measurements make competing models easier to distinguish \citep{wang2026identifiability,asadi2025oed}. Verification and validation ask whether a computational model is credible for an intended use \citep{oberkampf2007pcmm,laudy2026digitaltwin}. Our focus is the acceptance decision for one concrete physical edit after an optimizer has proposed it. A persistent scene needs a way to say: \emph{this change is physically supported}, \emph{this change is contradicted}, or \emph{the available test does not tell us enough}.
+By a \emph{video-reconstructed world}, we mean a scene recovered from observations that stores geometry or appearance together with simulator-facing state or parameters. Physics-aware radiance fields, Gaussian representations, and differentiable simulators increasingly combine reconstruction, parameter estimation, and interaction synthesis \citep{li2023pacnerf,xie2024physgaussian,zhang2024physdreamer,liu2025physflow,rho2026monophysics,wada2026mphygs,hu2019chainqueen,hu2020difftaichi}. A physical edit can therefore come from an optimizer, a scripted calibration step, an authoring interface, or a learned estimator. Reality Probe is agnostic to that proposal mechanism. It begins only after the current model (M_0) and candidate (M_1) are fixed.
 
-Reality Probe inserts that decision between proposal and commit. Fitting produces a provisional model from training and ordinary held-out observations. Once that model is fixed, a reserved physical observation or intervention is evaluated against both the current and proposed states. Measurement, repeat, and numerical uncertainty are carried into the comparison. The result is SUPPORT, VETO, or UNRESOLVED. SUPPORT permits a verified commit; VETO keeps the current state because the proposal is physically worse on the reserved test; UNRESOLVED also preserves the current state, but for a different reason: the experiment cannot separate the two models strongly enough.
+Inverse physics asks which parameters explain observations used for estimation. Identifiability asks whether those observations can determine the parameters, and experiment design asks which measurements best separate alternatives \citep{wang2026identifiability,asadi2025oed}. Verification and validation ask whether a computational model is credible for an intended use \citep{oberkampf2007pcmm,laudy2026digitaltwin}. Reality Probe uses ideas from these traditions at a narrower systems boundary: should one already-proposed physical edit be allowed to replace persistent scene state?
 
-Figure~\ref{fig:overview} shows the failure that motivates this gate. In one frozen synthetic example, the proposed state improves ordinary held-out error by 14.93\% but worsens an untouched physical target by 9.03\%. The example is illustrative and carries no special statistical weight. What matters is the structure of the failure: the metric used to choose the edit and the physical behavior we ultimately care about can move in opposite directions.
+Figure~\ref{fig:overview} shows the transaction. Proposal data may produce (M_1), but the reserved physical test is not opened until that proposal is fixed. The same reserved observation or intervention (Y) is then evaluated under (M_0) and (M_1), and the difference is scaled by measurement, repeat, and numerical uncertainty. SUPPORT allows the candidate to be committed; VETO preserves the current model because the reserved test contradicts the edit; UNRESOLVED also preserves the current model, but because the experiment cannot distinguish the two states strongly enough.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{../docs/readme_assets/storyboard.png}
-\caption{Reality Probe separates proposing a physical edit from accepting it. A proposed edit can improve ordinary held-out fit while degrading an untouched physical behavior. Once the proposal is fixed, the system asks a reserved physical question, compares current and proposed responses under uncertainty, and either commits the new state, vetoes it, or leaves the decision unresolved.}
+\resizebox{0.98\textwidth}{!}{\input{figures/reality_probe_pipeline.tikz}}
+\caption{Reality Probe as a physical-edit transaction. A proposal may come from optimization, authoring, or another estimator. The candidate is frozen before reserved physical evidence is opened. The current and proposed models are evaluated on the same withheld physical question, uncertainty is carried into the comparison, and the transaction ends in SUPPORT, VETO, or UNRESOLVED. Only SUPPORT permits (M_1) to replace (M_0); the other outcomes preserve the current state. The diagram describes the system boundary and contains no experimental result.}
 \label{fig:overview}
 \end{figure*}
 
-\begin{figure}
+The failure this gate is meant to catch is concrete. Figure~\ref{fig:deceptive-repair} shows one controlled case in which the proposed state lowers ordinary held-out error by 14.93\% while worsening an untouched physical target by 9.03\%. The example is illustrative rather than statistically special: it shows why the metric that proposes an edit and the evidence that accepts it should not be assumed to measure the same thing.
+
+\begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{../docs/readme_assets/02_deceptive_repair.png}
-\caption{Example of a fit-improving physical regression from the frozen synthetic population. Ordinary held-out error decreases by 14.93\%, while untouched-target error increases by 9.03\%. This case is shown for intuition and does not determine any threshold or aggregate result.}
+\includegraphics[width=\linewidth]{figures/02_deceptive_repair.png}
+\caption{One fit-improving physical regression from the controlled synthetic population. Ordinary held-out error decreases by 14.93\%, so the proposal looks better to the fitting criterion, while error on an untouched physical target increases by 9.03\%. The case motivates a separate acceptance test; it is not used to choose any threshold.}
 \label{fig:deceptive-repair}
 \end{figure}
 
-The central hypothesis of this paper is not that one verifier works everywhere. It is that the usefulness of verification depends on whether the reserved physical test contains information that distinguishes the proposed state from the current one. We therefore evaluate several physical tests and do not tune one mechanism until it passes. Dark-Field Counterfactual Spectroscopy (DCS) tests whether signed intervention contrasts expose higher-order disagreement. Known-force compliance changes the physical question entirely. IRIS pendulum video provides a measured setting where a dynamics-matched observable succeeds. A separately frozen free-fall protocol provides a measured setting where the verification approach fails validation. The negative result is part of the contribution because it shows where the acceptance gate must refuse to generalize.
+The paper tests the hypothesis that verification quality is limited by the information in the reserved physical question. A signed-intervention probe can be numerically correct and still carry too little discriminating signal. A known-force response asks a different question. A finite-amplitude pendulum period test matches the dynamics present in the measured video. A separately predefined free-fall transfer test fails untouched validation and is stopped. Preserving both successful and failed channels is important because Reality Probe is intended to expose when a test is uninformative, not to guarantee that every physical edit can be verified.
 
-The impact is architectural. A physically editable scene should not be a fit-and-commit pipeline. It should be a \emph{fit, test, then commit} pipeline in which the acceptance measurements are separated from the data that produced the proposal. This makes silent physical regressions observable and gives the system a principled reason to preserve the previous state when its experiment is uninformative.
+The resulting architectural change is simple: physically editable reconstructed worlds should use \emph{fit, test, then commit} rather than fit-and-commit.
 
 The paper makes three contributions:
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \item
-  \textbf{An evidence-gated commit model for physical scene edits.} Reality Probe separates proposal data from acceptance data, propagates the uncertainty of the reserved test, and records SUPPORT, VETO, or UNRESOLVED before a proposed physical state can replace the baseline.
+  \textbf{An evidence-gated state transition for physical edits.} Reality Probe separates proposal evidence from acceptance evidence and records SUPPORT, VETO, or UNRESOLVED before a candidate physical state can replace the current one.
 \item
-  \textbf{An empirical study of verification information.} Controlled synthetic experiments show that mathematically valid and numerically stable probes can remain too weak to support a decision, while changing the physical intervention can increase separability substantially.
+  \textbf{A controlled study of what makes a verification test informative.} Across synthetic and measured settings, we distinguish numerical correctness from physical separability and show that changing the physical interrogation can matter more than refining a weak one.
 \item
-  \textbf{A locked measured-video evaluation with both success and failure.} A pendulum-specific probe improves decision accuracy on fresh IRIS video, while a separately frozen free-fall protocol fails untouched validation. Together they bound the claim to evidence-matched physical tests.
+  \textbf{A measured finding with an explicit transfer failure.} On ten previously unopened IRIS pendulum videos, the finite-amplitude period test reaches 90/110 correct decisions versus 40/110 for the common small-angle approximation, while a separately predefined free-fall protocol fails untouched validation and leaves its final split unopened. The result therefore supports evidence-matched verification rather than universal physical certification.
 \end{enumerate}
 
 The rest of the paper asks a single question: \emph{what evidence justifies committing a physical edit to a persistent reconstructed world?}
@@ -101,9 +106,12 @@ Verification, validation, and uncertainty quantification separate numerical corr
 
 The three-way decision also has clear prior art. Reject-option analysis studies the error--rejection tradeoff \citep{chow1970reject}, and selective prediction learns mechanisms that abstain when a prediction is not sufficiently reliable \citep{geifman2019selectivenet}. We do not claim abstention as a new decision primitive. The contribution is where it is placed: UNRESOLVED is a first-class state of a physical-edit transaction, so an uninformative experiment prevents a proposed model from silently replacing the current one.
 
+\paragraph{Positioning of the contribution.}
+Reality Probe does not claim new mathematics for finite differences, moment cancellation, uncertainty standardization, abstention, inverse physics, or verification and validation. Its contribution is the captured-world state-transition boundary that combines these established ideas: the proposal must be fixed before acceptance evidence is opened; the acceptance test compares the current and proposed physical states under an explicit uncertainty model; and insufficient evidence has an operational consequence---the persistent world is not overwritten. The evaluation then asks when that transaction is informative and deliberately retains channels that fail.
+
 \section{Problem Formulation}\label{problem-formulation}
 
-Let \(M_0\) be the current physical model stored in a video-reconstructed world and \(M_1\) a proposed edit produced by fitting or optimization. We separate observations into three roles:
+Let \(M_0\) be the current physical model stored in a video-reconstructed world and \(M_1\) a proposed edit. An edit is any change to persistent simulator-facing state---for example a material parameter, damping coefficient, gravity estimate, contact parameter, or another quantity used by the scene's dynamics. The proposal may be produced automatically or authored manually; the acceptance logic does not depend on its source. We separate observations into three roles:
 
 \begin{itemize}[leftmargin=*]
 \item \textbf{fitting evidence}, which may change model parameters or generate \(M_1\);
@@ -205,7 +213,7 @@ The important systems property is independent of the particular probe: the same 
 
 \section{Evaluation Design}\label{experimental-program}
 
-The evaluation is organized by the question each study answers, not by the order in which the experiments were developed. We distinguish constructed controls, frozen validation, retrospective diagnosis, locked final tests, and post-final stress tests because those evidence classes support different claims.
+The evaluation is organized by the question each study answers, not by the order in which the experiments were developed. Table~\ref{tab:stages} maps each study to the claim it can support. We distinguish constructed controls, frozen validation, retrospective diagnosis, locked final tests, and post-final stress tests because those evidence classes support different claims.
 
 \begin{table*}[t]
 \centering
@@ -231,7 +239,7 @@ The synthetic study begins with a deliberately strong positive control (D1): 64 
 
 The next two stages freeze the selected probe and move to unseen truth worlds. D2 tests whether the signed witness reaches the fixed decision margin on 16 new worlds. D3 repeats the comparison on six fresh worlds while evaluating the same witness at finer numerical resolution, allowing us to distinguish weak physical separation from simple solver error.
 
-The final synthetic verification stage (D4V) starts from 36 edits that all improve ordinary held-out fit. Their untouched physical behavior separates them into 14 regressive edits and 22 beneficial edits. DCS is compared with raw-bundle, pair-specific raw, Fisher/Jacobian, and maximum-motion alternatives under the same \(|z|\ge2\) decision rule.
+The final synthetic verification stage (D4V) starts from 36 edits that all improve ordinary held-out fit. Their untouched physical behavior separates them into 14 regressive edits and 22 beneficial edits. The separate force-study population contains 12 regressive and 24 beneficial ordinary-improving edits; Table~\ref{tab:populations} keeps the two populations distinct. DCS is compared with raw-bundle, pair-specific raw, Fisher/Jacobian, and maximum-motion alternatives under the same \(|z|\ge2\) decision rule.
 
 \begin{table}[t]
 \centering
@@ -250,7 +258,7 @@ Fresh force study & 12 & 24 & 0/36 \\
 
 \subsection{Measured-system checks}\label{measured-engineering-and-gauge-protocols}
 
-DOT C2 is used as an engineering check for the complete measured-data path. The sequence supplies 3D correspondences, so the system can ingest measured trajectories, fit on one partition, replay held-out motion, propose a local material edit, evaluate it, and roll back when the acceptance test fails. Because DOT does not provide the stress-free state, loads, thickness, mass, or constitutive ground truth, its fitted material values are reported only as effective parameters of the chosen model.
+DOT C2 is used as an engineering check for the complete measured-data path. The sequence supplies 3D correspondences, so the system can ingest measured trajectories, fit on one partition, replay held-out motion, propose a local material edit, evaluate it, and roll back when the acceptance test fails. Table~\ref{tab:dot-c2} reports the measured-path quantities, and Figure~\ref{fig:dot-c2-heldout} shows held-out measured correspondences against model predictions at true residual scale. Because DOT does not provide the stress-free state, loads, thickness, mass, or constitutive ground truth, its fitted material values are reported only as effective parameters of the chosen model.
 
 \begin{table}[t]
 \centering
@@ -284,30 +292,27 @@ The force-compliance study holds proposal generation fixed and changes only the 
 
 The same decision magnitude \(\tau=2\) is used for DCS and force compliance. Numerical uncertainty is measured by repeating the proposed-model response at half timestep, while measurement and repeat scales are fixed before execution. The purpose of this study is not to rescue DCS with a different threshold. It asks whether a physically different experiment makes the current and proposed models easier to distinguish.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.94\linewidth]{../docs/readme_assets/04_same_probe.png}
-\caption{The same known \(+x\) force is applied to truth and proposed models. Deformation is magnified 400\(\times\) for visualization only; all quantitative values use unscaled displacement.}
-\label{fig:same-probe}
-\end{figure}
+Figure~\ref{fig:force-worked-example} makes one controlled edit concrete. The candidate is not judged by an abstract score alone: the same known load is applied to both states, their deformations are compared in model space, and the resulting response bundle is converted into the reserved evidence used by the gate.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=0.94\linewidth]{../docs/readme_assets/06_fingerprint.png}
-\caption{Four-direction force-response fingerprint for one frozen visualization case. The response bundle records top-layer and interior displacement under the four load directions.}
-\label{fig:force-fingerprint}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.94\linewidth]{../docs/readme_assets/07_residual_field.png}
-\caption{Spatial residual field for the same visualization case. The field localizes disagreement between responses; it is not itself the acceptance statistic.}
-\label{fig:residual-field}
-\end{figure}
+\begin{tabular}{cc}
+\includegraphics[width=0.47\textwidth]{figures/04_same_probe.png} &
+\includegraphics[width=0.47\textwidth]{figures/05_response_overlay.png} \\
+\scriptsize (a) Same known load on current/truth and proposed states &
+\scriptsize (b) Overlaid responses under the reserved intervention \\[1.5mm]
+\includegraphics[width=0.47\textwidth]{figures/06_fingerprint.png} &
+\includegraphics[width=0.47\textwidth]{figures/07_residual_field.png} \\
+\scriptsize (c) Four-direction response fingerprint &
+\scriptsize (d) Spatial disagreement field
+\end{tabular}
+\caption{Concrete force-compliance example from the controlled synthetic study. A known \(+x\) load of 40 N per top-layer particle is applied to the current/truth and proposed material states; the displayed deformation is magnified 400\(\times\) only for visibility. Panels (a--b) show the simulated physical states and their response overlay, while (c--d) expose the multi-direction response and where the two states disagree. Quantitative acceptance uses the unscaled responses and uncertainty model, not the display magnification or the residual image by itself.}
+\label{fig:force-worked-example}
+\end{figure*}
 
 \subsection{Locked real-video evaluation}\label{locked-iris-pendulum-protocol}
 
-The positive measured test uses the IRIS \texttt{pendulum\_90} setting. Before the ten final videos are opened, the tracker, proposal schedule, physical probe, and decision rule are frozen. The primary test uses the finite-amplitude pendulum period relation; the diagnostic baseline uses the small-angle approximation. Each physical video produces 11 controlled SUPPORT/VETO/UNRESOLVED cases, giving 110 nested case rows across ten videos.
+The positive measured test uses the IRIS \texttt{pendulum\_90} setting. Before the ten final videos are opened, the tracker, proposal schedule, physical probe, and decision rule are frozen. The primary test uses the finite-amplitude pendulum period relation, which accounts for the measured swing amplitude; the diagnostic baseline uses the common small-angle period approximation, which assumes sufficiently small oscillations. Each physical video produces 11 controlled SUPPORT/VETO/UNRESOLVED cases, giving 110 nested case rows across ten videos.
 
 A separate free-fall protocol tests transfer to another equation family. Development uses \texttt{drop\_50/06..10}; validation uses untouched \texttt{drop\_100/06..10}. The designated final set \texttt{drop\_150/02..10} is opened only if validation passes. Thresholds, tracker logic, proposal selection, and scene membership are frozen before validation.
 
@@ -319,11 +324,11 @@ Post-final pendulum analyses are kept separate from the locked result. They clus
 
 Fit-improving physical regressions occur in both controlled proposal populations. Fourteen of 36 D4V edits and 12 of 36 fresh force-study edits improve ordinary held-out error while worsening an untouched physical target. These fractions describe the constructed test populations; they are not prevalence estimates.
 
-The consequence is more important than the count. A pipeline that commits an edit because held-out trajectory error improved would accept physically worse states in these examples. Figure~\ref{fig:deceptive-repair} shows one case in which ordinary error falls by 14.93\% while untouched-target error rises by 9.03\%.
+The consequence is more important than the count. A pipeline that commits an edit because held-out trajectory error improved would accept physically worse states in these examples. Figure~\ref{fig:deceptive-repair} shows one such edit, and Figure~\ref{fig:deception-map} shows the same mismatch across the full fresh proposal population.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\linewidth]{../docs/readme_assets/03_deception_map.png}
+\includegraphics[width=0.95\linewidth]{figures/03_deception_map.png}
 \caption{Ordinary held-out improvement does not determine physical improvement in the fresh proposal population. The scatter makes the acceptance problem visible at population scale: some edits move the fitting metric in the desired direction while moving the untouched physical target in the wrong direction.}
 \label{fig:deception-map}
 \end{figure}
@@ -353,25 +358,25 @@ Resolved proposals & 0/36 & 0/36 \\
 \end{tabular}
 \end{table}
 
-\begin{figure}
-\centering
-\includegraphics[width=\linewidth]{../docs/readme_assets/10_signal_gain.png}
-\caption{Changing from the kinematic DCS channel to known-force compliance increases median evidence magnitude by 11.46\(\times\) on the fresh synthetic population.}
-\label{fig:signal-gain}
-\end{figure}
+Figure~\ref{fig:evidence-strength} visualizes both parts of that result: the changed physical question produces substantially stronger evidence, yet the entire proposal set remains below the fixed acceptance boundary.
 
-\begin{figure}
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\linewidth]{../docs/readme_assets/11_information_limit.png}
-\caption{The force channel moves the tested proposals closer to the acceptance boundary, but the strongest case still remains below the frozen decision magnitude.}
-\label{fig:information-limit}
-\end{figure}
+\begin{tabular}{cc}
+\includegraphics[width=0.47\textwidth]{figures/10_signal_gain.png} &
+\includegraphics[width=0.47\textwidth]{figures/11_information_limit.png} \\
+\scriptsize (a) Median standardized evidence increases 11.46\(\times\) &
+\scriptsize (b) The strongest proposal still remains below the fixed boundary
+\end{tabular}
+\caption{Changing the physical interrogation helps more than refining the original kinematic probe, but it does not manufacture a decision. Known-force compliance raises the median standardized evidence magnitude from 0.0488 to 0.5586, while the largest magnitude remains 1.3191 below the fixed decision threshold of 2.}
+\label{fig:evidence-strength}
+\end{figure*}
 
-Together, these studies isolate the core issue: when competing models produce nearly the same observable response, a more elaborate statistic cannot create missing physical information. The experiment must change.
+Together, these studies isolate the core issue: when competing models produce nearly the same measured physical response, a more elaborate statistic cannot create missing information. The experiment must change.
 
 \subsection{A dynamics-matched test works on fresh pendulum video}\label{locked-iris-pendulum-confirmation}
 
-All ten locked \texttt{pendulum\_90} videos pass quality control. The finite-amplitude probe reaches 81.82\% strict decision accuracy, compared with 36.36\% for the small-angle baseline. Table~\ref{tab:iris-pendulum} shows where the improvement comes from.
+All ten previously unopened \texttt{pendulum\_90} videos pass quality control. The finite-amplitude period test reaches 81.82\% strict decision accuracy, compared with 36.36\% for the small-angle approximation. Table~\ref{tab:iris-pendulum} separates SUPPORT, VETO, and placebo-UNRESOLVED outcomes so the source of the improvement is visible rather than hidden inside one accuracy number.
 
 \begin{table}[t]
 \centering
@@ -408,7 +413,7 @@ The protocol therefore stops. \texttt{drop\_100} becomes retrospective evidence,
 
 \subsection{From fit-and-commit to test-and-commit}\label{why-the-channels-behave-differently}
 
-The main systems consequence is a change in where physical validation sits. In a conventional fitting loop, a lower held-out loss may be enough to accept new parameters. Reality Probe inserts an explicit acceptance stage after fitting. The proposed state remains provisional until a reserved physical observation or intervention supports it.
+The systems consequence is a change in where acceptance happens. A fitting loop may be tempted to accept new parameters as soon as ordinary held-out loss decreases. Reality Probe keeps those parameters provisional and opens a separate physical question only after the proposal is fixed. The state changes only when that reserved evidence supports it.
 
 This matters for any application that keeps a physically parameterized scene alive after reconstruction. A graphics authoring system may update material behavior; a simulation-backed digital twin may recalibrate a parameter; a robotics world model may refine contact or compliance. The paper does not claim deployment validation for all of these domains. The architectural lesson is narrower and transferable: persistent physical state should not be overwritten solely because the fitting objective improved.
 
@@ -450,9 +455,6 @@ The locked pendulum result was also replayed on Ubuntu with current dependencies
 
 Paper figures are generated from committed trajectories or result ledgers. Display magnification is disclosed where used and never changes the reported numerical values. The Stanford Bunny is a visualization carrier, not benchmark geometry.
 
-\paragraph{Generative-AI-assisted research workflow.}
-OpenAI ChatGPT was used for code drafting and debugging, experiment orchestration and analysis scripts, visualization/manuscript tooling, and manuscript revision. AI-generated text or code was not treated as empirical evidence. Numerical claims were checked against committed result artifacts, frozen protocol state, and cited publication records.
-
 \section{Conclusion}\label{conclusion}
 
 A physically editable scene has two separate problems: estimating a better model and deciding whether that model should replace the one already stored. This paper focuses on the second problem. Reality Probe places a reserved physical test between proposal and commit, so a proposal can be accepted, rejected, or left pending when the experiment is not informative enough.
@@ -461,10 +463,25 @@ The experiments show why that separation matters. Better held-out fit can coinci
 
 The practical implication is a change in system architecture. Video-reconstructed worlds that carry persistent physical state should not let optimization overwrite that state automatically. They should treat a physical edit as provisional until reserved evidence supports it, preserve the previous model when evidence is weak, and record why the transition was or was not committed. Reality Probe provides that acceptance boundary; designing informative physical tests determines how often the system can cross it.
 
-\section*{Acknowledgments}
+\section*{Declarations}
 
-\textbf{Generative AI disclosure.}
-OpenAI ChatGPT was used as a research and writing assistant during development of this work, including drafting and revising manuscript text, generating and debugging code, assisting with experiment orchestration and analysis scripts, preparing tables and figures, and manuscript formatting. The author reviewed the generated material, validated reported experiments and numerical evidence against the frozen research artifacts, checked the references used in the manuscript, and takes responsibility for the final content.
+\paragraph{Ethics Statement.}
+N/A. This work reports software, simulation, rendering, and analysis of public research datasets. It does not recruit human participants or collect personal data from research participants.
+
+\paragraph{Data Availability Statement.}
+The public datasets used in this study remain available from their cited original providers. The implementation, experiment scripts, frozen protocols, machine-readable result ledgers, figure-generation code, and derived evidence supporting the reported results are available in the project repository at \url{https://github.com/swayam8624/Vulkax}. Third-party datasets and videos are not redistributed.
+
+\paragraph{Funding Statement.}
+This research received no specific grant from any funding agency in the public, commercial, or not-for-profit sectors.
+
+\paragraph{Conflict of Interest.}
+The author declares no conflict of interest.
+
+\paragraph{Permissions Statement.}
+All figures and tables in this manuscript were created by the author from project-generated simulations, diagrams, measurements, or derived analyses. No third-party copyrighted figure or table is reproduced; upstream datasets remain subject to their original terms.
+
+\paragraph{Generative AI Use Disclosure.}
+OpenAI ChatGPT was used during September--October 2026 as an assistive research and writing tool for code drafting and debugging, experiment orchestration, analysis scripts, visualization and manuscript tooling, and drafting or language revision. AI output was not treated as empirical evidence. Reported numerical results were produced by the project software and frozen experiment artifacts, and the author checked claims, citations, figures, tables, and manuscript text against those sources before submission. No confidential human-subject or personally identifying research data were supplied to the tool. The author remains responsible for the code, analyses, claims, conclusions, and final text.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}
