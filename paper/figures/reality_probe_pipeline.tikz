@@ -16,7 +16,7 @@
 \node[stage] (proposal) at (4.4,0) {\textbf{Propose a physical edit}\\optimizer, calibration, authoring, or learned estimator\\candidate $M_1$};
 \node[stage] (freeze) at (8.8,0) {\textbf{Freeze the proposal}\\record $M_0$, $M_1$, protocol, and provenance\\reserved test still unopened};
 \node[reserve] (test) at (13.4,0) {\textbf{Open reserved physical evidence}\\new load, held-out motion, or dynamics-matched measurement $Y$\\evaluate both states};
-\node[score] (compare) at (18.0,0) {\textbf{Compare under uncertainty}\$z=[e(M_0,Y)-e(M_1,Y)]/\sigma$\\measurement + repeat + numerical error};
+\node[score] (compare) at (18.0,0) {\textbf{Compare under uncertainty}\\$z=[e(M_0,Y)-e(M_1,Y)]/\sigma$\\measurement + repeat + numerical error};
 
 \draw[flow] (world) -- node[above,font=\scriptsize]{fitting / ordinary held-out evidence} (proposal);
 \draw[flow] (proposal) -- (freeze);
