@@ -38,7 +38,11 @@ frozen scientific result ledgers or reopen any spent validation set.
 - **Show the actual physical state/edit rather than only abstract diagnostics.**
   The force-compliance visuals are now grouped as one worked example showing the
   simulated states under the same 40 N load, their response overlay, response
-  fingerprint, and residual field. DOT C2 remains the measured-geometry example.
+  fingerprint, and residual field. DOT C2 now also includes the deterministic
+  Vulkan rendered-world contact sheet generated from the measured-world
+  one-command showcase: the unsupported rewrite is rejected, so the displayed
+  post-transaction state is the rolled-back current world. The manuscript
+  explicitly separates this renderer check from constitutive ground truth.
 - **Contribution wording should state findings, not call an experiment a
   contribution.** Contribution 3 now states the measured result and the failed
   transfer result directly.

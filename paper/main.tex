@@ -284,6 +284,15 @@ Acceptance outcome & rollback \\
 \label{fig:dot-c2-heldout}
 \end{figure}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.94\textwidth]{figures/dot_c2_rendered_world.jpg}
+\caption{Measured-world rendering check for the DOT C2 pipeline, produced by the repository's Vulkan showcase from the measured proxy. Left: the current captured-world state before the proposed physical rewrite is evaluated. Right: the state shown after the proposal is rejected and rollback preserves the current world. The two rendered states are intentionally identical at the audited output (zero changed pixels), because Reality Probe prevents the unsupported rewrite from being committed. Mild presentation grading is applied only to this display derivative; the raw renderer evidence and numerical acceptance quantities are unchanged.}
+\label{fig:dot-c2-render}
+\end{figure*}
+
+Figure~\ref{fig:dot-c2-render} complements the correspondence plot with the actual rendered system output. It is a pipeline/visualization check rather than constitutive ground truth: DOT does not provide the physical quantities needed to interpret the fitted material values as uniquely identified properties.
+
 GAUGE contributes two different measured evidence classes. GAUGE is retrospective in the foam-shearing study, where we ask whether ordinary marker error and a mechanism-sensitive longitudinal channel can prefer different models. A separate frozen validation study uses previously untouched stretching and compression repeats 5--7, with SUPPORT, VETO, and placebo cases declared before evaluation. Final repeats 8--10 remain unopened after that validation fails.
 
 \subsection{Changing the physical question}\label{fresh-orthogonal-force-compliance-study}
