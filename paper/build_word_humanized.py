@@ -64,7 +64,7 @@ for para in doc.paragraphs:
 
 props = doc.core_properties
 props.title = "Reality Probe: Verifying Physical Edits in Video-Reconstructed Worlds"
-props.author = "Swayam Singal"
+props.author = "Swayam Singal (ORCID: 0009-0003-6637-3803)"
 props.subject = "Prose-edited Reality Probe / Vulkax research manuscript"
 props.keywords = "captured worlds; physical verification; counterfactual simulation; MPM; uncertainty; experiment design"
 doc.save(OUT)
