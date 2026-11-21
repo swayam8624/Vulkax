@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Discrete Element Method solver. Collision candidate generation and any broad-phase logic should be
+// read alongside src/solvers/dem_broadphase.cpp and verified against exact contact pairs and numerical
+// invariants.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/solvers/dem.hpp"
 
 #include <algorithm>
