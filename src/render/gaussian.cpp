@@ -1,3 +1,8 @@
+// SOURCE STUDY NOTE:
+// Gaussian rendering path. Read render/gaussian.hpp with gaussian_projection and gaussian_tiles plus
+// render/camera to see how world-space representation becomes a rasterized observation.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/render/gaussian.hpp"
 
 #include <algorithm>
