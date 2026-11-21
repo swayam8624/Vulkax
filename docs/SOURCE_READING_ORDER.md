@@ -48,3 +48,22 @@ This guide is a **learning route through implemented components**, not a list of
 5. Explain why an experiment certificate is not itself proof of broad generalization.
 
 This guide is a curated first pass; it does **not** assert that every research hypothesis, graphics feature or GPU backend is complete.
+
+
+## Expanded study trail — solver mathematics, image evidence and verified rewrites
+
+**Numerical reference:** [Diffusion](../src/solvers/diffusion.cpp) derives an explicit timestep stability limit from grid spacing/diffusivity. [Linear FEM](../src/solvers/fem.cpp) assembles tetrahedral stiffness, while [Hyperelastic FEM](../src/solvers/hyperelastic_fem.cpp) handles nonlinear deformation and singular reference matrices. The [DEM broadphase](../src/solvers/dem_broadphase.cpp) generates conservative neighbor candidates; only the later DEM collision/response pipeline decides real contacts. Learn why stability, convergence and contact correctness are separate tests.
+
+**World edits with reversal:** [WorldIR](../src/world/world_ir.cpp) defines stable entity, observation and parameter identities → [WorldCorrespondenceGraph](../src/world/correspondence_graph.cpp) connects physical and Gaussian identities → [Transaction](../src/world/transaction.cpp) validates edits and records prior state → [CapturedVerifiedRewrite](../src/research/captured_verified_rewrite.cpp) applies bounded material rewrites subject to evidence checks. A transaction's existence proves neither scientific benefit nor successful validation.
+
+**Captured-data fit:** [CapturedMaterialCalibration](../src/research/captured_material_calibration.cpp) evaluates candidate material parameters against captured movement data. Distinguish calibration/training samples from genuinely held-out verification and report the measured error on both.
+
+**Rendering and verification:** [Camera](../src/render/camera.cpp) supplies time-dependent views → [GaussianProjectedRaster](../src/render/gaussian_projected_raster.cpp) dispatches visible splats to explicitly built Metal or Vulkan backends → [ImageMetrics](../src/render/image_metrics.cpp) compares RGBA render outputs. [ResultCertificate](../src/verify/result_certificate.cpp) combines finite measured criteria and trust states. Better PSNR is not by itself a more physically accurate world; use solver/observation evidence too.
+
+### Questions worth tracing
+
+1. Why does explicit diffusion reject dt beyond a stability threshold?
+2. How do FEM linear and hyperelastic constitutive models differ, and which material range makes their comparison meaningful?
+3. How is a Gaussian stable ID mapped back to its physical world entity after a transaction?
+4. What happens if a requested renderer backend was not included in the build?
+5. Which verification criteria were measured on held-out captured observations versus reused calibration data?
