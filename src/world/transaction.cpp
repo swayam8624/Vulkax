@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Validates and stages world edits with snapshots/TransactionReceipt for rollback. VerifiedRewrite
+// only commits changes after evidence gates; arbitrary parameter mutation without prior-state capture
+// would break reversal.
+// Read docs/SOURCE_READING_ORDER.md for the solver → world → verification flow.
+
 #include "vulkax/world/transaction.hpp"
 
 #include <algorithm>
