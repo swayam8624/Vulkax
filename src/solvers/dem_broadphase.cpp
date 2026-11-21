@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Grid/hash spatial candidate generation for discrete-element contact work. Cell coordinates and
+// sphere bounds determine conservative candidate pairs; DEM narrow collision/response stage decides
+// actual contact.
+// Read docs/SOURCE_READING_ORDER.md for the solver → world → verification flow.
+
 #include "vulkax/solvers/dem_broadphase.hpp"
 
 #include <algorithm>
