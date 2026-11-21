@@ -1,3 +1,7 @@
+> **Learn the source:** [READING_ORDER.md](READING_ORDER.md) explains the recommended cross-file order, physical-world and verification APIs, and how model changes connect to the experimental decision. [SOURCE_CATALOG.md](docs/SOURCE_CATALOG.md) links the full implementation and research scripts. Teaching comments are being added incrementally.
+>
+> **Open source:** the existing [Apache-2.0 license](LICENSE) applies to the project's original software; [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) records separately licensed material. You may learn from and develop the software further under those terms. Frozen scientific results and negative findings are not rewritten by documentation changes.
+
 <h1 align="center">Reality Probe</h1>
 
 <h3 align="center">Counterfactual Physical Verification of Captured Worlds</h3>

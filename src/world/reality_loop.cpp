@@ -1,3 +1,9 @@
+// LEARNING MAP — observed/candidate world evaluation and residual objectives.
+// This code reads the world IR and observation roles, evaluates model proposals,
+// and hands evidence to the later accept/refuse verification boundary.
+// Ground-truth observation roles and held-out splits must not leak into fitting.
+// See READING_ORDER.md, src/world/verified_rewrite.cpp and the research ledger.
+
 #include "vulkax/world/reality_loop.hpp"
 
 #include "vulkax/numerics/dense.hpp"

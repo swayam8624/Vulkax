@@ -1,3 +1,9 @@
+// LEARNING MAP — machine-readable verification/trust-state certificate.
+// VerificationCriterion and ResultCertificate aggregate required checks,
+// convergence evidence and serialized audit outputs. The certificate reports
+// what tests established; it cannot establish untested physical correctness.
+// Read include/vulkax/verify/result_certificate.hpp before this definition.
+
 #include "vulkax/verify/result_certificate.hpp"
 
 #include <algorithm>
@@ -46,6 +52,8 @@ bool VerificationCriterion::passed() const noexcept {
     return false;
 }
 
+// Gate trust transitions on mandatory recorded evidence, not solely on a
+// favorable scalar error. Callers must still check the physical protocol.
 bool ResultCertificate::requiredEvidencePasses() const noexcept {
     return std::all_of(criteria.begin(), criteria.end(), [](const VerificationCriterion& criterion) {
         return !criterion.required || criterion.passed();

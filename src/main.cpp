@@ -1,3 +1,9 @@
+// LEARNING MAP — VULKAX command-line integration boundary.
+// This CLI imports backend capability probes, experiment solvers, renderers,
+// captured-world research commands and result validation. It dispatches to
+// subsystem APIs; it is not itself the physical verification algorithm.
+// Follow READING_ORDER.md from public headers to research implementations.
+
 #include "vulkax/backend/backend.hpp"
 #include "vulkax/backend/probe.hpp"
 #include "vulkax/cli/captured_deformable.hpp"
@@ -228,6 +234,8 @@ int problemCommand(int argc, char** argv) {
 
 } // namespace
 
+// Application entrypoint: interpret commands and forward to bounded subsystem
+// APIs. This is separate from the frozen Reality Probe experiment orchestration.
 int main(int argc, char** argv) {
     using namespace vulkax;
     try {
