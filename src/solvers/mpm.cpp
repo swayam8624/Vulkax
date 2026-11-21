@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Material Point Method solver implementation. Follow particle/grid transfer, update and boundary
+// handling from the interface in include/vulkax/solvers/mpm.hpp; research/deformable_world and
+// coupling/mpm_gaussian are downstream consumers.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/solvers/mpm.hpp"
 
 #include <algorithm>
