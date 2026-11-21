@@ -1,3 +1,8 @@
+// SOURCE STUDY NOTE:
+// Experimental captured-world processing beyond core solver execution. Interpret outputs through
+// declared perturbation, correspondence, baselines and independent evidence checks.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/research/captured_reality_loop.hpp"
 
 #include <cmath>
