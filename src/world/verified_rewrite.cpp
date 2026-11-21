@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Proposed world-state rewrite with validation boundaries. Follow corresponding header, transaction
+// APIs and verify/result_certificate; an accepted revision needs independent physical/observational
+// evidence.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/world/verified_rewrite.hpp"
 
 #include <cmath>
