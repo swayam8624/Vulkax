@@ -1,5 +1,7 @@
 # Vulkax source reading order
 
+> **Deep implementation tutorial:** [MPM/DEM solvers, inverse fitting and verified world rewrites](SIMULATION_TO_VERIFIED_WORLD_TUTORIAL.md) explains the active function call path, numerical assumptions, failure conditions and evidence checks. It complements the [linked source reading order](SOURCE_READING_ORDER.md) rather than claiming research completeness.
+
 This guide is a **learning route through implemented components**, not a list of claims that every experiment succeeds. The [README](../README.md), [architecture](ARCHITECTURE.md), [research overview](RESEARCH.md), and [CMakeLists](../CMakeLists.txt) explain the repository's intended scope and compiled targets. Source lives under `include/vulkax/` (interfaces) and `src/` (implementations). Read header and matching implementation together.
 
 ## 1. Understand the simulation foundation
