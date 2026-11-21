@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Interpolates camera position, orientation target, up vector, FOV and exposure through keyframed
+// times. Rendering and captured-observation paths consume its consistent camera coordinates for
+// comparable images.
+// Follow docs/SOURCE_READING_ORDER.md for world and validation integration.
+
 #include "vulkax/render/camera.hpp"
 
 #include <algorithm>
