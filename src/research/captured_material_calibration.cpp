@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Calibrates candidate material parameters against captured free-relaxation observation splits,
+// measuring RMS and maximum position error. Keep fitting/validation splits distinct; otherwise
+// measured replay improvement may be circular.
+// Follow docs/SOURCE_READING_ORDER.md for world and validation integration.
+
 #include "vulkax/research/captured_material_calibration.hpp"
 
 #include <algorithm>
