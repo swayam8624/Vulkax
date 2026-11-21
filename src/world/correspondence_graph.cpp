@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Binds stable Gaussian IDs and physical bindings to WorldIR entities in both directions, supporting
+// observations and renderer-to-simulation attribution. Rebinding must update reverse indexes without
+// leaving stale ownership.
+// Follow docs/SOURCE_READING_ORDER.md for world and validation integration.
+
 #include "vulkax/world/correspondence_graph.hpp"
 
 #include <algorithm>

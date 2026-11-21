@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Nonlinear tetrahedral material deformation calculations. Builds 3x3 deformation/strain quantities
+// and guards singular reference elements; compare linear FEM only in regimes where its approximations
+// apply.
+// Read docs/SOURCE_READING_ORDER.md for the solver → world → verification flow.
+
 #include "vulkax/solvers/hyperelastic_fem.hpp"
 
 #include "vulkax/numerics/dense.hpp"

@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Numerical image comparison checks dimensions and RGBA byte counts then computes
+// per-channel/per-pixel error measures including PSNR. This verifies raster agreement, not physical
+// correctness of the simulated scene.
+// Follow docs/SOURCE_READING_ORDER.md for world and validation integration.
+
 #include "vulkax/render/image_metrics.hpp"
 
 #include <algorithm>

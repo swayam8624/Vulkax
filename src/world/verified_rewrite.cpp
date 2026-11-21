@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Proposed world-state rewrite with validation boundaries. Follow corresponding header, transaction
+// APIs and verify/result_certificate; an accepted revision needs independent physical/observational
+// evidence.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/world/verified_rewrite.hpp"
 
 #include <cmath>
@@ -41,6 +47,11 @@ const char* toString(RewriteVerificationStatus status) noexcept {
     return "rejected";
 }
 
+// This function is a commit gate for proposed world changes. Validate
+// transaction/propagation preconditions, tentatively apply it, then check
+// locality drift, required physical rerun artifacts and independent oracle.
+// On a failed post-application check, rollbackTransaction restores world;
+// status/evidence distinguish rejection from a verified committed rewrite.
 VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
                                             const WorldCorrespondenceGraph& graph,
                                             const WorldTransaction& transaction,
@@ -143,6 +154,9 @@ VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
     return result;
 }
 
+// Serialize the *evidence decision*, not an image or subjective quality
+// verdict: accepted status, rollback, locality bound, rerun and oracle
+// completion, physical tolerance and artifacts for reproducible review.
 void writeVerifiedRewriteEvidenceCsv(std::ostream& output, const VerifiedRewriteResult& result) {
     output << "status,preconditions_satisfied,transaction_applied,world_committed,rollback_performed,"
               "appearance_propagation_required,appearance_propagation_checked,unaffected_position_drift,"

@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Dispatches already-projected splats to enabled native Vulkan or Metal raster paths, checking
+// projected visible-count consistency. Backend build flags select capabilities; absent backends fail
+// explicitly instead of silently using another path.
+// Follow docs/SOURCE_READING_ORDER.md for world and validation integration.
+
 #include "vulkax/render/gaussian_projection.hpp"
 
 #include <stdexcept>

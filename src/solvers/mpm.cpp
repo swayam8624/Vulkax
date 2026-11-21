@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Material Point Method solver implementation. Follow particle/grid transfer, update and boundary
+// handling from the interface in include/vulkax/solvers/mpm.hpp; research/deformable_world and
+// coupling/mpm_gaussian are downstream consumers.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/solvers/mpm.hpp"
 
 #include <algorithm>
@@ -189,6 +195,8 @@ void visitStencil(const MpmParticle& particle, const MpmGridSettings& settings, 
             }
 }
 
+// Private precondition gate: grid must leave room for interpolation/boundary
+// layers, with positive finite cell size. Called before P2G allocates nodes.
 void validateSettings(const MpmGridSettings& settings) {
     if (settings.nx < 3 || settings.ny < 3 || settings.nz < 3)
         throw std::invalid_argument("MPM grid must contain at least 3 nodes per axis");
@@ -234,6 +242,10 @@ double totalMpmMass(const std::vector<MpmParticle>& particles) noexcept {
     return result;
 }
 
+// Particle-to-grid (P2G) stage of Material Point Method: validate grid/
+// material/particle state, clear grid nodes, then distribute per-particle
+// mass, momentum and stress contributions to a local interpolation stencil.
+// Evidence captures mass/momentum diagnostics for conservation checks.
 MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles, const MpmGridSettings& settings,
                                       const MpmMaterial& material, std::vector<MpmGridNode>& grid,
                                       MpmTransferScheme transferScheme, double flipBlend) {
@@ -278,6 +290,10 @@ MpmTransferEvidence particleToGridMpm(const std::vector<MpmParticle>& particles,
     return evidence;
 }
 
+// Full MPM step: P2G transfer -> update grid velocities/forces and
+// boundary constraints -> grid-to-particle (G2P) transfer/update positions
+// and deformation gradients. FLIP/PIC/APIC blending changes numerical
+// dissipation; evidence reports diagnostics, not proof of stable dynamics.
 MpmStepEvidence stepMpm(std::vector<MpmParticle>& particles, const MpmGridSettings& settings,
                         const MpmMaterial& material, double dt, math::Vec3 gravity,
                         MpmTransferScheme transferScheme, double flipBlend) {

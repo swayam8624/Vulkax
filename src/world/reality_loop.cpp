@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Reality-loop orchestration. Compare observed inputs in world/video_observation, world state in
+// world_ir, controlled transactions and verified_rewrite to distinguish prediction from demonstrated
+// correction.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/world/reality_loop.hpp"
 
 #include "vulkax/numerics/dense.hpp"
@@ -264,6 +270,11 @@ SymmetricEigenResult symmetricEigenJacobi(numerics::DenseMatrix matrix) {
 
 } // namespace
 
+// Fit selected WorldIR parameters to *fitting-role* observations by
+// finite-difference residual Jacobians, damped normal equations and
+// backtracking candidate updates. The output records every accepted/
+// rejected optimization step, then evaluates Validation-role evidence
+// separately without using it in the fitting objective.
 RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
                                      const std::vector<ParameterAddress>& parameters,
                                      const ForwardModel& forwardModel,
@@ -386,6 +397,9 @@ RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
     return result;
 }
 
+// Perturb parameters one at a time to estimate objective and weighted
+// prediction sensitivity. It ranks local influence only, not uniqueness
+// of an inferred physical parameter or an experimentally causal effect.
 std::vector<ParameterSensitivity> rankParameterSensitivity(
     const WorldIR& world,
     const std::vector<ParameterAddress>& parameters,
@@ -418,6 +432,9 @@ std::vector<ParameterSensitivity> rankParameterSensitivity(
     return sensitivities;
 }
 
+// Build parameter-scaled residual Jacobian, examine its Gram spectrum
+// and report numerical rank/weak directions. Optimization success and
+// low residual do not imply every parameter can be uniquely identified.
 LocalIdentifiabilityReport analyzeLocalIdentifiability(
     const WorldIR& world,
     const std::vector<ParameterAddress>& parameters,

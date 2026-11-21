@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Serializes result trust states and measured verification criteria. A criterion passes only if
+// measurements/thresholds are finite and relation checks succeed; certificates must link to actual
+// simulation/observation evidence.
+// Follow docs/SOURCE_READING_ORDER.md for world and validation integration.
+
 #include "vulkax/verify/result_certificate.hpp"
 
 #include <algorithm>

@@ -1,3 +1,8 @@
+// SOURCE STUDY NOTE:
+// Gaussian rendering path. Read render/gaussian.hpp with gaussian_projection and gaussian_tiles plus
+// render/camera to see how world-space representation becomes a rasterized observation.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/render/gaussian.hpp"
 
 #include <algorithm>
@@ -183,6 +188,9 @@ void validateSettings(const GaussianRenderSettings& settings) {
 
 } // namespace
 
+// Project Gaussian 3D means/covariances through the camera into a
+// raster-friendly ordered primitive batch. Clipping, opacity and depth
+// order affect compositing; the actual image backend is chosen later.
 GaussianRasterBatch buildGaussianRasterBatch(const gaussian::GaussianCloud& cloud,
                                               const GaussianRenderSettings& settings) {
     validateSettings(settings);
@@ -316,6 +324,9 @@ GaussianRasterBatch buildGaussianRasterBatch(const gaussian::GaussianCloud& clou
     return batch;
 }
 
+// Render one prepared Gaussian batch through a compiled Vulkan or Metal
+// implementation. The OpenGL branch explicitly rejects execution; a
+// BackendKind enum alone does not guarantee available native rendering.
 GaussianRenderResult renderGaussianCloudHeadless(backend::BackendKind backend,
                                                   const gaussian::GaussianCloud& cloud,
                                                   const GaussianRenderSettings& settings) {

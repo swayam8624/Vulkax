@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Explicit scalar-grid diffusion integrator with a timestep stability limit from grid spacing and
+// diffusivity. Demonstrates a numerically necessary failure mode rather than allowing silent unstable
+// stepping.
+// Read docs/SOURCE_READING_ORDER.md for the solver → world → verification flow.
+
 #include "vulkax/solvers/diffusion.hpp"
 
 #include <limits>

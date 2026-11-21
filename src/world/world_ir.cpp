@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Stable WorldIR entities, observations and parameter addresses. Transaction and VerifiedRewrite code
+// refer to these identities; material/constraint/global parameter namespaces must be preserved across
+// edits.
+// Read docs/SOURCE_READING_ORDER.md for the solver → world → verification flow.
+
 #include "vulkax/world/world_ir.hpp"
 
 #include <cmath>

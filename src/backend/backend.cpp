@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Backend dispatch and capability surface. Compare include/vulkax/backend/backend.hpp,
+// backend/probe.hpp and optional Metal/Vulkan probes. The numerical solvers should not assume every
+// backend supports identical operators.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/backend/backend.hpp"
 
 #include <algorithm>
@@ -35,6 +41,10 @@ bool supports(const BackendCapabilities& capability, Feature feature) noexcept {
            capability.features.end();
 }
 
+// Capability-constrained choice, not automatic executable backend creation.
+// Reject unavailable devices/missing required features before scoring
+// platform/native/dedicated-GPU preferences. Callers must still instantiate
+// and test the selected solver/render implementation in this build.
 BackendSelection selectBackend(const std::vector<BackendCapabilities>& candidates,
                                const WorkloadRequirements& requirements, PlatformKind platform) {
     BackendSelection best;

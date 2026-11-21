@@ -1,3 +1,8 @@
+// SOURCE STUDY NOTE:
+// Restricts captured-model world rewrite to supported material parameter edits, reads prior state from
+// TransactionReceipt and verifies against held-out observations before accepting change.
+// Follow docs/SOURCE_READING_ORDER.md for world and validation integration.
+
 #include "vulkax/research/captured_verified_rewrite.hpp"
 
 #include <algorithm>
