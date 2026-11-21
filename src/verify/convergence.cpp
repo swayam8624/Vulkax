@@ -12,6 +12,10 @@
 
 namespace vulkax::verify {
 
+// Numerical three-resolution estimate: infer an observed convergence
+// order/extrapolated value from coarse/medium/fine measurements with a
+// known refinement ratio. Reject nonmonotone or degenerate differences;
+// a visually plausible result is not a valid convergence certificate.
 ConvergenceEstimate estimateThreeLevelConvergence(double coarseValue, double mediumValue,
                                                     double fineValue, double refinementRatio,
                                                     double safetyFactor) {
