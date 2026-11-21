@@ -20,6 +20,9 @@ struct PairForce {
     bool contact{false};
 };
 
+// Pairwise contact law: compute overlap from radii and displacement,
+// then normal/damping/friction response for interacting particles. The
+// caller's O(n^2) pair loop is separate from any optimized broadphase.
 PairForce contactForce(const DemParticle& a, const DemParticle& b, const DemConfig& config) {
     const math::Vec3 displacement = b.position - a.position;
     const double distance = math::length(displacement);
@@ -63,6 +66,10 @@ void resolveWalls(DemParticle& particle, const DemBox& box, const DemConfig& con
 
 } // namespace
 
+// DEM time-step driver: initialize gravity forces, visit every unordered
+// particle pair, apply contact interactions, integrate and handle walls.
+// This direct all-pairs implementation scales quadratically; do not cite
+// broadphase performance for this function without an explicit integration.
 void advanceDem(std::vector<DemParticle>& particles, const DemBox& box, const DemConfig& config,
                 std::size_t steps) {
     if (config.dt <= 0.0 || config.normalStiffness < 0.0 || config.normalDamping < 0.0 ||
@@ -98,6 +105,9 @@ void advanceDem(std::vector<DemParticle>& particles, const DemBox& box, const De
     }
 }
 
+// Post-step diagnostics: kinetic/potential energy plus number and maximum
+// depth of overlapping particle pairs. A low overlap is not by itself
+// proof of physical correctness, convergence or energy conservation.
 DemDiagnostics measureDem(const std::vector<DemParticle>& particles, const DemBox& box,
                           const DemConfig& config) {
     DemDiagnostics diagnostics;
