@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Reality-loop orchestration. Compare observed inputs in world/video_observation, world state in
+// world_ir, controlled transactions and verified_rewrite to distinguish prediction from demonstrated
+// correction.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/world/reality_loop.hpp"
 
 #include "vulkax/numerics/dense.hpp"
