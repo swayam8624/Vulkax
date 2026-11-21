@@ -40,6 +40,10 @@ std::string capturedObservationId(const capture::CapturedMarkerObservation& obse
     return observationId(observation.markerId, observation.particleId, observation.time, observation.split);
 }
 
+// Import physically measured marker trajectories with durable IDs and
+// explicit Initialization/Fit/Validation split roles. Check duplicates,
+// entity references and uncertainty so fitting cannot silently overwrite
+// validation ground truth or fuse incompatible observation spaces.
 void appendCapturedObservations(world::WorldIR& world,
                                 const capture::CapturedDeformableDataset& dataset,
                                 const CapturedObservationImportOptions& options) {
@@ -106,6 +110,10 @@ CapturedMpmForwardModel::CapturedMpmForwardModel(
     }
 }
 
+// Read proposed stiffness/Poisson/density parameters from WorldIR, run
+// the captured relaxation forward simulation, then emit predictions with
+// stable marker/particle/time/split IDs in physical SI units. RealityLoop
+// compares these against the corresponding independent observations.
 std::vector<world::ObservationPrediction> CapturedMpmForwardModel::operator()(
     const world::WorldIR& candidate) const {
     NonlinearDeformableWorldSettings settings = settings_;
