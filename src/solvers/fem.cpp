@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Linear elastic tetrahedral FEM assembly. Computes element stiffness from physical material
+// parameters and reference geometry; numerics DenseMatrix handles assembled systems while
+// verification checks convergence and plausible displacement.
+// Read docs/SOURCE_READING_ORDER.md for the solver → world → verification flow.
+
 #include "vulkax/solvers/fem.hpp"
 
 #include "vulkax/numerics/dense.hpp"
