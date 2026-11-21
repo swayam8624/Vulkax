@@ -1,5 +1,7 @@
 <h1 align="center">Reality Probe</h1>
 
+> **Study the source:** The [linked source reading order](docs/SOURCE_READING_ORDER.md) follows numerical foundations, solvers, world observations, rendering, verified rewrites and research evidence. It distinguishes implemented API paths from experimental hypotheses, and complements the existing [architecture](docs/ARCHITECTURE.md) and [research notes](docs/RESEARCH.md).
+
 <h3 align="center">Counterfactual Physical Verification of Captured Worlds</h3>
 
 <p align="center">
