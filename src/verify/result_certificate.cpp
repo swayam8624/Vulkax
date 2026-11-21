@@ -1,3 +1,4 @@
+// TEACHING MAP: VERIFICATION STATE MACHINE: Public API is vulkax/verify/result_certificate.hpp. Solvers/experiments provide measurements, this file checks thresholds and serializes bounded trust states. Verified means configured required gates passed, not universal physical correctness. Scientific validation and frozen experimental decisions are separate under research/validation.
 #include "vulkax/verify/result_certificate.hpp"
 
 #include <algorithm>
@@ -37,6 +38,7 @@ const char* toString(TrustState state) noexcept {
     return "unknown";
 }
 
+// Fail closed on NaN/inf; the configured threshold relation sets the comparison direction.
 bool VerificationCriterion::passed() const noexcept {
     if (!std::isfinite(measured) || !std::isfinite(threshold)) return false;
     switch (relation) {
