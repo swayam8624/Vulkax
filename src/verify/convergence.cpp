@@ -1,3 +1,8 @@
+// SOURCE STUDY NOTE:
+// Numerical convergence evaluation. Use verify/convergence.hpp and experiment/design.hpp to understand
+// what is measured and how solver correctness differs from render quality or runtime speed.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/verify/convergence.hpp"
 
 #include <algorithm>
