@@ -648,3 +648,12 @@ own terms. The current attribution and redistribution boundaries are recorded in
 For paper writing, start with the
 [SIGGRAPH manuscript dossier](research/paper_data/MANUSCRIPT_DOSSIER_SIGGRAPH.md)
 and the [manuscript asset index](research/paper_data/MANUSCRIPT_ASSET_INDEX.csv).
+
+
+## Learn this repository from source
+
+The [Teaching source map](docs/SOURCE_READING_ORDER.md) gives a linked reading sequence, subsystem interactions, public API boundaries, and verification questions. Begin with the public contract and entry point, trace one real operation through its implementation, and use the linked tests to distinguish expected behavior from observed evidence.
+
+**Current scope and limitations.** Read the locked experimental results alongside negative experiments. The IRIS pendulum finding does not invalidate the failed free-fall verification, and 'verified' is scoped to configured acceptance criteria.
+
+**Learning and reuse.** Project-authored code is intended for study, modification and further development under the repository's applicable license. See [LICENSE](LICENSE) where present. Third-party libraries, borrowed source, assets, test data, models and media remain under their own terms; do not treat a top-level license as permission to redistribute restricted content.
