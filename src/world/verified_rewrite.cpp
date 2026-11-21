@@ -1,3 +1,9 @@
+// LEARNING MAP — physical-edit verification as a separate transaction.
+// A candidate revision may improve observational fit yet worsen untouched
+// physical behavior. The acceptance API distinguishes SUPPORT, VETO and
+// UNRESOLVED rather than treating any residual decrease as safe acceptance.
+// Read src/world/reality_loop.cpp and the frozen experiment protocol first.
+
 #include "vulkax/world/verified_rewrite.hpp"
 
 #include <cmath>
