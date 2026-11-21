@@ -1,3 +1,10 @@
+// LEARNING MAP — Dark-Field Counterfactual Spectroscopy math/response analysis.
+// The public API is include/vulkax/research/dark_field_counterfactual.hpp.
+// This module builds witness combinations from probe responses; it does NOT
+// prove that a fitted physical world is universally correct. Measured sensor
+// protocols, evidence thresholds and SUPPORT/VETO/UNRESOLVED decisions are
+// evaluated separately in research/validation and the world rewrite path.
+
 #include "vulkax/research/dark_field_counterfactual.hpp"
 
 #include <algorithm>
