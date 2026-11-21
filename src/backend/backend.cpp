@@ -1,3 +1,9 @@
+// SOURCE STUDY NOTE:
+// Backend dispatch and capability surface. Compare include/vulkax/backend/backend.hpp,
+// backend/probe.hpp and optional Metal/Vulkan probes. The numerical solvers should not assume every
+// backend supports identical operators.
+// Read docs/SOURCE_READING_ORDER.md for preceding and dependent layers.
+
 #include "vulkax/backend/backend.hpp"
 
 #include <algorithm>
