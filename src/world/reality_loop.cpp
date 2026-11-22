@@ -1,3 +1,18 @@
+// TEACHING MODULE: The reality loop fits a candidate WorldIR hypothesis
+// against selected observations using a ForwardModel and weighted residuals.
+// Role-tagged observations distinguish fitting/calibration from withheld
+// validation. A lower fitting objective is *not* proof of improved
+// counterfactual physics or out-of-distribution prediction.
+//
+// Finite-difference columns form a local sensitivity/Jacobian model;
+// damped normal equations propose numerical updates. Identifiability
+// analysis examines whether parameters are distinguishable at the
+// measured observation settings. It must not be confused with the
+// independent physical verifier in verified_rewrite.cpp.
+//
+// The transaction/verification layer decides whether a proposed world
+// edit can be accepted. These fitting routines do not themselves
+// authorize overwriting a frozen scientific evidence package.
 #include "vulkax/world/reality_loop.hpp"
 
 #include "vulkax/numerics/dense.hpp"
@@ -264,6 +279,9 @@ SymmetricEigenResult symmetricEigenJacobi(numerics::DenseMatrix matrix) {
 
 } // namespace
 
+// Optimize the supplied hypothesis on the selected observation roles.
+ // Caller must reserve independent data/perturbations for testing;
+ // minimizing training residuals alone can overfit a wrong mechanism.
 RealityLoopResult fitWorldHypothesis(WorldIR initialWorld,
                                      const std::vector<ParameterAddress>& parameters,
                                      const ForwardModel& forwardModel,
@@ -418,6 +436,9 @@ std::vector<ParameterSensitivity> rankParameterSensitivity(
     return sensitivities;
 }
 
+// Build a parameter-scaled local Jacobian and examine its spectrum:
+ // near-null modes signal that several models can explain the same
+ // observations. This is local and depends on parameter scaling/data.
 LocalIdentifiabilityReport analyzeLocalIdentifiability(
     const WorldIR& world,
     const std::vector<ParameterAddress>& parameters,
