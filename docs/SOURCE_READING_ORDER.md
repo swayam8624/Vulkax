@@ -1,5 +1,7 @@
 # Teaching source map — Vulkax
 
+**Recovered deep tutorial:** [simulation, rendering and verified world edits](SIMULATION_TO_VERIFIED_WORLD_TUTORIAL.md) — source-linked teaching, not a verified test result.
+
 **Historical full source inventory:** [455 linked first-party source/build paths](SOURCE_CATALOG.md) (November 21, 2026 snapshot; verify changed paths against current main).
 
 
