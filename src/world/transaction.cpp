@@ -41,6 +41,9 @@ void appendUnique(std::vector<T>& values, const T& value) {
     return stream.str();
 }
 
+// Save old authored physical material parameters for the affected stable
+// Entity ID before tentative edits, so rollback restores actual pre-edit
+// state rather than inventing defaults.
 void snapshotEntityMaterial(const WorldIR& world, TransactionReceipt& receipt, EntityId entityId) {
     if (std::find_if(receipt.previousMaterials.begin(), receipt.previousMaterials.end(),
                      [entityId](const EntityMaterialSnapshot& snapshot) { return snapshot.entity == entityId; }) != receipt.previousMaterials.end())
@@ -50,6 +53,9 @@ void snapshotEntityMaterial(const WorldIR& world, TransactionReceipt& receipt, E
     receipt.previousMaterials.push_back({entityId, entity->materialParameters});
 }
 
+// Snapshot constraint parameters independently of material and Gaussian
+// position; a physical rewrite may change several model domains and must
+// restore each one on veto.
 void snapshotEntityConstraints(const WorldIR& world, TransactionReceipt& receipt, EntityId entityId) {
     if (std::find_if(receipt.previousConstraints.begin(), receipt.previousConstraints.end(),
                      [entityId](const EntityConstraintSnapshot& snapshot) { return snapshot.entity == entityId; }) != receipt.previousConstraints.end())
@@ -75,6 +81,10 @@ void snapshotGaussian(const WorldIR& world,
 // Detect stale expectedRevision, duplicate provenance IDs, bad entity
 // or correspondence references and nonfinite requested parameters
 // *before* touching the authoritative WorldIR.
+// Check expected WorldIR revision, correspondence-graph integrity and all
+// typed edit targets before mutation. Missing Gaussian stable IDs, nonfinite
+// deltas and invalid physical bindings are explicit errors, not warnings to
+// ignore.
 TransactionValidation validateTransaction(const WorldIR& world,
                                           const WorldCorrespondenceGraph& graph,
                                           const WorldTransaction& transaction) {
@@ -169,6 +179,10 @@ TransactionValidation validateTransaction(const WorldIR& world,
  // publish the candidate and its revision/provenance only on success.
  // The receipt is later consumed by executeVerifiedRewrite on a failed
  // physical gate; this is not a filesystem commit.
+// Build a receipt of touched stable Gaussian IDs and original
+// material/constraint values, mutate a copy of WorldIR, advance revision and
+// append provenance, then publish by move. This transaction is in-memory; it
+// does not atomically update external solver/artifact files.
 TransactionReceipt applyTransaction(WorldIR& world,
                                     const WorldCorrespondenceGraph& graph,
                                     const WorldTransaction& transaction) {
@@ -224,6 +238,10 @@ TransactionReceipt applyTransaction(WorldIR& world,
 
 // Revision-guarded recovery of the specific applied transaction.
 // Applying a receipt after another intervening revision is an error.
+// Rollback is revision-guarded: only the exact tentative revision identified
+// by the receipt may be restored. Reapply saved
+// positions/materials/constraints and prior revision so a later unrelated
+// rewrite is never overwritten accidentally.
 void rollbackTransaction(WorldIR& world, const TransactionReceipt& receipt) {
     if (world.revision != receipt.revisionAfter)
         throw std::runtime_error("transaction rollback requires the receipt to match the current world revision");
@@ -245,6 +263,9 @@ void rollbackTransaction(WorldIR& world, const TransactionReceipt& receipt) {
     world.revision = receipt.revisionBefore;
 }
 
+// Measure untouched-region displacement by matching stable Gaussian IDs in
+// before/after clouds and excluding touched IDs. Vector position/index
+// changes from reordering must not be mistaken for physical drift.
 double unaffectedPositionDrift(const gaussian::GaussianCloud& before,
                                const gaussian::GaussianCloud& after,
                                const std::vector<gaussian::GaussianId>& touchedGaussians) {
