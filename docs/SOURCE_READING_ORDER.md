@@ -13,6 +13,8 @@ Read this as an experiment-driven research system: implementation is distinct fr
 
 Read each phase in order. Every link goes to a source file or directory in this repository. For a directory, inspect its public interface and then its implementation files. After each phase, identify the caller, the state it owns, the inputs it validates, and its observable outputs.
 
+**Numerical worked exercise:** [WorldIR revision receipts, untouched splat drift, three-level Richardson convergence and mandatory oracle criteria](TRANSACTION_TO_CONVERGENCE_AND_TRUST_LAB.md). Frozen negative and unresolved outcomes remain part of scientific provenance.
+
 ## 1. Scientific claims
 
 1. [`README.md`](../README.md)
