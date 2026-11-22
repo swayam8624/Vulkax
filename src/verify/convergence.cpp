@@ -1,3 +1,14 @@
+// TEACHING MODULE: Three-resolution convergence estimate for a scalar
+// physical observable. Differences between coarse/medium/fine predictions
+// estimate an empirical order p = log(|d_coarse/d_fine|)/log(r), then a
+// Richardson-style limit and safety-inflated relative error estimate.
+//
+// The calculation requires compatible quantities and refinement ratio
+// r > 1, nonzero and consistently signed consecutive differences, and a
+// nonsingular extrapolation denominator. A returned number is conditional
+// on the asymptotic-convergence assumption; it does not prove the solver
+// converges for all scenes or that video sampling error is negligible.
+// Scientific freeze evidence must track actual resolution/timestep inputs.
 #include "vulkax/verify/convergence.hpp"
 
 #include <algorithm>
@@ -7,6 +18,9 @@
 
 namespace vulkax::verify {
 
+// Estimate observed order and extrapolated fine-grid value. The test
+// should include nonconvergent/oscillatory triples and compare against
+// an analytical solution where available.
 ConvergenceEstimate estimateThreeLevelConvergence(double coarseValue, double mediumValue,
                                                     double fineValue, double refinementRatio,
                                                     double safetyFactor) {
