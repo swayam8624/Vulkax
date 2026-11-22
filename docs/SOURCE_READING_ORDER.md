@@ -4,6 +4,11 @@
 
 ## How to use this guide
 
+**Recommended worked example:** [From a fitted WorldIR hypothesis to a
+verified or rolled-back counterfactual rewrite](VERIFIED_REWRITE_LEARNING_PATH.md).
+It follows real source functions, trust gates and numerical convergence while
+preserving the negative and unresolved frozen research outcomes.
+
 Read this as an experiment-driven research system: implementation is distinct from scientific inference. The September 2026 scientific snapshot and later validation must not be conflated.
 
 Read each phase in order. Every link goes to a source file or directory in this repository. For a directory, inspect its public interface and then its implementation files. After each phase, identify the caller, the state it owns, the inputs it validates, and its observable outputs.
