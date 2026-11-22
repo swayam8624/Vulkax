@@ -54,6 +54,9 @@ const char* toString(TrustState state) noexcept {
 // Fail closed on NaN/inf; the configured threshold relation sets the comparison direction.
 // Finite measurements only: threshold comparison direction must be
 // declared by the criterion. A NaN never certifies a bound.
+// A criterion compares one *finite* observed scalar against a configured
+// threshold using a declared relation. NaN/inf are never successful evidence;
+// the direction of comparison matters as much as the number.
 bool VerificationCriterion::passed() const noexcept {
     if (!std::isfinite(measured) || !std::isfinite(threshold)) return false;
     switch (relation) {
@@ -63,6 +66,9 @@ bool VerificationCriterion::passed() const noexcept {
     return false;
 }
 
+// Only criteria flagged Required can veto a trust decision. Optional
+// measurements may still be reported for diagnosis, but their presence must
+// not be silently counted as evidence for mandatory physical claims.
 bool ResultCertificate::requiredEvidencePasses() const noexcept {
     return std::all_of(criteria.begin(), criteria.end(), [](const VerificationCriterion& criterion) {
         return !criterion.required || criterion.passed();
@@ -72,6 +78,9 @@ bool ResultCertificate::requiredEvidencePasses() const noexcept {
 // No required criteria -> Preview, missing/failed required evidence ->
 // Rejected or Converging, all required checks plus convergence-complete ->
 // Verified. A caller's 'complete' flag must itself be evidenced in tests.
+// Trust states depend on both required numeric evidence and an explicit
+// convergence-study completion flag. A passing coarse simulation cannot be
+// labeled Verified merely because its residual is visually small.
 void ResultCertificate::updateTrustState(bool convergenceStudyComplete) noexcept {
     const bool hasRequired = std::any_of(criteria.begin(), criteria.end(), [](const auto& criterion) {
         return criterion.required;
@@ -87,6 +96,9 @@ void ResultCertificate::updateTrustState(bool convergenceStudyComplete) noexcept
     state = hasRequired ? TrustState::Converging : TrustState::Preview;
 }
 
+// Write a reproducible evidence record with numeric precision, trust state,
+// backend/device provenance and individual criterion outcomes. JSON
+// serialization is reporting, not an independent scientific validity gate.
 std::string ResultCertificate::toJson() const {
     std::ostringstream stream;
     stream << std::setprecision(17);
