@@ -1,3 +1,17 @@
+// TEACHING MODULE: WorldIR is persistent scientific state; a transaction
+// includes stable ID/author/revision expectations, typed edits and
+// correspondence-graph constraints. validateTransaction checks referential
+// integrity and edit preconditions without publishing a new world revision.
+//
+// applyTransaction prepares a receipt containing original Gaussian
+// positions/material/constraint parameters, mutates a copied candidate,
+// increments revision and appends provenance, then publishes by move.
+// rollbackTransaction requires an exact expected revision and restores
+// the captured state. This is an in-memory transaction boundary; external
+// file outputs/solver processes need separate recovery policies.
+//
+// Untouched-region drift uses Gaussian stable IDs, not positional vector
+// indices: reordering a cloud should not change the scientific referent.
 #include "vulkax/world/transaction.hpp"
 
 #include <algorithm>
@@ -58,6 +72,9 @@ void snapshotGaussian(const WorldIR& world,
 
 } // namespace
 
+// Detect stale expectedRevision, duplicate provenance IDs, bad entity
+// or correspondence references and nonfinite requested parameters
+// *before* touching the authoritative WorldIR.
 TransactionValidation validateTransaction(const WorldIR& world,
                                           const WorldCorrespondenceGraph& graph,
                                           const WorldTransaction& transaction) {
@@ -148,6 +165,10 @@ TransactionValidation validateTransaction(const WorldIR& world,
     return validation;
 }
 
+// Snapshot all affected mutable fields, apply typed edits to a copy,
+ // publish the candidate and its revision/provenance only on success.
+ // The receipt is later consumed by executeVerifiedRewrite on a failed
+ // physical gate; this is not a filesystem commit.
 TransactionReceipt applyTransaction(WorldIR& world,
                                     const WorldCorrespondenceGraph& graph,
                                     const WorldTransaction& transaction) {
@@ -201,6 +222,8 @@ TransactionReceipt applyTransaction(WorldIR& world,
     return receipt;
 }
 
+// Revision-guarded recovery of the specific applied transaction.
+// Applying a receipt after another intervening revision is an error.
 void rollbackTransaction(WorldIR& world, const TransactionReceipt& receipt) {
     if (world.revision != receipt.revisionAfter)
         throw std::runtime_error("transaction rollback requires the receipt to match the current world revision");
