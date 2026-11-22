@@ -16,6 +16,8 @@
   <img src="https://img.shields.io/badge/Linux-Vulkan-A41E22?logo=vulkan" alt="Vulkan"/>
 </p>
 
+**Learn Reality Probe from source:** [Full file-reading order](docs/SOURCE_READING_ORDER.md) · [Worked counterfactual rewrite guide](docs/VERIFIED_REWRITE_LEARNING_PATH.md). The guide distinguishes observation fitting from independent physical verification and preserves reported negative results.
+
 ## Project status
 
 The original research program is frozen at the 2026-09-21 scientific snapshot. A separate publication-validation extension began on 2026-09-23 to strengthen verification, validation, uncertainty accounting, and external testing without changing the frozen evidence.
