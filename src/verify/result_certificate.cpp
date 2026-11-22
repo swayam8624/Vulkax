@@ -1,4 +1,17 @@
-// TEACHING MAP: VERIFICATION STATE MACHINE: Public API is vulkax/verify/result_certificate.hpp. Solvers/experiments provide measurements, this file checks thresholds and serializes bounded trust states. Verified means configured required gates passed, not universal physical correctness. Scientific validation and frozen experimental decisions are separate under research/validation.
+// TEACHING MAP: Convert numeric measurements into *configured* trust
+// states. Every required criterion has an explicit direction and threshold;
+// NaN/inf comparisons fail rather than silently passing. A Verified status
+// requires required evidence and an indicated complete convergence study,
+// not just a visually plausible rendering.
+//
+// Criterion passing is local to those measured quantities and tolerances.
+// It cannot prove model identifiability, out-of-sample prediction, or
+// numerical convergence in an untested regime. The separate world
+// verified-rewrite transaction may require an independent physical oracle
+// beyond this generic certificate's numeric gates.
+//
+// Preserve freeze-tag scientific decisions and carry validation failures
+// into results rather than rebranding them as passes.
 #include "vulkax/verify/result_certificate.hpp"
 
 #include <algorithm>
@@ -39,6 +52,8 @@ const char* toString(TrustState state) noexcept {
 }
 
 // Fail closed on NaN/inf; the configured threshold relation sets the comparison direction.
+// Finite measurements only: threshold comparison direction must be
+// declared by the criterion. A NaN never certifies a bound.
 bool VerificationCriterion::passed() const noexcept {
     if (!std::isfinite(measured) || !std::isfinite(threshold)) return false;
     switch (relation) {
@@ -54,6 +69,9 @@ bool ResultCertificate::requiredEvidencePasses() const noexcept {
     });
 }
 
+// No required criteria -> Preview, missing/failed required evidence ->
+// Rejected or Converging, all required checks plus convergence-complete ->
+// Verified. A caller's 'complete' flag must itself be evidenced in tests.
 void ResultCertificate::updateTrustState(bool convergenceStudyComplete) noexcept {
     const bool hasRequired = std::any_of(criteria.begin(), criteria.end(), [](const auto& criterion) {
         return criterion.required;
