@@ -1,3 +1,18 @@
+// TEACHING MODULE: A verified world rewrite is a *transaction plus
+// independent evidence gates*, not simply better image fitting.
+//
+// validateTransaction checks provenance/graph and edit preconditions;
+// applyTransaction edits a candidate WorldIR and records a rollback
+// receipt; appearance locality is checked against untouched Gaussian IDs.
+// When policy requires it, the caller's PhysicalRewriteVerifier must
+// supply an actual rerun, observable/tolerance evidence, artifact and
+// independent oracle decision. Failure rolls the world back.
+//
+// RewriteVerificationStatus::Verified means those configured gates passed
+// for the supplied experiment. It is not a universal claim of physical
+// correctness, generalization to free fall or validity across timesteps.
+// Publication decisions live in research/validation and frozen evidence;
+// keep the 2026-09-21 paper snapshot separate from later experiments.
 #include "vulkax/world/verified_rewrite.hpp"
 
 #include <cmath>
@@ -41,6 +56,10 @@ const char* toString(RewriteVerificationStatus status) noexcept {
     return "rejected";
 }
 
+// Execute a gated transaction. Validate and require verifier *before*
+// mutation, collect physical evidence after tentative application, and
+// commit only when all mandatory locality/appearance/physics/oracle gates
+// pass. Otherwise restore the prior revision from its receipt.
 VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
                                             const WorldCorrespondenceGraph& graph,
                                             const WorldTransaction& transaction,
@@ -70,6 +89,9 @@ VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
         return result;
     }
 
+    // Preserve pre-edit geometry for the untouched-region drift test.
+    // This is separate from comparing the physical observable to its
+    // independent oracle and from checking ordinary RGB appearance.
     const gaussian::GaussianCloud appearanceBefore = world.appearance;
     result.receipt = applyTransaction(world, graph, transaction);
     result.evidence.transactionApplied = true;
@@ -137,6 +159,9 @@ VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
             result.evidence.rejectionReason = "rewrite verification failed";
     }
 
+    // A failed post-edit check should not leave an accepted world
+    // revision behind. The receipt guards the expected revision and
+    // restores touched state; replay/provenance must agree.
     rollbackTransaction(world, result.receipt);
     result.rollbackPerformed = true;
     result.evidence.worldCommitted = false;
