@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/Linux-Vulkan-A41E22?logo=vulkan" alt="Vulkan"/>
 </p>
 
-**Learn Reality Probe from source:** [Full file-reading order](docs/SOURCE_READING_ORDER.md) · [Worked counterfactual rewrite guide](docs/VERIFIED_REWRITE_LEARNING_PATH.md). The guide distinguishes observation fitting from independent physical verification and preserves reported negative results.
+**Learn Reality Probe from source:** [Full file-reading order](docs/SOURCE_READING_ORDER.md) · [Worked counterfactual rewrite guide](docs/VERIFIED_REWRITE_LEARNING_PATH.md) · [Numerical transaction, convergence and trust-state laboratory](docs/TRANSACTION_TO_CONVERGENCE_AND_TRUST_LAB.md). The guide distinguishes observation fitting from independent physical verification and preserves reported negative results.
 
 ## Project status
 
