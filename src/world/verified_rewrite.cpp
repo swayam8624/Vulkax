@@ -60,6 +60,10 @@ const char* toString(RewriteVerificationStatus status) noexcept {
 // mutation, collect physical evidence after tentative application, and
 // commit only when all mandatory locality/appearance/physics/oracle gates
 // pass. Otherwise restore the prior revision from its receipt.
+// A verified rewrite is a tentative WorldIR transaction with multiple
+// evidence gates, not an optimization that commits whenever image fit
+// improves. Validate edit and verifier availability before mutation, then
+// measure untouched drift, physical rerun and required independent oracle.
 VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
                                             const WorldCorrespondenceGraph& graph,
                                             const WorldTransaction& transaction,
@@ -92,6 +96,9 @@ VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
     // Preserve pre-edit geometry for the untouched-region drift test.
     // This is separate from comparing the physical observable to its
     // independent oracle and from checking ordinary RGB appearance.
+// Preserve pre-edit Gaussian state *separately* from physical observable
+// evidence, allowing untouched-region drift to be measured by stable IDs
+// after applying the tentative world change.
     const gaussian::GaussianCloud appearanceBefore = world.appearance;
     result.receipt = applyTransaction(world, graph, transaction);
     result.evidence.transactionApplied = true;
@@ -100,6 +107,10 @@ VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
     result.evidence.unaffectedPositionDrift =
         unaffectedPositionDrift(appearanceBefore, world.appearance, result.receipt.touchedGaussians);
 
+// An injected PhysicalRewriteVerifier reruns the changed hypothesis and
+// supplies explicit completed/passed flags, observable error/tolerance,
+// independent oracle decision and attributable artifact. An exception is
+// recorded as a rejection, never treated as support.
     if (result.validation.requiresPhysicalRerun) {
         try {
             const auto physical = verifier(world, graph, transaction, result.receipt);
@@ -118,6 +129,9 @@ VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
         }
     }
 
+// Locality requires a finite maximum untouched Gaussian position drift not
+// exceeding configured tolerance. Appearance propagation, physics and oracle
+// have separate Boolean gates; one passing cannot substitute for another.
     const bool localityPassed =
         std::isfinite(result.evidence.unaffectedPositionDrift) &&
         result.evidence.unaffectedPositionDrift <= policy.maxUnaffectedPositionDrift;
@@ -140,6 +154,9 @@ VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
         !result.validation.requiresIndependentOracle ||
         (result.evidence.independentOracleCompleted && result.evidence.independentOraclePassed);
 
+// Only a conjunction of all *required* gates marks this configured
+// experimental rewrite Verified. It does not establish universal physical
+// correctness, parameter identifiability or transfer to unseen regimes.
     if (result.evidence.rejectionReason.empty() && localityPassed && appearancePassed && physicalPassed && oraclePassed) {
         result.status = RewriteVerificationStatus::Verified;
         result.evidence.worldCommitted = true;
@@ -162,12 +179,18 @@ VerifiedRewriteResult executeVerifiedRewrite(WorldIR& world,
     // A failed post-edit check should not leave an accepted world
     // revision behind. The receipt guards the expected revision and
     // restores touched state; replay/provenance must agree.
+// A failed post-edit gate must not leave the proposed world revision
+// published. The receipt checks exact revision and restores touched data;
+// retain the rejection/evidence record even though the world is rolled back.
     rollbackTransaction(world, result.receipt);
     result.rollbackPerformed = true;
     result.evidence.worldCommitted = false;
     return result;
 }
 
+// Export status plus traceable evidence fields for analysis. Writing a CSV
+// record is not a physical oracle; downstream paper claims must match frozen
+// raw measurements and their provenance.
 void writeVerifiedRewriteEvidenceCsv(std::ostream& output, const VerifiedRewriteResult& result) {
     output << "status,preconditions_satisfied,transaction_applied,world_committed,rollback_performed,"
               "appearance_propagation_required,appearance_propagation_checked,unaffected_position_drift,"
